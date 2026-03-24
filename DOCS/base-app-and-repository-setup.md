@@ -6,7 +6,7 @@ This document describes how we intend to lay out the **repository**, **Docker Co
 - [`engineering-guidelines.md`](engineering-guidelines.md) — `backend/` layout, domains, thin routes, dedicated **test DB**, layering.
 - [`senior-standards.md`](senior-standards.md) — typing, migrations, tests, logging, file size.
 
-**Status:** specification only. Implementation can follow this doc in a later change.
+**Status:** the repository implements this specification (root `Makefile`, `docker-compose.yml`, `backend/`). Treat this file as the canonical description of that layout.
 
 ---
 
@@ -175,3 +175,4 @@ backend/
 | Date | Change |
 |------|--------|
 | 2026-03-24 | Initial specification (documentation only; implementation reverted per team request) |
+| 2026-03-24 | Base app scaffold added: Compose, Makefile, `backend/` package, Alembic, tests, mypy/ruff |

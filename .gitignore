@@ -1,0 +1,126 @@
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+wheelhouse/
+pip-log.txt
+
+# Virtual environments (any name)
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# Packaging / build
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+parts/
+sdist/
+var/
+wheels/
+.installed.cfg
+MANIFEST
+
+# Unit tests & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+nosetests.xml
+
+# Type checkers & linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pytype/
+.pyre/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# pyenv installer stub (optional; remove if you commit local python version)
+# .python-version
+
+# Celery / task queues (if added later)
+celerybeat-schedule
+celerybeat.pid
+
+# --- Frontend (when you add Node / Next / Vite / etc.) ---
+node_modules/
+.npm
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.local
+dist/
+dist-ssr/
+*.tsbuildinfo
+.next/
+out/
+.nuxt/
+.svelte-kit/
+.parcel-cache/
+.vite/
+.turbo/
+.vercel/
+
+# --- Docker & local data ---
+*.log
+
+# --- IDE & editors (personal/machine-specific) ---
+.idea/
+*.swp
+*.swo
+*~
+
+# VS Code — uncomment if you do not commit shared workspace settings:
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# --- OS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Project artifacts ---
+artifacts/
+
+# --- Misc ---
+*.orig
+.cache/
+tmp/
+temp/
