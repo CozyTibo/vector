@@ -11,6 +11,24 @@ type MeResponse = {
   role: string;
 };
 
+type GithubConnectorDetails = {
+  installation_id: number | null;
+  account_login: string | null;
+  account_type: string | null;
+};
+
+type GithubConnectorStatusItem = {
+  provider: "github";
+  display_name: string;
+  connector_configured: boolean;
+  connected: boolean;
+  details: GithubConnectorDetails | null;
+};
+
+type ConnectorsResponse = {
+  items: GithubConnectorStatusItem[];
+};
+
 async function fetchHealthLive(base: string): Promise<{ status: string }> {
   const res = await fetch(`${base}/health/live`);
   if (!res.ok) {
@@ -28,6 +46,30 @@ async function fetchMe(base: string): Promise<MeResponse | null> {
     throw new Error(`HTTP ${res.status}`);
   }
   return res.json() as Promise<MeResponse>;
+}
+
+async function fetchConnectors(base: string): Promise<ConnectorsResponse> {
+  const res = await fetch(`${base}/connectors`, { credentials: "include" });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json() as Promise<ConnectorsResponse>;
+}
+
+function githubConnectorRow(
+  data: ConnectorsResponse | undefined,
+): GithubConnectorStatusItem | undefined {
+  return data?.items.find((i) => i.provider === "github");
+}
+
+async function disconnectGithub(base: string): Promise<void> {
+  const res = await fetch(`${base}/connectors/github`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await readErrorDetail(res));
+  }
 }
 
 async function readErrorDetail(res: Response): Promise<string> {
@@ -50,6 +92,7 @@ export default function App() {
   const queryClient = useQueryClient();
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
   const [localNotice, setLocalNotice] = useState<string | null>(null);
+  const [githubNotice, setGithubNotice] = useState<string | null>(null);
 
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
@@ -71,7 +114,36 @@ export default function App() {
     if (err || params.get("oauth_ok")) {
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, []);
+    const gh = params.get("github_connected");
+    const ghErr = params.get("github_error");
+    if (gh === "1") {
+      setGithubNotice(null);
+      void queryClient.invalidateQueries({ queryKey: ["connectors", apiBase] });
+    } else if (ghErr === "state") {
+      setGithubNotice("GitHub connect failed (invalid or expired state). Try again.");
+    } else if (ghErr === "oauth") {
+      setGithubNotice("GitHub OAuth failed (could not exchange code). Check app credentials.");
+    } else if (ghErr === "api") {
+      setGithubNotice("GitHub API error while reading installation. Check app private key / id.");
+    } else if (ghErr === "conflict") {
+      setGithubNotice(
+        "This GitHub installation is already linked to another Vector workspace.",
+      );
+    } else if (ghErr === "no_installation") {
+      setGithubNotice("GitHub did not return installation_id. Try install + user OAuth again.");
+    } else if (ghErr === "forbidden") {
+      setGithubNotice("Session not valid for GitHub callback.");
+    } else if (ghErr === "config") {
+      setGithubNotice("GitHub connector is not configured on the server.");
+    } else if (ghErr === "server") {
+      setGithubNotice(
+        "GitHub connect failed unexpectedly. Check API logs and .env (PEM, client secret).",
+      );
+    }
+    if (gh || ghErr) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [apiBase, queryClient]);
 
   const health = useQuery({
     queryKey: ["health", "live", apiBase],
@@ -81,6 +153,25 @@ export default function App() {
   const me = useQuery({
     queryKey: ["me", apiBase],
     queryFn: () => fetchMe(apiBase),
+  });
+
+  const connectors = useQuery({
+    queryKey: ["connectors", apiBase],
+    queryFn: () => fetchConnectors(apiBase),
+    enabled: Boolean(me.data),
+  });
+
+  const githubRow = githubConnectorRow(connectors.data);
+
+  const githubDisconnect = useMutation({
+    mutationFn: () => disconnectGithub(apiBase),
+    onSuccess: () => {
+      setGithubNotice(null);
+      void queryClient.invalidateQueries({ queryKey: ["connectors", apiBase] });
+    },
+    onError: (e: Error) => {
+      setGithubNotice(e.message);
+    },
   });
 
   const registerPw = useMutation({
@@ -157,6 +248,7 @@ export default function App() {
 
       {oauthNotice ? <p className="banner error">{oauthNotice}</p> : null}
       {localNotice ? <p className="banner error">{localNotice}</p> : null}
+      {githubNotice ? <p className="banner error">{githubNotice}</p> : null}
 
       <section className="card">
         <h2>Backend health</h2>
@@ -197,6 +289,49 @@ export default function App() {
             <button type="button" className="btn secondary" onClick={() => logout.mutate()}>
               Sign out
             </button>
+            <section className="card nested">
+              <h3>GitHub</h3>
+              <p className="meta">Connect your GitHub org or account (installation only — no sync yet).</p>
+              {connectors.isPending ? (
+                <p className="status loading">Loading connectors…</p>
+              ) : connectors.isError ? (
+                <p className="status error">Could not load connectors.</p>
+              ) : githubRow?.connector_configured === false ? (
+                <p className="status loading">
+                  GitHub App env is not set on the API (
+                  <code>GITHUB_APP_*</code> / <code>GITHUB_CLIENT_*</code>).
+                </p>
+              ) : githubRow?.connected && githubRow.details ? (
+                <div>
+                  <p className="status ok">
+                    Connected as{" "}
+                    <code>
+                      {githubRow.details.account_login} ({githubRow.details.account_type})
+                    </code>{" "}
+                    — installation <code>{String(githubRow.details.installation_id)}</code>
+                  </p>
+                  <p className="meta">
+                    Disconnect stops Vector from using this installation. The GitHub App may
+                    still be installed on the org until someone removes it in GitHub settings.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    disabled={githubDisconnect.isPending}
+                    onClick={() => githubDisconnect.mutate()}
+                  >
+                    Disconnect GitHub
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <p className="status loading">Not connected.</p>
+                  <a className="btn" href={`${apiBase}/connectors/github/install`}>
+                    Connect GitHub
+                  </a>
+                </div>
+              )}
+            </section>
           </div>
         ) : (
           <div className="signin-options">

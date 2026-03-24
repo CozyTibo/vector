@@ -15,6 +15,7 @@ from vector.infrastructure.db.base import Base
 if TYPE_CHECKING:
     from vector.infrastructure.db.models.identity import UserIdentity
     from vector.infrastructure.db.models.membership import TenantMembership
+    from vector.infrastructure.db.models.tenant_connection import TenantConnection
 
 
 class User(Base):
@@ -47,4 +48,8 @@ class User(Base):
     memberships: Mapped[list[TenantMembership]] = relationship(
         "TenantMembership",
         back_populates="user",
+    )
+    tenant_connections_initiated: Mapped[list[TenantConnection]] = relationship(
+        "TenantConnection",
+        back_populates="connected_by_user",
     )

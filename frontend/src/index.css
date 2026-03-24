@@ -41,6 +41,19 @@ body {
   border-radius: 10px;
 }
 
+.card.nested {
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  background: #15181e;
+  border-style: dashed;
+}
+
+.card.nested h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .card h2 {
   margin: 0 0 0.75rem;
   font-size: 1.05rem;

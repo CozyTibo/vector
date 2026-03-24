@@ -1,0 +1,1 @@
+"""Vendor connectors (GitHub, …)."""

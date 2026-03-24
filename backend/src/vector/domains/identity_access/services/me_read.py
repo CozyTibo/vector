@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 from vector.contracts.me import MeResponse
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.session_jwt import SessionClaims
+from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 
 
-def build_me_response(session: Session, claims: SessionClaims) -> MeResponse:
+def assert_membership(session: Session, claims: SessionClaims) -> TenantMembership:
     membership = tenancy_repo.get_membership_for_user_tenant(
         session,
         claims.user_id,
@@ -18,6 +19,11 @@ def build_me_response(session: Session, claims: SessionClaims) -> MeResponse:
     )
     if membership is None:
         raise NoMembershipError("no membership for session tenant")
+    return membership
+
+
+def build_me_response(session: Session, claims: SessionClaims) -> MeResponse:
+    membership = assert_membership(session, claims)
     user = tenancy_repo.get_user_by_id(session, claims.user_id)
     tenant = tenancy_repo.get_tenant_by_id(session, claims.tenant_id)
     if user is None or tenant is None:

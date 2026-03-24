@@ -44,6 +44,9 @@ services:
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/README.md:/app/README.md
       - ./backend/alembic.ini:/app/alembic.ini
+      # GitHub App PEM: create repo ./secrets/github_app.pem (gitignored) and set
+      # GITHUB_APP_PRIVATE_KEY_PATH=/run/secrets/github_app.pem in .env
+      - ./secrets:/run/secrets:ro
     command: >
       uvicorn vector.api.http.main:app
       --host 0.0.0.0
