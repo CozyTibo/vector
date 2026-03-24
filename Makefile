@@ -13,7 +13,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test db-schema db-psql db-psql-test shell test test-unit mypy lint fmt check
+.PHONY: help setup build up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check
 
 help:
 	@echo "Vector — Makefile (Docker Compose)"
@@ -25,7 +25,9 @@ help:
 	@echo "  make migrate-down    alembic downgrade -1"
 	@echo "  make migrate-new     make migrate-new msg=\"description\""
 	@echo "  make migrate-test    alembic upgrade on vector_test"
-	@echo "  make db-schema       pg_dump schema to artifacts/ (stack must be up)"
+	@echo "  make seed-basic-tenant  Dev DB: create tenant from SEED_* if slug missing"
+	@echo "  make db-schema       Rails-style schema snapshot to artifacts/ (stack must be up)"
+	@echo "  make routes          list HTTP routes (grouped by tag)"
 	@echo "  make db-psql         psql on dev DB"
 	@echo "  make db-psql-test    psql on test DB"
 	@echo "  make test            migrate-test then pytest on test DB"
@@ -81,14 +83,19 @@ migrate-new: $(DOTENV)
 migrate-test: $(DOTENV)
 	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) alembic upgrade head
 
+# Creates tenant SEED_TENANT_SLUG + password user if slug not in DB (see .env.example).
+seed-basic-tenant: $(DOTENV)
+	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) python -m vector.scripts.seed_basic_tenant
+
 db-schema: $(DOTENV)
 	@mkdir -p artifacts
-	@_out=artifacts/db-schema-$$(date +%Y%m%d-%H%M%S).sql; \
-	$(COMPOSE) exec -T $(POSTGRES_SERVICE) pg_dump \
-		-U "$(POSTGRES_USER)" \
-		-d "$(POSTGRES_DB)" \
-		--schema-only --no-owner --no-privileges > "$$_out"; \
+	@_out=artifacts/db-schema-$$(date +%Y%m%d-%H%M%S).schema.rb; \
+	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) \
+		python -m vector.scripts.dump_db_schema > "$$_out"; \
 	echo "Wrote $${_out}"
+
+routes: $(DOTENV)
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m vector.scripts.list_routes
 
 db-psql: $(DOTENV)
 	$(COMPOSE) exec $(POSTGRES_SERVICE) psql -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)"

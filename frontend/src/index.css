@@ -79,3 +79,93 @@ code {
   font-family: ui-monospace, "Cascadia Code", monospace;
   font-size: 0.88em;
 }
+
+.banner {
+  max-width: 640px;
+  margin: 0 auto 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.banner.error {
+  background: #3d1f24;
+  border: 1px solid #e06c75;
+  color: #f5c6cb;
+}
+
+.btn {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: #3d8bfd;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn:hover {
+  background: #5a9cff;
+}
+
+.btn.secondary {
+  background: #2d323c;
+  border: 1px solid #4a5260;
+}
+
+.btn.secondary:hover {
+  background: #3a4250;
+}
+
+.hint {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  color: #9aa0a6;
+}
+
+.signin-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #2d323c;
+}
+
+.form-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #9aa0a6;
+}
+
+.field input {
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid #2d323c;
+  background: #121418;
+  color: #e8eaed;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.optional {
+  font-weight: 400;
+  color: #6b7280;
+}

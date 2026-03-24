@@ -28,3 +28,9 @@ make install
 | `make mypy` | Typecheck |
 | `make db-psql` | SQL shell on dev DB |
 | `make db-schema` | Dump schema SQL to `artifacts/` |
+
+## Sign-in (product auth)
+
+- **Google:** set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `SECRET_KEY` in `.env`. In [Google Cloud Console](https://console.cloud.google.com/), add redirect URI `http://localhost:8000/auth/google/callback`.
+- **Email + password:** `POST /auth/register` and `POST /auth/login` (see OpenAPI at `/docs`); the UI has register/log-in forms. Same session cookie as Google.
+- **Dev tenant:** after migrations, run `make seed-basic-tenant` to create tenant slug `dev` (and user `dev@vector.local` / `changeme` from `.env.example`) if that slug is not in the DB yet.

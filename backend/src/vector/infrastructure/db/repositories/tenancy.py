@@ -1,0 +1,62 @@
+"""Tenant, user, membership, identity queries."""
+
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from vector.infrastructure.db.models.identity import UserIdentity
+from vector.infrastructure.db.models.membership import TenantMembership
+from vector.infrastructure.db.models.tenant import Tenant
+from vector.infrastructure.db.models.user import User
+
+
+def get_tenant_by_slug(session: Session, slug: str) -> Tenant | None:
+    return session.scalar(select(Tenant).where(Tenant.slug == slug))
+
+
+def get_identity_by_provider_subject(
+    session: Session,
+    provider: str,
+    subject: str,
+) -> UserIdentity | None:
+    stmt = select(UserIdentity).where(
+        UserIdentity.provider == provider,
+        UserIdentity.provider_subject == subject,
+    )
+    return session.scalar(stmt)
+
+
+def get_user_by_email(session: Session, email: str) -> User | None:
+    return session.scalar(select(User).where(User.email == email))
+
+
+def get_user_by_id(session: Session, user_id: uuid.UUID) -> User | None:
+    return session.scalar(select(User).where(User.id == user_id))
+
+
+def get_membership_for_user_tenant(
+    session: Session,
+    user_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+) -> TenantMembership | None:
+    stmt = select(TenantMembership).where(
+        TenantMembership.user_id == user_id,
+        TenantMembership.tenant_id == tenant_id,
+    )
+    return session.scalar(stmt)
+
+
+def list_memberships_for_user(session: Session, user_id: uuid.UUID) -> list[TenantMembership]:
+    stmt = (
+        select(TenantMembership)
+        .where(TenantMembership.user_id == user_id)
+        .order_by(TenantMembership.created_at.asc())
+    )
+    return list(session.scalars(stmt).all())
+
+
+def get_tenant_by_id(session: Session, tenant_id: uuid.UUID) -> Tenant | None:
+    return session.scalar(select(Tenant).where(Tenant.id == tenant_id))

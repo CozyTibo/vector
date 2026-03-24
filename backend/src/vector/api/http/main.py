@@ -7,7 +7,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from vector.api.http.routes import health
+from vector.api.http.routes import auth, health, me
 
 
 def _cors_allow_origins() -> list[str]:
@@ -26,3 +26,5 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/health", tags=["health"])
+app.include_router(auth.router)
+app.include_router(me.router)

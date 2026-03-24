@@ -27,6 +27,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://vector:vector@postgres:5432/vector}
       DATABASE_URL_TEST: ${DATABASE_URL_TEST:-postgresql+psycopg://vector:vector@postgres:5432/vector_test}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-me-use-openssl-rand-hex-32}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/auth/google/callback}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

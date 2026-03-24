@@ -9,6 +9,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from vector.infrastructure.db.base import Base
+from vector.infrastructure.db import models as _models  # noqa: F401 — register metadata
 
 config = context.config
 if config.config_file_name is not None:
