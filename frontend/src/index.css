@@ -1,0 +1,81 @@
+:root {
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  color: #e8eaed;
+  background: #121418;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+}
+
+.header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0;
+  color: #9aa0a6;
+  font-size: 0.95rem;
+}
+
+.card {
+  margin-top: 2rem;
+  padding: 1.25rem 1.35rem;
+  background: #1a1d23;
+  border: 1px solid #2d323c;
+  border-radius: 10px;
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.meta {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: #9aa0a6;
+}
+
+.meta code {
+  color: #c9d1d9;
+  word-break: break-all;
+}
+
+.status {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.status.loading {
+  color: #f0c674;
+}
+
+.status.ok {
+  color: #98c379;
+}
+
+.status.error {
+  color: #e06c75;
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.88em;
+}

@@ -15,7 +15,8 @@ cp .env.example .env
 make install
 ```
 
-- Health: http://localhost:8000/health/live  
+- API health: http://localhost:8000/health/live  
+- Frontend (checks API): http://localhost:5173/  
 - Full tooling: `make help`  
 - Specification: [`DOCS/base-app-and-repository-setup.md`](DOCS/base-app-and-repository-setup.md)
 

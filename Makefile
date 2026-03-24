@@ -3,6 +3,7 @@
 
 COMPOSE ?= docker compose
 BACKEND_SERVICE := backend
+FRONTEND_SERVICE := frontend
 POSTGRES_SERVICE := postgres
 DOTENV := .env
 
@@ -12,7 +13,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build up down logs restart install reinstall migrate migrate-down migrate-new migrate-test db-schema db-psql db-psql-test shell test test-unit mypy lint fmt check
+.PHONY: help setup build up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test db-schema db-psql db-psql-test shell test test-unit mypy lint fmt check
 
 help:
 	@echo "Vector — Makefile (Docker Compose)"
@@ -32,6 +33,7 @@ help:
 	@echo "  make mypy / lint / fmt"
 	@echo "  make check           mypy + lint + test"
 	@echo "  make reinstall       down, rebuild --no-cache, up, migrate"
+	@echo "  make logs-frontend   docker compose logs -f frontend"
 	@echo "  Note: reinstall keeps DB volume; use 'docker compose down -v' to wipe data."
 
 setup: $(DOTENV)
@@ -52,10 +54,14 @@ down:
 logs:
 	$(COMPOSE) logs -f $(BACKEND_SERVICE)
 
+logs-frontend:
+	$(COMPOSE) logs -f $(FRONTEND_SERVICE)
+
 restart: down up
 
 install: $(DOTENV) build up migrate
-	@echo "OK — http://localhost:$${BACKEND_PORT:-8000}/health/live"
+	@echo "OK — API http://localhost:$${BACKEND_PORT:-8000}/health/live"
+	@echo "    UI  http://localhost:$${FRONTEND_PORT:-5173}/"
 
 reinstall: down
 	$(COMPOSE) build --no-cache

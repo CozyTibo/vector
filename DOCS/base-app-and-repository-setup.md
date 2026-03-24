@@ -6,7 +6,7 @@ This document describes how we intend to lay out the **repository**, **Docker Co
 - [`engineering-guidelines.md`](engineering-guidelines.md) — `backend/` layout, domains, thin routes, dedicated **test DB**, layering.
 - [`senior-standards.md`](senior-standards.md) — typing, migrations, tests, logging, file size.
 
-**Status:** the repository implements this specification (root `Makefile`, `docker-compose.yml`, `backend/`). Treat this file as the canonical description of that layout.
+**Status:** the repository implements this specification (root `Makefile`, `docker-compose.yml`, `backend/`, `frontend/`). Treat this file as the canonical description of that layout.
 
 ---
 
@@ -17,7 +17,7 @@ Single git repository with a clear split so a **frontend** can land later withou
 ```text
 vector/
   backend/                 # Python application (this spec)
-  frontend/                 # Reserved — admin or product UI (optional, add when needed)
+  frontend/                 # Vite + React (Docker dev server); calls API via VITE_API_BASE_URL
   DOCS/                     # Architecture and engineering docs
   docker-compose.yml        # Root orchestration: Postgres + backend (and later services)
   Makefile                  # Developer commands (wrap docker compose)
@@ -39,6 +39,7 @@ Goal: a **runnable** backend shell with **no business features**, proving:
 - **Postgres** with two logical databases: **`vector`** (dev/default) and **`vector_test`** (tests only) — per engineering guidelines §7.3.
 - **Alembic** migrations on **`vector`** and **`vector_test`** in CI/Make targets.
 - **Structured package layout** matching the guidelines: `domains/` (empty or stub packages), `api/http/` (routers only), `infrastructure/db/` (Base, future models), `settings`, `contracts` as needed later.
+- **Frontend** (`frontend/`): Dockerized Vite dev server; browser fetches API at `VITE_API_BASE_URL` (e.g. `http://localhost:8000`). Backend **CORS** via `CORS_ORIGINS` (must include the UI origin, e.g. `http://localhost:5173`).
 - **pytest** with tests mirroring `src` layout; **no tests against `vector`** for routine runs.
 - **mypy** (`strict` or project-agreed level) on `src` (and relaxed rules for `tests` if needed).
 - **Optional but recommended:** **Ruff** (lint + format) in the same toolchain; **not** a substitute for mypy.
