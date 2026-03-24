@@ -87,9 +87,10 @@ migrate-test: $(DOTENV)
 seed-basic-tenant: $(DOTENV)
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) python -m vector.scripts.seed_basic_tenant
 
+# Overwrites artifacts/db-schema.schema.rb each run (timestamp only inside the file).
 db-schema: $(DOTENV)
 	@mkdir -p artifacts
-	@_out=artifacts/db-schema-$$(date +%Y%m%d-%H%M%S).schema.rb; \
+	@_out=artifacts/db-schema.schema.rb; \
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) \
 		python -m vector.scripts.dump_db_schema > "$$_out"; \
 	echo "Wrote $${_out}"

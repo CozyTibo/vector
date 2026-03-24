@@ -27,7 +27,7 @@ make install
 | `make test` | Migrate test DB, run pytest |
 | `make mypy` | Typecheck |
 | `make db-psql` | SQL shell on dev DB |
-| `make db-schema` | Dump schema SQL to `artifacts/` |
+| `make db-schema` | Overwrite `artifacts/db-schema.schema.rb` with a Rails-style snapshot |
 
 ## Sign-in (product auth)
 

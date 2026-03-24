@@ -75,7 +75,7 @@ All targets should **assume Docker Compose** unless documented otherwise. Naming
 | **`migrate-down`** | `alembic downgrade -1` (or documented policy) |
 | **`migrate-new`** | `alembic revision --autogenerate -m "…"` (requires models + env wiring) |
 | **`migrate-test`** | Apply migrations to **`vector_test`** (override `DATABASE_URL` for the one-shot container) |
-| **`db-schema`** | Dump **schema-only** SQL from dev DB (e.g. `pg_dump --schema-only`) into **`artifacts/`** with a timestamped filename |
+| **`db-schema`** | Overwrite **`artifacts/db-schema.schema.rb`** with a Rails **`schema.rb`**-style snapshot from the dev DB (reference only) |
 | **`db-psql`** | Interactive `psql` into **`vector`** |
 | **`db-psql-test`** | Interactive `psql` into **`vector_test`** |
 | **`test`** | Run **pytest** with **`DATABASE_URL` = test URL; run `migrate-test` first** so schema matches |
