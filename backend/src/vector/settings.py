@@ -58,6 +58,9 @@ class Settings(BaseSettings):
         default="http://127.0.0.1:8000",
         validation_alias="GITHUB_API_PUBLIC_BASE_URL",
     )
+    linear_client_id: str = Field(default="", validation_alias="LINEAR_CLIENT_ID")
+    linear_client_secret: str = Field(default="", validation_alias="LINEAR_CLIENT_SECRET")
+    linear_redirect_uri: str = Field(default="", validation_alias="LINEAR_REDIRECT_URI")
 
     @field_validator("github_app_private_key", mode="before")
     @classmethod
@@ -69,6 +72,13 @@ class Settings(BaseSettings):
     @field_validator("github_client_secret", mode="before")
     @classmethod
     def strip_github_client_secret_quotes(cls, value: object) -> object:
+        if isinstance(value, str) and len(value) >= 2 and value[0] == value[-1] == '"':
+            return value[1:-1]
+        return value
+
+    @field_validator("linear_client_secret", mode="before")
+    @classmethod
+    def strip_linear_client_secret_quotes(cls, value: object) -> object:
         if isinstance(value, str) and len(value) >= 2 and value[0] == value[-1] == '"':
             return value[1:-1]
         return value

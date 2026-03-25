@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
 from vector.api.http.routes.connectors import github as github_connect
+from vector.api.http.routes.connectors import linear as linear_connect
 from vector.contracts.connectors import ConnectorsListResponse
 from vector.domains.connectors.runtime import all_runtimes_ordered, runtime_by_id
 from vector.domains.identity_access.errors import NoMembershipError
@@ -57,4 +58,5 @@ def build_connectors_router() -> APIRouter:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     root.include_router(github_connect.build_github_connector_router(), prefix="/github")
+    root.include_router(linear_connect.build_linear_connector_router(), prefix="/linear")
     return root

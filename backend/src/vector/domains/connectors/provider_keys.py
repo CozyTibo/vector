@@ -5,3 +5,4 @@ from __future__ import annotations
 from typing import Final
 
 CONNECTION_PROVIDER_GITHUB: Final[str] = "github"
+CONNECTION_PROVIDER_LINEAR: Final[str] = "linear"

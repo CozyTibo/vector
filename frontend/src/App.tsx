@@ -25,8 +25,23 @@ type GithubConnectorStatusItem = {
   details: GithubConnectorDetails | null;
 };
 
+type LinearConnectorDetails = {
+  organization_id: string | null;
+  organization_name: string | null;
+};
+
+type LinearConnectorStatusItem = {
+  provider: "linear";
+  display_name: string;
+  connector_configured: boolean;
+  connected: boolean;
+  details: LinearConnectorDetails | null;
+};
+
+type ConnectorStatusItem = GithubConnectorStatusItem | LinearConnectorStatusItem;
+
 type ConnectorsResponse = {
-  items: GithubConnectorStatusItem[];
+  items: ConnectorStatusItem[];
 };
 
 async function fetchHealthLive(base: string): Promise<{ status: string }> {
@@ -59,11 +74,29 @@ async function fetchConnectors(base: string): Promise<ConnectorsResponse> {
 function githubConnectorRow(
   data: ConnectorsResponse | undefined,
 ): GithubConnectorStatusItem | undefined {
-  return data?.items.find((i) => i.provider === "github");
+  const row = data?.items.find((i) => i.provider === "github");
+  return row?.provider === "github" ? row : undefined;
+}
+
+function linearConnectorRow(
+  data: ConnectorsResponse | undefined,
+): LinearConnectorStatusItem | undefined {
+  const row = data?.items.find((i) => i.provider === "linear");
+  return row?.provider === "linear" ? row : undefined;
 }
 
 async function disconnectGithub(base: string): Promise<void> {
   const res = await fetch(`${base}/connectors/github`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await readErrorDetail(res));
+  }
+}
+
+async function disconnectLinear(base: string): Promise<void> {
+  const res = await fetch(`${base}/connectors/linear`, {
     method: "DELETE",
     credentials: "include",
   });
@@ -93,6 +126,7 @@ export default function App() {
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
   const [localNotice, setLocalNotice] = useState<string | null>(null);
   const [githubNotice, setGithubNotice] = useState<string | null>(null);
+  const [linearNotice, setLinearNotice] = useState<string | null>(null);
 
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
@@ -116,6 +150,8 @@ export default function App() {
     }
     const gh = params.get("github_connected");
     const ghErr = params.get("github_error");
+    const lin = params.get("linear_connected");
+    const linErr = params.get("linear_error");
     if (gh === "1") {
       setGithubNotice(null);
       void queryClient.invalidateQueries({ queryKey: ["connectors", apiBase] });
@@ -140,7 +176,23 @@ export default function App() {
         "GitHub connect failed unexpectedly. Check API logs and .env (PEM, client secret).",
       );
     }
-    if (gh || ghErr) {
+    if (lin === "1") {
+      setLinearNotice(null);
+      void queryClient.invalidateQueries({ queryKey: ["connectors", apiBase] });
+    } else if (linErr === "state") {
+      setLinearNotice("Linear connect failed (invalid or expired state). Try again.");
+    } else if (linErr === "oauth") {
+      setLinearNotice(
+        "Linear OAuth failed. Check LINEAR_CLIENT_* and that the redirect URI matches Linear’s app settings.",
+      );
+    } else if (linErr === "forbidden") {
+      setLinearNotice("Linear callback: user is not a member of this tenant.");
+    } else if (linErr === "config") {
+      setLinearNotice("Linear connector is not configured on the server.");
+    } else if (linErr === "server") {
+      setLinearNotice("Linear connect failed unexpectedly. Check API logs.");
+    }
+    if (gh || ghErr || lin || linErr) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [apiBase, queryClient]);
@@ -162,6 +214,7 @@ export default function App() {
   });
 
   const githubRow = githubConnectorRow(connectors.data);
+  const linearRow = linearConnectorRow(connectors.data);
 
   const githubDisconnect = useMutation({
     mutationFn: () => disconnectGithub(apiBase),
@@ -171,6 +224,17 @@ export default function App() {
     },
     onError: (e: Error) => {
       setGithubNotice(e.message);
+    },
+  });
+
+  const linearDisconnect = useMutation({
+    mutationFn: () => disconnectLinear(apiBase),
+    onSuccess: () => {
+      setLinearNotice(null);
+      void queryClient.invalidateQueries({ queryKey: ["connectors", apiBase] });
+    },
+    onError: (e: Error) => {
+      setLinearNotice(e.message);
     },
   });
 
@@ -249,6 +313,7 @@ export default function App() {
       {oauthNotice ? <p className="banner error">{oauthNotice}</p> : null}
       {localNotice ? <p className="banner error">{localNotice}</p> : null}
       {githubNotice ? <p className="banner error">{githubNotice}</p> : null}
+      {linearNotice ? <p className="banner error">{linearNotice}</p> : null}
 
       <section className="card">
         <h2>Backend health</h2>
@@ -296,7 +361,9 @@ export default function App() {
                 <p className="status loading">Loading connectors…</p>
               ) : connectors.isError ? (
                 <p className="status error">Could not load connectors.</p>
-              ) : githubRow?.connector_configured === false ? (
+              ) : !githubRow ? (
+                <p className="status error">GitHub connector not listed by API.</p>
+              ) : githubRow.connector_configured === false ? (
                 <p className="status loading">
                   GitHub App env is not set on the API (
                   <code>GITHUB_APP_*</code> / <code>GITHUB_CLIENT_*</code>).
@@ -328,6 +395,47 @@ export default function App() {
                   <p className="status loading">Not connected.</p>
                   <a className="btn" href={`${apiBase}/connectors/github/install`}>
                     Connect GitHub
+                  </a>
+                </div>
+              )}
+            </section>
+            <section className="card nested">
+              <h3>Linear</h3>
+              <p className="meta">OAuth (read scope). Connect your Linear workspace.</p>
+              {connectors.isPending ? (
+                <p className="status loading">Loading connectors…</p>
+              ) : connectors.isError ? (
+                <p className="status error">Could not load connectors.</p>
+              ) : !linearRow ? (
+                <p className="status error">Linear connector not listed by API.</p>
+              ) : linearRow.connector_configured === false ? (
+                <p className="status loading">
+                  Linear OAuth env is not set on the API (<code>LINEAR_CLIENT_ID</code>,{" "}
+                  <code>LINEAR_CLIENT_SECRET</code>
+                  ).
+                </p>
+              ) : linearRow.connected && linearRow.details ? (
+                <div>
+                  <p className="status ok">
+                    Connected —{" "}
+                    <code>
+                      {linearRow.details.organization_name ?? linearRow.details.organization_id ?? "workspace"}
+                    </code>
+                  </p>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    disabled={linearDisconnect.isPending}
+                    onClick={() => linearDisconnect.mutate()}
+                  >
+                    Disconnect Linear
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <p className="status loading">Not connected.</p>
+                  <a className="btn" href={`${apiBase}/connectors/linear/install`}>
+                    Connect Linear
                   </a>
                 </div>
               )}

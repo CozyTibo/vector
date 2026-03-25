@@ -48,6 +48,10 @@ def test_github_disconnect_unauthenticated(client: TestClient) -> None:
     assert client.delete("/connectors/github").status_code == 401
 
 
+def test_linear_disconnect_unauthenticated(client: TestClient) -> None:
+    assert client.delete("/connectors/linear").status_code == 401
+
+
 def test_github_status_not_configured(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
@@ -85,10 +89,14 @@ def test_github_status_not_configured(
     r = client.get("/connectors")
     assert r.status_code == 200
     body = r.json()
+    assert len(body["items"]) >= 2
     gh = _github_item(body)
     assert gh is not None
     assert gh["connector_configured"] is False
     assert gh["connected"] is False
+    lin = next((i for i in body["items"] if i["provider"] == "linear"), None)
+    assert lin is not None
+    assert lin["connector_configured"] is False
 
 
 def test_github_install_redirect_when_configured(

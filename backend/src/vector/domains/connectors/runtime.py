@@ -27,8 +27,12 @@ class ConnectorRuntime:
 def connector_runtimes() -> tuple[ConnectorRuntime, ...]:
     """All built-in providers. Import adapters inside to avoid circular imports."""
     from vector.domains.connectors.github.adapter import github_connector_runtime
+    from vector.domains.connectors.linear.adapter import linear_connector_runtime
 
-    return (github_connector_runtime(),)
+    return (
+        github_connector_runtime(),
+        linear_connector_runtime(),
+    )
 
 
 def runtime_by_id() -> dict[str, ConnectorRuntime]:
