@@ -185,6 +185,7 @@ def list_github_commits(
     ]
     extra = _ilike_q(
         q,
+        GithubCommit.repo_full_name,
         GithubCommit.commit_sha,
         GithubCommit.message,
         func.cast(GithubCommit.repository_github_id, String),

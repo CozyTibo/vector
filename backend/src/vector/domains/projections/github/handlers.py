@@ -351,6 +351,7 @@ def _project_commit(
             "connection_id": raw.connection_id,
             "repository_github_id": rid,
             "commit_sha": sha,
+            "repo_full_name": full_name,
             "message": _as_str(inner_d.get("message")) if inner_d else None,
             "author_name": _as_str(auth_d.get("name")) if auth_d else None,
             "author_email": _as_str(auth_d.get("email")) if auth_d else None,

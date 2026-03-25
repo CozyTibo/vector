@@ -137,6 +137,7 @@ def upsert_github_commit(session: Session, *, values: dict[str, Any]) -> None:
         index_elements=[t.c.connection_id, t.c.repository_github_id, t.c.commit_sha],
         set_={
             "tenant_id": ex.tenant_id,
+            "repo_full_name": _coalesce_new(ex.repo_full_name, t.c.repo_full_name),
             "message": _coalesce_new(ex.message, t.c.message),
             "author_name": _coalesce_new(ex.author_name, t.c.author_name),
             "author_email": _coalesce_new(ex.author_email, t.c.author_email),

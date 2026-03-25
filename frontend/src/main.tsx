@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import App from "./App.tsx";
 import GithubIngestionPage from "./pages/GithubIngestionPage.tsx";
 import ProjectionDebugPage from "./pages/ProjectionDebugPage.tsx";
+import RawIngestionDebugPage from "./pages/RawIngestionDebugPage.tsx";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -27,6 +28,7 @@ createRoot(document.getElementById("root")!).render(
             path="/debug/connectors/:connector/:connectionId/projections"
             element={<ProjectionDebugPage />}
           />
+          <Route path="/debug/ingestion/raw/:recordId" element={<RawIngestionDebugPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

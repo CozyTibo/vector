@@ -213,6 +213,15 @@ code {
   text-decoration: underline;
 }
 
+.data-table a.link-inline {
+  color: #8ab4f8;
+  text-decoration: none;
+}
+
+.data-table a.link-inline:hover {
+  text-decoration: underline;
+}
+
 .table-wrap {
   overflow-x: auto;
   margin-top: 0.75rem;

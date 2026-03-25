@@ -135,6 +135,7 @@ class GithubCommit(Base):
     connection_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     repository_github_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     commit_sha: Mapped[str] = mapped_column(Text, primary_key=True)
+    repo_full_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
     author_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     author_email: Mapped[str | None] = mapped_column(Text, nullable=True)

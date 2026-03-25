@@ -12,6 +12,66 @@ const ENTITIES = [
 
 type EntityId = (typeof ENTITIES)[number]["id"];
 
+const ENTITY_COLUMNS: Record<EntityId, readonly string[]> = {
+  repositories: [
+    "repository_github_id",
+    "full_name",
+    "owner_login",
+    "private",
+    "default_branch",
+    "archived",
+    "github_updated_at",
+    "last_observed_at",
+    "last_raw_record_id",
+    "last_replay_sequence",
+  ],
+  pull_requests: [
+    "repo_full_name",
+    "pr_number",
+    "title",
+    "state",
+    "author_login",
+    "base_ref",
+    "head_ref",
+    "merged_at",
+    "github_updated_at",
+    "last_observed_at",
+    "last_raw_record_id",
+    "last_replay_sequence",
+  ],
+  issues: [
+    "repo_full_name",
+    "issue_number",
+    "title",
+    "state",
+    "author_login",
+    "github_updated_at",
+    "last_observed_at",
+    "last_raw_record_id",
+    "last_replay_sequence",
+  ],
+  commits: [
+    "repo_full_name",
+    "commit_sha",
+    "author_login",
+    "author_date",
+    "message",
+    "last_observed_at",
+    "last_raw_record_id",
+    "last_replay_sequence",
+  ],
+  users: [
+    "github_id",
+    "login",
+    "type",
+    "avatar_url",
+    "html_url",
+    "last_observed_at",
+    "last_raw_record_id",
+    "last_replay_sequence",
+  ],
+};
+
 type ProjectionRowsResponse = {
   connector: string;
   connection_id: string;
@@ -47,6 +107,28 @@ async function readErrorDetail(res: Response): Promise<string> {
   return `HTTP ${res.status}`;
 }
 
+function displayCell(entity: EntityId, col: string, row: Record<string, unknown>): string {
+  if (entity === "commits" && col === "author_login") {
+    const login = row.author_login;
+    const name = row.author_name;
+    if (login != null && String(login).length > 0) {
+      return String(login);
+    }
+    if (name != null && String(name).length > 0) {
+      return String(name);
+    }
+    return "—";
+  }
+  const v = row[col];
+  if (v == null) {
+    return "—";
+  }
+  if (typeof v === "boolean") {
+    return v ? "true" : "false";
+  }
+  return String(v as string | number);
+}
+
 export default function ProjectionDebugPage() {
   const { connector = "github", connectionId = "" } = useParams<{
     connector: string;
@@ -59,6 +141,8 @@ export default function ProjectionDebugPage() {
   const [queryInput, setQueryInput] = useState("");
   const [detailJson, setDetailJson] = useState<string | null>(null);
   const [rawModal, setRawModal] = useState<string | null>(null);
+
+  const summaryKeys = useMemo(() => [...ENTITY_COLUMNS[entity]], [entity]);
 
   const rowsQuery = useQuery({
     queryKey: ["projection-rows", apiBase, connector, connectionId, entity, page, filterQ],
@@ -104,21 +188,13 @@ export default function ProjectionDebugPage() {
     setRawModal(JSON.stringify(data.item, null, 2));
   }
 
-  const summaryKeys = [
-    "full_name",
-    "repo_full_name",
-    "repository_github_id",
-    "pr_number",
-    "issue_number",
-    "commit_sha",
-    "github_id",
-    "login",
-    "title",
-    "state",
-    "last_raw_record_id",
-    "last_replay_sequence",
-    "last_observed_at",
-  ];
+  function rawRecordHref(recordId: number): string {
+    const q = new URLSearchParams({
+      connector,
+      connection_id: connectionId,
+    });
+    return `/debug/ingestion/raw/${recordId}?${q.toString()}`;
+  }
 
   return (
     <div className="app">
@@ -226,9 +302,7 @@ export default function ProjectionDebugPage() {
                         <button
                           type="button"
                           className="btn small secondary"
-                          onClick={() =>
-                            setDetailJson(JSON.stringify(row, null, 2))
-                          }
+                          onClick={() => setDetailJson(JSON.stringify(row, null, 2))}
                         >
                           JSON
                         </button>
@@ -245,9 +319,19 @@ export default function ProjectionDebugPage() {
                       </td>
                       {summaryKeys.map((k) => (
                         <td key={k}>
-                          <code className="cell-wrap cell-muted">
-                            {row[k] != null ? String(row[k] as string | number) : "—"}
-                          </code>
+                          {k === "last_raw_record_id" &&
+                          typeof row.last_raw_record_id === "number" ? (
+                            <Link
+                              className="cell-wrap link-inline"
+                              to={rawRecordHref(row.last_raw_record_id as number)}
+                            >
+                              {String(row.last_raw_record_id)}
+                            </Link>
+                          ) : (
+                            <code className="cell-wrap cell-muted">
+                              {displayCell(entity, k, row)}
+                            </code>
+                          )}
                         </td>
                       ))}
                     </tr>
