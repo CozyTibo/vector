@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -34,9 +34,11 @@ def _rsa_pem() -> str:
 
 
 def _github_item(payload: dict[str, Any]) -> dict[str, Any] | None:
-    for item in payload["items"]:
-        if item["provider"] == "github":
-            return item
+    for raw in payload["items"]:
+        if not isinstance(raw, dict):
+            continue
+        if raw.get("provider") == "github":
+            return cast(dict[str, Any], raw)
     return None
 
 
@@ -57,14 +59,19 @@ def test_github_status_not_configured(
     client: TestClient,
     db_session: Session,
 ) -> None:
+    # Empty string in os.environ overrides docker/.env-injected values; delenv alone can
+    # still let pydantic-settings repopulate from env_file for missing keys.
     for key in (
         "GITHUB_APP_ID",
         "GITHUB_APP_PRIVATE_KEY",
+        "GITHUB_APP_PRIVATE_KEY_PATH",
         "GITHUB_APP_SLUG",
         "GITHUB_CLIENT_ID",
         "GITHUB_CLIENT_SECRET",
+        "LINEAR_CLIENT_ID",
+        "LINEAR_CLIENT_SECRET",
     ):
-        monkeypatch.delenv(key, raising=False)
+        monkeypatch.setenv(key, "")
     monkeypatch.setenv("SECRET_KEY", "unit-test-secret-key-min-32-characters-long!")
     get_settings.cache_clear()
     settings = get_settings()

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 type MeResponse = {
   user_id: string;
@@ -42,6 +43,13 @@ type ConnectorStatusItem = GithubConnectorStatusItem | LinearConnectorStatusItem
 
 type ConnectorsResponse = {
   items: ConnectorStatusItem[];
+};
+
+type GithubSyncResponse = {
+  run_id: string;
+  status: string;
+  error_summary: string | null;
+  stats: Record<string, unknown> | null;
 };
 
 async function fetchHealthLive(base: string): Promise<{ status: string }> {
@@ -105,6 +113,17 @@ async function disconnectLinear(base: string): Promise<void> {
   }
 }
 
+async function syncGithub(base: string): Promise<GithubSyncResponse> {
+  const res = await fetch(`${base}/connectors/github/sync`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return res.json() as Promise<GithubSyncResponse>;
+}
+
 async function readErrorDetail(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as { detail?: string | unknown };
@@ -126,6 +145,7 @@ export default function App() {
   const [oauthNotice, setOauthNotice] = useState<string | null>(null);
   const [localNotice, setLocalNotice] = useState<string | null>(null);
   const [githubNotice, setGithubNotice] = useState<string | null>(null);
+  const [githubSyncMessage, setGithubSyncMessage] = useState<string | null>(null);
   const [linearNotice, setLinearNotice] = useState<string | null>(null);
 
   const [regEmail, setRegEmail] = useState("");
@@ -220,9 +240,30 @@ export default function App() {
     mutationFn: () => disconnectGithub(apiBase),
     onSuccess: () => {
       setGithubNotice(null);
+      setGithubSyncMessage(null);
       void queryClient.invalidateQueries({ queryKey: ["connectors", apiBase] });
     },
     onError: (e: Error) => {
+      setGithubNotice(e.message);
+    },
+  });
+
+  const githubSync = useMutation({
+    mutationFn: () => syncGithub(apiBase),
+    onSuccess: (data) => {
+      setGithubNotice(null);
+      const rows =
+        data.stats && typeof data.stats.records_written === "number"
+          ? String(data.stats.records_written)
+          : null;
+      setGithubSyncMessage(
+        `Ingestion ${data.status} — run ${data.run_id}` +
+          (rows !== null ? ` — ${rows} rows written (this run).` : "."),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["github-ingestion-runs", apiBase] });
+    },
+    onError: (e: Error) => {
+      setGithubSyncMessage(null);
       setGithubNotice(e.message);
     },
   });
@@ -313,6 +354,7 @@ export default function App() {
       {oauthNotice ? <p className="banner error">{oauthNotice}</p> : null}
       {localNotice ? <p className="banner error">{localNotice}</p> : null}
       {githubNotice ? <p className="banner error">{githubNotice}</p> : null}
+      {githubSyncMessage ? <p className="banner ok">{githubSyncMessage}</p> : null}
       {linearNotice ? <p className="banner error">{linearNotice}</p> : null}
 
       <section className="card">
@@ -356,7 +398,10 @@ export default function App() {
             </button>
             <section className="card nested">
               <h3>GitHub</h3>
-              <p className="meta">Connect your GitHub org or account (installation only — no sync yet).</p>
+              <p className="meta">
+                Connect your GitHub org or account, then run a poll sync to append raw ingestion rows
+                (repos, PRs, issues, commits).
+              </p>
               {connectors.isPending ? (
                 <p className="status loading">Loading connectors…</p>
               ) : connectors.isError ? (
@@ -381,14 +426,27 @@ export default function App() {
                     Disconnect stops Vector from using this installation. The GitHub App may
                     still be installed on the org until someone removes it in GitHub settings.
                   </p>
-                  <button
-                    type="button"
-                    className="btn secondary"
-                    disabled={githubDisconnect.isPending}
-                    onClick={() => githubDisconnect.mutate()}
-                  >
-                    Disconnect GitHub
-                  </button>
+                  <p className="meta">
+                    <Link to="/github/ingestion">Browse synced raw rows by run →</Link>
+                  </p>
+                  <div className="btn-row">
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={githubSync.isPending || githubDisconnect.isPending}
+                      onClick={() => githubSync.mutate()}
+                    >
+                      {githubSync.isPending ? "Syncing…" : "Sync from GitHub"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn secondary"
+                      disabled={githubDisconnect.isPending || githubSync.isPending}
+                      onClick={() => githubDisconnect.mutate()}
+                    >
+                      Disconnect GitHub
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div>

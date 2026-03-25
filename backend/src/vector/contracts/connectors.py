@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import uuid
+from datetime import datetime
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,6 +17,66 @@ class GithubConnectorDetails(BaseModel):
     installation_id: int | None = None
     account_login: str | None = None
     account_type: str | None = None
+
+
+class GithubIngestionSyncResponse(BaseModel):
+    """Result of POST /connectors/github/sync (Step 1 poll ingestion)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: uuid.UUID
+    status: str
+    error_summary: str | None = None
+    stats: dict[str, Any] | None = None
+
+
+class GithubIngestionRunListItem(BaseModel):
+    """One persisted ingestion run for this tenant (GitHub poll/webhook/…)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID
+    connection_id: uuid.UUID
+    status: str
+    source_trigger: str
+    started_at: datetime
+    finished_at: datetime | None
+    error_summary: str | None
+    stats: dict[str, Any] | None
+    records_written: int = Field(description="Rows in raw_ingestion_records for this run.")
+
+
+class GithubIngestionRunsListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[GithubIngestionRunListItem]
+
+
+class GithubRawIngestionRecordItem(BaseModel):
+    """One append-only raw envelope (resource-level)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    replay_sequence: int
+    resource_type: str
+    external_id: str
+    api_endpoint: str
+    query_params: dict[str, Any]
+    payload_hash: str
+    http_status: int
+    fetched_at: datetime
+    payload_body: dict[str, Any]
+
+
+class GithubIngestionRecordsPageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: uuid.UUID
+    total: int
+    limit: int
+    offset: int
+    items: list[GithubRawIngestionRecordItem]
 
 
 class GithubConnectorStatusItem(BaseModel):

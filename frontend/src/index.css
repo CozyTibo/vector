@@ -15,9 +15,10 @@ body {
 }
 
 .app {
-  max-width: 640px;
+  /* Wide enough for ingestion / JSON tables; still centered on large monitors */
+  max-width: min(1600px, calc(100vw - 2rem));
   margin: 0 auto;
-  padding: 2.5rem 1.5rem;
+  padding: 2.5rem clamp(1rem, 3vw, 2rem);
 }
 
 .header h1 {
@@ -94,8 +95,8 @@ code {
 }
 
 .banner {
-  max-width: 640px;
-  margin: 0 auto 1rem;
+  max-width: none;
+  margin: 0 0 1rem;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   font-size: 0.9rem;
@@ -105,6 +106,24 @@ code {
   background: #3d1f24;
   border: 1px solid #e06c75;
   color: #f5c6cb;
+}
+
+.banner.ok {
+  background: #1a2d22;
+  border: 1px solid #81c784;
+  color: #c8e6c9;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.btn-row .btn {
+  margin-top: 0;
 }
 
 .btn {
@@ -181,4 +200,92 @@ code {
 .optional {
   font-weight: 400;
   color: #6b7280;
+}
+
+.meta a,
+.header .subtitle a {
+  color: #8ab4f8;
+  text-decoration: none;
+}
+
+.meta a:hover,
+.header .subtitle a:hover {
+  text-decoration: underline;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid #2d323c;
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table th {
+  background: #1a1d22;
+  font-weight: 600;
+}
+
+.row-selected {
+  background: #1a251a;
+}
+
+.btn.small {
+  margin-top: 0;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.cell-wrap {
+  word-break: break-all;
+}
+
+.cell-muted {
+  color: #9aa0a6;
+}
+
+.cell-clip {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payload-preview {
+  max-height: 14rem;
+  overflow: auto;
+  margin: 0;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #121418;
+  padding: 0.45rem;
+  border-radius: 6px;
+}
+
+/* Raw ingestion explorer: give JSON room */
+.data-table.records-table {
+  table-layout: auto;
+}
+
+.data-table.records-table th:last-child,
+.data-table.records-table td:last-child {
+  min-width: min(52rem, 85vw);
+}
+
+.data-table.records-table .payload-preview {
+  max-height: min(32rem, 55vh);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }

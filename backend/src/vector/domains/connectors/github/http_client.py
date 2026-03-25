@@ -13,6 +13,9 @@ from vector.settings import Settings
 
 GITHUB_OAUTH_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_INSTALLATION_TEMPLATE = "https://api.github.com/app/installations/{installation_id}"
+GITHUB_API_INSTALLATION_ACCESS_TOKEN_TEMPLATE = (
+    "https://api.github.com/app/installations/{installation_id}/access_tokens"
+)
 
 
 @dataclass(frozen=True)
@@ -99,3 +102,40 @@ def fetch_github_installation(
     if not isinstance(data, dict):
         raise GitHubApiError("invalid github installation json")
     return data
+
+
+def create_github_installation_access_token(
+    settings: Settings,
+    installation_id: int,
+) -> str:
+    """POST /app/installations/{id}/access_tokens — returns short-lived installation token."""
+    app_jwt = create_github_app_jwt(settings)
+    url = GITHUB_API_INSTALLATION_ACCESS_TOKEN_TEMPLATE.format(installation_id=installation_id)
+    try:
+        resp = httpx.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {app_jwt}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            timeout=30.0,
+        )
+    except httpx.RequestError as e:
+        raise GitHubApiError(f"github installation token request failed: {e}") from e
+    if resp.is_error:
+        snippet = (resp.text or "").replace("\n", " ")[:400]
+        raise GitHubApiError(
+            f"github installation token http {resp.status_code}"
+            + (f" — {snippet}" if snippet else ""),
+        ) from None
+    try:
+        data = resp.json()
+    except ValueError:
+        raise GitHubApiError(
+            f"github installation token response not json (http {resp.status_code})",
+        ) from None
+    token = data.get("token")
+    if not isinstance(token, str) or not token:
+        raise GitHubApiError("github installation token missing token field")
+    return token

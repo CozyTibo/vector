@@ -13,7 +13,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check
+.PHONY: help setup build up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build
 
 help:
 	@echo "Vector — Makefile (Docker Compose)"
@@ -21,6 +21,7 @@ help:
 	@echo "  make setup / build   Build images"
 	@echo "  make install         Create .env if needed, build, up, migrate (dev DB)"
 	@echo "  make up / down       Start or stop stack"
+	@echo "  make frontend-build  docker compose build frontend (after package.json / lock changes)"
 	@echo "  make migrate         alembic upgrade head (dev DB)"
 	@echo "  make migrate-down    alembic downgrade -1"
 	@echo "  make migrate-new     make migrate-new msg=\"description\""
@@ -32,7 +33,7 @@ help:
 	@echo "  make db-psql-test    psql on test DB"
 	@echo "  make test            migrate-test then pytest on test DB"
 	@echo "  make test-unit       pytest excluding @integration"
-	@echo "  make mypy / lint / fmt"
+	@echo "  make mypy / lint / fmt   (mypy checks src/vector + tests per pyproject)"
 	@echo "  make check           mypy + lint + test"
 	@echo "  make reinstall       down, rebuild --no-cache, up, migrate"
 	@echo "  make logs-frontend   docker compose logs -f frontend"
@@ -69,6 +70,9 @@ reinstall: down
 	$(COMPOSE) build --no-cache
 	$(COMPOSE) up -d
 	$(MAKE) migrate
+
+frontend-build: $(DOTENV)
+	$(COMPOSE) build frontend
 
 migrate: $(DOTENV)
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic upgrade head
@@ -114,7 +118,7 @@ test-unit: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) pytest -q -m "not integration"
 
 mypy: $(DOTENV)
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) mypy src/vector
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) mypy
 
 lint: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) ruff check src tests
