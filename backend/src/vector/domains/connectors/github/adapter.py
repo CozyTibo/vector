@@ -41,6 +41,7 @@ def github_status_item(
         connector_configured=True,
         connected=True,
         details=GithubConnectorDetails(
+            connection_id=link.connection.id,
             installation_id=link.installation_id,
             account_login=link.account_login,
             account_type=link.account_type,

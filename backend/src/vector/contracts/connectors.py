@@ -14,6 +14,10 @@ class GithubConnectorDetails(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    connection_id: uuid.UUID | None = Field(
+        default=None,
+        description="tenant_connections.id — use for projection debug and ingestion scope.",
+    )
     installation_id: int | None = None
     account_login: str | None = None
     account_type: str | None = None

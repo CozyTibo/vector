@@ -99,6 +99,7 @@ def test_github_sync_ok_when_core_mocked(
     run_id = uuid.uuid4()
     mock_run = MagicMock()
     mock_run.id = run_id
+    mock_run.connection_id = uuid.uuid4()
     mock_run.status = "succeeded"
     mock_run.error_summary = None
     mock_run.stats = {"records_written": 42}
@@ -111,6 +112,7 @@ def test_github_sync_ok_when_core_mocked(
         return mock_run
 
     monkeypatch.setattr(github_routes, "run_github_poll_ingestion_for_tenant", _stub)
+    monkeypatch.setattr(github_routes, "drain_github_projections", lambda *_a, **_k: None)
     r = client.post("/connectors/github/sync")
     assert r.status_code == 200
     body = r.json()

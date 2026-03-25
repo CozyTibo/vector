@@ -36,7 +36,9 @@ from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
 from vector.domains.ingestion.http_fetch import FetchFatalError
+from vector.domains.projections.github.worker import drain_github_projections
 from vector.infrastructure.db.repositories import ingestion_queries as ing_queries
+from vector.infrastructure.db.repositories.ingestion import RUN_STATUS_SUCCEEDED
 from vector.settings import Settings
 
 _logger = logging.getLogger(__name__)
@@ -141,6 +143,12 @@ def build_github_connector_router() -> APIRouter:
             run = run_github_poll_ingestion_for_tenant(db, settings, claims.tenant_id)
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        if run.status == RUN_STATUS_SUCCEEDED:
+            drain_github_projections(
+                db,
+                tenant_id=claims.tenant_id,
+                connection_id=run.connection_id,
+            )
         return GithubIngestionSyncResponse(
             run_id=run.id,
             status=run.status,
@@ -200,7 +208,10 @@ def build_github_connector_router() -> APIRouter:
             run_id=run_id,
         )
         if run is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ingestion run not found.") from None
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail="Ingestion run not found.",
+            ) from None
         page = ing_queries.list_raw_records_for_run(
             db,
             run_id=run_id,

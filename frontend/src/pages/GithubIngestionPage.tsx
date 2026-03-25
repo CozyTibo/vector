@@ -128,6 +128,16 @@ export default function GithubIngestionPage() {
         </p>
         <p className="meta">
           <Link to="/">← Back to dashboard</Link>
+          {runsQuery.data?.items[0]?.connection_id ? (
+            <>
+              {" · "}
+              <Link
+                to={`/debug/connectors/github/${runsQuery.data.items[0].connection_id}/projections`}
+              >
+                Debug: GitHub projections
+              </Link>
+            </>
+          ) : null}
         </p>
       </header>
 

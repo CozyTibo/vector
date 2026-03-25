@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -62,7 +61,11 @@ def get_github_ingestion_run_for_tenant(
 
 
 def count_raw_records_for_run(session: Session, run_id: uuid.UUID) -> int:
-    stmt = select(func.count()).select_from(RawIngestionRecord).where(RawIngestionRecord.run_id == run_id)
+    stmt = (
+        select(func.count())
+        .select_from(RawIngestionRecord)
+        .where(RawIngestionRecord.run_id == run_id)
+    )
     return int(session.scalar(stmt) or 0)
 
 

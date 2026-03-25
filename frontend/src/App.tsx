@@ -13,6 +13,7 @@ type MeResponse = {
 };
 
 type GithubConnectorDetails = {
+  connection_id: string | null;
   installation_id: number | null;
   account_login: string | null;
   account_type: string | null;
