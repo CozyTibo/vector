@@ -18,6 +18,7 @@ from vector.domains.projections.github.resource_types import (
     RT_COMMIT,
     RT_ISSUE,
     RT_PULL_REQUEST,
+    RT_PULL_REQUEST_COMMIT,
     RT_REPOSITORY,
 )
 from vector.infrastructure.db.models.github_projection import GithubRepository
@@ -121,6 +122,9 @@ def handle_github_raw_row(
         _project_repository(session, raw, payload, prov)
     elif rtype == RT_PULL_REQUEST:
         _project_pull_request(session, raw, payload, prov)
+    elif rtype == RT_PULL_REQUEST_COMMIT:
+        # Step 2 has no projection table for PR→commit links; Step 3 reads raw only.
+        pass
     elif rtype == RT_ISSUE:
         _project_issue(session, raw, payload, prov, metrics)
     elif rtype == RT_COMMIT:

@@ -28,3 +28,18 @@ def parse_commit_external_id(external_id: str) -> tuple[str, str] | None:
     if not repo or "/" not in repo or len(sha) < 7:
         return None
     return repo, sha
+
+
+def parse_pr_commit_link_external_id(external_id: str) -> tuple[str, int, str] | None:
+    """`owner/repo#num@sha` → (\"owner/repo\", num, sha)."""
+    if "@" not in external_id:
+        return None
+    left, sha = external_id.rsplit("@", 1)
+    sha = sha.strip()
+    if len(sha) < 7:
+        return None
+    pr = parse_issue_or_pr_external_id(left.strip())
+    if pr is None:
+        return None
+    repo, num = pr
+    return repo, num, sha

@@ -213,13 +213,24 @@ code {
   text-decoration: underline;
 }
 
-.data-table a.link-inline {
+/* Inline app links (tables + connection prose — one accent; no browser default purple/blue) */
+a.link-inline,
+a.debug-entity-link {
   color: #8ab4f8;
   text-decoration: none;
 }
 
-.data-table a.link-inline:hover {
+a.link-inline:hover,
+a.debug-entity-link:hover {
+  color: #aecbfa;
   text-decoration: underline;
+}
+
+a.link-inline:visited,
+a.link-inline:active,
+a.debug-entity-link:visited,
+a.debug-entity-link:active {
+  color: #8ab4f8;
 }
 
 .table-wrap {
@@ -297,4 +308,81 @@ code {
   max-height: min(32rem, 55vh);
   font-size: 0.78rem;
   line-height: 1.35;
+}
+
+/* /debug/canonical — execution graph (developer tool) */
+.debug-pill {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+.debug-pill--person {
+  background: rgba(107, 74, 122, 0.35);
+  color: #e8eaed;
+}
+.debug-pill--work {
+  background: rgba(44, 82, 130, 0.35);
+  color: #e8eaed;
+}
+
+/* Pills inside <Link>: inherit accent color (otherwise pill #e8eaed hides link styling) */
+a.link-inline .debug-pill--work,
+a.link-inline .debug-pill--person,
+a.debug-entity-link .debug-pill--work,
+a.debug-entity-link .debug-pill--person {
+  color: inherit;
+}
+
+.debug-connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.debug-connection-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+.debug-connection-meta {
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+.debug-relation-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #c9d1d9;
+  background: #252830;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+.debug-id-muted {
+  font-size: 0.8rem;
+}
+.debug-copy-id__code {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: #8b949e;
+}
+.debug-copy-id__code:hover {
+  color: #c9d1d9;
+}
+.debug-xref-headline {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+.debug-connection-prose-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.debug-connection-prose {
+  margin-bottom: 0.65rem;
+  line-height: 1.55;
+}
+.debug-bracket {
+  color: #9aa0a6;
 }

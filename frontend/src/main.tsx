@@ -3,6 +3,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import App from "./App.tsx";
+import ActorDetailPage from "./pages/debug/ActorDetailPage.tsx";
+import ArtifactDetailPage from "./pages/debug/ArtifactDetailPage.tsx";
+import CanonicalDebugPage from "./pages/debug/CanonicalDebugPage.tsx";
 import GithubIngestionPage from "./pages/GithubIngestionPage.tsx";
 import ProjectionDebugPage from "./pages/ProjectionDebugPage.tsx";
 import RawIngestionDebugPage from "./pages/RawIngestionDebugPage.tsx";
@@ -29,6 +32,9 @@ createRoot(document.getElementById("root")!).render(
             element={<ProjectionDebugPage />}
           />
           <Route path="/debug/ingestion/raw/:recordId" element={<RawIngestionDebugPage />} />
+          <Route path="/debug/canonical" element={<CanonicalDebugPage />} />
+          <Route path="/debug/canonical/artifacts/:artifactId" element={<ArtifactDetailPage />} />
+          <Route path="/debug/canonical/actors/:actorId" element={<ActorDetailPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

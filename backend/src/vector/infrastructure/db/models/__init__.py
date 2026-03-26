@@ -1,5 +1,21 @@
 """ORM models — import side effects register metadata."""
 
+from vector.infrastructure.db.models.canonical import (
+    Actor,
+    ActorExternalIdentity,
+    Artifact,
+    ArtifactChangeset,
+    ArtifactKind,
+    ArtifactRepository,
+    ArtifactRevision,
+    ArtifactTrackableUnit,
+    CurrentMapping,
+    ExternalReference,
+    MappingEvent,
+    RelationKind,
+    Relationship,
+    Step3CanonicalCursor,
+)
 from vector.infrastructure.db.models.connector_projection_progress import (
     ConnectorProjectionProgress,
 )
@@ -22,7 +38,21 @@ from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.models.user import User
 
 __all__ = [
+    "Actor",
+    "ActorExternalIdentity",
+    "Artifact",
+    "ArtifactChangeset",
+    "ArtifactKind",
+    "ArtifactRepository",
+    "ArtifactRevision",
+    "ArtifactTrackableUnit",
     "ConnectorProjectionProgress",
+    "CurrentMapping",
+    "ExternalReference",
+    "MappingEvent",
+    "RelationKind",
+    "Relationship",
+    "Step3CanonicalCursor",
     "ConnectorSyncState",
     "GithubCommit",
     "GithubConnectionDetail",

@@ -429,6 +429,8 @@ export default function App() {
                   </p>
                   <p className="meta">
                     <Link to="/github/ingestion">Browse synced raw rows by run →</Link>
+                    {" · "}
+                    <Link to="/debug/canonical">Execution Graph (debug) →</Link>
                   </p>
                   <div className="btn-row">
                     <button

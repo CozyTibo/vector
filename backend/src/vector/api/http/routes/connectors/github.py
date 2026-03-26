@@ -18,6 +18,7 @@ from vector.contracts.connectors import (
     GithubIngestionSyncResponse,
     GithubRawIngestionRecordItem,
 )
+from vector.domains.canonical.worker import drain_github_canonical
 from vector.domains.connectors.github.errors import (
     GitHubApiError,
     GitHubConnectorNotConfiguredError,
@@ -145,6 +146,11 @@ def build_github_connector_router() -> APIRouter:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
         if run.status == RUN_STATUS_SUCCEEDED:
             drain_github_projections(
+                db,
+                tenant_id=claims.tenant_id,
+                connection_id=run.connection_id,
+            )
+            drain_github_canonical(
                 db,
                 tenant_id=claims.tenant_id,
                 connection_id=run.connection_id,

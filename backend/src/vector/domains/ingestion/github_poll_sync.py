@@ -19,6 +19,7 @@ from vector.domains.ingestion.http_fetch import (
     FetchTransientError,
     raise_for_github_status,
 )
+from vector.domains.projections.github.resource_types import RT_PULL_REQUEST_COMMIT
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import ingestion as ing_repo
@@ -32,6 +33,7 @@ CONNECTOR = ing_repo.CONNECTOR_GITHUB
 SOURCE_POLL = ing_repo.SOURCE_TRIGGER_POLL
 API_INSTALLATION_REpos = "GET /installation/repositories"
 API_LIST_PULLS = "GET /repos/{owner}/{repo}/pulls"
+API_LIST_PULL_COMMITS = "GET /repos/{owner}/{repo}/pulls/{n}/commits"
 API_LIST_ISSUES = "GET /repos/{owner}/{repo}/issues"
 API_LIST_COMMITS = "GET /repos/{owner}/{repo}/commits"
 
@@ -359,6 +361,54 @@ def _sync_installation_repositories(
     return refs
 
 
+def _sync_pull_commits(
+    executor: FetchExecutor,
+    token: str,
+    ref: _RepoRef,
+    pr_number: int,
+    list_pulls_query: dict[str, Any],
+    batch: list[dict[str, Any]],
+    flush: Callable[[], None],
+) -> None:
+    """Append raw rows linking a PR to each commit on `GET .../pulls/{n}/commits`."""
+    page = 1
+    per_page = 100
+    while True:
+        qp: dict[str, Any] = {"per_page": per_page, "page": page}
+        path = f"/repos/{ref.owner}/{ref.name}/pulls/{pr_number}/commits"
+        resp = _get_json(executor, path, token, params=qp)
+        if resp.status_code == 404:
+            raise GitHubRepoNotFoundError(ref.full_name)
+        raise_for_github_status(resp)
+        items = resp.json()
+        if not isinstance(items, list):
+            raise FetchFatalError("pull commits: expected array")
+
+        for c in items:
+            if not isinstance(c, dict):
+                continue
+            sha = c.get("sha")
+            if not isinstance(sha, str) or len(sha) < 7:
+                continue
+            ext = f"{ref.full_name}#{pr_number}@{sha}"
+            batch.append(
+                {
+                    "resource_type": RT_PULL_REQUEST_COMMIT,
+                    "external_id": ext,
+                    "api_endpoint": API_LIST_PULL_COMMITS,
+                    "query_params": {**qp, "inherited_from": list_pulls_query},
+                    "payload_body": c,
+                    "http_status": resp.status_code,
+                },
+            )
+            if len(batch) >= 100:
+                flush()
+
+        if len(items) < per_page:
+            break
+        page += 1
+
+
 def _sync_pulls(
     session: Session,
     executor: FetchExecutor,
@@ -421,10 +471,15 @@ def _sync_pulls(
                 continue
             if latest_observed is None or upd > latest_observed:
                 latest_observed = upd
-            if watermark_s is not None and upd <= watermark_s:
-                continue
             num = pr.get("number")
             if not isinstance(num, int):
+                continue
+            # First pulls page = most recently updated PRs. Always re-fetch their commit lists
+            # so `github.pull_request_commit` rows exist even when the PR body is skipped by
+            # the pulls watermark (otherwise `contains` edges are never built after catch-up).
+            if page == 1:
+                _sync_pull_commits(executor, token, ref, num, qp, batch, flush)
+            if watermark_s is not None and upd <= watermark_s:
                 continue
             ext = f"{ref.full_name}#{num}"
             batch.append(
@@ -439,6 +494,8 @@ def _sync_pulls(
             )
             if len(batch) >= 100:
                 flush()
+            if page != 1:
+                _sync_pull_commits(executor, token, ref, num, qp, batch, flush)
 
         if items and watermark_s is not None and page_all_old:
             break
