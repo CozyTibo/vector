@@ -4,24 +4,33 @@ import { Link, useParams } from "react-router-dom";
 
 import { formatArtifactListLine, workObjectTypeLabel } from "../../lib/executionModelDisplay";
 import {
+  adminCanonicalClient,
   fetchArtifactDetail,
   fetchMappingEventsForXref,
-  getApiBase,
+  sessionCanonicalClient,
   type ArtifactDetailResponse,
+  type CanonicalClient,
 } from "../../lib/canonicalApi";
+import { getAdminPassword } from "../../lib/adminCredentials";
 
-function TargetLink(ep: { type: string; id: string; label: string }) {
+function TargetLink({
+  ep,
+  linkPrefix,
+}: {
+  ep: { type: string; id: string; label: string };
+  linkPrefix: string;
+}) {
   const text = ep.label?.trim() || ep.id.slice(0, 8) + "…";
   if (ep.type === "artifact") {
     return (
-      <Link to={`/debug/canonical/artifacts/${ep.id}`} className="link-inline" title={ep.id}>
+      <Link to={`${linkPrefix}/artifacts/${ep.id}`} className="link-inline" title={ep.id}>
         {text}
       </Link>
     );
   }
   if (ep.type === "actor") {
     return (
-      <Link to={`/debug/canonical/actors/${ep.id}`} className="link-inline" title={ep.id}>
+      <Link to={`${linkPrefix}/actors/${ep.id}`} className="link-inline" title={ep.id}>
         {text}
       </Link>
     );
@@ -47,22 +56,37 @@ function splitRels(artifactId: string, rels: ArtifactDetailResponse["relationshi
   return { outgoing, incoming };
 }
 
+function clientTag(c: CanonicalClient): string {
+  return c.kind === "session" ? "session" : `admin:${c.tenantId}`;
+}
+
 export default function ArtifactDetailPage() {
-  const { artifactId = "" } = useParams<{ artifactId: string }>();
-  const apiBase = useMemo(() => getApiBase(), []);
+  const { artifactId = "", tenantId } = useParams<{ artifactId: string; tenantId?: string }>();
+  const adminPw = tenantId ? getAdminPassword() : null;
+  const client = useMemo((): CanonicalClient | null => {
+    if (tenantId) {
+      if (!adminPw) {
+        return null;
+      }
+      return adminCanonicalClient(tenantId, adminPw);
+    }
+    return sessionCanonicalClient();
+  }, [tenantId, adminPw]);
+  const entityBase = tenantId ? `/admin/tenants/${tenantId}/step3` : `/debug/canonical`;
+  const cqTag = client ? clientTag(client) : "none";
 
   const detailQuery = useQuery({
-    queryKey: ["canonical-artifact-detail", apiBase, artifactId],
-    queryFn: () => fetchArtifactDetail(apiBase, artifactId),
-    enabled: Boolean(artifactId),
+    queryKey: ["canonical-artifact-detail", cqTag, artifactId],
+    queryFn: () => fetchArtifactDetail(client!, artifactId),
+    enabled: Boolean(artifactId) && client !== null,
   });
 
   const xrefs = detailQuery.data?.external_references ?? [];
   const mappingQueries = useQueries({
     queries: xrefs.map((x) => ({
-      queryKey: ["canonical-mapping-events", apiBase, x.id],
-      queryFn: () => fetchMappingEventsForXref(apiBase, x.id),
-      enabled: Boolean(detailQuery.data) && xrefs.length > 0,
+      queryKey: ["canonical-mapping-events", cqTag, x.id],
+      queryFn: () => fetchMappingEventsForXref(client!, x.id),
+      enabled: Boolean(detailQuery.data) && xrefs.length > 0 && client !== null,
     })),
   });
 
@@ -94,6 +118,17 @@ export default function ArtifactDetailPage() {
     return splitRels(artifactId, detailQuery.data.relationships);
   }, [detailQuery.data, artifactId]);
 
+  if (tenantId && !adminPw) {
+    return (
+      <div className="app legacy-debug">
+        <p className="banner error">Admin session missing — sign in at /admin again.</p>
+        <p className="meta">
+          <Link to="/admin">← Admin</Link>
+        </p>
+      </div>
+    );
+  }
+
   const selfLine = useMemo(() => {
     if (!detailQuery.data) {
       return "";
@@ -108,10 +143,10 @@ export default function ArtifactDetailPage() {
 
   if (detailQuery.isError) {
     return (
-      <div className="app">
+      <div className="app legacy-debug">
         <p className="banner error">{(detailQuery.error as Error).message}</p>
         <p className="meta">
-          <Link to="/debug/canonical">← Execution Graph</Link>
+          <Link to={entityBase}>← Execution Graph</Link>
         </p>
       </div>
     );
@@ -119,10 +154,10 @@ export default function ArtifactDetailPage() {
 
   if (detailQuery.isPending || !detailQuery.data) {
     return (
-      <div className="app">
+      <div className="app legacy-debug">
         <p className="status loading">Loading work object…</p>
         <p className="meta">
-          <Link to="/debug/canonical">← Execution Graph</Link>
+          <Link to={entityBase}>← Execution Graph</Link>
         </p>
       </div>
     );
@@ -132,13 +167,13 @@ export default function ArtifactDetailPage() {
   const typeLabel = workObjectTypeLabel(artifact.artifact_kind);
 
   return (
-    <div className="app">
+    <div className="app legacy-debug">
       <header className="header">
         <h1>{selfLine}</h1>
         <p className="meta">
-          <Link to="/debug/canonical">← Execution Graph</Link>
+          <Link to={entityBase}>← Execution Graph</Link>
           {" · "}
-          <Link to={`/debug/canonical?tab=graph`}>Graph</Link>
+          <Link to={`${entityBase}?tab=graph`}>Graph</Link>
         </p>
       </header>
 
@@ -178,7 +213,7 @@ export default function ArtifactDetailPage() {
               <li key={r.id} className="debug-connection-prose">
                 <span className="debug-bracket">[{selfLine}]</span>{" "}
                 <span className="debug-relation-badge">{r.relation_kind}</span> →{" "}
-                <TargetLink {...r.object} />
+                <TargetLink ep={r.object} linkPrefix={entityBase} />
               </li>
             ))}
           </ul>
@@ -196,7 +231,7 @@ export default function ArtifactDetailPage() {
           <ul className="debug-connection-prose-list">
             {incoming.map((r) => (
               <li key={r.id} className="debug-connection-prose">
-                <TargetLink {...r.subject} />{" "}
+                <TargetLink ep={r.subject} linkPrefix={entityBase} />{" "}
                 <span className="debug-relation-badge">{r.relation_kind}</span> →{" "}
                 <span className="debug-bracket">[{selfLine}]</span>
               </li>

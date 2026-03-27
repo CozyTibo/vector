@@ -51,7 +51,7 @@ export default function RawIngestionDebugPage() {
       : "/";
 
   return (
-    <div className="app">
+    <div className="app legacy-debug">
       <header className="header">
         <h1>Debug — raw ingestion record</h1>
         <p className="subtitle">

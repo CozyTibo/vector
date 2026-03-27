@@ -27,6 +27,7 @@ from vector.domains.connectors.github.install_state import (
     create_install_state_token,
     parse_install_state_token,
 )
+from vector.domains.connectors.github.return_path import sanitize_github_install_return_to
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 from vector.settings import Settings
@@ -54,10 +55,13 @@ def start_github_install_url(
     settings: Settings,
     tenant_id: uuid.UUID,
     user_id: uuid.UUID,
+    *,
+    return_to: str | None = None,
 ) -> str:
     if not github_connector_configured(settings):
         raise GitHubConnectorNotConfiguredError("github app is not configured")
-    state = create_install_state_token(settings, tenant_id, user_id)
+    safe = sanitize_github_install_return_to(return_to)
+    state = create_install_state_token(settings, tenant_id, user_id, return_to=safe)
     base = GITHUB_INSTALL_NEW_URL_TEMPLATE.format(slug=settings.github_app_slug.strip())
     return f"{base}?state={quote(state, safe='')}"
 
@@ -83,12 +87,13 @@ def complete_github_install(
     installation_id: int | None,
     exchange_code: Callable[[Settings, str], GitHubUserTokenExchange] | None = None,
     fetch_installation: Callable[[Settings, int], dict[str, Any]] | None = None,
-) -> gh_repo.GithubTenantLink:
+) -> tuple[gh_repo.GithubTenantLink, str | None]:
     if not github_connector_configured(settings):
         raise GitHubConnectorNotConfiguredError("github app is not configured")
     if installation_id is None:
         raise GitHubInstallMissingError("missing installation_id")
     claims: GitHubInstallStateClaims = parse_install_state_token(settings, state)
+    redirect_after = claims.return_to
     if tenancy_repo.get_membership_for_user_tenant(
         session,
         claims.user_id,
@@ -121,7 +126,7 @@ def complete_github_install(
         raise GitHubInstallationConflictError()
 
     account_id, account_login, account_type = _account_from_installation_payload(inst_payload)
-    return gh_repo.upsert_github_connection(
+    link = gh_repo.upsert_github_connection(
         session,
         tenant_id=tenant_id,
         installation_id=installation_id,
@@ -130,3 +135,4 @@ def complete_github_install(
         account_type=account_type,
         connected_by_user_id=user_id,
     )
+    return link, redirect_after

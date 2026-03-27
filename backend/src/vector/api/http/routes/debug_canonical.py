@@ -6,7 +6,6 @@ import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
@@ -20,33 +19,16 @@ from vector.contracts.debug_canonical import (
     SubgraphResponse,
 )
 from vector.domains.canonical.worker import count_canonical_lag, drain_github_canonical
+from vector.domains.debug.github_pipeline_wipe import (
+    rebuild_derived_from_step1_github,
+    reset_github_pipeline_state,
+)
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
 from vector.domains.projections.github.worker import drain_github_projections
-from vector.infrastructure.db.models.canonical import (
-    Actor,
-    ActorExternalIdentity,
-    Artifact,
-    CurrentMapping,
-    ExternalReference,
-    MappingEvent,
-    Relationship,
-    Step3CanonicalCursor,
-)
-from vector.infrastructure.db.models.connector_projection_progress import (
-    ConnectorProjectionProgress,
-)
-from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
-from vector.infrastructure.db.models.github_projection import (
-    GithubCommit,
-    GithubIssue,
-    GithubPullRequest,
-    GithubRepository,
-    GithubUser,
-)
-from vector.infrastructure.db.models.ingestion_run import IngestionRun
+from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
 from vector.infrastructure.db.repositories import canonical_debug_queries as cq
 from vector.infrastructure.db.repositories import projection_debug_queries as dbg
 from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB, RUN_STATUS_SUCCEEDED
@@ -54,149 +36,6 @@ from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB, RU
 
 def build_debug_canonical_router() -> APIRouter:
     r = APIRouter()
-
-    def _wipe_step3_canonical_for_tenant_connection(
-        db: Session,
-        *,
-        tenant_id: uuid.UUID,
-        connection_id: uuid.UUID,
-    ) -> None:
-        db.execute(delete(Relationship).where(Relationship.tenant_id == tenant_id))
-        db.execute(delete(MappingEvent).where(MappingEvent.tenant_id == tenant_id))
-        db.execute(delete(CurrentMapping).where(CurrentMapping.tenant_id == tenant_id))
-        db.execute(delete(ExternalReference).where(ExternalReference.tenant_id == tenant_id))
-        db.execute(
-            delete(ActorExternalIdentity).where(ActorExternalIdentity.tenant_id == tenant_id),
-        )
-        db.execute(delete(Artifact).where(Artifact.tenant_id == tenant_id))
-        db.execute(delete(Actor).where(Actor.tenant_id == tenant_id))
-        db.execute(
-            delete(Step3CanonicalCursor).where(
-                Step3CanonicalCursor.tenant_id == tenant_id,
-                Step3CanonicalCursor.connection_id == connection_id,
-                Step3CanonicalCursor.connector == CONNECTOR_GITHUB,
-            ),
-        )
-
-    def _wipe_step2_github_projections_for_connection(
-        db: Session,
-        *,
-        tenant_id: uuid.UUID,
-        connection_id: uuid.UUID,
-    ) -> None:
-        db.execute(
-            delete(GithubCommit).where(
-                GithubCommit.tenant_id == tenant_id,
-                GithubCommit.connection_id == connection_id,
-            ),
-        )
-        db.execute(
-            delete(GithubIssue).where(
-                GithubIssue.tenant_id == tenant_id,
-                GithubIssue.connection_id == connection_id,
-            ),
-        )
-        db.execute(
-            delete(GithubPullRequest).where(
-                GithubPullRequest.tenant_id == tenant_id,
-                GithubPullRequest.connection_id == connection_id,
-            ),
-        )
-        db.execute(
-            delete(GithubRepository).where(
-                GithubRepository.tenant_id == tenant_id,
-                GithubRepository.connection_id == connection_id,
-            ),
-        )
-        db.execute(
-            delete(GithubUser).where(
-                GithubUser.tenant_id == tenant_id,
-                GithubUser.connection_id == connection_id,
-            ),
-        )
-        db.execute(
-            delete(ConnectorProjectionProgress).where(
-                ConnectorProjectionProgress.tenant_id == tenant_id,
-                ConnectorProjectionProgress.connection_id == connection_id,
-                ConnectorProjectionProgress.connector == CONNECTOR_GITHUB,
-            ),
-        )
-
-    def _wipe_step1_github_ingestion_for_connection(
-        db: Session,
-        *,
-        tenant_id: uuid.UUID,
-        connection_id: uuid.UUID,
-    ) -> None:
-        db.execute(
-            delete(IngestionRun).where(
-                IngestionRun.tenant_id == tenant_id,
-                IngestionRun.connection_id == connection_id,
-                IngestionRun.connector == CONNECTOR_GITHUB,
-            ),
-        )
-        db.execute(
-            delete(ConnectorSyncState).where(
-                ConnectorSyncState.tenant_id == tenant_id,
-                ConnectorSyncState.connection_id == connection_id,
-                ConnectorSyncState.connector == CONNECTOR_GITHUB,
-            ),
-        )
-
-    def _reset_github_pipeline_state(
-        db: Session,
-        *,
-        tenant_id: uuid.UUID,
-        connection_id: uuid.UUID,
-    ) -> None:
-        """Nuclear reset: Step 3 + Step 2 + Step 1 (raw runs + sync watermarks)."""
-        _wipe_step3_canonical_for_tenant_connection(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-        )
-        _wipe_step2_github_projections_for_connection(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-        )
-        _wipe_step1_github_ingestion_for_connection(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-        )
-        db.commit()
-
-    def _rebuild_derived_from_step1_github(
-        db: Session,
-        *,
-        tenant_id: uuid.UUID,
-        connection_id: uuid.UUID,
-    ) -> tuple[Any, Any]:
-        """Keep raw rows; wipe Step 3 + Step 2; replay projection + canonical."""
-        _wipe_step3_canonical_for_tenant_connection(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-        )
-        _wipe_step2_github_projections_for_connection(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-        )
-        db.commit()
-        p = drain_github_projections(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-        )
-        c = drain_github_canonical(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-            connector=CONNECTOR_GITHUB,
-        )
-        return p, c
 
     @r.get("/canonical/actors", response_model=PaginatedResponse)
     def list_actors(
@@ -395,8 +234,6 @@ def build_debug_canonical_router() -> APIRouter:
             connection_id=connection_id,
             connector=connector,
         )
-        from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
-
         cursor_row = db.get(Step3CanonicalCursor, (connection_id, connector))
         ts = cursor_row.last_processed_at if cursor_row else None
         return CanonicalStatusResponse(
@@ -524,7 +361,7 @@ def build_debug_canonical_router() -> APIRouter:
         ):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Connection not found.") from None
 
-        _reset_github_pipeline_state(
+        reset_github_pipeline_state(
             db,
             tenant_id=claims.tenant_id,
             connection_id=connection_id,
@@ -587,7 +424,7 @@ def build_debug_canonical_router() -> APIRouter:
             connection_id=connection_id,
         ):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Connection not found.") from None
-        p, c = _rebuild_derived_from_step1_github(
+        p, c = rebuild_derived_from_step1_github(
             db,
             tenant_id=claims.tenant_id,
             connection_id=connection_id,

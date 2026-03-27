@@ -1,7 +1,37 @@
-/** Fetch helpers for /debug/canonical (Step 3 ontology debug). */
+/** Fetch helpers for Step 3 canonical debug (session cookie or admin Basic). */
 
 export function getApiBase(): string {
   return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, "");
+}
+
+/** Client for `/debug/canonical` (product session) or `/admin/tenants/:id/canonical` (Basic). */
+export type CanonicalClient =
+  | { kind: "session"; base: string }
+  | { kind: "admin"; base: string; tenantId: string; password: string; basicUser?: string };
+
+export function sessionCanonicalClient(): CanonicalClient {
+  return { kind: "session", base: getApiBase() };
+}
+
+export function adminCanonicalClient(tenantId: string, password: string): CanonicalClient {
+  return { kind: "admin", base: getApiBase(), tenantId, password };
+}
+
+export function canonicalPrefix(c: CanonicalClient): string {
+  if (c.kind === "session") {
+    return `${c.base}/debug/canonical`;
+  }
+  return `${c.base}/admin/tenants/${c.tenantId}/canonical`;
+}
+
+function fetchInit(c: CanonicalClient, init?: RequestInit): RequestInit {
+  if (c.kind === "session") {
+    return { ...init, credentials: "include" };
+  }
+  const u = c.basicUser ?? "admin";
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Basic ${btoa(`${u}:${c.password}`)}`);
+  return { ...init, headers };
 }
 
 export async function readErrorDetail(res: Response): Promise<string> {
@@ -14,6 +44,18 @@ export async function readErrorDetail(res: Response): Promise<string> {
     /* ignore */
   }
   return `HTTP ${res.status}`;
+}
+
+async function canonJson<T>(c: CanonicalClient, pathAndQuery: string): Promise<T> {
+  const url = `${canonicalPrefix(c)}/${pathAndQuery}`;
+  const res = await fetch(url, fetchInit(c));
+  if (res.status === 401) {
+    throw new Error(c.kind === "session" ? "Not signed in" : "Admin authentication failed");
+  }
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return res.json() as Promise<T>;
 }
 
 export type Paginated<T> = {
@@ -51,19 +93,8 @@ export function relationKindName(id: number | null | undefined): string {
   return RELATION_KIND_BY_ID[id] ?? String(id);
 }
 
-async function jsonFetch<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
-  if (res.status === 401) {
-    throw new Error("Not signed in");
-  }
-  if (!res.ok) {
-    throw new Error(await readErrorDetail(res));
-  }
-  return res.json() as Promise<T>;
-}
-
 export async function fetchArtifactsPage(
-  base: string,
+  c: CanonicalClient,
   opts: { limit: number; offset: number; q?: string },
 ): Promise<Paginated<Record<string, unknown>>> {
   const q = new URLSearchParams({
@@ -73,11 +104,11 @@ export async function fetchArtifactsPage(
   if (opts.q?.trim()) {
     q.set("q", opts.q.trim());
   }
-  return jsonFetch(`${base}/debug/canonical/artifacts?${q}`);
+  return canonJson(c, `artifacts?${q}`);
 }
 
 export async function fetchActorsPage(
-  base: string,
+  c: CanonicalClient,
   opts: { limit: number; offset: number; q?: string },
 ): Promise<Paginated<Record<string, unknown>>> {
   const q = new URLSearchParams({
@@ -87,11 +118,11 @@ export async function fetchActorsPage(
   if (opts.q?.trim()) {
     q.set("q", opts.q.trim());
   }
-  return jsonFetch(`${base}/debug/canonical/actors?${q}`);
+  return canonJson(c, `actors?${q}`);
 }
 
 export async function fetchRelationshipsPage(
-  base: string,
+  c: CanonicalClient,
   opts: { limit: number; offset: number; currentOnly?: boolean },
 ): Promise<Paginated<Record<string, unknown>>> {
   const q = new URLSearchParams({
@@ -99,18 +130,18 @@ export async function fetchRelationshipsPage(
     offset: String(opts.offset),
     current_only: String(opts.currentOnly ?? true),
   });
-  return jsonFetch(`${base}/debug/canonical/relationships?${q}`);
+  return canonJson(c, `relationships?${q}`);
 }
 
 export async function fetchExternalReferencesPage(
-  base: string,
+  c: CanonicalClient,
   opts: { limit: number; offset: number },
 ): Promise<Paginated<Record<string, unknown>>> {
   const q = new URLSearchParams({
     limit: String(opts.limit),
     offset: String(opts.offset),
   });
-  return jsonFetch(`${base}/debug/canonical/external-references?${q}`);
+  return canonJson(c, `external-references?${q}`);
 }
 
 export type RelEndpoint = { type: string; id: string; label: string };
@@ -143,10 +174,10 @@ export type ArtifactDetailResponse = {
 };
 
 export async function fetchArtifactDetail(
-  base: string,
+  c: CanonicalClient,
   artifactId: string,
 ): Promise<ArtifactDetailResponse> {
-  return jsonFetch(`${base}/debug/canonical/artifacts/${encodeURIComponent(artifactId)}`);
+  return canonJson(c, `artifacts/${encodeURIComponent(artifactId)}`);
 }
 
 export type ActorDetailResponse = {
@@ -165,8 +196,11 @@ export type ActorDetailResponse = {
   relationships: ArtifactDetailResponse["relationships"];
 };
 
-export async function fetchActorDetail(base: string, actorId: string): Promise<ActorDetailResponse> {
-  return jsonFetch(`${base}/debug/canonical/actors/${encodeURIComponent(actorId)}`);
+export async function fetchActorDetail(
+  c: CanonicalClient,
+  actorId: string,
+): Promise<ActorDetailResponse> {
+  return canonJson(c, `actors/${encodeURIComponent(actorId)}`);
 }
 
 export type MappingEventRow = {
@@ -178,7 +212,7 @@ export type MappingEventRow = {
 };
 
 export async function fetchMappingEventsForXref(
-  base: string,
+  c: CanonicalClient,
   externalReferenceId: string,
 ): Promise<Paginated<MappingEventRow>> {
   const q = new URLSearchParams({
@@ -186,7 +220,7 @@ export async function fetchMappingEventsForXref(
     offset: "0",
     external_reference_id: externalReferenceId,
   });
-  return jsonFetch(`${base}/debug/canonical/mapping-events?${q}`);
+  return canonJson(c, `mapping-events?${q}`);
 }
 
 export type CanonicalStatusResponse = {
@@ -202,7 +236,7 @@ export type CanonicalStatusResponse = {
 };
 
 export async function fetchCanonicalStatus(
-  base: string,
+  c: CanonicalClient,
   connectionId: string,
   connector = "github",
 ): Promise<CanonicalStatusResponse> {
@@ -210,7 +244,7 @@ export async function fetchCanonicalStatus(
     connection_id: connectionId,
     connector,
   });
-  return jsonFetch(`${base}/debug/canonical/status?${q}`);
+  return canonJson(c, `status?${q}`);
 }
 
 export type CanonicalResetResyncResponse = {
@@ -224,7 +258,7 @@ export type CanonicalResetResyncResponse = {
 };
 
 export async function resetAndResyncCanonical(
-  base: string,
+  c: CanonicalClient,
   connectionId: string,
 ): Promise<CanonicalResetResyncResponse> {
   const q = new URLSearchParams({
@@ -232,12 +266,9 @@ export async function resetAndResyncCanonical(
     connector: "github",
     confirm: "RESET",
   });
-  const res = await fetch(`${base}/debug/canonical/reset-and-resync?${q}`, {
-    method: "POST",
-    credentials: "include",
-  });
+  const res = await fetch(`${canonicalPrefix(c)}/reset-and-resync?${q}`, fetchInit(c, { method: "POST" }));
   if (res.status === 401) {
-    throw new Error("Not signed in");
+    throw new Error(c.kind === "session" ? "Not signed in" : "Admin authentication failed");
   }
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
@@ -253,7 +284,7 @@ export type RebuildFromStep1Response = {
 };
 
 export async function rebuildFromStep1Canonical(
-  base: string,
+  c: CanonicalClient,
   connectionId: string,
 ): Promise<RebuildFromStep1Response> {
   const q = new URLSearchParams({
@@ -261,12 +292,12 @@ export async function rebuildFromStep1Canonical(
     connector: "github",
     confirm: "REBUILD",
   });
-  const res = await fetch(`${base}/debug/canonical/rebuild-from-step1?${q}`, {
-    method: "POST",
-    credentials: "include",
-  });
+  const res = await fetch(
+    `${canonicalPrefix(c)}/rebuild-from-step1?${q}`,
+    fetchInit(c, { method: "POST" }),
+  );
   if (res.status === 401) {
-    throw new Error("Not signed in");
+    throw new Error(c.kind === "session" ? "Not signed in" : "Admin authentication failed");
   }
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
@@ -300,7 +331,7 @@ export type SubgraphResponse = {
 };
 
 export async function fetchSubgraphByArtifact(
-  base: string,
+  c: CanonicalClient,
   artifactId: string,
   depth: number,
 ): Promise<SubgraphResponse> {
@@ -308,11 +339,11 @@ export async function fetchSubgraphByArtifact(
     artifact_id: artifactId,
     depth: String(Math.min(depth, 2)),
   });
-  return jsonFetch(`${base}/debug/canonical/subgraph?${q}`);
+  return canonJson(c, `subgraph?${q}`);
 }
 
 export async function fetchSubgraphByActor(
-  base: string,
+  c: CanonicalClient,
   actorId: string,
   depth: number,
 ): Promise<SubgraphResponse> {
@@ -320,13 +351,35 @@ export async function fetchSubgraphByActor(
     actor_id: actorId,
     depth: String(Math.min(depth, 2)),
   });
-  return jsonFetch(`${base}/debug/canonical/subgraph?${q}`);
+  return canonJson(c, `subgraph?${q}`);
 }
 
 export type IngestionRunsResponse = {
   items: { id: string; connection_id: string }[];
 };
 
-export async function fetchGithubIngestionRuns(base: string): Promise<IngestionRunsResponse> {
-  return jsonFetch(`${base}/connectors/github/ingestion/runs`);
+export async function fetchGithubIngestionRuns(c: CanonicalClient): Promise<IngestionRunsResponse> {
+  if (c.kind === "session") {
+    const res = await fetch(`${c.base}/connectors/github/ingestion/runs`, fetchInit(c));
+    if (res.status === 401) {
+      throw new Error("Not signed in");
+    }
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
+    const body = (await res.json()) as { items: { id: string; connection_id: string }[] };
+    return { items: body.items };
+  }
+  const res = await fetch(
+    `${c.base}/admin/tenants/${c.tenantId}/github/ingestion/runs`,
+    fetchInit(c),
+  );
+  if (res.status === 401) {
+    throw new Error("Admin authentication failed");
+  }
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  const body = (await res.json()) as { items: { id: string; connection_id: string }[] };
+  return { items: body.items };
 }

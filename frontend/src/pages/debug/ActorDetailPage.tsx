@@ -3,20 +3,33 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { entityRoleLabel } from "../../lib/executionModelDisplay";
-import { fetchActorDetail, getApiBase, type ActorDetailResponse } from "../../lib/canonicalApi";
+import {
+  adminCanonicalClient,
+  fetchActorDetail,
+  sessionCanonicalClient,
+  type ActorDetailResponse,
+  type CanonicalClient,
+} from "../../lib/canonicalApi";
+import { getAdminPassword } from "../../lib/adminCredentials";
 
-function TargetLink(ep: { type: string; id: string; label: string }) {
+function TargetLink({
+  ep,
+  linkPrefix,
+}: {
+  ep: { type: string; id: string; label: string };
+  linkPrefix: string;
+}) {
   const text = ep.label?.trim() || ep.id.slice(0, 8) + "…";
   if (ep.type === "artifact") {
     return (
-      <Link to={`/debug/canonical/artifacts/${ep.id}`} className="link-inline" title={ep.id}>
+      <Link to={`${linkPrefix}/artifacts/${ep.id}`} className="link-inline" title={ep.id}>
         {text}
       </Link>
     );
   }
   if (ep.type === "actor") {
     return (
-      <Link to={`/debug/canonical/actors/${ep.id}`} className="link-inline" title={ep.id}>
+      <Link to={`${linkPrefix}/actors/${ep.id}`} className="link-inline" title={ep.id}>
         {text}
       </Link>
     );
@@ -41,22 +54,48 @@ function otherEndpoint(
   return r.object;
 }
 
+function clientTag(c: CanonicalClient): string {
+  return c.kind === "session" ? "session" : `admin:${c.tenantId}`;
+}
+
 export default function ActorDetailPage() {
-  const { actorId = "" } = useParams<{ actorId: string }>();
-  const apiBase = useMemo(() => getApiBase(), []);
+  const { actorId = "", tenantId } = useParams<{ actorId: string; tenantId?: string }>();
+  const adminPw = tenantId ? getAdminPassword() : null;
+  const client = useMemo((): CanonicalClient | null => {
+    if (tenantId) {
+      if (!adminPw) {
+        return null;
+      }
+      return adminCanonicalClient(tenantId, adminPw);
+    }
+    return sessionCanonicalClient();
+  }, [tenantId, adminPw]);
+  const entityBase = tenantId ? `/admin/tenants/${tenantId}/step3` : `/debug/canonical`;
+  const cqTag = client ? clientTag(client) : "none";
 
   const detailQuery = useQuery({
-    queryKey: ["canonical-actor-detail", apiBase, actorId],
-    queryFn: () => fetchActorDetail(apiBase, actorId),
-    enabled: Boolean(actorId),
+    queryKey: ["canonical-actor-detail", cqTag, actorId],
+    queryFn: () => fetchActorDetail(client!, actorId),
+    enabled: Boolean(actorId) && client !== null,
   });
+
+  if (tenantId && !adminPw) {
+    return (
+      <div className="app legacy-debug">
+        <p className="banner error">Admin session missing — sign in at /admin again.</p>
+        <p className="meta">
+          <Link to="/admin">← Admin</Link>
+        </p>
+      </div>
+    );
+  }
 
   if (detailQuery.isError) {
     return (
-      <div className="app">
+      <div className="app legacy-debug">
         <p className="banner error">{(detailQuery.error as Error).message}</p>
         <p className="meta">
-          <Link to="/debug/canonical">← Execution Graph</Link>
+          <Link to={entityBase}>← Execution Graph</Link>
         </p>
       </div>
     );
@@ -64,10 +103,10 @@ export default function ActorDetailPage() {
 
   if (detailQuery.isPending || !detailQuery.data) {
     return (
-      <div className="app">
+      <div className="app legacy-debug">
         <p className="status loading">Loading person…</p>
         <p className="meta">
-          <Link to="/debug/canonical">← Execution Graph</Link>
+          <Link to={entityBase}>← Execution Graph</Link>
         </p>
       </div>
     );
@@ -77,11 +116,11 @@ export default function ActorDetailPage() {
   const displayTitle = actor.display_name?.trim() || "Person";
 
   return (
-    <div className="app">
+    <div className="app legacy-debug">
       <header className="header">
         <h1>{displayTitle}</h1>
         <p className="meta">
-          <Link to="/debug/canonical?tab=actors">← Execution Graph</Link>
+          <Link to={`${entityBase}?tab=actors`}>← Execution Graph</Link>
         </p>
       </header>
 
@@ -170,7 +209,7 @@ export default function ActorDetailPage() {
                         <span className="debug-relation-badge">{r.relation_kind}</span>
                       </td>
                       <td>
-                        <TargetLink {...other} />
+                        <TargetLink ep={other} linkPrefix={entityBase} />
                       </td>
                       <td className="cell-muted">{entityRoleLabel(other.type)}</td>
                       <td>{r.valid_from}</td>

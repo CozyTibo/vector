@@ -40,6 +40,23 @@ def test_install_state_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
     parsed = parse_install_state_token(settings, raw)
     assert parsed.tenant_id == tid
     assert parsed.user_id == uid
+    assert parsed.return_to is None
+
+
+def test_install_state_return_to_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-at-least-32-characters-long!!")
+    get_settings.cache_clear()
+    settings = get_settings()
+    tid = uuid.uuid4()
+    uid = uuid.uuid4()
+    raw = create_install_state_token(
+        settings,
+        tid,
+        uid,
+        return_to="/app/onboarding",
+    )
+    parsed = parse_install_state_token(settings, raw)
+    assert parsed.return_to == "/app/onboarding"
 
 
 def test_install_state_tamper_raises(monkeypatch: pytest.MonkeyPatch) -> None:

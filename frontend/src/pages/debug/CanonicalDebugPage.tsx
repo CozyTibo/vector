@@ -16,10 +16,10 @@ import {
   fetchRelationshipsPage,
   fetchSubgraphByActor,
   fetchSubgraphByArtifact,
-  getApiBase,
   relationKindName,
   rebuildFromStep1Canonical,
   resetAndResyncCanonical,
+  type CanonicalClient,
   type SubgraphResponse,
 } from "../../lib/canonicalApi";
 
@@ -36,8 +36,31 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export default function CanonicalDebugPage() {
-  const apiBase = useMemo(() => getApiBase(), []);
+function clientQueryTag(c: CanonicalClient): string {
+  return c.kind === "session" ? "session" : `admin:${c.tenantId}`;
+}
+
+export type CanonicalDebugPageProps = {
+  client: CanonicalClient;
+  /** Base path for in-app entity routes (no trailing slash). */
+  entityBasePath: string;
+  dashboardHref?: string;
+  /** `admin` uses light chrome to match Vector Admin; `developer` keeps the dark debug HUD. */
+  visualTheme?: "developer" | "admin";
+};
+
+export default function CanonicalDebugPage({
+  client: canonicalClient,
+  entityBasePath,
+  dashboardHref = "/app",
+  visualTheme = "developer",
+}: CanonicalDebugPageProps) {
+  const isAdminShell = visualTheme === "admin";
+  const rawIngestionHref =
+    canonicalClient.kind === "admin"
+      ? `/admin/tenants/${canonicalClient.tenantId}/step1`
+      : "/admin";
+  const cqTag = useMemo(() => clientQueryTag(canonicalClient), [canonicalClient]);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as TabId | null;
@@ -57,8 +80,8 @@ export default function CanonicalDebugPage() {
   const connectionFromUrl = searchParams.get("connection_id") ?? "";
 
   const runsQuery = useQuery({
-    queryKey: ["github-ingestion-runs", apiBase],
-    queryFn: () => fetchGithubIngestionRuns(apiBase),
+    queryKey: ["github-ingestion-runs", cqTag],
+    queryFn: () => fetchGithubIngestionRuns(canonicalClient),
   });
 
   const connectionOptions = useMemo(() => {
@@ -92,15 +115,15 @@ export default function CanonicalDebugPage() {
   }, [connectionFromUrl]);
 
   const statusQuery = useQuery({
-    queryKey: ["canonical-status", apiBase, statusConnectionId],
-    queryFn: () => fetchCanonicalStatus(apiBase, statusConnectionId),
+    queryKey: ["canonical-status", cqTag, statusConnectionId],
+    queryFn: () => fetchCanonicalStatus(canonicalClient, statusConnectionId),
     enabled: Boolean(statusConnectionId) && tab === "status",
   });
 
   const artifactsQuery = useQuery({
-    queryKey: ["canonical-artifacts", apiBase, page, filterQ],
+    queryKey: ["canonical-artifacts", cqTag, page, filterQ],
     queryFn: () =>
-      fetchArtifactsPage(apiBase, {
+      fetchArtifactsPage(canonicalClient, {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
         q: filterQ || undefined,
@@ -109,9 +132,9 @@ export default function CanonicalDebugPage() {
   });
 
   const actorsQuery = useQuery({
-    queryKey: ["canonical-actors", apiBase, page, filterQ],
+    queryKey: ["canonical-actors", cqTag, page, filterQ],
     queryFn: () =>
-      fetchActorsPage(apiBase, {
+      fetchActorsPage(canonicalClient, {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
         q: filterQ || undefined,
@@ -120,9 +143,9 @@ export default function CanonicalDebugPage() {
   });
 
   const relQuery = useQuery({
-    queryKey: ["canonical-relationships", apiBase, page],
+    queryKey: ["canonical-relationships", cqTag, page],
     queryFn: () =>
-      fetchRelationshipsPage(apiBase, {
+      fetchRelationshipsPage(canonicalClient, {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
         currentOnly: true,
@@ -131,9 +154,9 @@ export default function CanonicalDebugPage() {
   });
 
   const xrefQuery = useQuery({
-    queryKey: ["canonical-xrefs", apiBase, page],
+    queryKey: ["canonical-xrefs", cqTag, page],
     queryFn: () =>
-      fetchExternalReferencesPage(apiBase, {
+      fetchExternalReferencesPage(canonicalClient, {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       }),
@@ -168,7 +191,7 @@ export default function CanonicalDebugPage() {
     setResetError(null);
     setResetMessage(null);
     try {
-      const out = await resetAndResyncCanonical(apiBase, connectionId);
+      const out = await resetAndResyncCanonical(canonicalClient, connectionId);
       const msg =
         `Reset complete. Ingestion run ${out.ingestion_run_id} (${out.ingestion_status}). ` +
         `Projected ${out.projection_rows_processed} raw rows; canonical processed ${out.canonical_rows_processed}.`;
@@ -196,7 +219,7 @@ export default function CanonicalDebugPage() {
     setRebuildError(null);
     setRebuildMessage(null);
     try {
-      const out = await rebuildFromStep1Canonical(apiBase, connectionId);
+      const out = await rebuildFromStep1Canonical(canonicalClient, connectionId);
       setRebuildMessage(
         `Rebuilt from Step 1 (raw rows unchanged). Projected ${out.projection_rows_processed} raw rows; canonical processed ${out.canonical_rows_processed}.`,
       );
@@ -220,8 +243,8 @@ export default function CanonicalDebugPage() {
     try {
       const d =
         graphAnchor === "artifact"
-          ? await fetchSubgraphByArtifact(apiBase, id, graphDepth)
-          : await fetchSubgraphByActor(apiBase, id, graphDepth);
+          ? await fetchSubgraphByArtifact(canonicalClient, id, graphDepth)
+          : await fetchSubgraphByActor(canonicalClient, id, graphDepth);
       setGraphData(d);
     } catch (e) {
       setGraphData(null);
@@ -232,7 +255,7 @@ export default function CanonicalDebugPage() {
   }
 
   return (
-    <div className="app">
+    <div className={isAdminShell ? "canonical-admin-shell" : "app legacy-debug"}>
       <header className="header">
         <h1>Execution Graph (Step 3)</h1>
         <p className="subtitle">Inspect how people and work are connected in your system.</p>
@@ -242,9 +265,9 @@ export default function CanonicalDebugPage() {
           <li>Connections between them</li>
         </ul>
         <p className="meta">
-          <Link to="/">← Dashboard</Link>
+          <Link to={dashboardHref}>{isAdminShell ? "← Admin" : "← App"}</Link>
           {" · "}
-          <Link to="/github/ingestion">GitHub ingestion</Link>
+          <Link to={rawIngestionHref}>Raw ingestion (admin)</Link>
         </p>
       </header>
 
@@ -283,14 +306,22 @@ export default function CanonicalDebugPage() {
                   applyFilter();
                 }
               }}
-              style={{
-                flex: "1 1 12rem",
-                padding: "0.45rem 0.6rem",
-                borderRadius: 6,
-                border: "1px solid #333",
-                background: "#0e0f12",
-                color: "#e8eaed",
-              }}
+              style={
+                isAdminShell
+                  ? {
+                      flex: "1 1 12rem",
+                      padding: "0.45rem 0.6rem",
+                      borderRadius: 6,
+                    }
+                  : {
+                      flex: "1 1 12rem",
+                      padding: "0.45rem 0.6rem",
+                      borderRadius: 6,
+                      border: "1px solid #333",
+                      background: "#0e0f12",
+                      color: "#e8eaed",
+                    }
+              }
             />
             <button type="button" className="btn small" onClick={applyFilter}>
               Apply filter
@@ -346,7 +377,7 @@ export default function CanonicalDebugPage() {
                         <tr
                           key={id}
                           style={{ cursor: "pointer" }}
-                          onClick={() => navigate(`/debug/canonical/artifacts/${id}`)}
+                          onClick={() => navigate(`${entityBasePath}/artifacts/${id}`)}
                           title={id}
                         >
                           <td>
@@ -419,7 +450,7 @@ export default function CanonicalDebugPage() {
                         <tr
                           key={id}
                           style={{ cursor: "pointer" }}
-                          onClick={() => navigate(`/debug/canonical/actors/${id}`)}
+                          onClick={() => navigate(`${entityBasePath}/actors/${id}`)}
                           title={id}
                         >
                           <td>
@@ -483,9 +514,9 @@ export default function CanonicalDebugPage() {
                   return (
                     <div key={id} className="debug-connection-row">
                       <div className="debug-connection-line">
-                        <DebugEntityLabel apiBase={apiBase} type={st} id={sid} />
+                        <DebugEntityLabel client={canonicalClient} linkPrefix={entityBasePath} type={st} id={sid} />
                         <span className="debug-relation-badge">{rk}</span>
-                        <DebugEntityLabel apiBase={apiBase} type={ot} id={oid} />
+                        <DebugEntityLabel client={canonicalClient} linkPrefix={entityBasePath} type={ot} id={oid} />
                       </div>
                       <div className="debug-connection-meta">
                         <span className="cell-muted">row id</span> <CopyableId id={id} />
@@ -590,14 +621,22 @@ export default function CanonicalDebugPage() {
               placeholder="UUID"
               value={graphId}
               onChange={(ev) => setGraphId(ev.target.value)}
-              style={{
-                flex: "1 1 16rem",
-                padding: "0.45rem 0.6rem",
-                borderRadius: 6,
-                border: "1px solid #333",
-                background: "#0e0f12",
-                color: "#e8eaed",
-              }}
+              style={
+                isAdminShell
+                  ? {
+                      flex: "1 1 16rem",
+                      padding: "0.45rem 0.6rem",
+                      borderRadius: 6,
+                    }
+                  : {
+                      flex: "1 1 16rem",
+                      padding: "0.45rem 0.6rem",
+                      borderRadius: 6,
+                      border: "1px solid #333",
+                      background: "#0e0f12",
+                      color: "#e8eaed",
+                    }
+              }
             />
             <label className="meta">
               depth{" "}
@@ -617,7 +656,13 @@ export default function CanonicalDebugPage() {
               Load subgraph
             </button>
           </div>
-          <GraphPanel data={graphData} error={graphError} loading={graphLoading} />
+          <GraphPanel
+            data={graphData}
+            error={graphError}
+            loading={graphLoading}
+            entityBasePath={entityBasePath}
+            surface={isAdminShell ? "light" : "dark"}
+          />
         </section>
       )}
 
@@ -668,14 +713,22 @@ export default function CanonicalDebugPage() {
                   return p;
                 });
               }}
-              style={{
-                flex: "1 1 14rem",
-                padding: "0.45rem 0.6rem",
-                borderRadius: 6,
-                border: "1px solid #333",
-                background: "#0e0f12",
-                color: "#e8eaed",
-              }}
+              style={
+                isAdminShell
+                  ? {
+                      flex: "1 1 14rem",
+                      padding: "0.45rem 0.6rem",
+                      borderRadius: 6,
+                    }
+                  : {
+                      flex: "1 1 14rem",
+                      padding: "0.45rem 0.6rem",
+                      borderRadius: 6,
+                      border: "1px solid #333",
+                      background: "#0e0f12",
+                      color: "#e8eaed",
+                    }
+              }
             />
           </div>
           {runsQuery.isError ? (
@@ -723,8 +776,21 @@ export default function CanonicalDebugPage() {
             </p>
           ) : null}
 
-          <div className="card nested" style={{ marginTop: "1rem", borderColor: "#3d4f6b" }}>
-            <h3 style={{ marginTop: 0, fontSize: "0.95rem", color: "#b6cdf0" }}>
+          <div
+            className="card nested"
+            style={
+              isAdminShell
+                ? { marginTop: "1rem", borderColor: "#93c5fd", background: "#eff6ff" }
+                : { marginTop: "1rem", borderColor: "#3d4f6b" }
+            }
+          >
+            <h3
+              style={
+                isAdminShell
+                  ? { marginTop: 0, fontSize: "0.95rem", color: "#1e40af" }
+                  : { marginTop: 0, fontSize: "0.95rem", color: "#b6cdf0" }
+              }
+            >
               Rebuild from Step 1 (no GitHub pull)
             </h3>
             <p className="meta" style={{ marginTop: 0 }}>
@@ -738,14 +804,18 @@ export default function CanonicalDebugPage() {
                 placeholder='Type "REBUILD"'
                 value={rebuildConfirmText}
                 onChange={(ev) => setRebuildConfirmText(ev.target.value)}
-                style={{
-                  flex: "0 0 11rem",
-                  padding: "0.45rem 0.6rem",
-                  borderRadius: 6,
-                  border: "1px solid #4a5f8a",
-                  background: "#0f1218",
-                  color: "#dde7f7",
-                }}
+                style={
+                  isAdminShell
+                    ? { flex: "0 0 11rem", padding: "0.45rem 0.6rem", borderRadius: 6 }
+                    : {
+                        flex: "0 0 11rem",
+                        padding: "0.45rem 0.6rem",
+                        borderRadius: 6,
+                        border: "1px solid #4a5f8a",
+                        background: "#0f1218",
+                        color: "#dde7f7",
+                      }
+                }
               />
               <button
                 type="button"
@@ -772,8 +842,21 @@ export default function CanonicalDebugPage() {
             ) : null}
           </div>
 
-          <div className="card nested" style={{ marginTop: "1rem", borderColor: "#5b2a2a" }}>
-            <h3 style={{ marginTop: 0, fontSize: "0.95rem", color: "#f0b6b6" }}>
+          <div
+            className="card nested"
+            style={
+              isAdminShell
+                ? { marginTop: "1rem", borderColor: "#fecaca", background: "#fef2f2" }
+                : { marginTop: "1rem", borderColor: "#5b2a2a" }
+            }
+          >
+            <h3
+              style={
+                isAdminShell
+                  ? { marginTop: 0, fontSize: "0.95rem", color: "#991b1b" }
+                  : { marginTop: 0, fontSize: "0.95rem", color: "#f0b6b6" }
+              }
+            >
               Danger zone: reset and full reingest
             </h3>
             <p className="meta" style={{ marginTop: 0 }}>
@@ -786,14 +869,18 @@ export default function CanonicalDebugPage() {
                 placeholder='Type "RESET"'
                 value={resetConfirmText}
                 onChange={(ev) => setResetConfirmText(ev.target.value)}
-                style={{
-                  flex: "0 0 11rem",
-                  padding: "0.45rem 0.6rem",
-                  borderRadius: 6,
-                  border: "1px solid #6b3636",
-                  background: "#140f10",
-                  color: "#f2d7d7",
-                }}
+                style={
+                  isAdminShell
+                    ? { flex: "0 0 11rem", padding: "0.45rem 0.6rem", borderRadius: 6 }
+                    : {
+                        flex: "0 0 11rem",
+                        padding: "0.45rem 0.6rem",
+                        borderRadius: 6,
+                        border: "1px solid #6b3636",
+                        background: "#140f10",
+                        color: "#f2d7d7",
+                      }
+                }
               />
               <button
                 type="button"
@@ -804,7 +891,11 @@ export default function CanonicalDebugPage() {
                   resetConfirmText.trim().toUpperCase() !== "RESET"
                 }
                 onClick={() => void runResetAndResync()}
-                style={{ background: "#7d1f1f", borderColor: "#a83a3a" }}
+                style={
+                  isAdminShell
+                    ? { background: "#b91c1c", border: "1px solid #991b1b" }
+                    : { background: "#7d1f1f", borderColor: "#a83a3a" }
+                }
               >
                 {resetRunning ? "Resetting…" : "Reset + repull from scratch"}
               </button>

@@ -1,40 +1,104 @@
-:root {
+@import "tailwindcss";
+
+/* Light default for product surfaces; legacy debug pages keep .app / .card dark overrides below */
+@layer base {
+  body {
+    @apply m-0 min-h-screen bg-stone-50 text-stone-900 antialiased;
+  }
+}
+
+/* Shared debug / ingestion tables (canonical, raw) — keep readable on light + dark cards */
+.link-inline,
+.debug-entity-link {
+  @apply text-blue-600 no-underline hover:text-blue-800 hover:underline;
+}
+
+.data-table {
+  @apply w-full border-collapse text-sm;
+}
+.data-table th,
+.data-table td {
+  @apply border border-stone-200 px-2 py-1.5 text-left align-top;
+}
+.data-table th {
+  @apply bg-stone-100 font-semibold text-stone-700;
+}
+
+.debug-pill {
+  @apply inline-block rounded px-1.5 py-0.5 text-sm leading-snug;
+}
+.debug-pill--person {
+  @apply bg-violet-100 text-violet-900;
+}
+.debug-pill--work {
+  @apply bg-blue-100 text-blue-900;
+}
+
+/* Dark panels for embedded canonical debug (optional nesting) */
+.app.debug-surface {
+  @apply mx-auto max-w-[1600px] px-4 py-8 text-stone-100;
+  background: #121418;
+}
+.app.debug-surface .header h1 {
+  @apply text-stone-100;
+}
+.app.debug-surface .subtitle,
+.app.debug-surface .meta {
+  color: #9aa0a6;
+}
+.app.debug-surface .card {
+  @apply mt-6 rounded-lg border border-stone-600 bg-stone-900/80 p-4;
+}
+.app.debug-surface .btn {
+  @apply mt-2 inline-block cursor-pointer rounded-lg border-0 bg-blue-600 px-3 py-2 text-sm text-white no-underline hover:bg-blue-500;
+}
+.app.debug-surface .btn.secondary {
+  @apply border border-stone-500 bg-stone-800 text-stone-100 hover:bg-stone-700;
+}
+.app.debug-surface .btn.small {
+  @apply mt-0 px-2 py-1 text-xs;
+}
+.app.debug-surface .field input {
+  @apply rounded border border-stone-600 bg-stone-950 px-2 py-1 text-stone-100;
+}
+.app.debug-surface .data-table th,
+.app.debug-surface .data-table td {
+  border-color: #2d323c;
+}
+.app.debug-surface .data-table th {
+  background: #1a1d22;
+}
+.app.debug-surface a.link-inline,
+.app.debug-surface a.debug-entity-link {
+  color: #8ab4f8;
+}
+
+/* Legacy dark tool pages (.app + GitHub ingestion, projections, canonical) */
+.app.legacy-debug {
+  max-width: min(1600px, calc(100vw - 2rem));
+  margin: 0 auto;
+  padding: 2.5rem clamp(1rem, 3vw, 2rem);
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   color: #e8eaed;
   background: #121418;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
   min-height: 100vh;
 }
 
-.app {
-  /* Wide enough for ingestion / JSON tables; still centered on large monitors */
-  max-width: min(1600px, calc(100vw - 2rem));
-  margin: 0 auto;
-  padding: 2.5rem clamp(1rem, 3vw, 2rem);
-}
-
-.header h1 {
+.app.legacy-debug .header h1 {
   margin: 0 0 0.35rem;
   font-size: 1.75rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-.subtitle {
+.app.legacy-debug .subtitle {
   margin: 0;
   color: #9aa0a6;
   font-size: 0.95rem;
 }
 
-.card {
+.app.legacy-debug .card {
   margin-top: 2rem;
   padding: 1.25rem 1.35rem;
   background: #1a1d23;
@@ -42,91 +106,41 @@ body {
   border-radius: 10px;
 }
 
-.card.nested {
+.app.legacy-debug .card.nested {
   margin-top: 1.25rem;
   padding: 1rem 1.1rem;
   background: #15181e;
   border-style: dashed;
 }
 
-.card.nested h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.card h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-
-.meta {
+.app.legacy-debug .meta {
   margin: 0 0 1rem;
   font-size: 0.85rem;
   color: #9aa0a6;
 }
 
-.meta code {
-  color: #c9d1d9;
-  word-break: break-all;
-}
-
-.status {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.status.loading {
+.app.legacy-debug .status.loading {
   color: #f0c674;
 }
-
-.status.ok {
+.app.legacy-debug .status.ok {
   color: #98c379;
 }
-
-.status.error {
+.app.legacy-debug .status.error {
   color: #e06c75;
 }
 
-code {
-  font-family: ui-monospace, "Cascadia Code", monospace;
-  font-size: 0.88em;
-}
-
-.banner {
-  max-width: none;
-  margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-}
-
-.banner.error {
+.app.legacy-debug .banner.error {
   background: #3d1f24;
   border: 1px solid #e06c75;
   color: #f5c6cb;
 }
-
-.banner.ok {
+.app.legacy-debug .banner.ok {
   background: #1a2d22;
   border: 1px solid #81c784;
   color: #c8e6c9;
 }
 
-.btn-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  margin-top: 0.75rem;
-}
-
-.btn-row .btn {
-  margin-top: 0;
-}
-
-.btn {
+.app.legacy-debug .btn {
   display: inline-block;
   margin-top: 0.75rem;
   padding: 0.5rem 1rem;
@@ -139,150 +153,35 @@ code {
   cursor: pointer;
   font-family: inherit;
 }
-
-.btn:hover {
-  background: #5a9cff;
-}
-
-.btn.secondary {
+.app.legacy-debug .btn.secondary {
   background: #2d323c;
   border: 1px solid #4a5260;
 }
-
-.btn.secondary:hover {
-  background: #3a4250;
-}
-
-.hint {
-  margin-top: 0.75rem;
-  font-size: 0.82rem;
-  color: #9aa0a6;
-}
-
-.signin-options {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.form-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #2d323c;
-}
-
-.form-title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-  color: #9aa0a6;
-}
-
-.field input {
-  padding: 0.45rem 0.55rem;
-  border-radius: 6px;
-  border: 1px solid #2d323c;
-  background: #121418;
-  color: #e8eaed;
-  font-family: inherit;
-  font-size: 0.9rem;
-}
-
-.optional {
-  font-weight: 400;
-  color: #6b7280;
-}
-
-.meta a,
-.header .subtitle a {
-  color: #8ab4f8;
-  text-decoration: none;
-}
-
-.meta a:hover,
-.header .subtitle a:hover {
-  text-decoration: underline;
-}
-
-/* Inline app links (tables + connection prose — one accent; no browser default purple/blue) */
-a.link-inline,
-a.debug-entity-link {
-  color: #8ab4f8;
-  text-decoration: none;
-}
-
-a.link-inline:hover,
-a.debug-entity-link:hover {
-  color: #aecbfa;
-  text-decoration: underline;
-}
-
-a.link-inline:visited,
-a.link-inline:active,
-a.debug-entity-link:visited,
-a.debug-entity-link:active {
-  color: #8ab4f8;
-}
-
-.table-wrap {
-  overflow-x: auto;
-  margin-top: 0.75rem;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82rem;
-}
-
-.data-table th,
-.data-table td {
-  border: 1px solid #2d323c;
-  padding: 0.4rem 0.55rem;
-  text-align: left;
-  vertical-align: top;
-}
-
-.data-table th {
-  background: #1a1d22;
-  font-weight: 600;
-}
-
-.row-selected {
-  background: #1a251a;
-}
-
-.btn.small {
+.app.legacy-debug .btn.small {
   margin-top: 0;
   padding: 0.25rem 0.55rem;
   font-size: 0.78rem;
 }
 
-.cell-wrap {
-  word-break: break-all;
+.app.legacy-debug .data-table th,
+.app.legacy-debug .data-table td {
+  border: 1px solid #2d323c;
+  background: transparent;
+}
+.app.legacy-debug .data-table th {
+  background: #1a1d22;
+  font-weight: 600;
+}
+.app.legacy-debug .link-inline,
+.app.legacy-debug .debug-entity-link {
+  color: #8ab4f8;
 }
 
-.cell-muted {
-  color: #9aa0a6;
+.app.legacy-debug .row-selected {
+  background: #1a251a;
 }
 
-.cell-clip {
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.payload-preview {
+.app.legacy-debug .payload-preview {
   max-height: 14rem;
   overflow: auto;
   margin: 0;
@@ -294,95 +193,191 @@ a.debug-entity-link:active {
   border-radius: 6px;
 }
 
-/* Raw ingestion explorer: give JSON room */
-.data-table.records-table {
-  table-layout: auto;
+/* Admin Step 3 — match Vector Admin light chrome (stone / white) */
+.canonical-admin-shell {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  background: transparent;
+  color: #1c1917;
+  color-scheme: light;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
 }
 
-.data-table.records-table th:last-child,
-.data-table.records-table td:last-child {
-  min-width: min(52rem, 85vw);
+.canonical-admin-shell .header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1c1917;
+  letter-spacing: -0.02em;
 }
 
-.data-table.records-table .payload-preview {
-  max-height: min(32rem, 55vh);
-  font-size: 0.78rem;
-  line-height: 1.35;
+.canonical-admin-shell .subtitle {
+  margin: 0;
+  color: #57534e;
+  font-size: 0.9rem;
 }
 
-/* /debug/canonical — execution graph (developer tool) */
-.debug-pill {
+.canonical-admin-shell .meta {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: #57534e;
+}
+
+.canonical-admin-shell .meta a,
+.canonical-admin-shell .header a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.canonical-admin-shell .meta a:hover,
+.canonical-admin-shell .header a:hover {
+  text-decoration: underline;
+}
+
+.canonical-admin-shell .card {
+  margin-top: 1rem;
+  padding: 1rem 1.15rem;
+  background: #fafaf9;
+  border: 1px solid #e7e5e4;
+  border-radius: 0.75rem;
+}
+
+.canonical-admin-shell .card.nested {
+  background: #ffffff;
+  border: 1px solid #e7e5e4;
+}
+
+.canonical-admin-shell .btn {
   display: inline-block;
-  padding: 0.15rem 0.45rem;
-  border-radius: 6px;
-  font-size: 0.88rem;
-  line-height: 1.35;
-}
-.debug-pill--person {
-  background: rgba(107, 74, 122, 0.35);
-  color: #e8eaed;
-}
-.debug-pill--work {
-  background: rgba(44, 82, 130, 0.35);
-  color: #e8eaed;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  background: #991b1b;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid #7f1d1d;
+  cursor: pointer;
+  font-family: inherit;
 }
 
-/* Pills inside <Link>: inherit accent color (otherwise pill #e8eaed hides link styling) */
-a.link-inline .debug-pill--work,
-a.link-inline .debug-pill--person,
-a.debug-entity-link .debug-pill--work,
-a.debug-entity-link .debug-pill--person {
-  color: inherit;
+.canonical-admin-shell .btn:hover {
+  background: #7f1d1d;
 }
 
-.debug-connection-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
+.canonical-admin-shell .btn.secondary {
+  background: #ffffff;
+  color: #1c1917;
+  border: 1px solid #d6d3d1;
 }
-.debug-connection-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
+
+.canonical-admin-shell .btn.small {
+  margin-top: 0;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
 }
-.debug-connection-meta {
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
+
+.canonical-admin-shell .status.loading {
+  color: #a16207;
 }
-.debug-relation-badge {
+
+.canonical-admin-shell .status.ok {
+  color: #15803d;
+}
+
+.canonical-admin-shell .status.error {
+  color: #b91c1c;
+}
+
+.canonical-admin-shell .banner.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.canonical-admin-shell .banner.ok {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+}
+
+.canonical-admin-shell .input-guess {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #d6d3d1;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #1c1917;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.canonical-admin-shell select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #d6d3d1;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #1c1917;
+  font-size: 0.875rem;
+}
+
+.canonical-admin-shell input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not(
+    [type="button"]
+  ),
+.canonical-admin-shell textarea {
+  background: #fff;
+  color: #1c1917;
+  border: 1px solid #d6d3d1;
+}
+
+.canonical-admin-shell .data-table th,
+.canonical-admin-shell .data-table td {
+  border: 1px solid #e7e5e4;
+  background: transparent;
+}
+
+.canonical-admin-shell .data-table th {
+  background: #f5f5f4;
+  font-weight: 600;
+  color: #44403c;
+}
+
+.canonical-admin-shell .link-inline,
+.canonical-admin-shell .debug-entity-link {
+  color: #2563eb;
+}
+
+.canonical-admin-shell .debug-relation-badge {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.78rem;
-  color: #c9d1d9;
-  background: #252830;
+  color: #44403c;
+  background: #f5f5f4;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
 }
-.debug-id-muted {
-  font-size: 0.8rem;
+
+.canonical-admin-shell .cell-muted {
+  color: #78716c;
 }
-.debug-copy-id__code {
+
+.canonical-admin-shell .debug-copy-id__code {
+  color: #78716c;
+}
+
+.canonical-admin-shell code.cell-muted {
+  background: #f5f5f4;
+  padding: 0.1rem 0.25rem;
+  border-radius: 4px;
+  font-size: 0.82em;
+}
+
+.canonical-admin-shell details summary {
   cursor: pointer;
-  font-size: 0.78rem;
-  color: #8b949e;
-}
-.debug-copy-id__code:hover {
-  color: #c9d1d9;
-}
-.debug-xref-headline {
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 0.25rem;
-}
-.debug-connection-prose-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.debug-connection-prose {
-  margin-bottom: 0.65rem;
-  line-height: 1.55;
-}
-.debug-bracket {
-  color: #9aa0a6;
+  color: #57534e;
 }

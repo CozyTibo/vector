@@ -21,6 +21,10 @@ class GithubConnectorDetails(BaseModel):
     installation_id: int | None = None
     account_login: str | None = None
     account_type: str | None = None
+    last_sync_at: datetime | None = Field(
+        default=None,
+        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+    )
 
 
 class GithubIngestionSyncResponse(BaseModel):
@@ -108,8 +112,16 @@ class LinearConnectorDetails(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    connection_id: uuid.UUID | None = Field(
+        default=None,
+        description="tenant_connections.id for this Linear link.",
+    )
     organization_id: str | None = None
     organization_name: str | None = None
+    last_sync_at: datetime | None = Field(
+        default=None,
+        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+    )
 
 
 class LinearConnectorStatusItem(BaseModel):

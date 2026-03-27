@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from vector.infrastructure.db.models.identity import UserIdentity
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.tenant import Tenant
+from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.models.user import User
 
 
@@ -60,3 +61,21 @@ def list_memberships_for_user(session: Session, user_id: uuid.UUID) -> list[Tena
 
 def get_tenant_by_id(session: Session, tenant_id: uuid.UUID) -> Tenant | None:
     return session.scalar(select(Tenant).where(Tenant.id == tenant_id))
+
+
+def list_all_tenants(session: Session, *, limit: int = 500) -> list[Tenant]:
+    stmt = select(Tenant).order_by(Tenant.created_at.desc()).limit(limit)
+    return list(session.scalars(stmt).all())
+
+
+def list_connected_connector_providers(session: Session, tenant_id: uuid.UUID) -> list[str]:
+    """Provider keys from active tenant_connections (e.g. github, linear)."""
+    stmt = (
+        select(TenantConnection.provider)
+        .where(
+            TenantConnection.tenant_id == tenant_id,
+            TenantConnection.status == "active",
+        )
+        .order_by(TenantConnection.created_at.asc())
+    )
+    return list(session.scalars(stmt).all())

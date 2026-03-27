@@ -197,7 +197,7 @@ export default function ProjectionDebugPage() {
   }
 
   return (
-    <div className="app">
+    <div className="app legacy-debug">
       <header className="header">
         <h1>Debug — connector projections</h1>
         <p className="subtitle">

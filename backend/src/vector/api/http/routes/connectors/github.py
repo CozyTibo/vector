@@ -53,13 +53,19 @@ def build_github_connector_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         claims: Annotated[SessionClaims, Depends(get_session_claims)],
         settings: Annotated[Settings, Depends(settings_dep)],
+        return_to: Annotated[str | None, Query(description="Post-install redirect path")] = None,
     ) -> RedirectResponse:
         try:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         try:
-            url = start_github_install_url(settings, claims.tenant_id, claims.user_id)
+            url = start_github_install_url(
+                settings,
+                claims.tenant_id,
+                claims.user_id,
+                return_to=return_to,
+            )
         except GitHubConnectorNotConfiguredError as e:
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
         return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
@@ -74,8 +80,9 @@ def build_github_connector_router() -> APIRouter:
     ) -> RedirectResponse:
         """OAuth return from GitHub (session optional; signed `state` carries tenant + user)."""
         front = settings.frontend_url.rstrip("/")
+        return_to: str | None = None
         try:
-            complete_github_install(
+            _link, return_to = complete_github_install(
                 db,
                 settings,
                 code=code,
@@ -124,10 +131,12 @@ def build_github_connector_router() -> APIRouter:
                 url=f"{front}/?github_error=server",
                 status_code=status.HTTP_302_FOUND,
             )
-        return RedirectResponse(
-            url=f"{front}/?github_connected=1",
-            status_code=status.HTTP_302_FOUND,
+        ok = (
+            f"{front}{return_to}?github_connected=1"
+            if return_to
+            else f"{front}/?github_connected=1"
         )
+        return RedirectResponse(url=ok, status_code=status.HTTP_302_FOUND)
 
     @r.post("/sync", response_model=GithubIngestionSyncResponse)
     def github_poll_sync(

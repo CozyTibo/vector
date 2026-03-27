@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     linear_client_id: str = Field(default="", validation_alias="LINEAR_CLIENT_ID")
     linear_client_secret: str = Field(default="", validation_alias="LINEAR_CLIENT_SECRET")
     linear_redirect_uri: str = Field(default="", validation_alias="LINEAR_REDIRECT_URI")
+    admin_password: str = Field(
+        default="",
+        validation_alias="ADMIN_PASSWORD",
+        description="When set, enables /admin/* HTTP Basic (password only; username ignored).",
+    )
 
     @field_validator("github_app_private_key", mode="before")
     @classmethod

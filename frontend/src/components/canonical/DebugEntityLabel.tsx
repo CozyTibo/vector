@@ -6,28 +6,35 @@ import {
   fetchArtifactDetail,
   type ActorDetailResponse,
   type ArtifactDetailResponse,
+  type CanonicalClient,
 } from "../../lib/canonicalApi";
 import { formatArtifactListLine } from "../../lib/executionModelDisplay";
 
 type Props = {
-  apiBase: string;
+  client: CanonicalClient;
+  /** Base path for React Router links (e.g. /debug/canonical). */
+  linkPrefix: string;
   type: string;
   id: string;
 };
+
+function clientTag(c: CanonicalClient): string {
+  return c.kind === "session" ? "session" : `admin:${c.tenantId}`;
+}
 
 /**
  * Resolves a semantic label for an artifact or actor (uses existing detail endpoints).
  * React Query dedupes identical (type, id) on the same page.
  */
-export function DebugEntityLabel({ apiBase, type, id }: Props) {
+export function DebugEntityLabel({ client, linkPrefix, type, id }: Props) {
   const q = useQuery({
-    queryKey: ["debug-entity-label", apiBase, type, id],
+    queryKey: ["debug-entity-label", clientTag(client), type, id],
     queryFn: async () => {
       if (type === "artifact") {
-        return fetchArtifactDetail(apiBase, id);
+        return fetchArtifactDetail(client, id);
       }
       if (type === "actor") {
-        return fetchActorDetail(apiBase, id);
+        return fetchActorDetail(client, id);
       }
       throw new Error("unsupported endpoint type");
     },
@@ -37,14 +44,15 @@ export function DebugEntityLabel({ apiBase, type, id }: Props) {
 
   const personClass = "debug-pill debug-pill--person";
   const workClass = "debug-pill debug-pill--work";
+  const artPath = `${linkPrefix}/artifacts/${id}`;
+  const actPath = `${linkPrefix}/actors/${id}`;
 
   if (q.isPending) {
     return <span className="cell-muted">…</span>;
   }
 
   if (q.isError || !q.data) {
-    const href =
-      type === "artifact" ? `/debug/canonical/artifacts/${id}` : `/debug/canonical/actors/${id}`;
+    const href = type === "artifact" ? artPath : actPath;
     const fallback = type === "artifact" ? "Work object" : "Person";
     return (
       <Link to={href} className="link-inline debug-entity-link">
@@ -58,7 +66,7 @@ export function DebugEntityLabel({ apiBase, type, id }: Props) {
     const data = q.data as ActorDetailResponse;
     const name = data.actor.display_name?.trim() || "Person";
     return (
-      <Link to={`/debug/canonical/actors/${id}`} className="link-inline debug-entity-link">
+      <Link to={actPath} className="link-inline debug-entity-link">
         <span className={personClass}>{name}</span>
       </Link>
     );
@@ -72,7 +80,7 @@ export function DebugEntityLabel({ apiBase, type, id }: Props) {
   });
 
   return (
-    <Link to={`/debug/canonical/artifacts/${id}`} className="link-inline debug-entity-link">
+    <Link to={artPath} className="link-inline debug-entity-link">
       <span className={workClass}>{text}</span>
     </Link>
   );

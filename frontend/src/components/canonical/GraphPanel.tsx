@@ -9,9 +9,19 @@ type GraphPanelProps = {
   data: SubgraphResponse | null;
   error: string | null;
   loading: boolean;
+  /** Base path for entity routes (e.g. /debug/canonical or /admin/tenants/:id/step3). */
+  entityBasePath: string;
+  /** Admin embed uses a light panel; developer debug keeps the dark canvas. */
+  surface?: "dark" | "light";
 };
 
-export default function GraphPanel({ data, error, loading }: GraphPanelProps) {
+export default function GraphPanel({
+  data,
+  error,
+  loading,
+  entityBasePath,
+  surface = "dark",
+}: GraphPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const navigate = useNavigate();
@@ -64,6 +74,9 @@ export default function GraphPanel({ data, error, loading }: GraphPanelProps) {
       cyRef.current = null;
     }
 
+    const edgeLine = surface === "light" ? "#94a3b8" : "#6e7681";
+    const edgeLabel = surface === "light" ? "#64748b" : "#a0aec0";
+
     const cy = cytoscape({
       container: containerRef.current,
       elements,
@@ -107,13 +120,13 @@ export default function GraphPanel({ data, error, loading }: GraphPanelProps) {
           selector: "edge",
           style: {
             width: 2,
-            "line-color": "#6e7681",
-            "target-arrow-color": "#6e7681",
+            "line-color": edgeLine,
+            "target-arrow-color": edgeLine,
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
             label: "data(label)",
             "font-size": "9px",
-            color: "#a0aec0",
+            color: edgeLabel,
           },
         },
       ],
@@ -133,9 +146,9 @@ export default function GraphPanel({ data, error, loading }: GraphPanelProps) {
         return;
       }
       if (n.node_type === "artifact") {
-        navigate(`/debug/canonical/artifacts/${id}`);
+        navigate(`${entityBasePath}/artifacts/${id}`);
       } else {
-        navigate(`/debug/canonical/actors/${id}`);
+        navigate(`${entityBasePath}/actors/${id}`);
       }
     });
 
@@ -157,7 +170,7 @@ export default function GraphPanel({ data, error, loading }: GraphPanelProps) {
       cy.destroy();
       cyRef.current = null;
     };
-  }, [data, navigate]);
+  }, [data, navigate, entityBasePath, surface]);
 
   if (loading) {
     return <p className="status loading">Loading subgraph…</p>;
@@ -188,13 +201,23 @@ export default function GraphPanel({ data, error, loading }: GraphPanelProps) {
       </p>
       <div
         ref={containerRef}
-        style={{
-          width: "100%",
-          height: 420,
-          border: "1px solid #333",
-          borderRadius: 8,
-          background: "#0d1117",
-        }}
+        style={
+          surface === "light"
+            ? {
+                width: "100%",
+                height: 420,
+                border: "1px solid #e7e5e4",
+                borderRadius: 8,
+                background: "#fafaf9",
+              }
+            : {
+                width: "100%",
+                height: 420,
+                border: "1px solid #333",
+                borderRadius: 8,
+                background: "#0d1117",
+              }
+        }
       />
       <p className="meta" style={{ marginTop: "0.35rem" }}>
         Hover a node for internal id. Click to open the detail page.

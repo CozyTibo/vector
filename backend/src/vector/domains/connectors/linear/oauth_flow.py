@@ -33,10 +33,21 @@ def linear_connector_configured(settings: Settings) -> bool:
     return bool(settings.linear_client_id.strip() and settings.linear_client_secret.strip())
 
 
-def start_linear_oauth_url(settings: Settings, tenant_id: uuid.UUID, user_id: uuid.UUID) -> str:
+def start_linear_oauth_url(
+    settings: Settings,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    return_to: str | None = None,
+) -> str:
     if not linear_connector_configured(settings):
         raise LinearConnectorNotConfiguredError("linear OAuth is not configured")
-    state = create_linear_oauth_state_token(settings, tenant_id, user_id)
+    state = create_linear_oauth_state_token(
+        settings,
+        tenant_id,
+        user_id,
+        return_to=return_to,
+    )
     redirect_uri = linear_redirect_uri(settings)
     params = {
         "response_type": "code",
@@ -56,10 +67,11 @@ def complete_linear_oauth(
     state: str,
     exchange_code: Callable[[Settings, str], LinearTokenResponse] | None = None,
     fetch_org: Callable[[str], tuple[str | None, str | None]] | None = None,
-) -> linear_repo.LinearTenantLink:
+) -> tuple[linear_repo.LinearTenantLink, str | None]:
     if not linear_connector_configured(settings):
         raise LinearConnectorNotConfiguredError("linear OAuth is not configured")
     claims: LinearOAuthStateClaims = parse_linear_oauth_state_token(settings, state)
+    redirect_after = claims.return_to
     if (
         tenancy_repo.get_membership_for_user_tenant(session, claims.user_id, claims.tenant_id)
         is None
@@ -74,7 +86,7 @@ def complete_linear_oauth(
 
     org_id, org_name = org_fn(tok.access_token)
 
-    return linear_repo.upsert_linear_oauth_connection(
+    link = linear_repo.upsert_linear_oauth_connection(
         session,
         tenant_id=claims.tenant_id,
         connected_by_user_id=claims.user_id,
@@ -84,3 +96,4 @@ def complete_linear_oauth(
         organization_id=org_id,
         organization_name=org_name,
     )
+    return link, redirect_after

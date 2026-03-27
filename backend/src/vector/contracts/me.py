@@ -17,3 +17,11 @@ class MeResponse(BaseModel):
     company_name: str
     tenant_slug: str
     role: str = Field(description="Membership role in current tenant")
+    onboarding_completed: bool = Field(
+        default=False,
+        description="True when onboarding_state exists and status is completed.",
+    )
+    connected_connectors: list[str] = Field(
+        default_factory=list,
+        description="Active tenant_connections.provider values for this workspace.",
+    )

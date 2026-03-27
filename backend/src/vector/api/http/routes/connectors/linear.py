@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -36,13 +36,19 @@ def build_linear_connector_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         claims: Annotated[SessionClaims, Depends(get_session_claims)],
         settings: Annotated[Settings, Depends(settings_dep)],
+        return_to: Annotated[str | None, Query(description="Post-OAuth redirect path")] = None,
     ) -> RedirectResponse:
         try:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         try:
-            url = start_linear_oauth_url(settings, claims.tenant_id, claims.user_id)
+            url = start_linear_oauth_url(
+                settings,
+                claims.tenant_id,
+                claims.user_id,
+                return_to=return_to,
+            )
         except LinearConnectorNotConfiguredError as e:
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
         return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
@@ -56,8 +62,9 @@ def build_linear_connector_router() -> APIRouter:
     ) -> RedirectResponse:
         """OAuth return from Linear (session optional; `state` binds tenant + user)."""
         front = settings.frontend_url.rstrip("/")
+        return_to: str | None = None
         try:
-            complete_linear_oauth(db, settings, code=code, state=state)
+            _link, return_to = complete_linear_oauth(db, settings, code=code, state=state)
         except LinearInstallStateMembershipError:
             return RedirectResponse(
                 url=f"{front}/?linear_error=forbidden",
@@ -85,9 +92,11 @@ def build_linear_connector_router() -> APIRouter:
                 url=f"{front}/?linear_error=server",
                 status_code=status.HTTP_302_FOUND,
             )
-        return RedirectResponse(
-            url=f"{front}/?linear_connected=1",
-            status_code=status.HTTP_302_FOUND,
+        ok = (
+            f"{front}{return_to}?linear_connected=1"
+            if return_to
+            else f"{front}/?linear_connected=1"
         )
+        return RedirectResponse(url=ok, status_code=status.HTTP_302_FOUND)
 
     return r

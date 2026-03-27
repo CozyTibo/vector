@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import String, func, or_, select
@@ -231,6 +232,50 @@ def list_github_users(
         select(GithubUser)
         .where(*filters)
         .order_by(GithubUser.login.asc().nulls_last())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(session.scalars(stmt).all())
+    return RowsPage(total=total, items=items)
+
+
+def last_raw_fetched_at_for_connection(
+    session: Session,
+    connection_id: uuid.UUID,
+) -> datetime | None:
+    stmt = select(func.max(RawIngestionRecord.fetched_at)).where(
+        RawIngestionRecord.connection_id == connection_id,
+    )
+    return session.scalar(stmt)
+
+
+def list_tenant_connections_for_tenant(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> list[TenantConnection]:
+    stmt = (
+        select(TenantConnection)
+        .where(TenantConnection.tenant_id == tenant_id)
+        .order_by(TenantConnection.created_at.asc())
+    )
+    return list(session.scalars(stmt).all())
+
+
+def list_raw_ingestion_records_for_tenant(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    limit: int,
+    offset: int,
+) -> RowsPage:
+    filters = [RawIngestionRecord.tenant_id == tenant_id]
+    cnt_stmt = select(func.count()).select_from(RawIngestionRecord).where(*filters)
+    total = int(session.scalar(cnt_stmt) or 0)
+    stmt = (
+        select(RawIngestionRecord)
+        .where(*filters)
+        .order_by(RawIngestionRecord.replay_sequence.desc(), RawIngestionRecord.id.desc())
         .limit(limit)
         .offset(offset)
     )

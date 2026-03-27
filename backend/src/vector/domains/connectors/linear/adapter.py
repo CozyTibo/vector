@@ -11,6 +11,9 @@ from vector.domains.connectors.linear.oauth_flow import linear_connector_configu
 from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_LINEAR
 from vector.domains.connectors.runtime import ConnectorRuntime
 from vector.infrastructure.db.repositories import linear_connection as linear_repo
+from vector.infrastructure.db.repositories.projection_debug_queries import (
+    last_raw_fetched_at_for_connection,
+)
 from vector.settings import Settings
 
 _LINEAR_LABEL = "Linear"
@@ -37,13 +40,17 @@ def linear_status_item(
             details=None,
         )
     d = link.detail
+    cid = link.connection.id
+    last_sync = last_raw_fetched_at_for_connection(session, cid)
     return LinearConnectorStatusItem(
         display_name=_LINEAR_LABEL,
         connector_configured=True,
         connected=True,
         details=LinearConnectorDetails(
+            connection_id=cid,
             organization_id=d.linear_organization_id,
             organization_name=d.linear_organization_name,
+            last_sync_at=last_sync,
         ),
     )
 
