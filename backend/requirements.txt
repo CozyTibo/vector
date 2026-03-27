@@ -1,0 +1,16 @@
+# Production + worker (pip). Keep in sync with pyproject.toml dependencies.
+alembic>=1.14
+argon2-cffi>=23.1
+celery[redis]>=5.4
+email-validator>=2.0
+fastapi>=0.115
+google-auth>=2.35
+httpx>=0.27
+itsdangerous>=2.2
+psycopg[binary]>=3.2
+pydantic-settings>=2.6
+pyjwt[crypto]>=2.10
+redis>=5.0
+requests>=2.32
+sqlalchemy>=2.0
+uvicorn[standard]>=0.32

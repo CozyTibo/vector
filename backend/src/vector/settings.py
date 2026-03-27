@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     )
 
     database_url: str = Field(validation_alias="DATABASE_URL")
+    redis_url: str = Field(default="", validation_alias="REDIS_URL")
+    env: str = Field(default="development", validation_alias="ENV")
     secret_key: str = Field(
         default="dev-only-secret-key-min-32-chars-long!!",
         validation_alias="SECRET_KEY",

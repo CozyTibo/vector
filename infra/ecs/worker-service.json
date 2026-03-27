@@ -1,0 +1,20 @@
+{
+  "cluster": "vector-cluster",
+  "serviceName": "vector-worker",
+  "taskDefinition": "vector-worker:1",
+  "desiredCount": 1,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "subnet-0123456789abcdef0",
+        "subnet-0fedcba9876543210"
+      ],
+      "securityGroups": [
+        "sg-0123456789abcdef0"
+      ],
+      "assignPublicIp": "DISABLED"
+    }
+  }
+}
