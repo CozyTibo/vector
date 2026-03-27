@@ -52,34 +52,35 @@ jobs:
           docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG"
           docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:latest"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Build frontend
-        working-directory: frontend
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-        run: |
-          npm ci
-          npm run build
-
-      - name: Upload frontend to S3
-        env:
-          S3_BUCKET: ${{ secrets.S3_BUCKET_FRONTEND }}
-        run: |
-          aws s3 sync frontend/dist "s3://$S3_BUCKET" --delete
-
-      - name: Invalidate CloudFront
-        env:
-          DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id "$DISTRIBUTION_ID" \
-            --paths "/*"
+      # Frontend / static hosting — re-enable when S3 + CloudFront infra exists
+      # - name: Set up Node.js
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: "20"
+      #     cache: npm
+      #     cache-dependency-path: frontend/package-lock.json
+      #
+      # - name: Build frontend
+      #   working-directory: frontend
+      #   env:
+      #     VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+      #   run: |
+      #     npm ci
+      #     npm run build
+      #
+      # - name: Upload frontend to S3
+      #   env:
+      #     S3_BUCKET: ${{ secrets.S3_BUCKET_FRONTEND }}
+      #   run: |
+      #     aws s3 sync frontend/dist "s3://$S3_BUCKET" --delete
+      #
+      # - name: Invalidate CloudFront
+      #   env:
+      #     DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+      #   run: |
+      #     aws cloudfront create-invalidation \
+      #       --distribution-id "$DISTRIBUTION_ID" \
+      #       --paths "/*"
 
       - name: Force ECS service redeploy (API)
         run: |
