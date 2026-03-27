@@ -37,8 +37,8 @@ export default function AppHomePage() {
           Vector is getting your workspace ready
         </h1>
         <p className="mt-4 text-base leading-relaxed text-stone-600">
-          Your tools are connected and data is syncing. We&apos;re preparing the first version of the execution
-          interface.
+          Your tools are connected and data is syncing. We&apos;re preparing the first version of the executive
+          intelligence interface.
         </p>
       </header>
 
@@ -67,7 +67,7 @@ export default function AppHomePage() {
         <div className="mt-4 space-y-3 text-sm leading-relaxed text-stone-700">
           <p className="font-medium text-stone-900">You&apos;re early.</p>
           <p>
-            We&apos;re working with a small group of teams to build Vector&apos;s execution intelligence system.
+            We&apos;re working with a small group of teams to build Vector&apos;s executive intelligence system.
           </p>
           <p>Your data is syncing in the background and helping us shape the product.</p>
           <p>We&apos;ll reach out soon when the first features are ready.</p>

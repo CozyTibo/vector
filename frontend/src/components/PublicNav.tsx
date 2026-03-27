@@ -11,7 +11,12 @@ export default function PublicNav({ email, onLogout, showConnectors = false }: P
   return (
     <header className="border-b border-stone-200 bg-white">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <Link to="/app" className="text-lg font-semibold tracking-tight text-stone-900 no-underline">
+        <Link
+          to="/app"
+          className="flex items-center gap-2 text-lg font-semibold tracking-tight text-stone-900 no-underline"
+          aria-label="Vector home"
+        >
+          <img src="/vector-logo.png" alt="" className="h-8 w-auto shrink-0" decoding="async" />
           Vector
         </Link>
         <nav className="flex items-center gap-6 text-sm font-medium text-stone-700">

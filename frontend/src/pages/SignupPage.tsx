@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
+import MarketingLayout from "../components/marketing/MarketingLayout";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { fetchMe, productApiBase } from "../lib/meApi";
 
@@ -52,77 +53,85 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 px-4 py-16">
-      <div className="mx-auto max-w-sm">
-        <h1 className="mb-2 text-xl font-semibold text-stone-900">Sign up</h1>
-        <p className="mb-6 text-sm text-stone-600">
-          Already have an account?{" "}
-          <Link to="/login" className="text-blue-600 underline">
-            Sign in
-          </Link>
-        </p>
-        {notice ? (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            {notice}
+    <MarketingLayout>
+      <main className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-md flex-col justify-center px-5 py-12 sm:px-8">
+        <div className="rounded-3xl border border-zinc-200/80 bg-white/85 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.12),inset_0_0_0_1px_rgba(139,92,246,0.07)] backdrop-blur-2xl sm:p-9">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Create account</h1>
+          <p className="mt-2 text-sm text-zinc-600">
+            Already have one?{" "}
+            <Link to="/login" className="font-medium text-teal-600 no-underline hover:text-teal-700">
+              Sign in
+            </Link>
           </p>
-        ) : null}
-        <label className="mb-3 block text-sm text-stone-700">
-          Email
-          <input
-            type="email"
-            autoComplete="email"
-            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label className="mb-3 block text-sm text-stone-700">
-          Password
-          <input
-            type="password"
-            autoComplete="new-password"
-            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <label className="mb-3 block text-sm text-stone-700">
-          Full name <span className="font-normal text-stone-500">(optional)</span>
-          <input
-            type="text"
-            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-          />
-        </label>
-        <label className="mb-6 block text-sm text-stone-700">
-          Company <span className="font-normal text-stone-500">(optional)</span>
-          <input
-            type="text"
-            className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-          />
-        </label>
-        <button
-          type="button"
-          disabled={register.isPending}
-          className="w-full rounded-lg bg-stone-900 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-          onClick={() => register.mutate()}
-        >
-          {register.isPending ? "Creating…" : "Create account"}
-        </button>
-        <p className="mt-6 text-center text-xs text-stone-500">
-          <a className="text-blue-600 underline" href={`${apiBase}/auth/google/start`}>
-            Sign up with Google
-          </a>
-        </p>
-        <p className="mt-4 text-center text-sm">
-          <Link to="/" className="text-stone-600 underline">
-            ← Home
+          {notice ? (
+            <p className="mt-5 rounded-xl border border-rose-200/80 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+              {notice}
+            </p>
+          ) : null}
+          <label className="mt-6 block text-sm font-medium text-zinc-700">
+            Email
+            <input
+              type="email"
+              autoComplete="email"
+              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-400/80 focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,212,191,0.18)]"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label className="mt-4 block text-sm font-medium text-zinc-700">
+            Password
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-400/80 focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,212,191,0.18)]"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          <label className="mt-4 block text-sm font-medium text-zinc-700">
+            Full name <span className="font-normal text-zinc-500">(optional)</span>
+            <input
+              type="text"
+              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-400/80 focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,212,191,0.18)]"
+              placeholder="Alex Kim"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+          </label>
+          <label className="mt-4 block text-sm font-medium text-zinc-700">
+            Company <span className="font-normal text-zinc-500">(optional)</span>
+            <input
+              type="text"
+              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-400/80 focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,212,191,0.18)]"
+              placeholder="Acme"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={register.isPending}
+            className="mt-8 w-full rounded-full bg-zinc-900 py-3.5 text-sm font-semibold text-white shadow-[0_6px_28px_-8px_rgba(20,184,166,0.32),0_2px_10px_-6px_rgba(124,58,237,0.16)] transition-transform hover:scale-[1.01] disabled:opacity-50"
+            onClick={() => register.mutate()}
+          >
+            {register.isPending ? "Creating…" : "Get started"}
+          </button>
+          <p className="mt-6 text-center text-xs text-zinc-500">
+            <a
+              className="font-medium text-teal-600 no-underline hover:text-teal-700"
+              href={`${apiBase}/auth/google/start`}
+            >
+              Continue with Google
+            </a>
+          </p>
+        </div>
+        <p className="mt-8 text-center text-sm text-zinc-500">
+          <Link to="/" className="text-zinc-600 no-underline hover:text-zinc-900">
+            Back to home
           </Link>
         </p>
-      </div>
-    </div>
+      </main>
+    </MarketingLayout>
   );
 }

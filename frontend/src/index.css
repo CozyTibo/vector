@@ -7,6 +7,13 @@
   }
 }
 
+/* Marketing / auth — used by landing + login + signup only */
+@layer utilities {
+  .font-display {
+    font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
 /* Shared debug / ingestion tables (canonical, raw) — keep readable on light + dark cards */
 .link-inline,
 .debug-entity-link {
