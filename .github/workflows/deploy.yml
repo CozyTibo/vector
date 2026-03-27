@@ -5,7 +5,11 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY: vector-backend
+  WORKER_REPOSITORY: vector-worker
+  ECS_CLUSTER: vector-prod
+  ECS_SERVICE: vector-backend-service
 
 jobs:
   deploy:
@@ -22,7 +26,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -31,7 +35,6 @@ jobs:
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_BACKEND }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f backend/Dockerfile backend
@@ -42,13 +45,12 @@ jobs:
       - name: Build and push worker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_WORKER }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f backend/worker.Dockerfile backend
-          docker tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          docker build -t "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" -f backend/worker.Dockerfile backend
+          docker tag "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$WORKER_REPOSITORY:latest"
+          docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG"
+          docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:latest"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -80,9 +82,6 @@ jobs:
             --paths "/*"
 
       - name: Force ECS service redeploy (API)
-        env:
-          ECS_CLUSTER: ${{ secrets.ECS_CLUSTER_NAME }}
-          ECS_SERVICE: ${{ secrets.ECS_SERVICE_BACKEND }}
         run: |
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \

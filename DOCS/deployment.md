@@ -61,14 +61,24 @@ Artifacts are written to **`dist/`** (configured explicitly in `vite.config.ts`)
 Workflow: **`.github/workflows/deploy.yml`** (runs on push to **`main`**).
 
 1. Checkout  
-2. Configure AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`)  
+2. Configure AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`; region from workflow **`env.AWS_REGION`**)  
 3. Log in to **ECR**  
-4. Build and push **backend** image to **`ECR_REPOSITORY_BACKEND`**  
-5. Build and push **worker** image to **`ECR_REPOSITORY_WORKER`**  
+4. Build and push **backend** image (`$ECR_REPOSITORY`, e.g. **`vector-backend`**)  
+5. Build and push **worker** image (`$WORKER_REPOSITORY`, e.g. **`vector-worker`**)  
 6. **Node**: `npm ci` + **`npm run build`** in `frontend/` (uses **`VITE_API_BASE_URL`**)  
 7. **`aws s3 sync`** `frontend/dist` → **`S3_BUCKET_FRONTEND`**  
 8. **CloudFront** invalidation **`/*`** via **`CLOUDFRONT_DISTRIBUTION_ID`**  
-9. **`aws ecs update-service --force-new-deployment`** on **`ECS_CLUSTER_NAME`** / **`ECS_SERVICE_BACKEND`**
+9. **`aws ecs update-service --force-new-deployment`** on **`ECS_CLUSTER`** / **`ECS_SERVICE`** (workflow `env`, e.g. **`vector-prod`** / **`vector-backend-service`**)
+
+### Workflow `env` (see **`.github/workflows/deploy.yml`**)
+
+| Variable | Example | Purpose |
+|----------|---------|---------|
+| `AWS_REGION` | `eu-west-1` | Region for AWS CLI and ECR |
+| `ECR_REPOSITORY` | `vector-backend` | ECR repo name for API image |
+| `WORKER_REPOSITORY` | `vector-worker` | ECR repo name for worker image |
+| `ECS_CLUSTER` | `vector-prod` | ECS cluster for API redeploy |
+| `ECS_SERVICE` | `vector-backend-service` | ECS service for API |
 
 ### GitHub secrets checklist
 
@@ -76,16 +86,11 @@ Workflow: **`.github/workflows/deploy.yml`** (runs on push to **`main`**).
 |--------|---------|
 | `AWS_ACCESS_KEY_ID` | IAM user or role key (prefer OIDC + role in hardened setups) |
 | `AWS_SECRET_ACCESS_KEY` | Paired secret |
-| `AWS_REGION` | e.g. `us-east-1` |
-| `ECR_REPOSITORY_BACKEND` | ECR repo name (not full URI) |
-| `ECR_REPOSITORY_WORKER` | ECR repo name for worker |
 | `VITE_API_BASE_URL` | Public API base URL for the SPA build |
 | `S3_BUCKET_FRONTEND` | Bucket name for static assets |
 | `CLOUDFRONT_DISTRIBUTION_ID` | Distribution to invalidate |
-| `ECS_CLUSTER_NAME` | ECS cluster |
-| `ECS_SERVICE_BACKEND` | ECS service running the API task definition |
 
-Add a second **`aws ecs update-service`** step (or a separate workflow) for the **worker** service when you define it, using another secret such as `ECS_SERVICE_WORKER`.
+Add a second **`aws ecs update-service`** step for the **worker** service when you want CI to roll it, using another workflow `env` key such as `ECS_SERVICE_WORKER`.
 
 ## AWS infrastructure (outline)
 
