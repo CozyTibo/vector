@@ -140,15 +140,17 @@ export default function LandingPage() {
               <span className="h-px w-8 bg-gradient-to-r from-violet-600 via-teal-500 to-transparent" />
               Early access
             </p>
-             
+
             <h1 className="max-w-xl text-[2.65rem] font-bold leading-[0.96] tracking-tight text-zinc-900 sm:text-6xl lg:text-[3.5rem] lg:leading-[0.95]">
-              Detect how{" "}
+              Make execution observable.
+              <br />
               <span className="bg-gradient-to-r from-violet-600 via-purple-600 to-teal-500 bg-clip-text text-transparent">
-              your organization executes.
+               
+               Make it predictable.
               </span>
             </h1>
             <p className="mt-6 max-w-md text-base leading-relaxed text-zinc-600 sm:text-lg">
-              Vector learns from the signals across your tools and reconstructs how execution actually happens.
+              Vector analyzes signals across your tools to reconstruct how execution actually happens.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3 sm:mt-10">
               <Link
