@@ -13,6 +13,79 @@ from vector.domains.onboarding.constants import (
     PROFILE_ROLE_OTHER,
 )
 
+def _infer_role_from_keywords(key: str) -> str | None:
+    """
+    Map common multi-word phrases and shorthands (key is lowercased, whitespace-normalized).
+    More specific phrases first.
+    """
+    if not key:
+        return None
+    phrases: tuple[tuple[str, str], ...] = (
+        ("machine learning engineer", "Machine Learning Engineer"),
+        ("product marketing manager", "Product Marketing Manager"),
+        ("engineering manager", "Engineering Manager"),
+        ("program manager", "Program Manager"),
+        ("project manager", "Project Manager"),
+        ("product manager", "Product Manager"),
+        ("technical lead", "Technical Lead"),
+        ("tech lead", "Technical Lead"),
+        ("team lead", "Team Lead"),
+        ("head of engineering", "Head of Engineering"),
+        ("head of product", "Head of Product"),
+        ("head of design", "Head of Design"),
+        ("data scientist", "Data Scientist"),
+        ("machine learning", "Machine Learning Engineer"),
+        ("customer success", "Customer Success"),
+        ("account executive", "Account Executive"),
+        ("sales manager", "Sales Manager"),
+        ("software engineer", "Software Engineer"),
+        ("senior engineer", "Senior Engineer"),
+        ("staff engineer", "Staff Engineer"),
+        ("principal engineer", "Principal Engineer"),
+        ("product designer", "Product Designer"),
+        ("ux designer", "UX Designer"),
+        ("data analyst", "Data Analyst"),
+        ("qa engineer", "QA Engineer"),
+        ("security engineer", "Security Engineer"),
+        ("data engineer", "Data Engineer"),
+        ("founding engineer", "Founding Engineer"),
+        ("vp engineering", "VP Engineering"),
+        ("vp product", "VP Product"),
+        ("vp sales", "VP Sales"),
+        ("vp marketing", "VP Marketing"),
+        ("people manager", "People"),
+        ("hr manager", "HR"),
+    )
+    for phrase, label in phrases:
+        if phrase in key:
+            return label
+    singles: dict[str, str] = {
+        "manager": "Manager",
+        "mgr": "Manager",
+        "director": "Director",
+        "pm": "Product Manager",
+        "em": "Engineering Manager",
+        "tl": "Technical Lead",
+        "swe": "Software Engineer",
+        "ds": "Data Scientist",
+        "csm": "Customer Success",
+        "ae": "Account Executive",
+    }
+    if key in singles:
+        return singles[key]
+    return None
+
+
+def _ambiguous_head_of_free_text(key: str) -> bool:
+    """True when user said 'head of …' but not one of our known Head of * roles (avoid fuzzy wrong bucket)."""
+    if "head of" not in key:
+        return False
+    for sub in ("engineering", "product", "design"):
+        if sub in key:
+            return False
+    return True
+
+
 # Phrase aliases (after boilerplate strip + token typo fixes).
 _ROLE_ALIASES: dict[str, str] = {
     "foundr": "Founder",
@@ -42,6 +115,10 @@ _ROLE_ALIASES: dict[str, str] = {
     "ceo": "CEO",
     "cfo": "CFO",
     "coo": "COO",
+    "manager": "Manager",
+    "managers": "Manager",
+    "mgmt": "Manager",
+    "director": "Director",
 }
 
 # Common token-level typos (letters dropped / swapped) before fuzzy match.
@@ -133,6 +210,13 @@ def normalize_role(raw: str) -> str:
     lower_to_canon = {c.lower(): c for c in ONBOARDING_PROFILE_ROLE_CANONICAL}
     if key in lower_to_canon:
         return lower_to_canon[key]
+
+    inferred = _infer_role_from_keywords(key)
+    if inferred:
+        return inferred
+
+    if _ambiguous_head_of_free_text(key):
+        return PROFILE_ROLE_OTHER
 
     # Prefer fuzzy match on canonical labels (original + token-fixed string).
     for candidate in (stripped, token_fixed):

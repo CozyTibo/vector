@@ -25,6 +25,15 @@ def test_normalize_role_noisy_product_manager_typos() -> None:
     assert normalize_role("I am a product managr") == "Product Manager"
 
 
+def test_normalize_role_manager_phrase() -> None:
+    assert normalize_role("I'm a manager") == "Manager"
+    assert normalize_role("manager") == "Manager"
+
+
+def test_normalize_role_head_of_platform_stays_other() -> None:
+    assert normalize_role("Head of Platform") == "Other"
+
+
 def test_normalize_person_name_case() -> None:
     assert normalize_person_name("tibo") == "Tibo"
 
