@@ -83,6 +83,8 @@ class Settings(BaseSettings):
         validation_alias="VECTOR_MOCK_SEED",
         description="Deterministic seed for mock dataset generation.",
     )
+    openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_MODEL")
 
     @field_validator("github_app_private_key", mode="before")
     @classmethod

@@ -32,6 +32,7 @@ from vector.infrastructure.db.models.identity import UserIdentity
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.linear_connection_detail import LinearConnectionDetail
 from vector.infrastructure.db.models.membership import TenantMembership
+from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.infrastructure.db.models.tenant import Tenant
@@ -51,6 +52,7 @@ __all__ = [
     "CurrentMapping",
     "ExternalReference",
     "MappingEvent",
+    "OnboardingMessage",
     "OnboardingState",
     "RelationKind",
     "Relationship",

@@ -63,6 +63,19 @@ def get_tenant_by_id(session: Session, tenant_id: uuid.UUID) -> Tenant | None:
     return session.scalar(select(Tenant).where(Tenant.id == tenant_id))
 
 
+def get_first_user_for_tenant(session: Session, tenant_id: uuid.UUID) -> User | None:
+    stmt = (
+        select(TenantMembership)
+        .where(TenantMembership.tenant_id == tenant_id)
+        .order_by(TenantMembership.created_at.asc())
+        .limit(1)
+    )
+    m = session.scalar(stmt)
+    if m is None:
+        return None
+    return get_user_by_id(session, m.user_id)
+
+
 def list_all_tenants(session: Session, *, limit: int = 500) -> list[Tenant]:
     stmt = select(Tenant).order_by(Tenant.created_at.desc()).limit(limit)
     return list(session.scalars(stmt).all())

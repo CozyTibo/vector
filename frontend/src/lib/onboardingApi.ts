@@ -1,14 +1,19 @@
 import { readErrorDetail } from "./canonicalApi";
 
 export type OnboardingStep =
-  | "WELCOME"
-  | "COMPANY_INFO"
-  | "TOOL_STACK_DISCOVERY"
-  | "TOOLS_SELECTION"
+  | "CHAT_PROFILE"
+  | "CONNECT_SLACK"
   | "CONNECT_GITHUB"
   | "CONNECT_LINEAR"
   | "SCANNING"
   | "THANK_YOU";
+
+export type OnboardingMessagePayload = {
+  id: string;
+  role: string;
+  content: string;
+  created_at: string;
+};
 
 export type OnboardingStatePayload = {
   id: string;
@@ -19,6 +24,8 @@ export type OnboardingStatePayload = {
   started_at: string | null;
   completed_at: string | null;
   abandoned_at: string | null;
+  /** Persisted chat turns from the API (chronological). Empty when the messages table is absent or new tenant. */
+  messages?: OnboardingMessagePayload[];
   github_connected: boolean;
   linear_connected: boolean;
 };
@@ -33,7 +40,7 @@ export async function fetchOnboarding(base: string): Promise<OnboardingStatePayl
 
 export async function patchOnboarding(
   base: string,
-  body: { current_step?: OnboardingStep; answers?: Record<string, unknown> },
+  body: { current_step?: string; answers?: Record<string, unknown> },
 ): Promise<OnboardingStatePayload> {
   const res = await fetch(`${base}/onboarding`, {
     method: "PATCH",
@@ -45,6 +52,22 @@ export async function patchOnboarding(
     throw new Error(await readErrorDetail(res));
   }
   return res.json() as Promise<OnboardingStatePayload>;
+}
+
+export async function postOnboardingChat(
+  base: string,
+  body: { message: string | null; structured_action?: Record<string, unknown> | null },
+): Promise<{ assistant_message: string; step: string; answers: Record<string, unknown> }> {
+  const res = await fetch(`${base}/onboarding/chat`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return res.json() as Promise<{ assistant_message: string; step: string; answers: Record<string, unknown> }>;
 }
 
 export async function completeOnboarding(base: string): Promise<{ status: string; current_step: string; completed_at: string }> {

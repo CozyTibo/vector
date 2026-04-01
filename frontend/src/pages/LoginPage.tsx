@@ -36,6 +36,8 @@ export default function LoginPage() {
     },
     onSuccess: async () => {
       setNotice(null);
+      void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
+      void qc.removeQueries({ queryKey: ["connectors", apiBase] });
       await qc.invalidateQueries({ queryKey: ["me", apiBase] });
       navigate(from, { replace: true });
     },

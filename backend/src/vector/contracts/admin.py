@@ -9,6 +9,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class OnboardingChatMessageItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    role: str
+    content: str
+    created_at: datetime
+
+
 class TenantListItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -34,14 +42,32 @@ class OnboardingAdminSnapshot(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     abandoned_at: datetime | None = None
+    profile_phase: str | None = Field(
+        default=None,
+        description="Chat profile sub-step from answers_json.profile_phase.",
+    )
     tools_interest: list[str] = Field(default_factory=list)
     company_domain: str | None = Field(
         default=None,
         description="From onboarding answers_json if provided.",
     )
+    company_website: str | None = Field(
+        default=None,
+        description="From answers_json.company.website (or legacy company_domain).",
+    )
+    company_size: str | None = Field(default=None, description="From answers_json.company.size.")
+    user_role: str | None = Field(default=None, description="From answers_json.profile.role.")
+    tools_engineering: list[str] = Field(default_factory=list)
+    tools_pm: list[str] = Field(default_factory=list)
+    tools_communication: list[str] = Field(default_factory=list)
+    tools_docs: list[str] = Field(default_factory=list)
     tools_stack: dict[str, Any] | None = Field(
         default=None,
-        description="Product research: tools by category from answers_json.tools_stack.",
+        description="Legacy wizard: tools by category from answers_json.tools_stack.",
+    )
+    chat_messages: list[OnboardingChatMessageItem] = Field(
+        default_factory=list,
+        description="Recent onboarding chat rows (append-only log).",
     )
 
 
@@ -52,6 +78,10 @@ class TenantAdminDetailResponse(BaseModel):
     company_name: str
     created_at: datetime
     onboarding: OnboardingAdminSnapshot | None = None
+    member_full_name: str | None = Field(
+        default=None,
+        description="First membership user's full_name (users.full_name).",
+    )
     connected_connectors: list[str] = Field(default_factory=list)
 
 

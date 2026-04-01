@@ -39,6 +39,8 @@ export default function SignupPage() {
     },
     onSuccess: async () => {
       setNotice(null);
+      void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
+      void qc.removeQueries({ queryKey: ["connectors", apiBase] });
       await qc.invalidateQueries({ queryKey: ["me", apiBase] });
       navigate("/app/onboarding", { replace: true });
     },

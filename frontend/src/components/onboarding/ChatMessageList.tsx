@@ -1,0 +1,33 @@
+import { useEffect, useRef } from "react";
+
+import type { ChatMessage } from "./types";
+import ChatMessageBubble from "./ChatMessageBubble";
+import TypingIndicator from "./TypingIndicator";
+
+type ChatMessageListProps = {
+  messages: ChatMessage[];
+  userDisplayName: string;
+  isTyping?: boolean;
+};
+
+export default function ChatMessageList({ messages, userDisplayName, isTyping = false }: ChatMessageListProps) {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, messages, isTyping]);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-1 pb-2 pt-3 sm:px-2">
+        <div className="mx-auto flex w-full max-w-full flex-col">
+          {messages.map((m) => (
+            <ChatMessageBubble key={m.id} message={m} userDisplayName={userDisplayName} />
+          ))}
+          {isTyping ? <TypingIndicator /> : null}
+          <div ref={endRef} className="h-2 w-full shrink-0" aria-hidden />
+        </div>
+      </div>
+    </div>
+  );
+}

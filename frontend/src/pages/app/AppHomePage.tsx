@@ -24,14 +24,14 @@ export default function AppHomePage() {
 
   if (me.isPending || !me.data) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-12">
+      <main className="mx-auto max-w-2xl min-h-0 flex-1 overflow-y-auto px-4 py-12">
         <p className="text-stone-500">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-12">
+    <main className="mx-auto max-w-2xl min-h-0 flex-1 overflow-y-auto px-4 py-12">
       <header className="mb-10">
         <h1 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
           Vector is getting your workspace ready

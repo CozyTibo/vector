@@ -18,6 +18,50 @@
   .font-display {
     font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
   }
+
+  /** Onboarding chat — subtle entrance (respect reduced motion) */
+  .onboarding-message-enter {
+    animation: onboarding-message-in 0.18s ease-out both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .onboarding-message-enter {
+      animation: none;
+    }
+  }
+
+  .onboarding-typing-dot {
+    animation: onboarding-typing-dot 0.65s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .onboarding-typing-dot {
+      animation: none;
+      opacity: 0.55;
+    }
+  }
+}
+
+@keyframes onboarding-message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/** Onboarding typing dots — short loop (~0.65s), respects reduced motion via Tailwind animate */
+@keyframes onboarding-typing-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
 }
 
 /* Shared debug / ingestion tables (canonical, raw) — keep readable on light + dark cards */

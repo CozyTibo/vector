@@ -9,7 +9,7 @@ type Props = {
 
 export default function PublicNav({ email, onLogout, showConnectors = false }: Props) {
   return (
-    <header className="border-b border-stone-200 bg-white">
+    <header className="relative z-40 border-b border-stone-200 bg-white">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <Link
           to="/app"

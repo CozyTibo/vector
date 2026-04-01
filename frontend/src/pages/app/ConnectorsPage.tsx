@@ -170,7 +170,7 @@ export default function ConnectorsPage() {
   });
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
+    <main className="mx-auto max-w-4xl min-h-0 flex-1 overflow-y-auto px-4 py-10">
       <h1 className="mb-2 text-2xl font-semibold text-stone-900">Connectors</h1>
       <p className="mb-6 text-sm text-stone-600">Link tools to your workspace.</p>
       {banner ? (

@@ -14,6 +14,7 @@ from vector.api.http.serialization import orm_to_dict
 from vector.contracts.admin import (
     AdminConnectionsResponse,
     OnboardingAdminSnapshot,
+    OnboardingChatMessageItem,
     RawIngestionAdminItem,
     RawIngestionAdminPage,
     TenantAdminDetailResponse,
@@ -73,19 +74,81 @@ def _tools_stack(ans: dict[str, object]) -> dict[str, Any] | None:
     return dict(raw)
 
 
-def _snapshot_from_onboarding(row: OnboardingState | None) -> OnboardingAdminSnapshot | None:
+def _profile_phase(ans: dict[str, object]) -> str | None:
+    raw = ans.get("profile_phase")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def _profile_role(ans: dict[str, object]) -> str | None:
+    prof = ans.get("profile")
+    if isinstance(prof, dict):
+        r = prof.get("role")
+        if isinstance(r, str) and r.strip():
+            return r.strip()
+    return None
+
+
+def _company_size(ans: dict[str, object]) -> str | None:
+    comp = ans.get("company")
+    if isinstance(comp, dict):
+        s = comp.get("size")
+        if isinstance(s, str) and s.strip():
+            return s.strip()
+    return None
+
+
+def _company_website(ans: dict[str, object]) -> str | None:
+    comp = ans.get("company")
+    if isinstance(comp, dict):
+        w = comp.get("website")
+        if isinstance(w, str) and w.strip():
+            return w.strip()
+    return _company_domain(ans)
+
+
+def _tools_category(ans: dict[str, object], key: str) -> list[str]:
+    raw = ans.get("tools")
+    if not isinstance(raw, dict):
+        return []
+    v = raw.get(key)
+    if not isinstance(v, list):
+        return []
+    return [str(x) for x in v if isinstance(x, str)]
+
+
+def _snapshot_from_onboarding(
+    session: Session, row: OnboardingState | None
+) -> OnboardingAdminSnapshot | None:
     if row is None:
         return None
     ans = dict(row.answers_json or {})
+    msgs: list[OnboardingChatMessageItem] = []
+    if onboarding_repo.onboarding_messages_table_exists(session):
+        raw_rows = onboarding_repo.list_recent_onboarding_messages(session, row.tenant_id, limit=50)
+        for m in sorted(raw_rows, key=lambda x: x.created_at):
+            msgs.append(
+                OnboardingChatMessageItem(role=m.role, content=m.content, created_at=m.created_at)
+            )
     return OnboardingAdminSnapshot(
         status=row.status,
         current_step=row.current_step,
         started_at=row.started_at,
         completed_at=row.completed_at,
         abandoned_at=row.abandoned_at,
+        profile_phase=_profile_phase(ans),
         tools_interest=_tools_interest(ans),
         company_domain=_company_domain(ans),
+        company_website=_company_website(ans),
+        company_size=_company_size(ans),
+        user_role=_profile_role(ans),
+        tools_engineering=_tools_category(ans, "engineering"),
+        tools_pm=_tools_category(ans, "pm"),
+        tools_communication=_tools_category(ans, "communication"),
+        tools_docs=_tools_category(ans, "docs"),
         tools_stack=_tools_stack(ans),
+        chat_messages=msgs,
     )
 
 
@@ -135,11 +198,13 @@ def build_admin_router() -> APIRouter:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
         ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
         conns = dbg.list_tenant_connections_for_tenant(db, tenant_id=tenant_id)
+        member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
         return TenantAdminDetailResponse(
             id=t.id,
             company_name=t.company_name,
             created_at=t.created_at,
-            onboarding=_snapshot_from_onboarding(ob),
+            onboarding=_snapshot_from_onboarding(db, ob),
+            member_full_name=member.full_name if member else None,
             connected_connectors=[c.provider for c in conns],
         )
 

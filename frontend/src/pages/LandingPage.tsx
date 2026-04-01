@@ -258,6 +258,8 @@ export default function LandingPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("oauth_ok") === "1") {
+      void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
+      void qc.removeQueries({ queryKey: ["connectors", apiBase] });
       void qc.invalidateQueries({ queryKey: ["me", apiBase] });
       window.history.replaceState({}, "", window.location.pathname);
       navigate("/app", { replace: true });
