@@ -122,7 +122,7 @@ function HeroChatThread() {
             </div>
           </div>
 
-          {/* Alex */}
+          {/* Alexx */}
           <div className="flex gap-3 sm:gap-3.5">
             <img src={heroAlexAvatarUrl} alt="Alex" className={alexAvatarClass} width={40} height={40} decoding="async" />
             <div className="min-w-0 flex-1">
