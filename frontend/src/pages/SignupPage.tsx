@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
+import { landingAccentText } from "../components/landing/landingBrandPalette";
 import MarketingLayout from "../components/marketing/MarketingLayout";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { fetchMe, productApiBase } from "../lib/meApi";
@@ -12,8 +13,6 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [company, setCompany] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
   const already = useQuery({
@@ -30,8 +29,8 @@ export default function SignupPage() {
         body: JSON.stringify({
           email,
           password,
-          full_name: fullName.trim() || null,
-          company_name: company.trim() || null,
+          full_name: null,
+          company_name: null,
         }),
       });
       if (!res.ok) {
@@ -56,6 +55,12 @@ export default function SignupPage() {
     <MarketingLayout>
       <main className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-md flex-col justify-center px-5 py-12 sm:px-8">
         <div className="rounded-3xl border border-zinc-200/80 bg-white/85 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.12),inset_0_0_0_1px_rgba(139,92,246,0.07)] backdrop-blur-2xl sm:p-9">
+          <p
+            className={`mb-5 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] ${landingAccentText}`}
+          >
+            <span className="h-px w-10 bg-[#E878BE]" aria-hidden />
+            Early access
+          </p>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Create account</h1>
           <p className="mt-2 text-sm text-zinc-600">
             Already have one?{" "}
@@ -85,28 +90,9 @@ export default function SignupPage() {
               type="password"
               autoComplete="new-password"
               className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-400/80 focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,212,191,0.18)]"
+              placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          <label className="mt-4 block text-sm font-medium text-zinc-700">
-            Full name <span className="font-normal text-zinc-500">(optional)</span>
-            <input
-              type="text"
-              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-400/80 focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,212,191,0.18)]"
-              placeholder="Alex Kim"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-            />
-          </label>
-          <label className="mt-4 block text-sm font-medium text-zinc-700">
-            Company <span className="font-normal text-zinc-500">(optional)</span>
-            <input
-              type="text"
-              className="mt-2 w-full rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-teal-400/80 focus:bg-white focus:shadow-[0_0_0_3px_rgba(45,212,191,0.18)]"
-              placeholder="Acme"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
             />
           </label>
           <button

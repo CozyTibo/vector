@@ -11,9 +11,6 @@ import httpx
 from vector.domains.connectors.linear.errors import LinearOAuthError
 from vector.settings import Settings
 
-LINEAR_OAUTH_TOKEN_URL = "https://api.linear.app/oauth/token"
-LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql"
-
 
 @dataclass(frozen=True)
 class LinearTokenResponse:
@@ -44,7 +41,7 @@ def exchange_linear_authorization_code(settings: Settings, code: str) -> LinearT
     }
     try:
         r = httpx.post(
-            LINEAR_OAUTH_TOKEN_URL,
+            settings.linear_oauth_token_url(),
             data=body,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=30.0,
@@ -66,7 +63,7 @@ def exchange_linear_authorization_code(settings: Settings, code: str) -> LinearT
     )
 
 
-def fetch_linear_viewer_org(access_token: str) -> tuple[str | None, str | None]:
+def fetch_linear_viewer_org(settings: Settings, access_token: str) -> tuple[str | None, str | None]:
     query = """
     query ViewerOrg {
       viewer {
@@ -79,7 +76,7 @@ def fetch_linear_viewer_org(access_token: str) -> tuple[str | None, str | None]:
     """
     try:
         r = httpx.post(
-            LINEAR_GRAPHQL_URL,
+            settings.linear_graphql_url(),
             json={"query": query},
             headers={
                 "Authorization": f"Bearer {access_token}",

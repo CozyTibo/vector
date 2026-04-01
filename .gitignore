@@ -1,3 +1,7 @@
+# Local mock connectors (generated / runtime)
+backend/mock_connectors/fixtures/generated/dataset.json
+backend/.mock_connectors.pid
+
 # --- Environment & secrets ---
 .env
 .env.*

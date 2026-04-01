@@ -79,7 +79,7 @@ def complete_linear_oauth(
         raise LinearInstallStateMembershipError()
 
     ex = exchange_code or exchange_linear_authorization_code
-    org_fn = fetch_org or fetch_linear_viewer_org
+    org_fn = fetch_org or (lambda tok: fetch_linear_viewer_org(settings, tok))
 
     tok = ex(settings, code)
     expires_at = token_expires_at(tok.expires_in)

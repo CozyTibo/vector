@@ -27,8 +27,15 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 @pytest.fixture(autouse=True)
 def _settings_cache() -> Generator[None, None, None]:
     get_settings.cache_clear()
+    prev_mock = os.environ.get("VECTOR_USE_MOCK_CONNECTORS")
+    # CI and automated tests must never use local mock connectors (strategy §17).
+    os.environ["VECTOR_USE_MOCK_CONNECTORS"] = "false"
     yield
     get_settings.cache_clear()
+    if prev_mock is None:
+        os.environ.pop("VECTOR_USE_MOCK_CONNECTORS", None)
+    else:
+        os.environ["VECTOR_USE_MOCK_CONNECTORS"] = prev_mock
 
 
 @pytest.fixture(scope="session")

@@ -27,6 +27,9 @@ def _cors_allow_origins() -> list[str]:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    if settings.env in ("staging", "production") and settings.vector_use_mock_connectors:
+        msg = "VECTOR_USE_MOCK_CONNECTORS must be false in staging/production"
+        raise RuntimeError(msg)
     logger.info("Vector API starting (env=%s)", settings.env)
     yield
     logger.info("Vector API shutting down")

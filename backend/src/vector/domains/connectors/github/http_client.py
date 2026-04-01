@@ -12,10 +12,6 @@ from vector.domains.connectors.github.errors import GitHubApiError, GitHubUserOA
 from vector.settings import Settings
 
 GITHUB_OAUTH_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token"
-GITHUB_API_INSTALLATION_TEMPLATE = "https://api.github.com/app/installations/{installation_id}"
-GITHUB_API_INSTALLATION_ACCESS_TOKEN_TEMPLATE = (
-    "https://api.github.com/app/installations/{installation_id}/access_tokens"
-)
 
 
 @dataclass(frozen=True)
@@ -74,7 +70,8 @@ def fetch_github_installation(
 ) -> dict[str, Any]:
     """GET /app/installations/{id} with app JWT."""
     app_jwt = create_github_app_jwt(settings)
-    url = GITHUB_API_INSTALLATION_TEMPLATE.format(installation_id=installation_id)
+    base = settings.github_rest_api_base_url()
+    url = f"{base}/app/installations/{installation_id}"
     try:
         resp = httpx.get(
             url,
@@ -110,7 +107,8 @@ def create_github_installation_access_token(
 ) -> str:
     """POST /app/installations/{id}/access_tokens — returns short-lived installation token."""
     app_jwt = create_github_app_jwt(settings)
-    url = GITHUB_API_INSTALLATION_ACCESS_TOKEN_TEMPLATE.format(installation_id=installation_id)
+    base = settings.github_rest_api_base_url()
+    url = f"{base}/app/installations/{installation_id}/access_tokens"
     try:
         resp = httpx.post(
             url,

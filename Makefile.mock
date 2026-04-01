@@ -1,0 +1,53 @@
+# Local mock connectors only — never used in CI or AWS.
+# See backend/mock_connectors/README.md and DOCS/strategy/local-mock-connectors-and-fixtures.md
+
+.PHONY: mock-connectors-up mock-connectors-down mock-dataset mock-validate mock-reseed dev-mock dev-real help-mock
+
+MOCK_HOST := 127.0.0.1
+MOCK_PORT := 9183
+BACKEND_DIR := backend
+PYTHONPATH := $(BACKEND_DIR)/src:$(BACKEND_DIR)
+# Written by mock-connectors-up inside backend/
+PID_FILE := $(BACKEND_DIR)/.mock_connectors.pid
+
+help-mock:
+	@echo "Vector mock connectors (local dev, loopback only)"
+	@echo "  make -f Makefile.mock mock-connectors-up   # start mock on $(MOCK_HOST):$(MOCK_PORT)"
+	@echo "  make -f Makefile.mock mock-connectors-down # stop (uses $(PID_FILE))"
+	@echo "  make -f Makefile.mock mock-dataset       # write fixtures/generated/dataset.json"
+	@echo "  make -f Makefile.mock mock-validate     # validate dataset"
+	@echo "  make -f Makefile.mock mock-reseed       # POST /admin/reseed (SEED=1)"
+	@echo "  make -f Makefile.mock dev-mock           # print env for running API with mocks"
+	@echo "  make -f Makefile.mock dev-real           # print env for real GitHub/Linear APIs"
+
+mock-connectors-up:
+	@cd $(BACKEND_DIR) && VECTOR_MOCK_SEED=$${VECTOR_MOCK_SEED:-42} PYTHONPATH=$(PYTHONPATH) \
+		sh -c 'python -m uvicorn mock_connectors.unified:app --host $(MOCK_HOST) --port $(MOCK_PORT) & echo $$! > .mock_connectors.pid'
+	@echo "Mock connectors PID $$(cat $(PID_FILE)) — http://$(MOCK_HOST):$(MOCK_PORT)/health"
+
+mock-connectors-down:
+	@test ! -f $(PID_FILE) || (kill $$(cat $(PID_FILE)) 2>/dev/null; rm -f $(PID_FILE); echo "Stopped mock connectors.")
+
+mock-dataset:
+	@cd $(BACKEND_DIR) && VECTOR_MOCK_SEED=$${VECTOR_MOCK_SEED:-42} PYTHONPATH=$(PYTHONPATH) \
+		python mock_connectors/scripts/generate_dataset.py
+
+mock-validate:
+	@cd $(BACKEND_DIR) && VECTOR_MOCK_SEED=$${VECTOR_MOCK_SEED:-42} PYTHONPATH=$(PYTHONPATH) \
+		python mock_connectors/scripts/validate_mock_dataset.py
+
+# Reseed running mock server (requires mock-connectors-up). Example: make -f Makefile.mock mock-reseed SEED=3
+mock-reseed:
+	@curl -sS -X POST "http://$(MOCK_HOST):$(MOCK_PORT)/admin/reseed?seed=$${SEED:-42}"
+
+dev-mock:
+	@echo "Export for local API process (development only):"
+	@echo "  export ENV=development"
+	@echo "  export VECTOR_USE_MOCK_CONNECTORS=true"
+	@echo "  export VECTOR_MOCK_CONNECTOR_BASE_URL=http://127.0.0.1:$(MOCK_PORT)"
+	@echo "  export VECTOR_MOCK_SEED=$${VECTOR_MOCK_SEED:-42}"
+
+dev-real:
+	@echo "Export for real vendor APIs:"
+	@echo "  export VECTOR_USE_MOCK_CONNECTORS=false"
+	@echo "  unset VECTOR_MOCK_CONNECTOR_BASE_URL || true"

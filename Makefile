@@ -13,7 +13,10 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build
+.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build mock-help
+
+mock-help:
+	@$(MAKE) -f Makefile.mock help-mock
 
 help:
 	@echo "Vector — Makefile (Docker Compose)"
@@ -39,6 +42,7 @@ help:
 	@echo "  make reinstall       down, rebuild --no-cache, up, migrate"
 	@echo "  make logs-frontend   docker compose logs -f frontend"
 	@echo "  Note: reinstall keeps DB volume; use 'docker compose down -v' to wipe data."
+	@echo "  make mock-help          local GitHub/Linear mocks (Makefile.mock; dev-only)"
 
 setup: $(DOTENV)
 	$(COMPOSE) build

@@ -23,11 +23,9 @@ from vector.domains.projections.github.resource_types import RT_PULL_REQUEST_COM
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import ingestion as ing_repo
-from vector.settings import Settings
+from vector.settings import Settings, get_settings
 
 _logger = logging.getLogger(__name__)
-
-GITHUB_API_BASE = "https://api.github.com"
 
 CONNECTOR = ing_repo.CONNECTOR_GITHUB
 SOURCE_POLL = ing_repo.SOURCE_TRIGGER_POLL
@@ -91,9 +89,10 @@ def _get_json(
     token: str,
     params: dict[str, Any] | None = None,
 ) -> httpx.Response:
+    base = get_settings().github_rest_api_base_url()
     return executor.request(
         "GET",
-        f"{GITHUB_API_BASE}{path}",
+        f"{base}{path}",
         headers=_github_headers(token),
         params=params or {},
     )

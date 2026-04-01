@@ -68,6 +68,21 @@ class Settings(BaseSettings):
         validation_alias="ADMIN_PASSWORD",
         description="When set, enables /admin/* HTTP Basic (password only; username ignored).",
     )
+    vector_use_mock_connectors: bool = Field(
+        default=False,
+        validation_alias="VECTOR_USE_MOCK_CONNECTORS",
+        description="Local dev: use mock connectors (requires ENV=development).",
+    )
+    vector_mock_connector_base_url: str = Field(
+        default="http://127.0.0.1:9183",
+        validation_alias="VECTOR_MOCK_CONNECTOR_BASE_URL",
+        description="Base URL for unified mock (GitHub REST + Linear /linear/*).",
+    )
+    vector_mock_seed: int = Field(
+        default=42,
+        validation_alias="VECTOR_MOCK_SEED",
+        description="Deterministic seed for mock dataset generation.",
+    )
 
     @field_validator("github_app_private_key", mode="before")
     @classmethod
@@ -99,6 +114,34 @@ class Settings(BaseSettings):
             if pem.strip():
                 object.__setattr__(self, "github_app_private_key", pem)
         return self
+
+    @model_validator(mode="after")
+    def enforce_mock_connectors_local_only(self) -> Self:
+        """Mock connectors are allowed only in local development; forbidden in prod/CI-like envs."""
+        env = self.env.strip().lower()
+        if self.vector_use_mock_connectors and env != "development":
+            msg = "VECTOR_USE_MOCK_CONNECTORS=true is only allowed when ENV=development"
+            raise ValueError(msg)
+        if env in ("staging", "production") and self.vector_use_mock_connectors:
+            msg = "VECTOR_USE_MOCK_CONNECTORS must be false when ENV is staging or production"
+            raise ValueError(msg)
+        return self
+
+    def github_rest_api_base_url(self) -> str:
+        """Base for GitHub REST (poll sync, installation token)."""
+        if self.vector_use_mock_connectors:
+            return self.vector_mock_connector_base_url.rstrip("/")
+        return "https://api.github.com"
+
+    def linear_graphql_url(self) -> str:
+        if self.vector_use_mock_connectors:
+            return f"{self.vector_mock_connector_base_url.rstrip('/')}/linear/graphql"
+        return "https://api.linear.app/graphql"
+
+    def linear_oauth_token_url(self) -> str:
+        if self.vector_use_mock_connectors:
+            return f"{self.vector_mock_connector_base_url.rstrip('/')}/linear/oauth/token"
+        return "https://api.linear.app/oauth/token"
 
 
 @lru_cache
