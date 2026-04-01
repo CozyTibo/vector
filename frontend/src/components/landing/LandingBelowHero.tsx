@@ -1,11 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import vectorHqShowcaseUrl from "../../assets/vector-hq.png";
+import {
+  landingAccentChipPurple,
+  landingAccentText,
+  landingSubtleLineH,
+  landingTitleKeywordGradient,
+} from "./landingBrandPalette";
 
 const panel =
-  "rounded-2xl border border-zinc-200/80 bg-white/80 shadow-[0_12px_48px_-20px_rgba(15,23,42,0.09),inset_0_0_0_1px_rgba(139,92,246,0.07)] backdrop-blur-xl";
-const glowPurple = "shadow-[0_0_80px_-20px_rgba(124,58,237,0.35)]";
+  "rounded-2xl border border-zinc-200/80 bg-white/90 shadow-[0_12px_48px_-20px_rgba(15,23,42,0.08)] backdrop-blur-xl";
+/** Neutral card shadow (avoid pink glow halos) */
+const glowPurple = "shadow-[0_20px_50px_-32px_rgba(15,23,42,0.1)]";
 /** Section vertical rhythm - tight enough to scroll comfortably */
 const sectionPad = "py-14 sm:py-16 lg:py-20";
 
@@ -26,7 +33,7 @@ const sectionTitleClass =
 const sectionHeaderClass = "w-full text-left lg:pl-2";
 
 /** Body copy - matches Vision (“Execution should be observable”) left column */
-const sectionProseBorder = "border-l-2 border-violet-200/70 pl-7 sm:border-violet-200/80 sm:pl-9";
+const sectionProseBorder = "border-l-2 border-[#F5C8E0]/90 pl-7 sm:border-[#F5C8E0] sm:pl-9";
 const sectionProseStack = "space-y-6 sm:space-y-7";
 export const sectionProseMuted = "text-pretty text-lg leading-snug text-zinc-600 sm:text-xl";
 const sectionProseBody = "text-pretty text-lg font-medium leading-snug text-zinc-800 sm:text-xl";
@@ -65,27 +72,15 @@ const pipelineIntegrationChipNames = [
   "Internal tools",
 ] as const;
 
-/**
- * Title accents - same family as the logo: electric violet / purple / fuchsia + neon teal / cyan.
- * Each section varies direction and stops so they stay distinct without leaving the brand palette.
- */
 const titleAccent = {
-  howVector:
-    "bg-gradient-to-r from-teal-500 via-cyan-500 to-violet-600 bg-clip-text text-transparent",
-  core:
-    "bg-gradient-to-l from-purple-600 via-violet-600 to-indigo-600 bg-clip-text text-transparent",
-  who:
-    "bg-gradient-to-r from-teal-500 via-violet-500 to-fuchsia-600 bg-clip-text text-transparent",
-  cta:
-    "bg-gradient-to-r from-violet-600 via-fuchsia-600 to-teal-400 bg-clip-text text-transparent",
-  problem:
-    "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-amber-600 bg-clip-text text-transparent",
-  agent:
-    "bg-gradient-to-r from-violet-600 via-purple-600 to-teal-500 bg-clip-text text-transparent",
-  threeThings:
-    "bg-gradient-to-r from-teal-500 via-violet-600 to-fuchsia-500 bg-clip-text text-transparent",
-  stack:
-    "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-teal-400 bg-clip-text text-transparent",
+  howVector: landingTitleKeywordGradient,
+  core: landingTitleKeywordGradient,
+  who: landingTitleKeywordGradient,
+  cta: landingTitleKeywordGradient,
+  problem: landingTitleKeywordGradient,
+  agent: landingTitleKeywordGradient,
+  threeThings: landingTitleKeywordGradient,
+  stack: landingTitleKeywordGradient,
 } as const;
 
 /** Problem section - 2×2 cards, concrete copy, max ~18 words per body */
@@ -149,9 +144,9 @@ function ScrollFade({ children, className = "" }: { children: React.ReactNode; c
 function ToolChip({ name, color }: { name: string; color: "purple" | "teal" | "zinc" | "amber" }) {
   const c =
     color === "purple"
-      ? "border-violet-300/60 bg-violet-500/10 text-violet-800"
+      ? landingAccentChipPurple
       : color === "teal"
-        ? "border-teal-300/60 bg-teal-500/10 text-teal-800"
+        ? "border-zinc-300/80 bg-zinc-100/90 text-zinc-800"
         : color === "amber"
           ? "border-amber-300/50 bg-amber-500/10 text-amber-900"
           : "border-zinc-200/80 bg-zinc-50 text-zinc-700";
@@ -216,14 +211,14 @@ function PipelineProductVisual({ size = "full" }: { size?: "full" | "mini" }) {
         ))}
       </div>
       <PipelineFlowArrow />
-      <p className={`text-center font-semibold text-violet-800 ${title}`}>Execution signals</p>
+      <p className={`text-center font-semibold ${landingAccentText} ${title}`}>Execution signals</p>
       <PipelineFlowArrow />
-      <div className="rounded-xl border border-violet-300/50 bg-gradient-to-r from-violet-600/10 to-teal-500/10 px-4 py-3 text-center sm:py-4">
-        <p className={`font-bold text-zinc-900 ${size === "mini" ? "text-xs" : "text-sm"}`}>Vector</p>
+      <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 text-center sm:py-4">
+        <p className={`font-bold ${landingAccentText} ${size === "mini" ? "text-xs" : "text-sm"}`}>Vector</p>
         <p className={`mt-1 text-zinc-600 ${size === "mini" ? "text-[10px]" : "text-xs"}`}>Understands execution continuously</p>
       </div>
       <PipelineFlowArrow />
-      <p className={`text-center font-semibold text-teal-800 ${title}`}>Insights · Reports · Recommendations</p>
+      <p className={`text-center font-semibold text-zinc-900 ${title}`}>Insights · Reports · Recommendations</p>
     </div>
   );
 }
@@ -232,7 +227,6 @@ function PipelineProductVisual({ size = "full" }: { size?: "full" | "mini" }) {
 function FragmentedToolsVisual() {
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute -inset-6 rounded-3xl bg-gradient-to-br from-violet-500/[0.06] via-transparent to-teal-500/[0.07] blur-2xl" />
       <div className={`relative ${panel} p-5 sm:p-6`}>
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Fragmented tools</p>
         <div className="relative mt-6 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
@@ -261,12 +255,11 @@ function FragmentedToolsVisual() {
         </div>
         <div className="mt-8 border-t border-dashed border-zinc-200/80 pt-6">
           <div
-            className={`relative overflow-hidden rounded-xl border border-violet-400/35 bg-gradient-to-br from-violet-600/[0.08] via-white to-teal-500/[0.1] p-4 ${glowPurple}`}
+            className={`relative overflow-hidden rounded-xl border border-zinc-200/70 bg-white p-4 shadow-sm ${glowPurple}`}
           >
-            <div className="absolute right-2 top-2 h-16 w-16 rounded-full bg-teal-400/20 blur-2xl" />
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-700">Vector</p>
+            <p className={`text-[10px] font-semibold uppercase tracking-widest ${landingAccentText}`}>Vector</p>
             <p className="mt-2 text-sm font-semibold text-zinc-900">Execution signal detected</p>
-            <p className="mt-1 text-xs font-medium text-violet-800">Untracked work</p>
+            <p className="mt-1 text-xs font-medium text-zinc-600">Untracked work</p>
             <p className="mt-2 font-mono text-[11px] text-zinc-600">
               Slack → GitHub PR → <span className="text-amber-700">no Linear issue</span>
             </p>
@@ -287,7 +280,8 @@ function HowVectorReconstructsSection() {
       <ScrollFade>
         <header className={sectionHeaderClass}>
           <h2 className={`${sectionTitleClass} max-w-4xl`}>
-            How Vector <span className={titleAccent.howVector}>reconstructs</span> execution
+            How <span className={landingAccentText}>Vector</span>{" "}
+            <span className={titleAccent.howVector}>reconstructs</span> execution
           </h2>
         </header>
         <div className="mt-12 grid items-start gap-12 lg:grid-cols-2 lg:gap-14">
@@ -322,10 +316,22 @@ const CORE_ROLE_TABS: { id: CoreRoleId; label: string }[] = [
   { id: "teams", label: "Teams" },
 ];
 
-const CORE_ROLE_CONTEXT: Record<CoreRoleId, string> = {
-  executive: "How Vector helps leaders stay ahead of execution",
-  leaders: "How Vector helps managers run teams with clarity",
-  teams: "How Vector helps teams stay focused on what matters",
+const CORE_ROLE_CONTEXT: Record<CoreRoleId, ReactNode> = {
+  executive: (
+    <>
+      How <span className={`font-semibold ${landingAccentText}`}>Vector</span> helps leaders stay ahead of execution
+    </>
+  ),
+  leaders: (
+    <>
+      How <span className={`font-semibold ${landingAccentText}`}>Vector</span> helps managers run teams with clarity
+    </>
+  ),
+  teams: (
+    <>
+      How <span className={`font-semibold ${landingAccentText}`}>Vector</span> helps teams stay focused on what matters
+    </>
+  ),
 };
 
 /** Minimal monochrome strokes — symbolic only, not decorative mockups */
@@ -526,6 +532,41 @@ const CORE_VALUE_BLOCKS_BY_ROLE: Record<CoreRoleId, readonly CoreValueBlock[]> =
   ],
 };
 
+const executionSignalsPhrase = "execution signals";
+
+function AccentVectorInText({ text }: { text: string }) {
+  if (!text.includes("Vector")) {
+    return <>{text}</>;
+  }
+  return (
+    <>
+      {text.split(/(Vector)/g).map((segment, i) =>
+        segment === "Vector" ? (
+          <span key={`${i}-v`} className={landingAccentText}>
+            Vector
+          </span>
+        ) : (
+          <span key={`${i}-t`}>{segment}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function CoreBenefitCardTitle({ title }: { title: string }) {
+  if (!title.includes(executionSignalsPhrase)) {
+    return <>{title}</>;
+  }
+  const i = title.indexOf(executionSignalsPhrase);
+  return (
+    <>
+      {title.slice(0, i)}
+      <span className={landingAccentText}>{executionSignalsPhrase}</span>
+      {title.slice(i + executionSignalsPhrase.length)}
+    </>
+  );
+}
+
 function CoreFeaturesSection() {
   const [role, setRole] = useState<CoreRoleId>("leaders");
   const blocks = CORE_VALUE_BLOCKS_BY_ROLE[role];
@@ -535,10 +576,12 @@ function CoreFeaturesSection() {
       <ScrollFade>
         <header className={sectionHeaderClass}>
           <h2 className={`${sectionTitleClass} max-w-4xl`}>
-            Vector <span className={titleAccent.core}>empowers</span> your teams
+            <span className={landingAccentText}>Vector</span>{" "}
+            <span className={titleAccent.core}>empowers</span> your teams
           </h2>
           <p className={`mt-6 max-w-2xl text-pretty ${sectionLead}`}>
-            Same teammate, three lenses. Pick your role to see how Vector shows up for you.
+            Same teammate, three lenses. Pick your role to see how{" "}
+            <span className={landingAccentText}>Vector</span> shows up for you.
           </p>
           <div className="mt-10 pb-2">
             <div
@@ -557,22 +600,14 @@ function CoreFeaturesSection() {
                     onClick={() => setRole(r.id)}
                     className={`relative rounded-2xl px-5 py-3.5 text-left text-[15px] font-semibold transition-[color,transform,box-shadow,background-color] duration-200 ease-out sm:rounded-full sm:px-6 sm:py-3.5 sm:text-base ${
                       active
-                        ? "bg-white/95 text-zinc-900 shadow-[0_6px_28px_-12px_rgba(124,58,237,0.2)] ring-1 ring-violet-200/35"
+                        ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/80"
                         : "text-zinc-500 hover:bg-white/40 hover:text-zinc-800"
                     }`}
                   >
-                    <span
-                      className={
-                        active
-                          ? "bg-gradient-to-r from-violet-600 via-blue-600 to-teal-500 bg-clip-text text-transparent"
-                          : undefined
-                      }
-                    >
-                      {r.label}
-                    </span>
+                    <span className={active ? landingAccentText : undefined}>{r.label}</span>
                     {active ? (
                       <span
-                        className="pointer-events-none absolute bottom-1.5 left-1/2 h-0.5 w-[72%] max-w-[10rem] -translate-x-1/2 rounded-full bg-gradient-to-r from-violet-500 via-blue-500 to-teal-400 shadow-[0_0_14px_rgba(124,58,237,0.45),0_0_20px_rgba(20,184,166,0.2)] sm:bottom-2"
+                        className={`pointer-events-none absolute bottom-1.5 left-1/2 h-0.5 w-[72%] max-w-[10rem] -translate-x-1/2 rounded-full ${landingSubtleLineH} sm:bottom-2`}
                         aria-hidden
                       />
                     ) : null}
@@ -596,11 +631,6 @@ function CoreFeaturesSection() {
             aria-label={`${roleLabel}: what Vector delivers`}
           >
             <div
-              className="pointer-events-none absolute left-1/2 top-0 z-0 h-[min(42rem,110%)] w-[min(100%,56rem)] -translate-x-1/2 translate-y-8 rounded-[2.5rem] bg-gradient-to-br from-violet-600/[0.025] via-blue-600/[0.02] to-teal-500/[0.025] blur-3xl"
-              aria-hidden
-            />
-
-            <div
               key={role}
               className="relative z-[1] motion-reduce:animate-none grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:gap-8 animate-[coreRoleContent_0.2s_ease-out_both]"
             >
@@ -608,9 +638,9 @@ function CoreFeaturesSection() {
               <article
                 key={b.title}
                 style={{ animationDelay: `${i * 32}ms` }}
-                className="core-benefit-card group relative rounded-2xl p-px transition-[transform,box-shadow] duration-300 ease-out motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:shadow-none hover:-translate-y-1 hover:shadow-[0_28px_64px_-28px_rgba(124,58,237,0.12),0_16px_40px_-32px_rgba(20,184,166,0.06)] bg-gradient-to-br from-violet-500/[0.025] via-blue-500/[0.018] to-teal-500/[0.025] shadow-[0_12px_40px_-28px_rgba(15,23,42,0.08)] hover:from-violet-500/[0.04] hover:via-blue-500/[0.03] hover:to-teal-500/[0.04] sm:min-h-[12.5rem]"
+                className="core-benefit-card group relative rounded-2xl border border-zinc-200/70 bg-white transition-[transform,box-shadow] duration-300 ease-out motion-reduce:translate-y-0 motion-reduce:opacity-100 hover:-translate-y-1 hover:shadow-[0_20px_50px_-28px_rgba(15,23,42,0.12)] shadow-[0_12px_40px_-28px_rgba(15,23,42,0.07)] sm:min-h-[12.5rem]"
               >
-                <div className="flex h-full min-h-[inherit] flex-col justify-center rounded-[0.95rem] border border-zinc-200/45 bg-gradient-to-br from-white via-violet-50/[0.012] to-teal-50/[0.01] px-9 py-9 text-left backdrop-blur-xl sm:rounded-[0.98rem] sm:px-10 sm:py-10 lg:px-11 lg:py-10">
+                <div className="flex h-full min-h-[inherit] flex-col justify-center rounded-[calc(1rem-1px)] px-9 py-9 text-left sm:px-10 sm:py-10 lg:px-11 lg:py-10">
                   <div className="flex items-start gap-3.5 sm:gap-4">
                     <span
                       className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200/60 bg-zinc-50/90 text-zinc-400 transition-colors duration-200 group-hover:border-zinc-200/80 group-hover:bg-white group-hover:text-zinc-500"
@@ -620,10 +650,10 @@ function CoreFeaturesSection() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <h3 className="text-xl font-bold leading-snug tracking-tight text-zinc-900 sm:text-2xl">
-                        {b.title}
+                        <CoreBenefitCardTitle title={b.title} />
                       </h3>
                       <p className="mt-3 max-w-[26rem] text-pretty text-base leading-snug text-zinc-600 sm:text-[1.05rem] sm:leading-snug">
-                        {b.sentence}
+                        <AccentVectorInText text={b.sentence} />
                       </p>
                     </div>
                   </div>
@@ -657,13 +687,13 @@ function CoreFeaturesSection() {
 function problemCardDotClass(dot: (typeof PROBLEM_CARDS)[number]["dot"]) {
   switch (dot) {
     case "violet":
-      return "bg-violet-500 shadow-[0_0_0_3px_rgba(139,92,246,0.2)]";
+      return "bg-[#E878BE] shadow-[0_0_0_3px_rgba(232,120,190,0.25)]";
     case "teal":
-      return "bg-teal-500 shadow-[0_0_0_3px_rgba(20,184,166,0.2)]";
+      return "bg-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.22)]";
     case "amber":
       return "bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.2)]";
     case "fuchsia":
-      return "bg-fuchsia-500 shadow-[0_0_0_3px_rgba(217,70,239,0.2)]";
+      return "bg-indigo-600 shadow-[0_0_0_3px_rgba(79,70,229,0.22)]";
   }
 }
 
@@ -712,16 +742,8 @@ function MeetVectorAvatarShowcase() {
   return (
     <div className="relative mx-auto w-full max-w-[18rem] translate-x-1.5 sm:max-w-[20rem] sm:translate-x-2 lg:max-w-[24rem] lg:translate-x-5 xl:max-w-[26rem] xl:translate-x-6">
       <div
-        className="pointer-events-none absolute -inset-3 rounded-[1.75rem] bg-gradient-to-br from-violet-500/[0.16] via-fuchsia-500/[0.06] to-teal-400/[0.12] blur-2xl"
-        aria-hidden
-      />
-      <div
-        className={`relative overflow-hidden rounded-3xl border border-violet-200/70 bg-gradient-to-b from-white via-violet-50/35 to-teal-50/50 shadow-[0_20px_60px_-32px_rgba(124,58,237,0.28),0_16px_48px_-36px_rgba(20,184,166,0.18)] ring-1 ring-inset ring-white/80 ${glowPurple}`}
+        className={`relative overflow-hidden rounded-3xl border border-zinc-200/80 bg-white shadow-[0_20px_50px_-32px_rgba(15,23,42,0.1)] ring-1 ring-inset ring-zinc-100/80 ${glowPurple}`}
       >
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_115%,rgba(124,58,237,0.1),transparent_58%),radial-gradient(ellipse_70%_50%_at_80%_20%,rgba(20,184,166,0.07),transparent_55%)]"
-          aria-hidden
-        />
         <img
           src={vectorHqShowcaseUrl}
           alt="Vector, your execution manager"
@@ -730,7 +752,9 @@ function MeetVectorAvatarShowcase() {
         />
       </div>
       <div className="mt-4 text-center sm:mt-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-700 sm:text-[13px] sm:tracking-[0.13em]">
+        <p
+          className={`text-xs font-semibold uppercase tracking-[0.12em] sm:text-[13px] sm:tracking-[0.13em] ${landingAccentText}`}
+        >
           Vector
         </p>
         <p className="mt-1 text-xs font-medium leading-snug text-zinc-600 sm:text-sm">Your execution manager</p>
@@ -755,18 +779,20 @@ function MeetVectorAgentSection() {
                   Not a SaaS. Not a Dashboard.
                 </p>
                 <p className={sectionProseMuted}>
-                  Vector is on your team, it lives inside your existing tools and adapts to your company&apos;s processes
-                  and routine.
+                  <span className={landingAccentText}>Vector</span> is on your team, it lives inside your existing tools
+                  and adapts to your company&apos;s processes and routine.
                 </p>
               </div>
             </header>
             <p className={`mt-10 sm:mt-12 ${sectionProseBody}`}>
-              Vector always knows:
+              <span className={landingAccentText}>Vector</span> always knows:
             </p>
             <ul className={`mt-3 space-y-3 sm:mt-4 ${sectionListEmphasis}`}>
               {points.map((x) => (
                 <li key={x} className="flex items-start gap-3">
-                  <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-teal-500/15 text-xs text-violet-800">
+                  <span
+                    className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-zinc-200/80 bg-zinc-50 text-xs ${landingAccentText}`}
+                  >
                     ✓
                   </span>
                   <span>{x}</span>
@@ -776,7 +802,7 @@ function MeetVectorAgentSection() {
             <div className="mt-8 sm:mt-10">
               <Link
                 to="/signup"
-                className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-9 py-4 text-base font-semibold text-white no-underline shadow-[0_6px_32px_-8px_rgba(20,184,166,0.38),0_2px_12px_-6px_rgba(124,58,237,0.18)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_8px_36px_-6px_rgba(6,182,212,0.28),0_2px_14px_-4px_rgba(139,92,246,0.22)]"
+                className="inline-flex items-center justify-center rounded-full bg-[#0F0F12] px-9 py-4 text-base font-semibold text-white no-underline shadow-[0_8px_24px_-12px_rgba(15,23,42,0.35)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_12px_32px_-12px_rgba(15,23,42,0.2)]"
               >
                 Get early access
               </Link>
@@ -824,16 +850,17 @@ function WhatVectorKnowsSection() {
       <ScrollFade>
         <header className={sectionHeaderClass}>
           <h2 className={`${sectionTitleClass} max-w-none md:whitespace-nowrap`}>
-            The questions Vector <span className={titleAccent.threeThings}>answers for you</span>
+            The questions <span className={landingAccentText}>Vector</span>{" "}
+            <span className={titleAccent.threeThings}>answers for you</span>
           </h2>
         </header>
         <div className="mt-12 grid gap-6 lg:grid-cols-3 lg:gap-5">
           {THREE_PILLARS.map((p) => (
             <div
               key={p.title}
-              className={`${panel} flex flex-col p-6 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_48px_-28px_rgba(124,58,237,0.2)]`}
+              className={`${panel} flex flex-col p-6 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_48px_-28px_rgba(232,120,190,0.14)]`}
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-bold text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0F0F12] text-sm font-bold text-white">
                 {p.n}
               </span>
               <h3 className={`mt-3 ${cardTitleClass}`}>{p.title}</h3>
@@ -841,7 +868,7 @@ function WhatVectorKnowsSection() {
               <ul className="mt-4 space-y-1.5 border-t border-zinc-200/70 pt-3 text-sm font-medium leading-snug text-zinc-600 sm:text-base">
                 {p.examples.map((ex) => (
                   <li key={ex} className="flex gap-2">
-                    <span className="text-violet-500" aria-hidden>
+                    <span className={landingAccentText} aria-hidden>
                       ·
                     </span>
                     <span>{ex}</span>
@@ -863,7 +890,8 @@ function StackSection() {
       <ScrollFade>
         <header className={sectionHeaderClass}>
           <h2 className={`${sectionTitleClass} max-w-4xl`}>
-            Vector fits into your <span className={titleAccent.stack}>stack</span>
+            <span className={landingAccentText}>Vector</span> fits into your{" "}
+            <span className={titleAccent.stack}>stack</span>
           </h2>
         </header>
         <div className="mt-12 grid items-center gap-12 lg:grid-cols-12 lg:gap-10 lg:pl-2">
@@ -872,11 +900,11 @@ function StackSection() {
               Slack, GitHub, Linear, Notion, Jira, and internal tools all emit signals about execution.
             </p>
             <p className={`mt-4 ${sectionProseBody}`}>
-              They flow into Vector's brain, and he produces insights, reports, and recommendations leaders can act on.
+              They flow into <span className={landingAccentText}>Vector</span>&apos;s brain, and he produces insights,
+              reports, and recommendations leaders can act on.
             </p>
           </div>
           <div className="relative lg:col-span-7 lg:-mr-2 xl:-mr-4">
-            <div className="pointer-events-none absolute -inset-4 rounded-[28px] bg-gradient-to-b from-violet-500/8 to-teal-500/12 opacity-90 blur-3xl lg:-inset-6" />
             <div className="relative">
               <PipelineProductVisual size="full" />
             </div>
@@ -927,22 +955,18 @@ function WhoSection() {
   const personas: {
     label: string;
     hook: string;
-    wins: { lead: string; rest: string }[];
-    bar: string;
+    wins: { lead: string; rest: string; restAccent?: string }[];
     iconKind: "executives" | "leaders" | "teams";
-    labelToneClass: string;
   }[] = [
     {
       label: "Executives",
       hook: "Run execution with clarity",
       wins: [
         { lead: "Spot risks early", rest: " while there is still time to act" },
-        { lead: "Make decisions", rest: " from real execution signals" },
+        { lead: "Make decisions", rest: " from real ", restAccent: "execution signals" },
         { lead: "See how the organization is delivering", rest: " in real time" },
       ],
-      bar: "from-teal-500 via-cyan-400 to-teal-400",
       iconKind: "executives",
-      labelToneClass: "text-teal-700",
     },
     {
       label: "Engineering & product leaders",
@@ -952,9 +976,7 @@ function WhoSection() {
         { lead: "Detect work drift", rest: " before it turns into delays" },
         { lead: "Spend more time", rest: " coaching and unblocking teams" },
       ],
-      bar: "from-violet-500 via-purple-500 to-fuchsia-500",
       iconKind: "leaders",
-      labelToneClass: "text-violet-700",
     },
     {
       label: "Teams",
@@ -964,9 +986,7 @@ function WhoSection() {
         { lead: "Get clear visibility", rest: " without constant check-ins" },
         { lead: "Surface blockers as they happen", rest: " and resolve them faster" },
       ],
-      bar: "from-violet-600 via-teal-500 to-teal-400",
       iconKind: "teams",
-      labelToneClass: "text-emerald-700",
     },
   ];
   return (
@@ -982,11 +1002,11 @@ function WhoSection() {
           {personas.map((p) => (
             <article
               key={p.label}
-              className="group flex h-full flex-col overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-[0_20px_50px_-32px_rgba(15,23,42,0.18)] backdrop-blur-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_28px_60px_-36px_rgba(124,58,237,0.12)]"
+              className="group flex h-full flex-col overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-[0_20px_50px_-32px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_56px_-36px_rgba(15,23,42,0.14)]"
             >
-              <div className={`h-1.5 w-full bg-gradient-to-r ${p.bar}`} aria-hidden />
+              <div className={`h-1.5 w-full ${landingSubtleLineH}`} aria-hidden />
               <div className="flex flex-1 flex-col px-6 pb-7 pt-6 sm:px-7 sm:pt-7">
-                <div className={`flex items-center gap-2.5 ${p.labelToneClass}`}>
+                <div className={`flex items-center gap-2.5 ${landingAccentText}`}>
                   <PersonaLabelIcon kind={p.iconKind} />
                   <p className="text-xs font-semibold uppercase tracking-[0.11em] sm:text-[13px] sm:tracking-[0.13em]">
                     {p.label}
@@ -998,18 +1018,25 @@ function WhoSection() {
                 <ul className="mt-6 flex flex-1 flex-col gap-3" role="list">
                   {p.wins.map((w) => (
                     <li
-                      key={w.lead + w.rest}
+                      key={w.lead + w.rest + (w.restAccent ?? "")}
                       className="flex items-start gap-3 rounded-2xl bg-zinc-50/80 px-3.5 py-2.5 text-sm leading-snug text-zinc-600 ring-1 ring-zinc-100/90 sm:text-[15px]"
                     >
                       <span
-                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/20 to-teal-500/20 text-[10px] font-bold text-violet-700"
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-zinc-200/80 bg-zinc-50 text-[10px] font-bold ${landingAccentText}`}
                         aria-hidden
                       >
                         ✓
                       </span>
                       <span className="min-w-0">
                         <span className="font-semibold text-zinc-900">{w.lead}</span>
-                        {w.rest}
+                        {w.restAccent ? (
+                          <>
+                            {w.rest}
+                            <span className={`font-semibold ${landingAccentText}`}>{w.restAccent}</span>
+                          </>
+                        ) : (
+                          w.rest
+                        )}
                       </span>
                     </li>
                   ))}
@@ -1028,12 +1055,7 @@ function CtaSection() {
   return (
     <SectionShell id="cta" divider className={sectionPad}>
       <ScrollFade>
-        <div className="relative overflow-hidden rounded-3xl border border-violet-200/50 bg-gradient-to-br from-violet-500/[0.08] via-white to-teal-500/[0.1] px-6 py-14 text-left sm:px-12 sm:py-16">
-        <div
-          className="pointer-events-none absolute -left-20 top-0 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl motion-safe:animate-pulse"
-          style={{ animationDuration: "4s" }}
-        />
-        <div className="pointer-events-none absolute -right-16 bottom-0 h-56 w-56 rounded-full bg-teal-400/20 blur-3xl motion-safe:animate-pulse" style={{ animationDuration: "5s" }} />
+        <div className="relative overflow-hidden rounded-3xl border border-zinc-200/70 bg-white px-6 py-14 text-left shadow-[0_20px_50px_-36px_rgba(15,23,42,0.08)] sm:px-12 sm:py-16">
         <div className="relative">
           <h2 className={`${sectionTitleClass} max-w-4xl`}>
             <span className="block">Less time collecting signals.</span>
@@ -1044,22 +1066,27 @@ function CtaSection() {
           <p className={`mt-4 max-w-md ${sectionCtaMuted}`}>Setup takes minutes.</p>
           <ol className={`mt-8 flex max-w-md flex-col gap-4 ${sectionCtaList}`}>
             <li className="flex gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">1</span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0F0F12] text-xs font-bold text-white">1</span>
               Connect tools
             </li>
             <li className="flex gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">2</span>
-              Vector analyzes execution signals
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0F0F12] text-xs font-bold text-white">2</span>
+              <span>
+                <span className={`font-semibold ${landingAccentText}`}>Vector</span> analyzes{" "}
+                <span className={`font-semibold ${landingAccentText}`}>{executionSignalsPhrase}</span>
+              </span>
             </li>
             <li className="flex gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">3</span>
-              Vector is ready to work
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0F0F12] text-xs font-bold text-white">3</span>
+              <span>
+                <span className={`font-semibold ${landingAccentText}`}>Vector</span> is ready to work
+              </span>
             </li>
           </ol>
           <div className="mt-10 flex flex-wrap gap-3">
             <Link
               to="/signup"
-              className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-8 py-3.5 text-sm font-semibold text-white no-underline shadow-[0_8px_32px_-8px_rgba(124,58,237,0.4)] transition-transform hover:scale-[1.02]"
+              className="inline-flex items-center justify-center rounded-full bg-[#0F0F12] px-8 py-3.5 text-sm font-semibold text-white no-underline shadow-[0_8px_24px_-12px_rgba(15,23,42,0.35)] transition-transform hover:scale-[1.02]"
             >
               Get early access
             </Link>

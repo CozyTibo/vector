@@ -7,11 +7,19 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import vectorHeroAvatarUrl from "../assets/vector-hero-avatar.png";
 import heroAlexAvatarUrl from "../assets/hero-org-michelle.png";
+import {
+  landingAccentRgb,
+  landingAccentText,
+  landingSubtleLineV,
+  landingTitleKeywordGradient,
+} from "../components/landing/landingBrandPalette";
 import { LandingBelowHero } from "../components/landing/LandingBelowHero";
 import MarketingLayout from "../components/marketing/MarketingLayout";
 import { fetchMe, productApiBase } from "../lib/meApi";
 
 const LANDING_SCROLL_KEY = "vector:landing-scroll-y";
+
+const heroVectorBubbleAccentClass = `pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] ${landingSubtleLineV}`;
 
 function signedInDestination(me: NonNullable<Awaited<ReturnType<typeof fetchMe>>>): string {
   const mustFinishOnboarding =
@@ -36,7 +44,7 @@ function VectorHeroAvatar({ className }: { className: string }) {
 function VectorHeroAvatarPulseWrap({ dimmed }: { dimmed?: boolean }) {
   return (
     <VectorHeroAvatar
-      className={`hero-vector-avatar-pulse h-9 w-9 shrink-0 rounded-2xl object-cover ring-2 ring-violet-100/95 sm:h-10 sm:w-10 ${dimmed ? "opacity-90" : ""}`}
+      className={`hero-vector-avatar-pulse h-9 w-9 shrink-0 rounded-2xl object-cover ring-2 ring-[#F5C8E0]/90 sm:h-10 sm:w-10 ${dimmed ? "opacity-90" : ""}`}
     />
   );
 }
@@ -61,7 +69,7 @@ function HeroChatThread() {
 
   return (
     <div className="pointer-events-none w-full select-none pb-2">
-      <div className="w-full rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white to-zinc-50/90 p-5 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.18),0_8px_24px_-16px_rgba(109,40,217,0.08)] sm:p-6 lg:p-7">
+      <div className="w-full rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.12)] sm:p-6 lg:p-7">
         <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-100/95 pb-4">
           <span className="text-[12px] font-semibold tracking-tight text-zinc-800"># checkout</span>
           <span className="text-[11px] text-zinc-400">·</span>
@@ -98,16 +106,13 @@ function HeroChatThread() {
             <VectorHeroAvatarPulseWrap />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-                <span className="text-sm font-semibold text-violet-950">Vector</span>
+                <span className={`text-sm font-semibold ${landingAccentText}`}>Vector</span>
                 <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:42">
                   9:42 AM
                 </time>
               </div>
-              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-violet-200/55 bg-gradient-to-br from-fuchsia-50/50 via-white to-blue-50/45 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
-                <div
-                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] bg-gradient-to-b from-fuchsia-500 via-violet-500 to-blue-500"
-                  aria-hidden
-                />
+              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-zinc-200/70 bg-zinc-50/90 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <div className={heroVectorBubbleAccentClass} aria-hidden />
                 <p className="relative">Yeah, I dug into it earlier.</p>
                 <p className="relative mt-2">
                   The checkout refactor depends on the new auth middleware. That PR has been waiting for review since
@@ -141,16 +146,13 @@ function HeroChatThread() {
             <VectorHeroAvatarPulseWrap />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-                <span className="text-sm font-semibold text-violet-950">Vector</span>
+                <span className={`text-sm font-semibold ${landingAccentText}`}>Vector</span>
                 <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:43:30">
                   9:43 AM
                 </time>
               </div>
-              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-violet-200/55 bg-gradient-to-br from-fuchsia-50/50 via-white to-blue-50/45 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
-                <div
-                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] bg-gradient-to-b from-fuchsia-500 via-violet-500 to-blue-500"
-                  aria-hidden
-                />
+              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-zinc-200/70 bg-zinc-50/90 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <div className={heroVectorBubbleAccentClass} aria-hidden />
                 <p className="relative">Not fully yet, but it might slow things down if it stays open.</p>
                 <p className="relative mt-2">
                   Might be worth pulling someone from platform to review it today.
@@ -183,16 +185,13 @@ function HeroChatThread() {
             <VectorHeroAvatarPulseWrap />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-                <span className="text-sm font-semibold text-violet-950">Vector</span>
+                <span className={`text-sm font-semibold ${landingAccentText}`}>Vector</span>
                 <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:44:30">
                   9:44 AM
                 </time>
               </div>
-              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-violet-200/55 bg-gradient-to-br from-fuchsia-50/50 via-white to-blue-50/45 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
-                <div
-                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] bg-gradient-to-b from-fuchsia-500 via-violet-500 to-blue-500"
-                  aria-hidden
-                />
+              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-zinc-200/70 bg-zinc-50/90 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <div className={heroVectorBubbleAccentClass} aria-hidden />
                 <p className="relative">I can ping Sam — he worked on the middleware last week and should have context.</p>
               </div>
             </div>
@@ -216,13 +215,13 @@ function HeroChatThread() {
       <style>{`
         @keyframes hero-vector-avatar-pulse {
           0%, 100% {
-            box-shadow: 0 4px 14px -5px rgba(124, 58, 237, 0.38);
+            box-shadow: 0 4px 14px -5px rgba(${landingAccentRgb}, 0.32);
           }
           50% {
             box-shadow:
-              0 4px 14px -5px rgba(124, 58, 237, 0.52),
-              0 0 0 2px rgba(192, 132, 252, 0.22),
-              0 0 16px rgba(139, 92, 246, 0.16);
+              0 4px 14px -5px rgba(${landingAccentRgb}, 0.42),
+              0 0 0 2px rgba(${landingAccentRgb}, 0.22),
+              0 0 16px rgba(246, 200, 230, 0.45);
           }
         }
         .hero-vector-avatar-pulse {
@@ -315,7 +314,7 @@ export default function LandingPage() {
     return (
       <MarketingLayout>
         <main className="flex min-h-[60vh] flex-col items-center justify-center px-6">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-pink-100 border-t-[#E878BE]" />
           <p className="mt-4 text-sm text-zinc-500">Loading…</p>
         </main>
       </MarketingLayout>
@@ -333,37 +332,39 @@ export default function LandingPage() {
         <div className="mx-auto max-w-[96rem] px-5 pb-20 pt-6 sm:px-8 sm:pb-28 sm:pt-4 lg:pt-2">
           <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-12 lg:pt-4">
             <div className="relative z-[1] min-w-0 lg:col-span-6 lg:pl-2 lg:pr-2">
-              <p className="mb-6 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] text-violet-700">
-                <span className="h-px w-10 bg-gradient-to-r from-violet-600 via-teal-500 to-transparent" />
+              <p
+                className={`mb-6 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] ${landingAccentText}`}
+              >
+                <span className="h-px w-10 bg-[#E878BE]" />
                 Early access
               </p>
 
-              <h1 className="max-w-none text-[clamp(1.35rem,4.35vw+0.85rem,4.1rem)] font-bold leading-[1.03] tracking-[-0.02em] text-zinc-900">
+              <h1 className="max-w-none text-[clamp(1.35rem,4.35vw+0.85rem,4.1rem)] font-bold leading-[1.03] tracking-[-0.02em] text-[#0F0F12]">
                 <span className="whitespace-nowrap">Stop chasing updates.</span>
                 <br aria-hidden />
                 <span className="whitespace-nowrap">
                   Start making{" "}
-                  <span className="bg-gradient-to-r from-violet-600 via-purple-600 to-teal-500 bg-clip-text text-transparent">
+                  <span className={landingTitleKeywordGradient}>
                     decisions
                   </span>
                   .
                 </span>
               </h1>
               <p className="mt-7 max-w-2xl text-pretty text-xl leading-snug text-zinc-600 sm:mt-8 sm:text-2xl sm:leading-snug">
-                Vector joins your team as an{" "}
-                <span className="font-semibold text-zinc-800">execution manager</span>, keeping track of progress
-                and <span className="font-semibold text-zinc-800">tackling bottlenecks</span>.
+                <span className={`font-semibold ${landingAccentText}`}>Vector</span> joins your team as an{" "}
+                <span className="font-semibold text-[#0F0F12]">execution manager</span>, keeping track of progress
+                and <span className="font-semibold text-[#0F0F12]">tackling bottlenecks</span>.
               </p>
               <div className="mt-9 flex flex-wrap items-center gap-4 sm:mt-11">
                 <Link
                   to="/signup"
-                  className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-9 py-4 text-base font-semibold text-white no-underline shadow-[0_6px_32px_-8px_rgba(20,184,166,0.38),0_2px_12px_-6px_rgba(124,58,237,0.18)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_8px_36px_-6px_rgba(6,182,212,0.28),0_2px_14px_-4px_rgba(139,92,246,0.22)]"
+                  className="inline-flex items-center justify-center rounded-full bg-[#0F0F12] px-9 py-4 text-base font-semibold text-white no-underline shadow-[0_8px_28px_-12px_rgba(15,23,42,0.35)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_12px_36px_-12px_rgba(15,23,42,0.22)]"
                 >
                   Get early access
                 </Link>
                 <a
                   href="#meet-vector-agent"
-                  className="inline-flex items-center justify-center rounded-full border border-zinc-200/90 bg-white/75 px-9 py-4 text-base font-semibold text-zinc-800 no-underline shadow-[0_2px_16px_-8px_rgba(15,23,42,0.06)] backdrop-blur-sm transition-colors hover:border-zinc-300 hover:bg-white"
+                  className="inline-flex items-center justify-center rounded-full border border-zinc-200/90 bg-[#FFFFFF]/75 px-9 py-4 text-base font-semibold text-[#0F0F12] no-underline shadow-[0_2px_16px_-8px_rgba(15,15,18,0.06)] backdrop-blur-sm transition-colors hover:border-zinc-300 hover:bg-white"
                 >
                   See how it works
                 </a>
