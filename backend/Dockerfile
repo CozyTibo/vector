@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq5 \
@@ -7,7 +7,8 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && python -c "from jose import jwt as _jose_jwt; import bcrypt; from openai import OpenAI"
 
 COPY alembic.ini ./
 COPY alembic ./alembic

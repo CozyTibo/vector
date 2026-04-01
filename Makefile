@@ -13,12 +13,13 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build
+.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build
 
 help:
 	@echo "Vector — Makefile (Docker Compose)"
 	@echo ""
 	@echo "  make setup / build   Build images"
+	@echo "  make build-backend   Build only the API image (picks up requirements.txt changes)"
 	@echo "  make install         Create .env if needed, build, up, migrate (dev DB)"
 	@echo "  make up / down       Start or stop stack"
 	@echo "  make frontend-build  docker compose build frontend (after package.json / lock changes)"
@@ -31,8 +32,8 @@ help:
 	@echo "  make routes          list HTTP routes (grouped by tag)"
 	@echo "  make db-psql         psql on dev DB"
 	@echo "  make db-psql-test    psql on test DB"
-	@echo "  make test            migrate-test then pytest on test DB"
-	@echo "  make test-unit       pytest excluding @integration"
+	@echo "  make test            rebuild backend image if needed, migrate-test, pytest"
+	@echo "  make test-unit       rebuild backend image if needed, pytest (no integration)"
 	@echo "  make mypy / lint / fmt   (mypy checks src/vector + tests per pyproject)"
 	@echo "  make check           mypy + lint + test"
 	@echo "  make reinstall       down, rebuild --no-cache, up, migrate"
@@ -47,6 +48,10 @@ $(DOTENV):
 
 build: $(DOTENV)
 	$(COMPOSE) build
+
+# Ensures dependency changes in backend/requirements.txt are in the image before run/test.
+build-backend: $(DOTENV)
+	$(COMPOSE) build $(BACKEND_SERVICE)
 
 up: $(DOTENV)
 	$(COMPOSE) up -d
@@ -74,17 +79,17 @@ reinstall: down
 frontend-build: $(DOTENV)
 	$(COMPOSE) build frontend
 
-migrate: $(DOTENV)
+migrate: $(DOTENV) build-backend
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic upgrade head
 
-migrate-down: $(DOTENV)
+migrate-down: $(DOTENV) build-backend
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic downgrade -1
 
-migrate-new: $(DOTENV)
+migrate-new: $(DOTENV) build-backend
 	@test -n "$(msg)" || (echo 'Usage: make migrate-new msg="description"' && exit 1)
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic revision --autogenerate -m "$(msg)"
 
-migrate-test: $(DOTENV)
+migrate-test: $(DOTENV) build-backend
 	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) alembic upgrade head
 
 # Creates tenant SEED_TENANT_SLUG + password user if slug not in DB (see .env.example).
@@ -112,10 +117,10 @@ shell: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) bash
 
 test: $(DOTENV) migrate-test
-	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) pytest -q
+	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) python -m pytest -q
 
-test-unit: $(DOTENV)
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) pytest -q -m "not integration"
+test-unit: $(DOTENV) build-backend
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration"
 
 mypy: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) mypy

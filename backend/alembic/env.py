@@ -6,7 +6,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 from vector.infrastructure.db.base import Base
 from vector.infrastructure.db import models as _models  # noqa: F401 — register metadata
@@ -23,6 +23,11 @@ def get_url() -> str:
     if not url:
         msg = "DATABASE_URL is required for migrations"
         raise RuntimeError(msg)
+    # Bare postgresql:// makes SQLAlchemy use the psycopg2 driver; this image only ships psycopg v3.
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    elif url.startswith("postgres://"):
+        url = "postgresql+psycopg://" + url.removeprefix("postgres://")
     return url
 
 
@@ -38,12 +43,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    section = config.get_section(config.config_ini_section)
-    configuration = dict(section) if section is not None else {}
-    configuration["sqlalchemy.url"] = get_url()
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        get_url(),
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:

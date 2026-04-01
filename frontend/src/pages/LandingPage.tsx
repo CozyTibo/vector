@@ -1,9 +1,17 @@
+/**
+ * Marketing landing (hero + below-fold). Golden reference: `src/vector-landing-snapshot/`.
+ */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
+import vectorHeroAvatarUrl from "../assets/vector-hero-avatar.png";
+import heroAlexAvatarUrl from "../assets/hero-org-michelle.png";
+import { LandingBelowHero } from "../components/landing/LandingBelowHero";
 import MarketingLayout from "../components/marketing/MarketingLayout";
 import { fetchMe, productApiBase } from "../lib/meApi";
+
+const LANDING_SCROLL_KEY = "vector:landing-scroll-y";
 
 function signedInDestination(me: NonNullable<Awaited<ReturnType<typeof fetchMe>>>): string {
   const mustFinishOnboarding =
@@ -11,87 +19,224 @@ function signedInDestination(me: NonNullable<Awaited<ReturnType<typeof fetchMe>>
   return mustFinishOnboarding ? "/app/onboarding" : "/app";
 }
 
-function HeroSignalStack() {
+function VectorHeroAvatar({ className }: { className: string }) {
   return (
-    <div className="relative mx-auto h-[min(600px,80vh)] w-full max-w-[480px] lg:mx-0 lg:max-w-none">
-      <div
-        className="absolute left-[4%] top-[5%] z-[3] w-[88%] rotate-[-2deg] rounded-2xl border border-zinc-200/80 bg-white/75 p-4 shadow-[0_12px_48px_-20px_rgba(15,23,42,0.09),inset_0_0_0_1px_rgba(139,92,246,0.07)] backdrop-blur-xl sm:p-5"
-        style={{ animation: "marketing-float-a 7s ease-in-out infinite" }}
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-zinc-200/70 pb-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-teal-600">Live signals</span>
-          <span className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-600">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            Ingesting
-          </span>
-        </div>
-        <div className="mt-4 space-y-3">
-          <div className="flex items-start gap-3 rounded-xl bg-gradient-to-br from-violet-500/14 to-transparent p-3 ring-1 ring-violet-300/35">
-            <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-violet-600 shadow-[0_0_10px_rgba(124,58,237,0.55)]" />
-            <div>
-              <p className="text-sm font-medium text-zinc-900">Execution stalled · Issue in progress but no commits in 12h</p>
-              <p className="mt-0.5 text-xs text-zinc-500">GitHub ↔ Linear</p>
-            </div>
-          </div>
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-200 to-transparent" />
-          <div className="flex items-start gap-3 rounded-xl bg-zinc-50/90 p-3 ring-1 ring-zinc-200/80">
-            <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.55)]" />
-            <div>
-              <p className="text-sm font-medium text-zinc-800">Untracked work: discussion and PR open but no issue</p>
-              <p className="mt-0.5 text-xs text-zinc-500">Linear ↔ GitHub ↔ Slack</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3 rounded-xl bg-zinc-50/90 p-3 ring-1 ring-zinc-200/80">
-            <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.45)]" />
-            <div>
-              <p className="text-sm font-medium text-zinc-800">Priority conflict detected: Checkout blocked by Payments team</p>
-              <p className="mt-0.5 text-xs text-zinc-500">Linear ↔ GitHub · delay ~1d</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <img
+      src={vectorHeroAvatarUrl}
+      alt="Vector"
+      width={128}
+      height={128}
+      className={className}
+      decoding="async"
+    />
+  );
+}
 
-      <div
-        className="absolute right-[2%] top-[56%] z-[2] w-[72%] rotate-[3deg] rounded-xl border border-violet-200/50 bg-white/85 p-3 shadow-[0_14px_40px_-18px_rgba(124,58,237,0.14),0_14px_40px_-18px_rgba(20,184,166,0.12)] backdrop-blur-md sm:p-4"
-        style={{ animation: "marketing-float-b 8s ease-in-out infinite" }}
-      >
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-700">Execution graph</p>
-        <div className="mt-3 flex h-14 items-end gap-1 sm:h-16">
-          {[40, 72, 48, 88, 55, 95, 62].map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t-sm bg-gradient-to-t from-violet-600/85 to-teal-400/90 opacity-95"
-              style={{ height: `${h}%` }}
-            />
-          ))}
-        </div>
-      </div>
+/** Same footprint as Alex’s avatar; pulse is box-shadow only (no layout growth). */
+function VectorHeroAvatarPulseWrap({ dimmed }: { dimmed?: boolean }) {
+  return (
+    <VectorHeroAvatar
+      className={`hero-vector-avatar-pulse h-9 w-9 shrink-0 rounded-2xl object-cover ring-2 ring-violet-100/95 sm:h-10 sm:w-10 ${dimmed ? "opacity-90" : ""}`}
+    />
+  );
+}
 
-      <div
-        className="absolute bottom-[4%] left-[12%] z-[1] w-[64%] rotate-[-4deg] rounded-xl border border-teal-200/55 bg-white/88 px-4 py-3 shadow-[0_12px_40px_-16px_rgba(124,58,237,0.1),0_12px_40px_-16px_rgba(20,184,166,0.12)] backdrop-blur-lg"
-        style={{ animation: "marketing-float-c 9s ease-in-out infinite" }}
-      >
-        <p className="text-[11px] font-medium text-zinc-700">
-          <span className="text-violet-600">→</span> Workflow depth <span className="text-zinc-400">· realtime</span>
-        </p>
+function HeroNotionGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M3 2.5h7l3 3v8a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5z"
+        className="stroke-zinc-500"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+      <path d="M10 2.5V5h2.5" className="stroke-zinc-500" strokeWidth="1.1" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function HeroChatThread() {
+  const alexAvatarClass =
+    "h-9 w-9 shrink-0 rounded-full object-cover object-center shadow-md ring-2 ring-white ring-offset-1 ring-offset-zinc-100/80 sm:h-10 sm:w-10";
+
+  return (
+    <div className="pointer-events-none w-full select-none pb-2">
+      <div className="w-full rounded-2xl border border-zinc-200/80 bg-gradient-to-b from-white to-zinc-50/90 p-5 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.18),0_8px_24px_-16px_rgba(109,40,217,0.08)] sm:p-6 lg:p-7">
+        <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-zinc-100/95 pb-4">
+          <span className="text-[12px] font-semibold tracking-tight text-zinc-800"># checkout</span>
+          <span className="text-[11px] text-zinc-400">·</span>
+          <span className="text-[11px] font-medium text-zinc-500">Engineering</span>
+        </div>
+
+        <div className="space-y-5 sm:space-y-5">
+          {/* Alex */}
+          <div className="flex gap-3 sm:gap-3.5">
+            <img src={heroAlexAvatarUrl} alt="Alex" className={alexAvatarClass} width={40} height={40} decoding="async" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="text-sm font-semibold text-zinc-900">Alex</span>
+                  <span className="text-[11px] font-medium text-zinc-500">Engineering Manager</span>
+                  <span className="inline-flex items-center gap-1 rounded-md border border-zinc-200/90 bg-white/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-600 shadow-sm">
+                    <HeroNotionGlyph className="h-3 w-3 shrink-0" />
+                    Notion
+                  </span>
+                </div>
+                <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:41">
+                  9:41 AM
+                </time>
+              </div>
+              <div className="mt-1.5 rounded-2xl rounded-tl-md border border-zinc-200/70 bg-zinc-100/90 px-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <p>Hey! just read the checkout update in the Notion report you sent me.</p>
+                <p className="mt-2">Did we figure out why it slipped?</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Vector */}
+          <div className="flex gap-3 sm:gap-3.5">
+            <VectorHeroAvatarPulseWrap />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                <span className="text-sm font-semibold text-violet-950">Vector</span>
+                <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:42">
+                  9:42 AM
+                </time>
+              </div>
+              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-violet-200/55 bg-gradient-to-br from-fuchsia-50/50 via-white to-blue-50/45 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <div
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] bg-gradient-to-b from-fuchsia-500 via-violet-500 to-blue-500"
+                  aria-hidden
+                />
+                <p className="relative">Yeah, I dug into it earlier.</p>
+                <p className="relative mt-2">
+                  The checkout refactor depends on the new auth middleware. That PR has been waiting for review since
+                  yesterday.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Alex */}
+          <div className="flex gap-3 sm:gap-3.5">
+            <img src={heroAlexAvatarUrl} alt="Alex" className={alexAvatarClass} width={40} height={40} decoding="async" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                <div className="flex flex-wrap items-center gap-x-2">
+                  <span className="text-sm font-semibold text-zinc-900">Alex</span>
+                  <span className="text-[11px] font-medium text-zinc-500">Engineering Manager</span>
+                </div>
+                <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:43">
+                  9:43 AM
+                </time>
+              </div>
+              <div className="mt-1.5 rounded-2xl rounded-tl-md border border-zinc-200/70 bg-zinc-100/90 px-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <p>Ah got it. Is that blocking the launch?</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Vector */}
+          <div className="flex gap-3 sm:gap-3.5">
+            <VectorHeroAvatarPulseWrap />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                <span className="text-sm font-semibold text-violet-950">Vector</span>
+                <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:43:30">
+                  9:43 AM
+                </time>
+              </div>
+              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-violet-200/55 bg-gradient-to-br from-fuchsia-50/50 via-white to-blue-50/45 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <div
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] bg-gradient-to-b from-fuchsia-500 via-violet-500 to-blue-500"
+                  aria-hidden
+                />
+                <p className="relative">Not fully yet, but it might slow things down if it stays open.</p>
+                <p className="relative mt-2">
+                  Might be worth pulling someone from platform to review it today.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Alex */}
+          <div className="flex gap-3 sm:gap-3.5">
+            <img src={heroAlexAvatarUrl} alt="Alex" className={alexAvatarClass} width={40} height={40} decoding="async" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                <div className="flex flex-wrap items-center gap-x-2">
+                  <span className="text-sm font-semibold text-zinc-900">Alex</span>
+                  <span className="text-[11px] font-medium text-zinc-500">Engineering Manager</span>
+                </div>
+                <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:44">
+                  9:44 AM
+                </time>
+              </div>
+              <div className="mt-1.5 rounded-2xl rounded-tl-md border border-zinc-200/70 bg-zinc-100/90 px-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <p>Makes sense. Who should we ask?</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Vector */}
+          <div className="flex gap-3 sm:gap-3.5">
+            <VectorHeroAvatarPulseWrap />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                <span className="text-sm font-semibold text-violet-950">Vector</span>
+                <time className="text-[10px] font-medium tabular-nums text-zinc-400" dateTime="09:44:30">
+                  9:44 AM
+                </time>
+              </div>
+              <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-violet-200/55 bg-gradient-to-br from-fuchsia-50/50 via-white to-blue-50/45 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
+                <div
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] bg-gradient-to-b from-fuchsia-500 via-violet-500 to-blue-500"
+                  aria-hidden
+                />
+                <p className="relative">I can ping Sam — he worked on the middleware last week and should have context.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Typing */}
+          <div className="flex gap-3 sm:gap-3.5 pt-0.5">
+            <VectorHeroAvatarPulseWrap dimmed />
+            <div className="flex min-h-[2.25rem] items-center rounded-2xl rounded-tl-md border border-zinc-200/60 bg-zinc-100/70 px-3.5 py-2">
+              <div className="flex items-center gap-1" aria-hidden>
+                <span className="hero-chat-typing-dot inline-block h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                <span className="hero-chat-typing-dot inline-block h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                <span className="hero-chat-typing-dot inline-block h-1.5 w-1.5 rounded-full bg-zinc-400" />
+              </div>
+              <span className="sr-only">Vector is typing</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <style>{`
-        @keyframes marketing-float-a {
-          0%, 100% { transform: translateY(0) rotate(-2deg); }
-          50% { transform: translateY(-10px) rotate(-1.5deg); }
+        @keyframes hero-vector-avatar-pulse {
+          0%, 100% {
+            box-shadow: 0 4px 14px -5px rgba(124, 58, 237, 0.38);
+          }
+          50% {
+            box-shadow:
+              0 4px 14px -5px rgba(124, 58, 237, 0.52),
+              0 0 0 2px rgba(192, 132, 252, 0.22),
+              0 0 16px rgba(139, 92, 246, 0.16);
+          }
         }
-        @keyframes marketing-float-b {
-          0%, 100% { transform: translateY(0) rotate(3deg); }
-          50% { transform: translateY(8px) rotate(3.5deg); }
+        .hero-vector-avatar-pulse {
+          animation: hero-vector-avatar-pulse 2.75s ease-in-out infinite;
         }
-        @keyframes marketing-float-c {
-          0%, 100% { transform: translateY(0) rotate(-4deg); }
-          50% { transform: translateY(-6px) rotate(-3deg); }
+        @keyframes hero-chat-typing-dot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+          30% { transform: translateY(-3px); opacity: 1; }
         }
+        .hero-chat-typing-dot {
+          animation: hero-chat-typing-dot 1.05s ease-in-out infinite;
+        }
+        .hero-chat-typing-dot:nth-child(2) { animation-delay: 0.18s; }
+        .hero-chat-typing-dot:nth-child(3) { animation-delay: 0.36s; }
       `}</style>
     </div>
   );
@@ -105,6 +250,10 @@ export default function LandingPage() {
   const me = useQuery({
     queryKey: ["me", apiBase],
     queryFn: () => fetchMe(apiBase),
+    /** Session rarely changes on the marketing surface; keep cache warm so revisiting does not refetch like a full reload */
+    staleTime: 5 * 60_000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -116,7 +265,53 @@ export default function LandingPage() {
     }
   }, [apiBase, navigate, qc]);
 
-  if (me.isPending) {
+  /** `isLoading` = no cached data yet (unlike `isPending`, which can stay true during background refetch) */
+  const showLanding = !me.isLoading && !me.data;
+
+  useEffect(() => {
+    if (!showLanding) return;
+    const prev = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    return () => {
+      window.history.scrollRestoration = prev;
+    };
+  }, [showLanding]);
+
+  useLayoutEffect(() => {
+    if (!showLanding) return;
+    const raw = sessionStorage.getItem(LANDING_SCROLL_KEY);
+    if (raw == null) return;
+    const y = Number.parseInt(raw, 10);
+    if (Number.isNaN(y) || y < 0) return;
+    requestAnimationFrame(() => {
+      window.scrollTo(0, y);
+    });
+  }, [showLanding]);
+
+  useEffect(() => {
+    if (!showLanding) return;
+    let idle: ReturnType<typeof setTimeout>;
+    const save = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => {
+        sessionStorage.setItem(LANDING_SCROLL_KEY, String(window.scrollY));
+      }, 120);
+    };
+    window.addEventListener("scroll", save, { passive: true });
+    const onHide = () => {
+      if (document.visibilityState === "hidden") save();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    save();
+    return () => {
+      clearTimeout(idle);
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("scroll", save);
+      sessionStorage.setItem(LANDING_SCROLL_KEY, String(window.scrollY));
+    };
+  }, [showLanding]);
+
+  if (me.isLoading) {
     return (
       <MarketingLayout>
         <main className="flex min-h-[60vh] flex-col items-center justify-center px-6">
@@ -133,45 +328,55 @@ export default function LandingPage() {
 
   return (
     <MarketingLayout>
-      <main className="mx-auto max-w-6xl px-5 pb-20 pt-6 sm:px-8 sm:pb-28 sm:pt-4 lg:pt-2">
-        <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-8 lg:pt-4">
-          <div className="relative z-[1] lg:col-span-6 lg:pl-2">
-            <p className="mb-5 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-violet-700">
-              <span className="h-px w-8 bg-gradient-to-r from-violet-600 via-teal-500 to-transparent" />
-              Early access
-            </p>
+      <main>
+        {/* Hero */}
+        <div className="mx-auto max-w-[96rem] px-5 pb-20 pt-6 sm:px-8 sm:pb-28 sm:pt-4 lg:pt-2">
+          <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-12 lg:pt-4">
+            <div className="relative z-[1] min-w-0 lg:col-span-6 lg:pl-2 lg:pr-2">
+              <p className="mb-6 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] text-violet-700">
+                <span className="h-px w-10 bg-gradient-to-r from-violet-600 via-teal-500 to-transparent" />
+                Early access
+              </p>
 
-            <h1 className="max-w-xl text-[2.65rem] font-bold leading-[0.96] tracking-tight text-zinc-900 sm:text-6xl lg:text-[3.5rem] lg:leading-[0.95]">
-              Make execution observable.
-              <br />
-              <span className="bg-gradient-to-r from-violet-600 via-purple-600 to-teal-500 bg-clip-text text-transparent">
-               
-               Make it predictable.
-              </span>
-            </h1>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-zinc-600 sm:text-lg">
-              Vector analyzes signals across your tools to reconstruct how execution actually happens.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3 sm:mt-10">
-              <Link
-                to="/signup"
-                className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-7 py-3.5 text-sm font-semibold text-white no-underline shadow-[0_6px_32px_-8px_rgba(20,184,166,0.38),0_2px_12px_-6px_rgba(124,58,237,0.18)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_8px_36px_-6px_rgba(6,182,212,0.28),0_2px_14px_-4px_rgba(139,92,246,0.22)]"
-              >
-                Get started
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center rounded-full border border-zinc-200/90 bg-white/75 px-7 py-3.5 text-sm font-semibold text-zinc-800 no-underline shadow-[0_2px_16px_-8px_rgba(15,23,42,0.06)] backdrop-blur-sm transition-colors hover:border-zinc-300 hover:bg-white"
-              >
-                Sign in
-              </Link>
+              <h1 className="max-w-none text-[clamp(1.35rem,4.35vw+0.85rem,4.1rem)] font-bold leading-[1.03] tracking-[-0.02em] text-zinc-900">
+                <span className="whitespace-nowrap">Stop chasing updates.</span>
+                <br aria-hidden />
+                <span className="whitespace-nowrap">
+                  Start making{" "}
+                  <span className="bg-gradient-to-r from-violet-600 via-purple-600 to-teal-500 bg-clip-text text-transparent">
+                    decisions
+                  </span>
+                  .
+                </span>
+              </h1>
+              <p className="mt-7 max-w-2xl text-pretty text-xl leading-snug text-zinc-600 sm:mt-8 sm:text-2xl sm:leading-snug">
+                Vector joins your team as an{" "}
+                <span className="font-semibold text-zinc-800">execution manager</span>, keeping track of progress
+                and <span className="font-semibold text-zinc-800">tackling bottlenecks</span>.
+              </p>
+              <div className="mt-9 flex flex-wrap items-center gap-4 sm:mt-11">
+                <Link
+                  to="/signup"
+                  className="inline-flex items-center justify-center rounded-full bg-zinc-900 px-9 py-4 text-base font-semibold text-white no-underline shadow-[0_6px_32px_-8px_rgba(20,184,166,0.38),0_2px_12px_-6px_rgba(124,58,237,0.18)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_8px_36px_-6px_rgba(6,182,212,0.28),0_2px_14px_-4px_rgba(139,92,246,0.22)]"
+                >
+                  Get early access
+                </Link>
+                <a
+                  href="#meet-vector-agent"
+                  className="inline-flex items-center justify-center rounded-full border border-zinc-200/90 bg-white/75 px-9 py-4 text-base font-semibold text-zinc-800 no-underline shadow-[0_2px_16px_-8px_rgba(15,23,42,0.06)] backdrop-blur-sm transition-colors hover:border-zinc-300 hover:bg-white"
+                >
+                  See how it works
+                </a>
+              </div>
+            </div>
+
+            <div className="relative z-0 min-w-0 lg:col-span-6 lg:-mr-2 lg:pl-1">
+              <HeroChatThread />
             </div>
           </div>
-
-          <div className="relative z-0 lg:col-span-6 lg:-mr-4">
-            <HeroSignalStack />
-          </div>
         </div>
+
+        <LandingBelowHero />
       </main>
     </MarketingLayout>
   );

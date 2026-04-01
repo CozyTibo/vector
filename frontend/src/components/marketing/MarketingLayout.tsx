@@ -28,7 +28,7 @@ export default function MarketingLayout({ children, showChrome = true }: Props) 
       </div>
 
       {showChrome ? (
-        <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 pt-7 pb-4 sm:px-8 sm:pt-8">
+        <header className="relative z-20 mx-auto flex max-w-[96rem] items-center justify-between gap-4 px-5 pt-7 pb-4 sm:px-8 sm:pt-8">
           <Link
             to="/"
             className="group flex items-center gap-2.5 no-underline outline-none transition-opacity hover:opacity-90"

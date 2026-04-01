@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -144,7 +144,7 @@ class LinearConnectorStatusItem(BaseModel):
     )
 
 
-type ConnectorStatusItem = GithubConnectorStatusItem | LinearConnectorStatusItem
+ConnectorStatusItem: TypeAlias = GithubConnectorStatusItem | LinearConnectorStatusItem
 
 
 class ConnectorsListResponse(BaseModel):

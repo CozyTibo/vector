@@ -1,16 +1,24 @@
 # Production + worker (pip). Keep in sync with pyproject.toml dependencies.
 alembic>=1.14
 argon2-cffi>=23.1
+bcrypt>=4
 celery[redis]>=5.4
 email-validator>=2.0
 fastapi>=0.115
 google-auth>=2.35
 httpx>=0.27
 itsdangerous>=2.2
+openai>=1.54
 psycopg[binary]>=3.2
+# SQLAlchemy uses this for plain postgresql:// URLs; keeps alembic working if DSN omits +psycopg.
+psycopg2-binary>=2.9
 pydantic-settings>=2.6
 pyjwt[crypto]>=2.10
+python-jose[cryptography]>=3.3
 redis>=5.0
 requests>=2.32
 sqlalchemy>=2.0
 uvicorn[standard]>=0.32
+# Used by `make test` / `make test-unit` (docker compose run … pytest).
+pytest>=8
+pytest-asyncio>=0.24

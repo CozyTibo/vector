@@ -2,6 +2,12 @@
 
 /* Light default for product surfaces; legacy debug pages keep .app / .card dark overrides below */
 @layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
   body {
     @apply m-0 min-h-screen bg-stone-50 text-stone-900 antialiased;
   }
