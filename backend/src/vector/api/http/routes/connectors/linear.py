@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
+from vector.application.services import connector_sync
 from vector.contracts.connectors import (
     LinearIngestionRecordsPageResponse,
     LinearIngestionRunListItem,
@@ -32,7 +33,6 @@ from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.domains.ingestion.http_fetch import FetchFatalError
-from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
 from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_reachable
 from vector.infrastructure.db.repositories import ingestion_queries as ing_queries
 from vector.settings import Settings
@@ -117,14 +117,18 @@ def build_linear_connector_router() -> APIRouter:
         claims: Annotated[SessionClaims, Depends(get_session_claims)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> LinearIngestionSyncResponse:
-        """Poll Linear GraphQL and append resource-level raw ingestion rows (Step 1)."""
+        """Poll Linear GraphQL (Step 1), then drain Step 2 projections for this connection."""
         try:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         preflight_mock_connectors_reachable(settings)
         try:
-            run = run_linear_graphql_ingestion_for_tenant(db, settings, claims.tenant_id)
+            run = connector_sync.run_linear_poll_sync_with_projections(
+                db,
+                settings,
+                claims.tenant_id,
+            )
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
         return LinearIngestionSyncResponse(

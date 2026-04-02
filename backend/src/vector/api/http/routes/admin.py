@@ -17,6 +17,10 @@ from vector.contracts.admin import (
     AdminConnectionsResponse,
     AdminStep1RawResetRequest,
     AdminStep1RawResetResponse,
+    AdminStep2ProjectionsResetRequest,
+    AdminStep2ProjectionsResetResponse,
+    AdminStep3CanonicalResetRequest,
+    AdminStep3CanonicalResetResponse,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
     RawIngestionAdminDetail,
@@ -38,7 +42,11 @@ from vector.contracts.debug_canonical import (
     SubgraphResponse,
 )
 from vector.contracts.debug_projections import ProjectionRowsResponse
-from vector.domains.canonical.worker import count_canonical_lag, drain_github_canonical
+from vector.domains.canonical.worker import (
+    count_canonical_lag,
+    drain_github_canonical,
+    drain_linear_canonical,
+)
 from vector.domains.connectors.runtime import runtime_by_id
 from vector.domains.debug.github_pipeline_wipe import (
     rebuild_derived_from_step1_github,
@@ -46,11 +54,16 @@ from vector.domains.debug.github_pipeline_wipe import (
 )
 from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
 from vector.domains.ingestion.http_fetch import FetchFatalError
-from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
 from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_reachable
 from vector.domains.ingestion.step1_reset import (
     STEP1_RAW_RESET_CONFIRMATION_PHRASE,
     wipe_step1_raw_for_tenant,
+)
+from vector.domains.ingestion.step2_step3_reset import (
+    STEP2_PROJECTIONS_RESET_CONFIRMATION_PHRASE,
+    STEP3_CANONICAL_RESET_CONFIRMATION_PHRASE,
+    wipe_step2_projections_for_tenant,
+    wipe_step3_canonical_for_tenant,
 )
 from vector.domains.projections.github.worker import drain_github_projections
 from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
@@ -60,10 +73,15 @@ from vector.infrastructure.db.repositories import ingestion_queries as ing_queri
 from vector.infrastructure.db.repositories import onboarding as onboarding_repo
 from vector.infrastructure.db.repositories import projection_debug_queries as dbg
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
-from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB, RUN_STATUS_SUCCEEDED
+from vector.infrastructure.db.repositories.ingestion import (
+    CONNECTOR_GITHUB,
+    CONNECTOR_LINEAR,
+    RUN_STATUS_SUCCEEDED,
+)
 from vector.settings import Settings
 
 GITHUB_ENTITIES = frozenset({"repositories", "pull_requests", "issues", "commits", "users"})
+LINEAR_ENTITIES = frozenset({"teams", "projects", "issues", "users", "issue_comments"})
 
 
 def _tools_interest(ans: dict[str, object]) -> list[str]:
@@ -357,6 +375,67 @@ def build_admin_router() -> APIRouter:
             deleted_sync_state_rows=stats["deleted_sync_state_rows"],
         )
 
+    @r.post(
+        "/tenants/{tenant_id}/projections/reset",
+        response_model=AdminStep2ProjectionsResetResponse,
+    )
+    def reset_tenant_step2_projections(
+        tenant_id: uuid.UUID,
+        body: AdminStep2ProjectionsResetRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminStep2ProjectionsResetResponse:
+        """Wipe Step 2 for tenant (GitHub + Linear projection tables + projection cursors)."""
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != STEP2_PROJECTIONS_RESET_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Confirmation phrase does not match. Open the Step2 Projections admin tab for "
+                    "the exact text — this only deletes Step 2 data, not raw or canonical."
+                ),
+            )
+        stats = wipe_step2_projections_for_tenant(db, tenant_id=tenant_id)
+        db.commit()
+        return AdminStep2ProjectionsResetResponse(
+            deleted_github_projection_rows=stats["deleted_github_projection_rows"],
+            deleted_linear_projection_rows=stats["deleted_linear_projection_rows"],
+            deleted_connector_projection_progress_rows=stats[
+                "deleted_connector_projection_progress_rows"
+            ],
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/canonical/reset",
+        response_model=AdminStep3CanonicalResetResponse,
+    )
+    def reset_tenant_step3_canonical(
+        tenant_id: uuid.UUID,
+        body: AdminStep3CanonicalResetRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminStep3CanonicalResetResponse:
+        """Wipe Step 3 canonical ontology + Step3 cursors for tenant (all connections)."""
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != STEP3_CANONICAL_RESET_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Confirmation phrase does not match. Open the Step3 Canonical admin tab for "
+                    "the exact text — this only deletes Step 3 data, not raw or projections."
+                ),
+            )
+        stats = wipe_step3_canonical_for_tenant(db, tenant_id=tenant_id)
+        db.commit()
+        return AdminStep3CanonicalResetResponse(
+            deleted_relationships=stats["deleted_relationships"],
+            deleted_mapping_events=stats["deleted_mapping_events"],
+            deleted_current_mappings=stats["deleted_current_mappings"],
+            deleted_external_references=stats["deleted_external_references"],
+            deleted_actor_external_identities=stats["deleted_actor_external_identities"],
+            deleted_artifacts=stats["deleted_artifacts"],
+            deleted_actors=stats["deleted_actors"],
+            deleted_step3_canonical_cursors=stats["deleted_step3_canonical_cursors"],
+        )
+
     @r.post("/tenants/{tenant_id}/ingestion/github-sync")
     def admin_trigger_github_step1_sync(
         tenant_id: uuid.UUID,
@@ -391,7 +470,7 @@ def build_admin_router() -> APIRouter:
         _assert_tenant(db, tenant_id)
         preflight_mock_connectors_reachable(settings)
         try:
-            run = run_linear_graphql_ingestion_for_tenant(db, settings, tenant_id)
+            run = connector_sync.run_linear_poll_sync_with_projections(db, settings, tenant_id)
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
         return {
@@ -479,6 +558,60 @@ def build_admin_router() -> APIRouter:
         items = [orm_to_dict(row) for row in page.items]
         return ProjectionRowsResponse(
             connector="github",
+            connection_id=connection_id,
+            entity=entity,
+            total=page.total,
+            limit=limit,
+            offset=offset,
+            items=items,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/projections/linear/{connection_id}/rows",
+        response_model=ProjectionRowsResponse,
+    )
+    def linear_projection_rows(
+        tenant_id: uuid.UUID,
+        connection_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        entity: Annotated[str, Query(description="teams | projects | issues | …")],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        q: Annotated[str | None, Query(description="Filter substring")] = None,
+    ) -> ProjectionRowsResponse:
+        _assert_tenant(db, tenant_id)
+        if entity not in LINEAR_ENTITIES:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown entity '{entity}'.",
+            ) from None
+        if not dbg.connection_belongs_to_tenant(
+            db,
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+        ):
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail="Connection not found for tenant.",
+            ) from None
+        listers: dict[str, Any] = {
+            "teams": dbg.list_linear_teams,
+            "projects": dbg.list_linear_projects,
+            "issues": dbg.list_linear_issues,
+            "users": dbg.list_linear_users,
+            "issue_comments": dbg.list_linear_issue_comments,
+        }
+        page = listers[entity](
+            db,
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+            limit=limit,
+            offset=offset,
+            q=q,
+        )
+        items = [orm_to_dict(row) for row in page.items]
+        return ProjectionRowsResponse(
+            connector="linear",
             connection_id=connection_id,
             entity=entity,
             total=page.total,
@@ -733,12 +866,23 @@ def build_admin_router() -> APIRouter:
             connection_id=connection_id,
         ):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Connection not found.") from None
-        m = drain_github_canonical(
-            db,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-            connector=connector,
-        )
+        if connector == CONNECTOR_GITHUB:
+            m = drain_github_canonical(
+                db,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+            )
+        elif connector == CONNECTOR_LINEAR:
+            m = drain_linear_canonical(
+                db,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+            )
+        else:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported connector for canonical drain: {connector}",
+            ) from None
         return {
             "raw_rows_processed": m.raw_rows_processed,
             "batches_committed": m.batches_committed,

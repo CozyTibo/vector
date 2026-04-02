@@ -14,10 +14,12 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from vector.domains.canonical.github_mapper import handle_github_canonical_row
+from vector.domains.canonical.linear_mapper import handle_linear_canonical_row
 from vector.domains.projections.github.resource_types import GITHUB_RESOURCE_TYPES
+from vector.domains.projections.linear.resource_types import LINEAR_RESOURCE_TYPES
 from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
-from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB
+from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB, CONNECTOR_LINEAR
 
 _logger = logging.getLogger(__name__)
 
@@ -155,6 +157,105 @@ def drain_github_canonical(
     return metrics
 
 
+def drain_linear_canonical(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    max_batches: int = DEFAULT_MAX_BATCHES,
+    connector: str = CONNECTOR_LINEAR,
+) -> CanonicalDrainMetrics:
+    """Process Linear raw rows after Step 3 cursor until caught up or max_batches."""
+    if connector != CONNECTOR_LINEAR:
+        msg = f"unsupported connector for linear canonical drain: {connector}"
+        raise ValueError(msg)
+
+    metrics = CanonicalDrainMetrics()
+    batches = 0
+
+    ensure_step3_cursor_row(
+        session,
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+    )
+
+    while batches < max_batches:
+        cursor = session.get(Step3CanonicalCursor, (connection_id, connector))
+        if cursor is None:
+            msg = "step3_canonical_cursor row missing after ensure"
+            raise RuntimeError(msg)
+        if cursor.tenant_id != tenant_id:
+            msg = "step3 canonical cursor tenant mismatch"
+            raise ValueError(msg)
+
+        last_rs = cursor.last_replay_sequence
+        last_rid = cursor.last_raw_record_id
+
+        stmt = (
+            select(RawIngestionRecord)
+            .where(
+                RawIngestionRecord.connection_id == connection_id,
+                RawIngestionRecord.connector == connector,
+                RawIngestionRecord.http_status >= 200,
+                RawIngestionRecord.http_status <= 299,
+                RawIngestionRecord.resource_type.in_(LINEAR_RESOURCE_TYPES),
+                or_(
+                    RawIngestionRecord.replay_sequence > last_rs,
+                    and_(
+                        RawIngestionRecord.replay_sequence == last_rs,
+                        RawIngestionRecord.id > last_rid,
+                    ),
+                ),
+            )
+            .order_by(
+                RawIngestionRecord.replay_sequence.asc(),
+                RawIngestionRecord.id.asc(),
+            )
+            .limit(batch_size)
+        )
+        batch = list(session.scalars(stmt).all())
+
+        if not batch:
+            session.commit()
+            return metrics
+
+        try:
+            for raw in batch:
+                handle_linear_canonical_row(session, raw)
+                metrics.raw_rows_processed += 1
+
+            tail = batch[-1]
+            now = datetime.now(tz=UTC)
+            session.execute(
+                update(Step3CanonicalCursor)
+                .where(
+                    Step3CanonicalCursor.connection_id == connection_id,
+                    Step3CanonicalCursor.connector == connector,
+                )
+                .values(
+                    last_replay_sequence=tail.replay_sequence,
+                    last_raw_record_id=tail.id,
+                    last_processed_at=now,
+                    updated_at=now,
+                ),
+            )
+            session.commit()
+            metrics.batches_committed += 1
+            batches += 1
+        except Exception:
+            session.rollback()
+            raise
+
+    _logger.warning(
+        "linear canonical drain stopped at max_batches=%s connection_id=%s",
+        max_batches,
+        connection_id,
+    )
+    return metrics
+
+
 def count_canonical_lag(
     session: Session,
     *,
@@ -166,6 +267,17 @@ def count_canonical_lag(
     from vector.infrastructure.db.models.connector_projection_progress import (
         ConnectorProjectionProgress,
     )
+
+    rtypes = (
+        GITHUB_RESOURCE_TYPES
+        if connector == CONNECTOR_GITHUB
+        else LINEAR_RESOURCE_TYPES
+        if connector == CONNECTOR_LINEAR
+        else None
+    )
+    if rtypes is None:
+        msg = f"unsupported connector for canonical lag: {connector}"
+        raise ValueError(msg)
 
     step3 = session.get(Step3CanonicalCursor, (connection_id, connector))
     step2 = session.get(ConnectorProjectionProgress, (connection_id, connector))
@@ -182,7 +294,7 @@ def count_canonical_lag(
         RawIngestionRecord.connector == connector,
         RawIngestionRecord.http_status >= 200,
         RawIngestionRecord.http_status <= 299,
-        RawIngestionRecord.resource_type.in_(GITHUB_RESOURCE_TYPES),
+        RawIngestionRecord.resource_type.in_(rtypes),
         or_(
             RawIngestionRecord.replay_sequence > s3_rs,
             and_(

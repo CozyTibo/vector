@@ -116,6 +116,8 @@ def _emit_open_relationship(
     relation_kind_id: int,
     valid_from: datetime,
     evidence_ref: str | None,
+    rule_version: str | None = None,
+    rule_source: str | None = None,
 ) -> None:
     vf_key = valid_from.isoformat()
     rid = relationship_uuid(
@@ -148,8 +150,8 @@ def _emit_open_relationship(
         source=RELATIONSHIP_SOURCE_CONNECTOR,
         confidence=None,
         evidence_ref=evidence_ref,
-        rule_version=RULE_VERSION,
-        rule_source=RULE_SOURCE_GITHUB,
+        rule_version=rule_version if rule_version is not None else RULE_VERSION,
+        rule_source=rule_source if rule_source is not None else RULE_SOURCE_GITHUB,
         valid_from=valid_from,
         valid_to=None,
     )

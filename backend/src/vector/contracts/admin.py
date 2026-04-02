@@ -166,3 +166,48 @@ class AdminStep1RawResetResponse(BaseModel):
     deleted_raw_records: int
     deleted_ingestion_runs: int
     deleted_sync_state_rows: int
+
+
+class AdminStep2ProjectionsResetRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    confirmation: str = Field(
+        ...,
+        description=(
+            "Must exactly match the server phrase (see admin Step2 UI). "
+            "Prevents accidental destructive resets."
+        ),
+    )
+
+
+class AdminStep2ProjectionsResetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    deleted_github_projection_rows: int
+    deleted_linear_projection_rows: int
+    deleted_connector_projection_progress_rows: int
+
+
+class AdminStep3CanonicalResetRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    confirmation: str = Field(
+        ...,
+        description=(
+            "Must exactly match the server phrase (see admin Step3 UI). "
+            "Prevents accidental destructive resets."
+        ),
+    )
+
+
+class AdminStep3CanonicalResetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    deleted_relationships: int
+    deleted_mapping_events: int
+    deleted_current_mappings: int
+    deleted_external_references: int
+    deleted_actor_external_identities: int
+    deleted_artifacts: int
+    deleted_actors: int
+    deleted_step3_canonical_cursors: int

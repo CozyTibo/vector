@@ -18,7 +18,11 @@ from vector.contracts.debug_canonical import (
     SubgraphNode,
     SubgraphResponse,
 )
-from vector.domains.canonical.worker import count_canonical_lag, drain_github_canonical
+from vector.domains.canonical.worker import (
+    count_canonical_lag,
+    drain_github_canonical,
+    drain_linear_canonical,
+)
 from vector.domains.debug.github_pipeline_wipe import (
     rebuild_derived_from_step1_github,
     reset_github_pipeline_state,
@@ -31,7 +35,11 @@ from vector.domains.projections.github.worker import drain_github_projections
 from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
 from vector.infrastructure.db.repositories import canonical_debug_queries as cq
 from vector.infrastructure.db.repositories import projection_debug_queries as dbg
-from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB, RUN_STATUS_SUCCEEDED
+from vector.infrastructure.db.repositories.ingestion import (
+    CONNECTOR_GITHUB,
+    CONNECTOR_LINEAR,
+    RUN_STATUS_SUCCEEDED,
+)
 
 
 def build_debug_canonical_router() -> APIRouter:
@@ -320,12 +328,23 @@ def build_debug_canonical_router() -> APIRouter:
             connection_id=connection_id,
         ):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Connection not found.") from None
-        m = drain_github_canonical(
-            db,
-            tenant_id=claims.tenant_id,
-            connection_id=connection_id,
-            connector=connector,
-        )
+        if connector == CONNECTOR_GITHUB:
+            m = drain_github_canonical(
+                db,
+                tenant_id=claims.tenant_id,
+                connection_id=connection_id,
+            )
+        elif connector == CONNECTOR_LINEAR:
+            m = drain_linear_canonical(
+                db,
+                tenant_id=claims.tenant_id,
+                connection_id=connection_id,
+            )
+        else:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported connector for canonical drain: {connector}",
+            ) from None
         return {
             "raw_rows_processed": m.raw_rows_processed,
             "batches_committed": m.batches_committed,

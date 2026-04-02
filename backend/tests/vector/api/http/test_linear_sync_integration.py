@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
 import vector.api.http.routes.connectors.linear as linear_routes
+from vector.application.services import connector_sync
 from vector.domains.identity_access.services.session_jwt import issue_session_token
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.tenant import Tenant
@@ -99,7 +100,7 @@ def test_linear_sync_ok_when_core_mocked(
         return mock_run
 
     monkeypatch.setattr(linear_routes, "preflight_mock_connectors_reachable", lambda *_a, **_k: None)
-    monkeypatch.setattr(linear_routes, "run_linear_graphql_ingestion_for_tenant", _stub)
+    monkeypatch.setattr(connector_sync, "run_linear_poll_sync_with_projections", _stub)
     r = client.post("/connectors/linear/sync")
     assert r.status_code == 200
     body = r.json()

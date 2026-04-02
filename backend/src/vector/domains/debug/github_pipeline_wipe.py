@@ -35,12 +35,12 @@ from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB
 
 
-def wipe_step3_canonical_for_tenant_connection(
+def _delete_step3_canonical_entities_for_tenant(
     db: Session,
     *,
     tenant_id: uuid.UUID,
-    connection_id: uuid.UUID,
 ) -> None:
+    """Remove ontology rows for a tenant (not Step3 cursors). Order respects FKs."""
     db.execute(delete(Relationship).where(Relationship.tenant_id == tenant_id))
     db.execute(delete(MappingEvent).where(MappingEvent.tenant_id == tenant_id))
     db.execute(delete(CurrentMapping).where(CurrentMapping.tenant_id == tenant_id))
@@ -50,6 +50,15 @@ def wipe_step3_canonical_for_tenant_connection(
     )
     db.execute(delete(Artifact).where(Artifact.tenant_id == tenant_id))
     db.execute(delete(Actor).where(Actor.tenant_id == tenant_id))
+
+
+def wipe_step3_canonical_for_tenant_connection(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+) -> None:
+    _delete_step3_canonical_entities_for_tenant(db, tenant_id=tenant_id)
     db.execute(
         delete(Step3CanonicalCursor).where(
             Step3CanonicalCursor.tenant_id == tenant_id,

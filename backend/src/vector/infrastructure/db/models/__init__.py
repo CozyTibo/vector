@@ -31,11 +31,18 @@ from vector.infrastructure.db.models.github_projection import (
 from vector.infrastructure.db.models.identity import UserIdentity
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.linear_connection_detail import LinearConnectionDetail
-from vector.infrastructure.db.models.slack_connection_detail import SlackConnectionDetail
+from vector.infrastructure.db.models.linear_projection import (
+    LinearIssue,
+    LinearIssueComment,
+    LinearProject,
+    LinearTeam,
+    LinearUser,
+)
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
+from vector.infrastructure.db.models.slack_connection_detail import SlackConnectionDetail
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.models.user import User
@@ -67,6 +74,11 @@ __all__ = [
     "GithubUser",
     "IngestionRun",
     "LinearConnectionDetail",
+    "LinearIssue",
+    "LinearIssueComment",
+    "LinearProject",
+    "LinearTeam",
+    "LinearUser",
     "SlackConnectionDetail",
     "RawIngestionRecord",
     "Tenant",

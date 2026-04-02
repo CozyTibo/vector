@@ -11,6 +11,7 @@ from vector.domains.ingestion.github_poll_sync import (
     run_github_poll_ingestion_for_tenant,
 )
 from vector.domains.ingestion.http_fetch import FetchFatalError
+from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import ingestion as ing_repo
@@ -62,6 +63,30 @@ def run_github_poll_sync_with_drains(
             connection_id=run.connection_id,
         )
         drain_github_canonical(
+            session,
+            tenant_id=tenant_id,
+            connection_id=run.connection_id,
+        )
+    return run
+
+
+def run_linear_poll_sync_with_projections(
+    session: Session,
+    settings: Settings,
+    tenant_id: uuid.UUID,
+) -> IngestionRun:
+    """Linear Step 1 + Step 2 projection + Step 3 canonical drain (in-process)."""
+    from vector.domains.canonical.worker import drain_linear_canonical
+    from vector.domains.projections.linear.worker import drain_linear_projections
+
+    run = run_linear_graphql_ingestion_for_tenant(session, settings, tenant_id)
+    if run.status == ing_repo.RUN_STATUS_SUCCEEDED:
+        drain_linear_projections(
+            session,
+            tenant_id=tenant_id,
+            connection_id=run.connection_id,
+        )
+        drain_linear_canonical(
             session,
             tenant_id=tenant_id,
             connection_id=run.connection_id,

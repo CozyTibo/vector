@@ -18,6 +18,13 @@ from vector.infrastructure.db.models.github_projection import (
     GithubRepository,
     GithubUser,
 )
+from vector.infrastructure.db.models.linear_projection import (
+    LinearIssue,
+    LinearIssueComment,
+    LinearProject,
+    LinearTeam,
+    LinearUser,
+)
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 
@@ -232,6 +239,182 @@ def list_github_users(
         select(GithubUser)
         .where(*filters)
         .order_by(GithubUser.login.asc().nulls_last())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(session.scalars(stmt).all())
+    return RowsPage(total=total, items=items)
+
+
+def list_linear_teams(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    q: str | None,
+) -> RowsPage:
+    filters = [
+        LinearTeam.tenant_id == tenant_id,
+        LinearTeam.connection_id == connection_id,
+    ]
+    extra = _ilike_q(
+        q,
+        LinearTeam.key,
+        LinearTeam.name,
+        LinearTeam.linear_team_id,
+    )
+    if extra is not None:
+        filters.append(extra)
+    cnt_stmt = select(func.count()).select_from(LinearTeam).where(*filters)
+    total = int(session.scalar(cnt_stmt) or 0)
+    stmt = (
+        select(LinearTeam)
+        .where(*filters)
+        .order_by(LinearTeam.key.asc().nulls_last(), LinearTeam.name.asc().nulls_last())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(session.scalars(stmt).all())
+    return RowsPage(total=total, items=items)
+
+
+def list_linear_projects(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    q: str | None,
+) -> RowsPage:
+    filters = [
+        LinearProject.tenant_id == tenant_id,
+        LinearProject.connection_id == connection_id,
+    ]
+    extra = _ilike_q(
+        q,
+        LinearProject.name,
+        LinearProject.slug,
+        LinearProject.linear_project_id,
+    )
+    if extra is not None:
+        filters.append(extra)
+    cnt_stmt = select(func.count()).select_from(LinearProject).where(*filters)
+    total = int(session.scalar(cnt_stmt) or 0)
+    stmt = (
+        select(LinearProject)
+        .where(*filters)
+        .order_by(LinearProject.name.asc().nulls_last())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(session.scalars(stmt).all())
+    return RowsPage(total=total, items=items)
+
+
+def list_linear_issues(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    q: str | None,
+) -> RowsPage:
+    filters = [
+        LinearIssue.tenant_id == tenant_id,
+        LinearIssue.connection_id == connection_id,
+    ]
+    extra = _ilike_q(
+        q,
+        LinearIssue.title,
+        LinearIssue.identifier,
+        LinearIssue.linear_issue_id,
+        LinearIssue.description,
+    )
+    if extra is not None:
+        filters.append(extra)
+    cnt_stmt = select(func.count()).select_from(LinearIssue).where(*filters)
+    total = int(session.scalar(cnt_stmt) or 0)
+    stmt = (
+        select(LinearIssue)
+        .where(*filters)
+        .order_by(
+            LinearIssue.identifier.asc().nulls_last(),
+            LinearIssue.updated_at.desc().nulls_last(),
+        )
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(session.scalars(stmt).all())
+    return RowsPage(total=total, items=items)
+
+
+def list_linear_users(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    q: str | None,
+) -> RowsPage:
+    filters = [
+        LinearUser.tenant_id == tenant_id,
+        LinearUser.connection_id == connection_id,
+    ]
+    extra = _ilike_q(
+        q,
+        LinearUser.name,
+        LinearUser.display_name,
+        LinearUser.email,
+        LinearUser.linear_user_id,
+    )
+    if extra is not None:
+        filters.append(extra)
+    cnt_stmt = select(func.count()).select_from(LinearUser).where(*filters)
+    total = int(session.scalar(cnt_stmt) or 0)
+    stmt = (
+        select(LinearUser)
+        .where(*filters)
+        .order_by(LinearUser.display_name.asc().nulls_last(), LinearUser.name.asc().nulls_last())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(session.scalars(stmt).all())
+    return RowsPage(total=total, items=items)
+
+
+def list_linear_issue_comments(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    q: str | None,
+) -> RowsPage:
+    filters = [
+        LinearIssueComment.tenant_id == tenant_id,
+        LinearIssueComment.connection_id == connection_id,
+    ]
+    extra = _ilike_q(
+        q,
+        LinearIssueComment.body,
+        LinearIssueComment.linear_comment_id,
+        LinearIssueComment.linear_issue_id,
+        LinearIssueComment.issue_identifier,
+    )
+    if extra is not None:
+        filters.append(extra)
+    cnt_stmt = select(func.count()).select_from(LinearIssueComment).where(*filters)
+    total = int(session.scalar(cnt_stmt) or 0)
+    stmt = (
+        select(LinearIssueComment)
+        .where(*filters)
+        .order_by(LinearIssueComment.created_at.desc().nulls_last())
         .limit(limit)
         .offset(offset)
     )

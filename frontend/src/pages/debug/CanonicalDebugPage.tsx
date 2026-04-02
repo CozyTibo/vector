@@ -78,6 +78,7 @@ export default function CanonicalDebugPage({
   const [graphLoading, setGraphLoading] = useState(false);
 
   const connectionFromUrl = searchParams.get("connection_id") ?? "";
+  const statusConnector = searchParams.get("connector") ?? "github";
 
   const runsQuery = useQuery({
     queryKey: ["github-ingestion-runs", cqTag],
@@ -115,8 +116,8 @@ export default function CanonicalDebugPage({
   }, [connectionFromUrl]);
 
   const statusQuery = useQuery({
-    queryKey: ["canonical-status", cqTag, statusConnectionId],
-    queryFn: () => fetchCanonicalStatus(canonicalClient, statusConnectionId),
+    queryKey: ["canonical-status", cqTag, statusConnectionId, statusConnector],
+    queryFn: () => fetchCanonicalStatus(canonicalClient, statusConnectionId, statusConnector),
     enabled: Boolean(statusConnectionId) && tab === "status",
   });
 
@@ -669,11 +670,36 @@ export default function CanonicalDebugPage({
       {tab === "status" && (
         <section className="card">
           <p className="meta" style={{ marginBottom: "0.75rem" }}>
-            Pipeline health for Step 3 (canonical) vs Step 2 (projections), per GitHub connection.
-            Choose a connection or paste its UUID. Deep link:{" "}
-            <code className="cell-muted">?connection_id=&lt;uuid&gt;&amp;tab=status</code>.
+            Pipeline health for Step 3 (canonical) vs Step 2 (projections), per connector
+            connection. Choose a connection or paste its UUID. Deep link:{" "}
+            <code className="cell-muted">
+              ?connection_id=&lt;uuid&gt;&amp;tab=status&amp;connector=linear
+            </code>
+            .
           </p>
           <div className="btn-row wrap" style={{ gap: "0.5rem", alignItems: "center" }}>
+            <label className="meta" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Connector
+              <select
+                value={statusConnector}
+                onChange={(ev) => {
+                  const v = ev.target.value;
+                  setSearchParams((prev) => {
+                    const p = new URLSearchParams(prev);
+                    if (v && v !== "github") {
+                      p.set("connector", v);
+                    } else {
+                      p.delete("connector");
+                    }
+                    return p;
+                  });
+                }}
+                style={{ padding: "0.35rem 0.5rem" }}
+              >
+                <option value="github">github</option>
+                <option value="linear">linear</option>
+              </select>
+            </label>
             <select
               value={statusConnectionId}
               onChange={(ev) => {
