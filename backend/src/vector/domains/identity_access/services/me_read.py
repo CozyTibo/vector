@@ -11,6 +11,7 @@ from vector.domains.onboarding.constants import STATUS_COMPLETED
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.repositories import onboarding as onboarding_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
+from vector.settings import get_settings
 
 
 def assert_membership(session: Session, claims: SessionClaims) -> TenantMembership:
@@ -33,6 +34,9 @@ def build_me_response(session: Session, claims: SessionClaims) -> MeResponse:
     ob = onboarding_repo.get_onboarding_for_tenant(session, tenant.id)
     onboarding_completed = ob is not None and ob.status == STATUS_COMPLETED
     connected = tenancy_repo.list_connected_connector_providers(session, tenant.id)
+    settings = get_settings()
+    env = settings.env.strip().lower()
+    use_mock = env == "development" and settings.vector_use_mock_connectors
     return MeResponse(
         user_id=user.id,
         email=user.email,
@@ -43,4 +47,5 @@ def build_me_response(session: Session, claims: SessionClaims) -> MeResponse:
         role=membership.role,
         onboarding_completed=onboarding_completed,
         connected_connectors=connected,
+        use_mock_connectors=use_mock,
     )

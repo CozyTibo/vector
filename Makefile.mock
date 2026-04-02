@@ -24,6 +24,7 @@ mock-connectors-up:
 	@cd $(BACKEND_DIR) && VECTOR_MOCK_SEED=$${VECTOR_MOCK_SEED:-42} PYTHONPATH=$(PYTHONPATH) \
 		sh -c 'python -m uvicorn mock_connectors.unified:app --host $(MOCK_HOST) --port $(MOCK_PORT) & echo $$! > .mock_connectors.pid'
 	@echo "Mock connectors PID $$(cat $(PID_FILE)) — http://$(MOCK_HOST):$(MOCK_PORT)/health"
+	@echo "Tip: `docker compose up` already starts the mock-connectors service; stop this host process to avoid port $(MOCK_PORT) conflicts."
 
 mock-connectors-down:
 	@test ! -f $(PID_FILE) || (kill $$(cat $(PID_FILE)) 2>/dev/null; rm -f $(PID_FILE); echo "Stopped mock connectors.")
@@ -45,6 +46,7 @@ dev-mock:
 	@echo "  export ENV=development"
 	@echo "  export VECTOR_USE_MOCK_CONNECTORS=true"
 	@echo "  export VECTOR_MOCK_CONNECTOR_BASE_URL=http://127.0.0.1:$(MOCK_PORT)"
+	@echo "  # Docker Compose API: compose sets http://mock-connectors:$(MOCK_PORT) automatically."
 	@echo "  export VECTOR_MOCK_SEED=$${VECTOR_MOCK_SEED:-42}"
 
 dev-real:

@@ -136,7 +136,11 @@ class Settings(BaseSettings):
     vector_mock_connector_base_url: str = Field(
         default="http://127.0.0.1:9183",
         validation_alias="VECTOR_MOCK_CONNECTOR_BASE_URL",
-        description="Base URL for unified mock (GitHub REST + Linear /linear/*).",
+        description=(
+            "Unified mock base: GitHub REST (poll sync) + Linear GraphQL only. "
+            "GitHub user token and App JWT GET /app/installations/{id} always use api.github.com. "
+            "Linear OAuth code exchange always uses https://api.linear.app/oauth/token."
+        ),
     )
     vector_mock_seed: int = Field(
         default=42,
@@ -197,19 +201,36 @@ class Settings(BaseSettings):
         return self
 
     def github_rest_api_base_url(self) -> str:
-        """Base for GitHub REST (poll sync, installation token)."""
+        """Base for GitHub REST (poll sync, installation access token POST)."""
         if self.vector_use_mock_connectors:
             return self.vector_mock_connector_base_url.rstrip("/")
         return "https://api.github.com"
 
+    def github_rest_api_app_install_base_url(self) -> str:
+        """App JWT GET /app/installations/{id} during OAuth callback — always GitHub.
+
+        Installation IDs from the real install flow exist only on api.github.com; the local REST
+        mock cannot validate App JWTs or return that record. Poll sync still uses
+        `github_rest_api_base_url()` (mock when enabled).
+        """
+        return "https://api.github.com"
+
     def linear_graphql_url(self) -> str:
+        """GraphQL for Step 1 sync / bulk reads — mock base when `VECTOR_USE_MOCK_CONNECTORS`."""
         if self.vector_use_mock_connectors:
             return f"{self.vector_mock_connector_base_url.rstrip('/')}/linear/graphql"
         return "https://api.linear.app/graphql"
 
+    def linear_graphql_oauth_profile_url(self) -> str:
+        """Post-OAuth viewer/org lookup only — always Linear production.
+
+        Uses the real access token from `api.linear.app/oauth/token`. Keeps OAuth working when
+        the backend runs in Docker (mock GraphQL on 127.0.0.1 is unreachable from the container).
+        """
+        return "https://api.linear.app/graphql"
+
     def linear_oauth_token_url(self) -> str:
-        if self.vector_use_mock_connectors:
-            return f"{self.vector_mock_connector_base_url.rstrip('/')}/linear/oauth/token"
+        """Always real Linear — OAuth codes are issued by linear.app, not the mock."""
         return "https://api.linear.app/oauth/token"
 
 

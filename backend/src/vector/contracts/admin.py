@@ -104,6 +104,7 @@ class RawIngestionAdminItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     id: int = Field(description="raw_ingestion_records.id")
+    connector: str = Field(description="github | linear | …")
     replay_sequence: int
     resource_type: str
     external_id: str
@@ -118,3 +119,50 @@ class RawIngestionAdminPage(BaseModel):
     limit: int
     offset: int
     items: list[RawIngestionAdminItem]
+
+
+class RawIngestionAdminDetail(BaseModel):
+    """Single Step 1 envelope for admin inspection (full payload + request metadata)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: int
+    connection_id: uuid.UUID
+    run_id: uuid.UUID
+    connector: str
+    source_trigger: str
+    replay_sequence: int
+    resource_type: str
+    external_id: str
+    api_endpoint: str
+    query_params: dict[str, Any]
+    payload_hash: str
+    http_status: int
+    fetched_at: datetime
+    payload_body: dict[str, Any]
+
+
+class RawIngestionAdminDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    item: RawIngestionAdminDetail
+
+
+class AdminStep1RawResetRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    confirmation: str = Field(
+        ...,
+        description=(
+            "Must exactly match the server phrase (see admin Step1 UI). "
+            "Prevents accidental destructive resets."
+        ),
+    )
+
+
+class AdminStep1RawResetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    deleted_raw_records: int
+    deleted_ingestion_runs: int
+    deleted_sync_state_rows: int

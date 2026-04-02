@@ -43,7 +43,8 @@ export default function AdminTenantConnections() {
   return (
     <div>
       <p className="mb-4 text-sm text-stone-600">
-        Raw GitHub ingestion rows for this tenant are under{" "}
+        OAuth only stores the link. Step 1 raw rows appear after{" "}
+        <strong>sync</strong> (onboarding SCANNING or product/admin sync). View them under{" "}
         <Link to={`/admin/tenants/${tenantId}/step1`} className="text-blue-700 underline">
           Step1 Raw
         </Link>

@@ -112,3 +112,24 @@ export async function triggerGithubSync(base: string): Promise<{
     stats: Record<string, unknown> | null;
   }>;
 }
+
+export async function triggerLinearSync(base: string): Promise<{
+  run_id: string;
+  status: string;
+  error_summary: string | null;
+  stats: Record<string, unknown> | null;
+}> {
+  const res = await fetch(`${base}/connectors/linear/sync`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return res.json() as Promise<{
+    run_id: string;
+    status: string;
+    error_summary: string | null;
+    stats: Record<string, unknown> | null;
+  }>;
+}

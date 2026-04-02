@@ -17,13 +17,13 @@
 
 | Environment | GitHub / Linear | Mock server |
 |-------------|-----------------|-------------|
-| **Local dev (`ENV=development`)** | Optional: mock **or** real APIs via `VECTOR_USE_MOCK_CONNECTORS` | **Only when mock flag is true** — binds to **127.0.0.1** |
+| **Local dev (`ENV=development`)** | Optional: mock **or** real APIs via `VECTOR_USE_MOCK_CONNECTORS` | **Only when mock flag is true** — **Compose:** `mock-connectors` service; **host:** Makefile binds **127.0.0.1** |
 | **CI** | **Real APIs only**; `VECTOR_USE_MOCK_CONNECTORS=false` (mandatory) | **Must not** start |
 | **Staging / Production / AWS** | **Real** `https://api.github.com` and `https://api.linear.app` | **Disabled** — startup guard asserts mock is off |
 
 **Rules**
 
-- Mock server **binds to loopback only** (`127.0.0.1`), never `0.0.0.0`.
+- **Host-only** mock (`make -f Makefile.mock mock-connectors-up`) binds to **127.0.0.1** only. **Docker Compose** runs the same app on **0.0.0.0:9183** inside the `mock-connectors` container (published to the host for debugging).
 - **Mock connectors are not a CI feature** — no deterministic “mock CI” mode; tests must not start mock servers.
 - **No** production feature flag for mock URLs.
 
@@ -34,10 +34,10 @@
 ### 3.1 Environment variables
 
 - **`VECTOR_USE_MOCK_CONNECTORS`** — `true` only when `ENV=development`.
-- **`VECTOR_MOCK_CONNECTOR_BASE_URL`** — e.g. `http://127.0.0.1:9183` (GitHub REST + Linear OAuth/GraphQL under this host).
+- **`VECTOR_MOCK_CONNECTOR_BASE_URL`** — e.g. `http://127.0.0.1:9183` for a host-only stack, or Compose sets `http://mock-connectors:9183` for the backend container (GitHub REST + Linear GraphQL; Linear OAuth token exchange stays on `https://api.linear.app/oauth/token`).
 - **`VECTOR_MOCK_SEED`** — deterministic dataset seed (default `42`).
 
-When `VECTOR_USE_MOCK_CONNECTORS=true`, GitHub REST and Linear OAuth/GraphQL URLs point at the mock base. When `false`, defaults are `https://api.github.com` and `https://api.linear.app` (with Linear paths as implemented in settings).
+When `VECTOR_USE_MOCK_CONNECTORS=true`, **GitHub REST** and **Linear GraphQL (ingestion / sync)** use the mock base; **Linear OAuth** uses real `https://api.linear.app/oauth/token` and real `https://api.linear.app/graphql` for the post-auth viewer/org lookup (so Docker backends are not required to reach the mock during connect). When `false`, GitHub REST and Linear GraphQL use the real API hosts.
 
 **GitHub App installation tokens** — mock implements **`POST /app/installations/{id}/access_tokens`** and returns a **mock installation token** accepted by the mock GitHub REST routes.
 
@@ -104,6 +104,7 @@ See §11 for graph-oriented patterns. Includes mis-linked GH↔Linear, tickets w
 ## 8. Documentation & handoff
 
 - **`backend/mock_connectors/README.md`** — how to run mocks and the backend.
+- **[`mock-data-seed-audit.md`](./mock-data-seed-audit.md)** — full audit: what the seed contains, how Vector uses it, gaps vs strategy, improvement backlog.
 
 ---
 
@@ -122,6 +123,7 @@ See §11 for graph-oriented patterns. Includes mis-linked GH↔Linear, tickets w
 |------|--------|
 | 2026-04-01 | Initial strategy. |
 | 2026-04-01 | Added §11–§16; CI/AWS/local-only rules; implementation reference. |
+| 2026-04-01 | Link to `mock-data-seed-audit.md` (seed audit & backlog). |
 
 ---
 

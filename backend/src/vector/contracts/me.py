@@ -25,3 +25,10 @@ class MeResponse(BaseModel):
         default_factory=list,
         description="Active tenant_connections.provider values for this workspace.",
     )
+    use_mock_connectors: bool = Field(
+        default=False,
+        description=(
+            "True when ENV=development and VECTOR_USE_MOCK_CONNECTORS=true. "
+            "UI may gate local-only flows (e.g. onboarding sync against the mock stack)."
+        ),
+    )

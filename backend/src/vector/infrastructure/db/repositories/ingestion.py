@@ -16,6 +16,7 @@ from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRec
 
 __all__ = [
     "CONNECTOR_GITHUB",
+    "CONNECTOR_LINEAR",
     "SOURCE_TRIGGER_POLL",
     "RUN_STATUS_FAILED",
     "RUN_STATUS_PARTIAL",
@@ -31,6 +32,7 @@ __all__ = [
 ]
 
 CONNECTOR_GITHUB = "github"
+CONNECTOR_LINEAR = "linear"
 SOURCE_TRIGGER_POLL = "poll"
 
 RUN_STATUS_RUNNING = "running"

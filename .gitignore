@@ -1,4 +1,5 @@
 # Local mock connectors (generated / runtime)
+# dataset.json: regenerate via `generate_dataset.py` / make mock-dataset (e.g. seed=42). Large; not useful on GitHub.
 backend/mock_connectors/fixtures/generated/dataset.json
 backend/.mock_connectors.pid
 

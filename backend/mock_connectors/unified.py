@@ -1,6 +1,7 @@
 """Unified local mock: GitHub REST + Linear OAuth/GraphQL on one host.
 
-Binds to 127.0.0.1 only (see Makefile / README). Not for production or CI.
+**Docker Compose** runs this on `0.0.0.0:9183` as the `mock-connectors` service. **Makefile**
+`mock-connectors-up` binds **127.0.0.1** only for host-only dev. Not for production or CI.
 
 Dataset is loaded at import time from `VECTOR_MOCK_SEED` and can be **reseeded** via
 `POST /admin/reseed?seed=` without restarting the process.

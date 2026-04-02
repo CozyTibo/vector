@@ -1,10 +1,11 @@
 # Local mock connectors (development only)
 
-Mock HTTP server for **GitHub REST** and **Linear OAuth + GraphQL**. Binds to **127.0.0.1** only.
+Mock HTTP server for **GitHub REST** and **Linear GraphQL** (and an optional `/linear/oauth/token` stub). **Docker Compose** starts it as the **`mock-connectors`** service (`0.0.0.0:9183` in-container, port **9183** on the host). **Makefile** can run the same app on **127.0.0.1** only for a host-only backend. The Vector backend exchanges Linear OAuth codes with **real** `https://api.linear.app/oauth/token`, resolves viewer/org with **real** `https://api.linear.app/graphql`, then sends **ingestion** GraphQL to this mock when `VECTOR_USE_MOCK_CONNECTORS=true`.
 
 **Do not** enable this in production, CI, or AWS. Server-side rules: `VECTOR_USE_MOCK_CONNECTORS=true` is valid only when `ENV=development`.
 
-Strategy: [`DOCS/strategy/local-mock-connectors-and-fixtures.md`](../../DOCS/strategy/local-mock-connectors-and-fixtures.md).
+Strategy: [`DOCS/strategy/local-mock-connectors-and-fixtures.md`](../../DOCS/strategy/local-mock-connectors-and-fixtures.md).  
+Seed audit (contents, usage, gaps): [`DOCS/strategy/mock-data-seed-audit.md`](../../DOCS/strategy/mock-data-seed-audit.md).
 
 ## Prerequisites
 
@@ -13,21 +14,27 @@ Strategy: [`DOCS/strategy/local-mock-connectors-and-fixtures.md`](../../DOCS/str
 
 ## Start mocks
 
+**Recommended (Docker Compose):** from the repo root, `docker compose up` builds and runs **`mock-connectors`** alongside postgres/backend/frontend. The backend container is configured with `VECTOR_MOCK_CONNECTOR_BASE_URL=http://mock-connectors:9183`.
+
+**Host-only backend** (uvicorn on your machine, no Compose):
+
 ```bash
 make -f Makefile.mock mock-connectors-up
 ```
 
-Health: `http://127.0.0.1:9183/health` (includes current `seed`).
+Do **not** run both Compose `mock-connectors` and `make mock-connectors-up` at once — they contend for host port **9183**.
+
+Health (host): `http://127.0.0.1:9183/health` (includes current `seed`).
 
 - GitHub-shaped routes: `http://127.0.0.1:9183/...` (same paths as `https://api.github.com/...`).
-- Linear: `http://127.0.0.1:9183/linear/graphql`, `http://127.0.0.1:9183/linear/oauth/token`.
+- Linear GraphQL (used by backend in mock mode): `http://127.0.0.1:9183/linear/graphql`. Ingestion uses **`operationName`** (e.g. `LinearIngestIssues`, `LinearIngestComments`, `LinearIngestTeams`, …) matching `vector.domains.ingestion.linear_graphql_sync`. The mock also exposes `POST /linear/oauth/token` for ad-hoc testing; **ingestion uses a real Linear access token** from `api.linear.app/oauth/token` when not in mock mode.
 
 ### Admin (debug)
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/admin/reseed?seed=<int>` | Regenerate in-memory dataset (no uvicorn restart). |
-| `GET` | `/admin/dataset` | JSON with `seed`, `github` (repos, PRs, commits, GitHub issues), and `linear` (org name, teams, projects, epics, issues, users, comments, relations, workflow states). |
+| `GET` | `/admin/dataset` | JSON with `seed`, `github` (…), and `linear` (teams, projects, epics, **initiatives**, **cycles**, **issue_labels**, issues, users, comments, relations, workflow states). |
 | `GET` | `/admin/scenarios` | Scenario slugs present in the dataset (strategy §11). |
 
 Reseed from Makefile (mock server must be running):
@@ -40,19 +47,18 @@ GitHub list endpoints include a **`Link`** header (`rel="next"`, `prev`, `first`
 
 ## Run the Vector API against mocks
 
-1. Start mocks (above).
-2. Export:
+1. **Docker Compose:** `docker compose up` — mocks + URL for the API are already wired.
+2. **Host-only API:** start mocks (`make -f Makefile.mock mock-connectors-up`), then:
 
 ```bash
 make -f Makefile.mock dev-mock
-# then run uvicorn / docker with those variables, e.g.:
 # export ENV=development
 # export VECTOR_USE_MOCK_CONNECTORS=true
 # export VECTOR_MOCK_CONNECTOR_BASE_URL=http://127.0.0.1:9183
 # export VECTOR_MOCK_SEED=42
 ```
 
-3. Start the backend as you usually do (`uvicorn app.main:app` or Docker Compose with env overrides).
+3. Run `uvicorn app.main:app` from `backend/` with `PYTHONPATH` set (see Makefile).
 
 ## Switch back to real APIs
 
@@ -76,6 +82,8 @@ Writes `backend/mock_connectors/fixtures/generated/dataset.json` (gitignored; op
 make -f Makefile.mock mock-validate
 ```
 
+By default this validates the **live** `generate_dataset(VECTOR_MOCK_SEED)` output (not a stale `dataset.json`). To validate the checked-in JSON snapshot instead, set `MOCK_VALIDATE_USE_JSON=1`.
+
 ## Stop mocks
 
 ```bash
@@ -92,7 +100,10 @@ make -f Makefile.mock mock-connectors-down
 
 ## Layout
 
-- `fixtures/company_generator.py` — Nexora dataset.
+- `fixtures/company_generator.py` — Nexora dataset orchestration.
+- `fixtures/execution_stories.py` — deterministic execution scenarios (timelines, relations, PR budget).
+- `fixtures/nexora_content.py` — product copy and comment arcs.
 - `github_mock/` — GitHub REST handlers.
 - `linear_mock/` — Linear OAuth + GraphQL handlers.
-- `unified.py` — single ASGI app (loopback bind enforced via Makefile / uvicorn `--host`).
+- `unified.py` — single ASGI app.
+- `../Dockerfile.mock-connectors` — slim image used by Compose service **`mock-connectors`**.

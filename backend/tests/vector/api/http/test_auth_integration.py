@@ -73,6 +73,7 @@ def test_google_oauth_flow_creates_tenant_and_session(
     assert body["tenant_slug"].startswith("acme-example")
     assert body.get("onboarding_completed") is False
     assert body.get("connected_connectors") == []
+    assert body.get("use_mock_connectors") is False
 
 
 def test_me_rejects_session_for_wrong_tenant(
@@ -131,6 +132,7 @@ def test_register_and_login_with_password(client: TestClient) -> None:
     assert body["company_name"] == "PW Corp"
     assert body.get("onboarding_completed") is False
     assert body.get("connected_connectors") == []
+    assert body.get("use_mock_connectors") is False
 
     out = client.post("/auth/logout")
     assert out.status_code == 204

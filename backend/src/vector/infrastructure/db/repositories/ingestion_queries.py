@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
-from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB
+from vector.infrastructure.db.repositories.ingestion import CONNECTOR_GITHUB, CONNECTOR_LINEAR
 
 
 def list_github_ingestion_runs_for_tenant(
@@ -56,6 +56,38 @@ def get_github_ingestion_run_for_tenant(
     if run is None:
         return None
     if run.tenant_id != tenant_id or run.connector != CONNECTOR_GITHUB:
+        return None
+    return run
+
+
+def list_linear_ingestion_runs_for_tenant(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    limit: int = 100,
+) -> list[IngestionRun]:
+    stmt = (
+        select(IngestionRun)
+        .where(
+            IngestionRun.tenant_id == tenant_id,
+            IngestionRun.connector == CONNECTOR_LINEAR,
+        )
+        .order_by(IngestionRun.started_at.desc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt).all())
+
+
+def get_linear_ingestion_run_for_tenant(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> IngestionRun | None:
+    run = session.get(IngestionRun, run_id)
+    if run is None:
+        return None
+    if run.tenant_id != tenant_id or run.connector != CONNECTOR_LINEAR:
         return None
     return run
 

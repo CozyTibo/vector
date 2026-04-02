@@ -12,6 +12,8 @@ export type MeResponse = {
   onboarding_completed?: boolean;
   /** Active connector provider keys for this tenant (e.g. github, linear). */
   connected_connectors?: string[];
+  /** True when backend uses local mock GitHub/Linear URLs (development only). */
+  use_mock_connectors?: boolean;
 };
 
 export async function fetchMe(base: string): Promise<MeResponse | null> {

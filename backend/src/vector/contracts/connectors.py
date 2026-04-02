@@ -87,6 +87,62 @@ class GithubIngestionRecordsPageResponse(BaseModel):
     items: list[GithubRawIngestionRecordItem]
 
 
+class LinearIngestionSyncResponse(BaseModel):
+    """Result of POST /connectors/linear/sync (Step 1 GraphQL ingestion)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: uuid.UUID
+    status: str
+    error_summary: str | None = None
+    stats: dict[str, Any] | None = None
+
+
+class LinearIngestionRunListItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID
+    connection_id: uuid.UUID
+    status: str
+    source_trigger: str
+    started_at: datetime
+    finished_at: datetime | None
+    error_summary: str | None
+    stats: dict[str, Any] | None
+    records_written: int = Field(description="Rows in raw_ingestion_records for this run.")
+
+
+class LinearIngestionRunsListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[LinearIngestionRunListItem]
+
+
+class LinearRawIngestionRecordItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    replay_sequence: int
+    resource_type: str
+    external_id: str
+    api_endpoint: str
+    query_params: dict[str, Any]
+    payload_hash: str
+    http_status: int
+    fetched_at: datetime
+    payload_body: dict[str, Any]
+
+
+class LinearIngestionRecordsPageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: uuid.UUID
+    total: int
+    limit: int
+    offset: int
+    items: list[LinearRawIngestionRecordItem]
+
+
 class GithubConnectorStatusItem(BaseModel):
     """Status row for the GitHub integration."""
 
@@ -181,7 +237,9 @@ class SlackConnectorStatusItem(BaseModel):
     )
 
 
-ConnectorStatusItem: TypeAlias = GithubConnectorStatusItem | LinearConnectorStatusItem | SlackConnectorStatusItem
+ConnectorStatusItem: TypeAlias = (
+    GithubConnectorStatusItem | LinearConnectorStatusItem | SlackConnectorStatusItem
+)
 
 
 class ConnectorsListResponse(BaseModel):

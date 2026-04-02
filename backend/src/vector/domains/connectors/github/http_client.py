@@ -70,7 +70,7 @@ def fetch_github_installation(
 ) -> dict[str, Any]:
     """GET /app/installations/{id} with app JWT."""
     app_jwt = create_github_app_jwt(settings)
-    base = settings.github_rest_api_base_url()
+    base = settings.github_rest_api_app_install_base_url()
     url = f"{base}/app/installations/{installation_id}"
     try:
         resp = httpx.get(

@@ -1,0 +1,16 @@
+# Local development only — unified GitHub REST + Linear GraphQL mock (see mock_connectors/README.md).
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir "fastapi>=0.115" "uvicorn[standard]>=0.32"
+
+COPY mock_connectors ./mock_connectors
+
+ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 9183
+
+CMD ["uvicorn", "mock_connectors.unified:app", "--host", "0.0.0.0", "--port", "9183"]

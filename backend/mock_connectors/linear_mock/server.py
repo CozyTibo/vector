@@ -32,10 +32,8 @@ def build_linear_router(get_linear: Callable[[], dict[str, Any]]) -> APIRouter:
 
     @r.post("/graphql")
     def graphql(body: dict[str, Any]) -> JSONResponse:
-        q = body.get("query") or ""
-        variables = body.get("variables") if isinstance(body.get("variables"), dict) else None
         linear = get_linear()
-        payload = lg.handle_graphql(linear, str(q), variables)
+        payload = lg.handle_graphql(linear, body if isinstance(body, dict) else {})
         return JSONResponse(payload)
 
     return r

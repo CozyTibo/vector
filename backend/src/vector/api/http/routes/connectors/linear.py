@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,6 +11,13 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
+from vector.contracts.connectors import (
+    LinearIngestionRecordsPageResponse,
+    LinearIngestionRunListItem,
+    LinearIngestionRunsListResponse,
+    LinearIngestionSyncResponse,
+    LinearRawIngestionRecordItem,
+)
 from vector.domains.connectors.linear.errors import (
     InvalidLinearOAuthStateError,
     LinearConnectorNotConfiguredError,
@@ -23,6 +31,10 @@ from vector.domains.connectors.linear.oauth_flow import (
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
+from vector.domains.ingestion.http_fetch import FetchFatalError
+from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
+from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_reachable
+from vector.infrastructure.db.repositories import ingestion_queries as ing_queries
 from vector.settings import Settings
 
 _logger = logging.getLogger(__name__)
@@ -98,5 +110,111 @@ def build_linear_connector_router() -> APIRouter:
             else f"{front}/?linear_connected=1"
         )
         return RedirectResponse(url=ok, status_code=status.HTTP_302_FOUND)
+
+    @r.post("/sync", response_model=LinearIngestionSyncResponse)
+    def linear_graphql_sync(
+        db: Annotated[Session, Depends(get_db)],
+        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> LinearIngestionSyncResponse:
+        """Poll Linear GraphQL and append resource-level raw ingestion rows (Step 1)."""
+        try:
+            assert_membership(db, claims)
+        except NoMembershipError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        preflight_mock_connectors_reachable(settings)
+        try:
+            run = run_linear_graphql_ingestion_for_tenant(db, settings, claims.tenant_id)
+        except FetchFatalError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        return LinearIngestionSyncResponse(
+            run_id=run.id,
+            status=run.status,
+            error_summary=run.error_summary,
+            stats=run.stats,
+        )
+
+    @r.get("/ingestion/runs", response_model=LinearIngestionRunsListResponse)
+    def list_linear_ingestion_runs(
+        db: Annotated[Session, Depends(get_db)],
+        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> LinearIngestionRunsListResponse:
+        try:
+            assert_membership(db, claims)
+        except NoMembershipError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        runs = ing_queries.list_linear_ingestion_runs_for_tenant(
+            db,
+            claims.tenant_id,
+            limit=limit,
+        )
+        counts = ing_queries.record_counts_for_run_ids(db, [r.id for r in runs])
+        items = [
+            LinearIngestionRunListItem(
+                id=run.id,
+                connection_id=run.connection_id,
+                status=run.status,
+                source_trigger=run.source_trigger,
+                started_at=run.started_at,
+                finished_at=run.finished_at,
+                error_summary=run.error_summary,
+                stats=run.stats,
+                records_written=counts.get(run.id, 0),
+            )
+            for run in runs
+        ]
+        return LinearIngestionRunsListResponse(items=items)
+
+    @r.get("/ingestion/runs/{run_id}/records", response_model=LinearIngestionRecordsPageResponse)
+    def list_linear_ingestion_records(
+        run_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> LinearIngestionRecordsPageResponse:
+        try:
+            assert_membership(db, claims)
+        except NoMembershipError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        run = ing_queries.get_linear_ingestion_run_for_tenant(
+            db,
+            tenant_id=claims.tenant_id,
+            run_id=run_id,
+        )
+        if run is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail="Ingestion run not found.",
+            ) from None
+        page = ing_queries.list_raw_records_for_run(
+            db,
+            run_id=run_id,
+            limit=limit,
+            offset=offset,
+        )
+        rec_items = [
+            LinearRawIngestionRecordItem(
+                id=rec.id,
+                replay_sequence=rec.replay_sequence,
+                resource_type=rec.resource_type,
+                external_id=rec.external_id,
+                api_endpoint=rec.api_endpoint,
+                query_params=dict(rec.query_params) if rec.query_params is not None else {},
+                payload_hash=rec.payload_hash,
+                http_status=rec.http_status,
+                fetched_at=rec.fetched_at,
+                payload_body=dict(rec.payload_body) if rec.payload_body is not None else {},
+            )
+            for rec in page.items
+        ]
+        return LinearIngestionRecordsPageResponse(
+            run_id=run_id,
+            total=page.total,
+            limit=limit,
+            offset=offset,
+            items=rec_items,
+        )
 
     return r

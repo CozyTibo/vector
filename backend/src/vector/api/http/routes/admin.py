@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
@@ -13,8 +13,12 @@ from vector.api.http.deps import get_db, settings_dep
 from vector.api.http.serialization import orm_to_dict
 from vector.contracts.admin import (
     AdminConnectionsResponse,
+    AdminStep1RawResetRequest,
+    AdminStep1RawResetResponse,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
+    RawIngestionAdminDetail,
+    RawIngestionAdminDetailResponse,
     RawIngestionAdminItem,
     RawIngestionAdminPage,
     TenantAdminDetailResponse,
@@ -39,6 +43,13 @@ from vector.domains.debug.github_pipeline_wipe import (
     reset_github_pipeline_state,
 )
 from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
+from vector.domains.ingestion.http_fetch import FetchFatalError
+from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
+from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_reachable
+from vector.domains.ingestion.step1_reset import (
+    STEP1_RAW_RESET_CONFIRMATION_PHRASE,
+    wipe_step1_raw_for_tenant,
+)
 from vector.domains.projections.github.worker import drain_github_projections
 from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
@@ -266,6 +277,7 @@ def build_admin_router() -> APIRouter:
         items = [
             RawIngestionAdminItem(
                 id=row.id,
+                connector=row.connector,
                 replay_sequence=int(row.replay_sequence),
                 resource_type=row.resource_type,
                 external_id=row.external_id,
@@ -280,6 +292,119 @@ def build_admin_router() -> APIRouter:
             offset=offset,
             items=items,
         )
+
+    @r.get(
+        "/tenants/{tenant_id}/raw-ingestion/{record_id}",
+        response_model=RawIngestionAdminDetailResponse,
+    )
+    def get_raw_ingestion_detail(
+        tenant_id: uuid.UUID,
+        record_id: Annotated[int, Path(ge=1)],
+        db: Annotated[Session, Depends(get_db)],
+    ) -> RawIngestionAdminDetailResponse:
+        _assert_tenant(db, tenant_id)
+        row = dbg.get_raw_ingestion_record_for_tenant(
+            db,
+            tenant_id=tenant_id,
+            record_id=record_id,
+        )
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Raw ingestion record not found")
+        detail = RawIngestionAdminDetail(
+            id=row.id,
+            connection_id=row.connection_id,
+            run_id=row.run_id,
+            connector=row.connector,
+            source_trigger=row.source_trigger,
+            replay_sequence=int(row.replay_sequence),
+            resource_type=row.resource_type,
+            external_id=row.external_id,
+            api_endpoint=row.api_endpoint,
+            query_params=row.query_params,
+            payload_hash=row.payload_hash,
+            http_status=row.http_status,
+            fetched_at=row.fetched_at,
+            payload_body=row.payload_body,
+        )
+        return RawIngestionAdminDetailResponse(item=detail)
+
+    @r.post(
+        "/tenants/{tenant_id}/raw-ingestion/reset",
+        response_model=AdminStep1RawResetResponse,
+    )
+    def reset_tenant_step1_raw_ingestion(
+        tenant_id: uuid.UUID,
+        body: AdminStep1RawResetRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminStep1RawResetResponse:
+        """Wipe Step 1 for tenant (raw rows, ingestion runs, sync state). No connector calls."""
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != STEP1_RAW_RESET_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Confirmation phrase does not match. Open the Step1 Raw admin tab for the "
+                    "exact text — this only deletes Step 1 data, not OAuth or Step 2/3."
+                ),
+            )
+        stats = wipe_step1_raw_for_tenant(db, tenant_id=tenant_id)
+        db.commit()
+        return AdminStep1RawResetResponse(
+            deleted_raw_records=stats["deleted_raw_records"],
+            deleted_ingestion_runs=stats["deleted_ingestion_runs"],
+            deleted_sync_state_rows=stats["deleted_sync_state_rows"],
+        )
+
+    @r.post("/tenants/{tenant_id}/ingestion/github-sync")
+    def admin_trigger_github_step1_sync(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> dict[str, Any]:
+        """GitHub poll Step 1; drain projection + canonical if run succeeds."""
+        _assert_tenant(db, tenant_id)
+        preflight_mock_connectors_reachable(settings)
+        try:
+            run = run_github_poll_ingestion_for_tenant(db, settings, tenant_id)
+        except FetchFatalError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        if run.status == RUN_STATUS_SUCCEEDED:
+            drain_github_projections(
+                db,
+                tenant_id=tenant_id,
+                connection_id=run.connection_id,
+            )
+            drain_github_canonical(
+                db,
+                tenant_id=tenant_id,
+                connection_id=run.connection_id,
+            )
+        return {
+            "run_id": str(run.id),
+            "status": run.status,
+            "error_summary": run.error_summary,
+            "stats": run.stats,
+        }
+
+    @r.post("/tenants/{tenant_id}/ingestion/linear-sync")
+    def admin_trigger_linear_step1_sync(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> dict[str, Any]:
+        """Linear GraphQL Step 1 raw rows only (product linear/sync parity)."""
+        _assert_tenant(db, tenant_id)
+        preflight_mock_connectors_reachable(settings)
+        try:
+            run = run_linear_graphql_ingestion_for_tenant(db, settings, tenant_id)
+        except FetchFatalError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        return {
+            "run_id": str(run.id),
+            "status": run.status,
+            "error_summary": run.error_summary,
+            "stats": run.stats,
+        }
 
     @r.get(
         "/tenants/{tenant_id}/github/ingestion/runs",

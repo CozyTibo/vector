@@ -37,6 +37,7 @@ from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
 from vector.domains.ingestion.http_fetch import FetchFatalError
+from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_reachable
 from vector.domains.projections.github.worker import drain_github_projections
 from vector.infrastructure.db.repositories import ingestion_queries as ing_queries
 from vector.infrastructure.db.repositories.ingestion import RUN_STATUS_SUCCEEDED
@@ -149,6 +150,7 @@ def build_github_connector_router() -> APIRouter:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        preflight_mock_connectors_reachable(settings)
         try:
             run = run_github_poll_ingestion_for_tenant(db, settings, claims.tenant_id)
         except FetchFatalError as e:

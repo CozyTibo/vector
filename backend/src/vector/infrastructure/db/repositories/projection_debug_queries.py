@@ -262,6 +262,19 @@ def list_tenant_connections_for_tenant(
     return list(session.scalars(stmt).all())
 
 
+def get_raw_ingestion_record_for_tenant(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    record_id: int,
+) -> RawIngestionRecord | None:
+    stmt = select(RawIngestionRecord).where(
+        RawIngestionRecord.id == record_id,
+        RawIngestionRecord.tenant_id == tenant_id,
+    )
+    return session.scalar(stmt)
+
+
 def list_raw_ingestion_records_for_tenant(
     session: Session,
     *,

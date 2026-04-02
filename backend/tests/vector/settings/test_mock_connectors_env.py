@@ -44,6 +44,29 @@ def test_mock_connectors_rejected_in_production() -> None:
         _restore("VECTOR_USE_MOCK_CONNECTORS", old_mock)
 
 
+def test_mock_mode_swaps_github_rest_and_linear_graphql_only() -> None:
+    """Mirror GitHub: real OAuth hosts; mock only replaces REST / GraphQL data plane."""
+    old_env = os.environ.get("ENV")
+    old_mock = os.environ.get("VECTOR_USE_MOCK_CONNECTORS")
+    old_base = os.environ.get("VECTOR_MOCK_CONNECTOR_BASE_URL")
+    get_settings.cache_clear()
+    try:
+        os.environ["ENV"] = "development"
+        os.environ["VECTOR_USE_MOCK_CONNECTORS"] = "true"
+        os.environ["VECTOR_MOCK_CONNECTOR_BASE_URL"] = "http://127.0.0.1:9183"
+        s = Settings()
+        assert s.github_rest_api_base_url() == "http://127.0.0.1:9183"
+        assert s.github_rest_api_app_install_base_url() == "https://api.github.com"
+        assert s.linear_graphql_url() == "http://127.0.0.1:9183/linear/graphql"
+        assert s.linear_graphql_oauth_profile_url() == "https://api.linear.app/graphql"
+        assert s.linear_oauth_token_url() == "https://api.linear.app/oauth/token"
+    finally:
+        get_settings.cache_clear()
+        _restore("ENV", old_env)
+        _restore("VECTOR_USE_MOCK_CONNECTORS", old_mock)
+        _restore("VECTOR_MOCK_CONNECTOR_BASE_URL", old_base)
+
+
 def test_github_rest_defaults_to_real_api() -> None:
     old_env = os.environ.get("ENV")
     old_mock = os.environ.get("VECTOR_USE_MOCK_CONNECTORS")
@@ -53,7 +76,9 @@ def test_github_rest_defaults_to_real_api() -> None:
         os.environ["VECTOR_USE_MOCK_CONNECTORS"] = "false"
         s = Settings()
         assert s.github_rest_api_base_url() == "https://api.github.com"
+        assert s.github_rest_api_app_install_base_url() == "https://api.github.com"
         assert s.linear_graphql_url() == "https://api.linear.app/graphql"
+        assert s.linear_oauth_token_url() == "https://api.linear.app/oauth/token"
     finally:
         get_settings.cache_clear()
         _restore("ENV", old_env)

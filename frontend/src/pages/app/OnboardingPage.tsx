@@ -23,6 +23,7 @@ import {
   patchOnboarding,
   postOnboardingChat,
   triggerGithubSync,
+  triggerLinearSync,
   type OnboardingMessagePayload,
   type OnboardingStatePayload,
   type OnboardingStep,
@@ -527,6 +528,27 @@ export default function OnboardingPage() {
     return false;
   }, [server]);
 
+  const wantsLinearSync = useMemo(() => {
+    if (!server) {
+      return false;
+    }
+    const ti = server.answers.tools_interest;
+    if (Array.isArray(ti) && ti.includes("linear")) {
+      return true;
+    }
+    const t = server.answers.tools;
+    if (t && typeof t === "object" && !Array.isArray(t)) {
+      const pm = (t as Record<string, unknown>).pm;
+      return Array.isArray(pm) && pm.includes("linear");
+    }
+    return false;
+  }, [server]);
+
+  const useMockConnectors = me.data?.use_mock_connectors === true;
+  /** Local mock dataset: both OAuth links exist before GitHub poll + projection + canonical (steps 1-3) against mock REST. */
+  const mockOnboardingNeedsGithubAndLinear =
+    useMockConnectors && wantsGithubSync && wantsLinearSync;
+
   useEffect(() => {
     if (!server || profilePhase !== "tools") {
       return;
@@ -994,6 +1016,9 @@ export default function OnboardingPage() {
     if (displayStep !== "SCANNING" || server?.status === "completed" || !server) {
       return;
     }
+    if (wantsGithubSync && wantsLinearSync && me.isPending) {
+      return;
+    }
     if (scanStarted.current) {
       return;
     }
@@ -1007,10 +1032,30 @@ export default function OnboardingPage() {
             setScanError("GitHub is not connected.");
             return;
           }
+          if (mockOnboardingNeedsGithubAndLinear && !server.linear_connected) {
+            scanStarted.current = false;
+            setScanError(
+              "Local mock mode: connect Linear as well, then we run GitHub sync (steps 1-3) against the mock APIs.",
+            );
+            return;
+          }
           const run = await triggerGithubSync(apiBase);
           if (run.status !== "succeeded" && run.status !== "partial") {
             scanStarted.current = false;
             setScanError(run.error_summary || "Ingestion did not finish successfully.");
+            return;
+          }
+        }
+        if (wantsLinearSync) {
+          if (!server.linear_connected) {
+            scanStarted.current = false;
+            setScanError("Linear is not connected.");
+            return;
+          }
+          const linearRun = await triggerLinearSync(apiBase);
+          if (linearRun.status !== "succeeded") {
+            scanStarted.current = false;
+            setScanError(linearRun.error_summary || "Linear ingestion did not finish successfully.");
             return;
           }
         }
@@ -1024,7 +1069,18 @@ export default function OnboardingPage() {
         setScanError(e instanceof Error ? e.message : "Something went wrong.");
       }
     })();
-  }, [apiBase, displayStep, qc, server, wantsGithubSync, scanRetry, tenantId]);
+  }, [
+    apiBase,
+    displayStep,
+    me.isPending,
+    mockOnboardingNeedsGithubAndLinear,
+    qc,
+    server,
+    wantsGithubSync,
+    wantsLinearSync,
+    scanRetry,
+    tenantId,
+  ]);
 
   useEffect(() => {
     if (displayStep !== "SCANNING") {
@@ -1044,6 +1100,19 @@ export default function OnboardingPage() {
     setScanError(null);
     setScanRetry((n) => n + 1);
   }, [displayStep, server?.github_connected, scanError]);
+
+  /** After Linear OAuth, retry SCANNING if we had blocked on Linear not connected. */
+  useEffect(() => {
+    if (displayStep !== "SCANNING" || !server?.linear_connected) {
+      return;
+    }
+    if (scanError !== "Linear is not connected.") {
+      return;
+    }
+    scanStarted.current = false;
+    setScanError(null);
+    setScanRetry((n) => n + 1);
+  }, [displayStep, server?.linear_connected, scanError]);
 
   if (!tenantId || ob.isPending || !server) {
     return (

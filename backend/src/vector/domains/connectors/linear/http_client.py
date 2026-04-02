@@ -76,7 +76,7 @@ def fetch_linear_viewer_org(settings: Settings, access_token: str) -> tuple[str 
     """
     try:
         r = httpx.post(
-            settings.linear_graphql_url(),
+            settings.linear_graphql_oauth_profile_url(),
             json={"query": query},
             headers={
                 "Authorization": f"Bearer {access_token}",

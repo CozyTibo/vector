@@ -17,6 +17,32 @@ services:
       retries: 15
       start_period: 5s
 
+  mock-connectors:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.mock-connectors
+    ports:
+      - "${MOCK_CONNECTORS_PORT:-9183}:9183"
+    environment:
+      VECTOR_MOCK_SEED: ${VECTOR_MOCK_SEED:-42}
+    volumes:
+      - ./backend/mock_connectors:/app/mock_connectors
+    command: >
+      uvicorn mock_connectors.unified:app
+      --host 0.0.0.0
+      --port 9183
+      --reload
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:9183/health\", timeout=2).read()"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   backend:
     build:
       context: ./backend
@@ -35,10 +61,15 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/auth/google/callback}
+      # Mock runs as `mock-connectors` below; process env overrides `.env` (pydantic-settings).
+      # Remove this line if the API container must call a mock on the host instead.
+      VECTOR_MOCK_CONNECTOR_BASE_URL: http://mock-connectors:9183
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      mock-connectors:
         condition: service_healthy
     volumes:
       # Uvicorn cwd is `/app`; `Settings` loads `./.env` so Slack/GitHub/etc. apply without Compose interpolation.
