@@ -139,6 +139,26 @@ def _connect_queue_from_tools(tools: dict[str, list[str]]) -> list[str]:
     return q
 
 
+def _queue_skip_connected(
+    queue: list[str],
+    *,
+    slack_connected: bool,
+    linear_connected: bool,
+    github_connected: bool,
+) -> list[str]:
+    """Drop OAuth queue entries that are already linked for this workspace (e.g. after edit tools)."""
+    out: list[str] = []
+    for item in queue:
+        if item == "slack" and slack_connected:
+            continue
+        if item == "linear" and linear_connected:
+            continue
+        if item == "github" and github_connected:
+            continue
+        out.append(item)
+    return out
+
+
 def _first_connect_step(connect_queue: list[str]) -> str:
     if not connect_queue:
         return STEP_SCANNING
@@ -286,6 +306,10 @@ def handle_turn(
     user_message: str | None,
     structured_action: dict[str, Any] | None,
     answers_json: dict[str, Any],
+    *,
+    slack_connected: bool = False,
+    linear_connected: bool = False,
+    github_connected: bool = False,
 ) -> OnboardingTurnResult:
     """Pure deterministic transition for one chat turn."""
     msg = _norm_str(user_message or "")
@@ -437,11 +461,21 @@ def handle_turn(
             merged = _merge_tools_categories(answers, raw_tools)
             prior = _had_prior_tool_selection(answers)
             cq = _connect_queue_from_tools(merged)
+            cq = _queue_skip_connected(
+                cq,
+                slack_connected=slack_connected,
+                linear_connected=linear_connected,
+                github_connected=github_connected,
+            )
             oauth_labels = _oauth_connector_labels_in_order(cq)
             instr = _tools_post_pick_instruction(prior=prior, oauth_labels=oauth_labels)
+            ti = _tools_interest_flat(merged)
             updates = {
                 "tools": merged,
                 "profile_phase": PROFILE_PHASE_DONE,
+                "connect_queue": cq,
+                "connect_plan": list(cq),
+                "tools_interest": ti,
             }
             return OnboardingTurnResult(
                 next_step=_first_connect_step(cq),

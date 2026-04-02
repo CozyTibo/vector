@@ -164,6 +164,56 @@ def test_tools_selected_moves_to_connect_slack_with_tools_merged() -> None:
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
     assert "github" in r.answers_updates["tools"]["engineering"]
     assert "linear" in r.answers_updates["tools"]["pm"]
+    assert r.answers_updates["connect_queue"] == ["slack", "linear", "github"]
+
+
+def test_tools_selected_skips_already_connected_slack() -> None:
+    """Re-confirming tools after Slack OAuth should not send user back to Connect Slack."""
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["linear"],
+            "communication": ["slack"],
+            "docs": ["notion"],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a, slack_connected=True)
+    assert r.next_step == STEP_CONNECT_LINEAR
+    assert r.answers_updates["connect_queue"] == ["linear", "github"]
+
+
+def test_tools_selected_all_live_connectors_linked_goes_scanning() -> None:
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["linear"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(
+        STEP_CHAT_PROFILE,
+        None,
+        action,
+        a,
+        slack_connected=True,
+        linear_connected=True,
+        github_connected=True,
+    )
+    assert r.next_step == STEP_SCANNING
+    assert r.answers_updates["connect_queue"] == []
 
 
 def test_connect_slack_message_advances_to_github_when_github_selected() -> None:

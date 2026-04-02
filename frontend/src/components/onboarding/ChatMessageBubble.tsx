@@ -10,6 +10,27 @@ type ChatMessageBubbleProps = {
   isContinuation?: boolean;
 };
 
+/** Legacy rows may store JSON for structured-only user turns; map to display copy. */
+function structuredOnlyUserDisplayLabel(content: string): string | null {
+  const t = content.trim();
+  if (!t.startsWith("{")) {
+    return null;
+  }
+  try {
+    const o = JSON.parse(t) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      return null;
+    }
+    const rec = o as Record<string, unknown>;
+    if (rec.type === "connectors_intro_ready") {
+      return "I'm ready to choose tools";
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function tryParseToolsSelectedContent(content: string): Record<string, string[]> | null {
   const t = content.trim();
   if (!t.startsWith("{")) {
@@ -55,6 +76,8 @@ export default function ChatMessageBubble({
 }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
   const toolsPick = isUser ? tryParseToolsSelectedContent(message.content) : null;
+  const structuredOnlyLabel =
+    isUser && !toolsPick ? structuredOnlyUserDisplayLabel(message.content) : null;
 
   if (isUser) {
     return (
@@ -88,6 +111,8 @@ export default function ChatMessageBubble({
                   </span>
                 ))}
               </div>
+            ) : structuredOnlyLabel ? (
+              <p className="whitespace-pre-wrap break-words">{structuredOnlyLabel}</p>
             ) : (
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
             )}

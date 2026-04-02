@@ -73,6 +73,47 @@ function NextConnectStep(next: ConnectorQueueId): OnboardingStep {
   return "SCANNING";
 }
 
+/** Next step + answers after skipping an optional Linear/GitHub OAuth card (queue filter + SCANNING when empty). */
+function computeOptionalOAuthSkipNavigation(
+  server: OnboardingStatePayload,
+  provider: "linear" | "github",
+): { step: OnboardingStep; answers: Record<string, unknown> } | null {
+  if (provider === "linear" && server.linear_connected) {
+    return null;
+  }
+  if (provider === "github" && server.github_connected) {
+    return null;
+  }
+  const queue = [...effectiveConnectQueue(server.answers, server.current_step)];
+  const filtered = queue.filter((p) => p !== provider);
+  if (filtered.length === 0) {
+    return { step: "SCANNING", answers: { ...server.answers, connect_queue: [] } };
+  }
+  const next = filtered[0] as ConnectorQueueId;
+  return {
+    step: NextConnectStep(next),
+    answers: { ...server.answers, connect_queue: filtered },
+  };
+}
+
+/** Short in-chat line after optional skip so the next screen feels continuous with earlier connector bridges. */
+function vectorBridgeMessageAfterOptionalSkip(step: OnboardingStep): string | null {
+  if (step === "CONNECT_GITHUB") {
+    return (
+      "All set for GitHub next. When you're ready, use Connect GitHub below - that's what lets us sync engineering activity for this workspace."
+    );
+  }
+  if (step === "CONNECT_LINEAR") {
+    return (
+      "All set for Linear next. When you're ready, use Connect Linear below to authorize so we can pick up project and issue activity."
+    );
+  }
+  if (step === "SCANNING") {
+    return "Great. Next we'll sync what we can from your connected tools - hang tight while that runs.";
+  }
+  return null;
+}
+
 /** Order matches backend `onboarding_flow._connect_queue_from_tools`. */
 function connectorOrderFromTools(answers: Record<string, unknown>): ConnectorQueueId[] {
   const t = answers.tools as Record<string, string[]> | undefined;
@@ -97,16 +138,39 @@ function connectorOrderFromTools(answers: Record<string, unknown>): ConnectorQue
   return order;
 }
 
-function previousConnectorStep(
+function liveProviderConnected(provider: LiveConnectorId, server: OnboardingStatePayload): boolean {
+  if (provider === "slack") {
+    return server.slack_connected;
+  }
+  if (provider === "linear") {
+    return server.linear_connected;
+  }
+  return server.github_connected;
+}
+
+const CONNECTOR_STEP_FOOTER_LINK_CLASS =
+  "text-center text-sm leading-snug text-zinc-500 underline decoration-zinc-300 decoration-1 underline-offset-2 hover:text-zinc-700";
+
+/**
+ * Previous screen in the connector wizard (tool order). Restores connect_queue from that step so
+ * e.g. Back from Linear lands on Slack with ["slack","linear",…] — not Edit tools — and Continue still works.
+ */
+function navigateBackFromConnectorStep(
+  goToStep: (step: OnboardingStep, answers?: Record<string, unknown>) => void,
   currentId: ConnectorQueueId,
-  answers: Record<string, unknown>,
-): OnboardingStep {
+  server: OnboardingStatePayload,
+) {
+  const answers = server.answers;
   const order = connectorOrderFromTools(answers);
   const idx = order.indexOf(currentId);
   if (idx <= 0) {
-    return "CHAT_PROFILE";
+    goToStep("CHAT_PROFILE", { ...answers, profile_phase: "tools" });
+    return;
   }
-  return NextConnectStep(order[idx - 1]!);
+  const prevIdx = idx - 1;
+  const pid = order[prevIdx]!;
+  const tail = order.slice(prevIdx).map(String);
+  goToStep(NextConnectStep(pid), { ...answers, connect_queue: tail });
 }
 
 function effectiveConnectQueue(answers: Record<string, unknown>, currentStep: string): string[] {
@@ -129,6 +193,118 @@ function effectiveConnectQueue(answers: Record<string, unknown>, currentStep: st
     return ["linear"];
   }
   return [];
+}
+
+function isLiveConnectorId(id: string): id is LiveConnectorId {
+  return id === "github" || id === "linear" || id === "slack";
+}
+
+/** OAuth-capable tools from the user's picks that are not connected yet, in sensible order (persisted queue first). */
+function pendingOAuthConnectorsOrdered(
+  answers: Record<string, unknown>,
+  server: OnboardingStatePayload,
+): LiveConnectorId[] {
+  const fromTools = connectorOrderFromTools(answers);
+  const pending: LiveConnectorId[] = [];
+  for (const id of fromTools) {
+    if (id === "comm_placeholder") {
+      continue;
+    }
+    if (id === "slack" && !server.slack_connected) {
+      pending.push("slack");
+    } else if (id === "linear" && !server.linear_connected) {
+      pending.push("linear");
+    } else if (id === "github" && !server.github_connected) {
+      pending.push("github");
+    }
+  }
+  const cqRaw = answers.connect_queue;
+  if (!Array.isArray(cqRaw) || cqRaw.length === 0) {
+    return pending;
+  }
+  const cqFiltered = cqRaw.filter(
+    (x): x is LiveConnectorId =>
+      typeof x === "string" && isLiveConnectorId(x) && pending.includes(x),
+  );
+  if (cqFiltered.length === 0) {
+    return pending;
+  }
+  const rest = pending.filter((p) => !cqFiltered.includes(p));
+  return [...cqFiltered, ...rest];
+}
+
+function reorderQueueWithFirst(pending: LiveConnectorId[], pick: LiveConnectorId): string[] {
+  const rest = pending.filter((x) => x !== pick);
+  return [pick, ...rest];
+}
+
+function oauthConnectorLabel(id: LiveConnectorId): string {
+  if (id === "github") {
+    return "GitHub";
+  }
+  if (id === "linear") {
+    return "Linear";
+  }
+  return "Slack";
+}
+
+function oauthInstallHref(apiBase: string, id: LiveConnectorId): string {
+  const path =
+    id === "github"
+      ? "/connectors/github/install"
+      : id === "linear"
+        ? "/connectors/linear/install"
+        : "/connectors/slack/install";
+  return `${apiBase}${path}?return_to=${encodeURIComponent("/app/onboarding")}`;
+}
+
+/** In-chat copy when the user taps “Skip this step” on an optional OAuth card (Linear / GitHub). */
+function optionalConnectorSkipVectorAsk(provider: "linear" | "github"): string {
+  if (provider === "linear") {
+    return (
+      "Want to skip Linear for now? You’ll have less project and issue context until you connect it from Connectors. " +
+      "Your communication tool is what we need to get started—Linear and GitHub just make execution signals richer when you add them."
+    );
+  }
+  return (
+    "Want to skip GitHub for now? You’ll have less engineering activity context until you connect it from Connectors. " +
+    "Your communication tool is what we need to get started—Linear and GitHub just make execution signals richer when you add them."
+  );
+}
+
+function ConnectorOptionalSkipTagBar({
+  visible,
+  onSkipAnyway,
+  onKeepConnecting,
+}: {
+  visible: boolean;
+  onSkipAnyway: () => void;
+  onKeepConnecting: () => void;
+}) {
+  if (!visible) {
+    return null;
+  }
+  const tagPrimary =
+    "cursor-pointer rounded-full border border-[#E878BE]/50 bg-[#E878BE]/12 px-3.5 py-1.5 text-sm font-semibold " +
+    `${landingAccentText} shadow-[0_8px_24px_-14px_rgba(232,120,190,0.65)] transition hover:brightness-[1.03] active:scale-[0.99]`;
+  const tagSecondary =
+    "cursor-pointer rounded-full border border-zinc-200/95 bg-white px-3.5 py-1.5 text-sm font-semibold text-zinc-800 shadow-sm transition hover:border-[#E878BE]/30 hover:bg-zinc-50/90 active:scale-[0.99]";
+  return (
+    <div
+      className="shrink-0 border-t border-zinc-100/90 bg-gradient-to-b from-white to-zinc-50/90 px-4 pb-8 pt-3 sm:px-5 sm:pb-10"
+      role="region"
+      aria-label="Confirm skip"
+    >
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button type="button" className={tagSecondary} onClick={onKeepConnecting}>
+          Keep connecting
+        </button>
+        <button type="button" className={tagPrimary} onClick={onSkipAnyway}>
+          Skip for now
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function normalizeQueueAfterOAuth(
@@ -214,6 +390,7 @@ export default function OnboardingPage() {
   const [scanBlurb, setScanBlurb] = useState(0);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanRetry, setScanRetry] = useState(0);
+  const [scanSkipFinishBusy, setScanSkipFinishBusy] = useState(false);
   const scanStarted = useRef(false);
   /** Shown when ?*_connected=1 is in the URL but GET /onboarding does not reflect the link yet, or PATCH fails. */
   const [oauthReturnError, setOauthReturnError] = useState<string | null>(null);
@@ -223,6 +400,11 @@ export default function OnboardingPage() {
   const [connectorsIntroChipMode, setConnectorsIntroChipMode] = useState<"both" | "ready_only">(
     "both",
   );
+  /** In-chat confirm for skipping optional GitHub / Linear OAuth (replaces window.confirm). */
+  const [optionalSkipPromptProvider, setOptionalSkipPromptProvider] = useState<
+    null | "linear" | "github"
+  >(null);
+  const optionalSkipPromptBusyRef = useRef(false);
 
   const server = ob.data;
 
@@ -249,9 +431,12 @@ export default function OnboardingPage() {
     scanStarted.current = false;
     setScanBlurb(0);
     setScanError(null);
+    setScanSkipFinishBusy(false);
     setOauthReturnError(null);
     oauthAdvanceLockRef.current = null;
     setConnectorsIntroChipMode("both");
+    optionalSkipPromptBusyRef.current = false;
+    setOptionalSkipPromptProvider(null);
   }, [tenantId]);
 
   /** Restore persisted chat from GET /onboarding before bootstrap; must run before the bootstrap effect. */
@@ -278,6 +463,15 @@ export default function OnboardingPage() {
     }
     return server.current_step as OnboardingStep;
   }, [server]);
+
+  const resetOptionalSkipPrompt = useCallback(() => {
+    optionalSkipPromptBusyRef.current = false;
+    setOptionalSkipPromptProvider(null);
+  }, []);
+
+  useEffect(() => {
+    resetOptionalSkipPrompt();
+  }, [displayStep, resetOptionalSkipPrompt]);
 
   const thankYou = Boolean(server && (server.status === "completed" || displayStep === "THANK_YOU"));
 
@@ -356,21 +550,67 @@ export default function OnboardingPage() {
     [patchMut],
   );
 
+  const pickOauthConnectorFromScanning = useCallback(
+    (pick: LiveConnectorId) => {
+      if (!server) {
+        return;
+      }
+      scanStarted.current = false;
+      setScanError(null);
+      const pending = pendingOAuthConnectorsOrdered(server.answers, server);
+      const newQueue = reorderQueueWithFirst(pending, pick);
+      goToStep(NextConnectStep(pick), { ...server.answers, connect_queue: newQueue });
+    },
+    [server, goToStep],
+  );
+
+  const skipConnectorStepAndFinish = useCallback(async () => {
+    if (!tenantId) {
+      return;
+    }
+    scanStarted.current = false;
+    setScanError(null);
+    setScanSkipFinishBusy(true);
+    try {
+      await completeOnboarding(apiBase);
+      await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+    } catch (e) {
+      setScanError(e instanceof Error ? e.message : "Could not finish onboarding.");
+    } finally {
+      setScanSkipFinishBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
   const continueAfterManualConnect = useCallback(
     (provider: LiveConnectorId) => {
       if (!server) {
         return;
       }
-      const queue = effectiveConnectQueue(server.answers, server.current_step);
+      let queue = [...effectiveConnectQueue(server.answers, server.current_step)];
+      if (liveProviderConnected(provider, server)) {
+        if (queue[0] === provider) {
+          queue = queue.slice(1);
+        } else {
+          queue = queue.filter((p) => p !== provider);
+        }
+        if (queue.length === 0) {
+          goToStep("SCANNING", { ...server.answers, connect_queue: [] });
+        } else {
+          const next = queue[0] as ConnectorQueueId;
+          goToStep(NextConnectStep(next), { ...server.answers, connect_queue: queue });
+        }
+        return;
+      }
       if (queue[0] !== provider) {
         return;
       }
       const rest = queue.slice(1);
       if (rest.length === 0) {
-        goToStep("SCANNING", { connect_queue: [] });
+        goToStep("SCANNING", { ...server.answers, connect_queue: [] });
       } else {
         const next = rest[0] as ConnectorQueueId;
-        goToStep(NextConnectStep(next), { connect_queue: rest });
+        goToStep(NextConnectStep(next), { ...server.answers, connect_queue: rest });
       }
     },
     [server, goToStep],
@@ -386,12 +626,83 @@ export default function OnboardingPage() {
     }
     const rest = queue.slice(1);
     if (rest.length === 0) {
-      goToStep("SCANNING", { connect_queue: [] });
+      goToStep("SCANNING", { ...server.answers, connect_queue: [] });
     } else {
       const next = rest[0] as ConnectorQueueId;
-      goToStep(NextConnectStep(next), { connect_queue: rest });
+      goToStep(NextConnectStep(next), { ...server.answers, connect_queue: rest });
     }
   }, [server, goToStep]);
+
+  const requestOptionalConnectorSkip = useCallback(
+    async (provider: "linear" | "github") => {
+      if (optionalSkipPromptProvider === provider || optionalSkipPromptBusyRef.current) {
+        return;
+      }
+      optionalSkipPromptBusyRef.current = true;
+      setOptionalSkipPromptProvider(provider);
+      setIsTyping(true);
+      try {
+        await minTypingDelay(320, 520);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "vector",
+            content: optionalConnectorSkipVectorAsk(provider),
+            timestamp: Date.now(),
+          },
+        ]);
+      } finally {
+        setIsTyping(false);
+        optionalSkipPromptBusyRef.current = false;
+      }
+    },
+    [optionalSkipPromptProvider],
+  );
+
+  const confirmOptionalConnectorSkip = useCallback(
+    async (provider: "linear" | "github") => {
+      if (!server) {
+        return;
+      }
+      const nav = computeOptionalOAuthSkipNavigation(server, provider);
+      if (!nav) {
+        return;
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: "Skip for now",
+          timestamp: Date.now(),
+        },
+      ]);
+      resetOptionalSkipPrompt();
+      goToStep(nav.step, nav.answers);
+
+      const bridge = vectorBridgeMessageAfterOptionalSkip(nav.step);
+      if (!bridge) {
+        return;
+      }
+      setIsTyping(true);
+      try {
+        await minTypingDelay(320, 520);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "vector",
+            content: bridge,
+            timestamp: Date.now(),
+          },
+        ]);
+      } finally {
+        setIsTyping(false);
+      }
+    },
+    [server, resetOptionalSkipPrompt, goToStep],
+  );
 
   /**
    * Bootstrap: brief typing indicator, then opening copy. POST syncs FSM (fast path, no LLM wait).
@@ -911,8 +1222,8 @@ export default function OnboardingPage() {
                   </button>
                   <button
                     type="button"
-                    className="text-sm text-zinc-500 underline decoration-zinc-300"
-                    onClick={() => goToStep("CHAT_PROFILE", { profile_phase: "tools" })}
+                    className="text-sm text-zinc-500 underline decoration-zinc-300 decoration-1 underline-offset-2"
+                    onClick={() => goToStep("CHAT_PROFILE", { ...server.answers, profile_phase: "tools" })}
                   >
                     Back
                   </button>
@@ -936,11 +1247,16 @@ export default function OnboardingPage() {
                 </p>
               ) : null}
               <h2 className="text-lg font-semibold text-zinc-900">Connect Slack</h2>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                Invite Vector to your Slack workspace and get to work!
-              </p>
+              {!server.slack_connected ? (
+                <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                  Invite Vector to your Slack workspace and get to work!
+                </p>
+              ) : null}
               {server.slack_connected ? (
-                <p className="mt-3 text-sm font-medium text-emerald-700">Slack is connected.</p>
+                <div className="mt-3 space-y-1">
+                  <p className="text-sm font-medium text-emerald-700">Slack is connected to this workspace.</p>
+                  <p className="text-sm text-zinc-600">When you&apos;re ready, continue to the next integration.</p>
+                </div>
               ) : null}
               <div className="mt-6 flex flex-col items-center gap-3">
                 {!server.slack_connected ? (
@@ -956,16 +1272,28 @@ export default function OnboardingPage() {
                     className="rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03]"
                     onClick={() => continueAfterManualConnect("slack")}
                   >
-                    Continue
+                    Continue to next step
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="text-sm text-zinc-500 underline decoration-zinc-300"
-                  onClick={() => goToStep("CHAT_PROFILE", { profile_phase: "tools" })}
+                <nav
+                  className="mx-auto mt-1 grid w-full max-w-xs grid-cols-2 items-center justify-items-center gap-x-6 px-2 sm:max-w-sm sm:gap-x-10"
+                  aria-label="Slack step actions"
                 >
-                  Edit tools
-                </button>
+                  <button
+                    type="button"
+                    className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                    onClick={() => navigateBackFromConnectorStep(goToStep, "slack", server)}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                    onClick={() => goToStep("CHAT_PROFILE", { ...server.answers, profile_phase: "tools" })}
+                  >
+                    Edit tools
+                  </button>
+                </nav>
               </div>
             </div>
           </div>
@@ -975,10 +1303,18 @@ export default function OnboardingPage() {
   }
 
   if (displayStep === "CONNECT_GITHUB") {
+    const showGithubConnectorCard =
+      server.github_connected || optionalSkipPromptProvider !== "github";
     return (
       <OnboardingChatLayout>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ChatMessageList messages={messages} userDisplayName={userLabel} isTyping={isTyping} />
+          <ConnectorOptionalSkipTagBar
+            visible={optionalSkipPromptProvider === "github"}
+            onKeepConnecting={resetOptionalSkipPrompt}
+            onSkipAnyway={() => confirmOptionalConnectorSkip("github")}
+          />
+          {showGithubConnectorCard ? (
           <div className="shrink-0 px-4 pb-8 pt-1 sm:px-5">
             <div className="rounded-2xl border border-[#E878BE]/20 bg-white/95 p-6 text-center shadow-[0_16px_44px_-28px_rgba(232,120,190,0.45)] ring-1 ring-zinc-950/[0.04]">
               <h2 className="text-lg font-semibold text-zinc-900">Connect GitHub</h2>
@@ -986,7 +1322,10 @@ export default function OnboardingPage() {
                 Install the GitHub app for this workspace so we can sync engineering activity.
               </p>
               {server.github_connected ? (
-                <p className="mt-3 text-sm font-medium text-emerald-700">GitHub is connected.</p>
+                <div className="mt-3 space-y-1">
+                  <p className="text-sm font-medium text-emerald-700">GitHub is connected to this workspace.</p>
+                  <p className="text-sm text-zinc-600">When you&apos;re ready, continue to the next step.</p>
+                </div>
               ) : null}
               <div className="mt-6 flex flex-col items-center gap-3">
                 {!server.github_connected ? (
@@ -1002,29 +1341,65 @@ export default function OnboardingPage() {
                     className="rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03]"
                     onClick={() => continueAfterManualConnect("github")}
                   >
-                    Continue
+                    Continue to next step
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="text-sm text-zinc-500 underline decoration-zinc-300"
-                  onClick={() => goToStep(previousConnectorStep("github", server.answers))}
+                <nav
+                  className={
+                    !server.github_connected
+                      ? "mx-auto mt-1 grid w-full max-w-lg grid-cols-3 items-center justify-items-center gap-x-2 px-1 sm:px-4"
+                      : "mx-auto mt-1 grid w-full max-w-xs grid-cols-2 items-center justify-items-center gap-x-6 px-2 sm:max-w-sm sm:gap-x-10"
+                  }
+                  aria-label="GitHub step actions"
                 >
-                  Back
-                </button>
+                  <button
+                    type="button"
+                    className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                    onClick={() => navigateBackFromConnectorStep(goToStep, "github", server)}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                    onClick={() => goToStep("CHAT_PROFILE", { ...server.answers, profile_phase: "tools" })}
+                  >
+                    Edit tools
+                  </button>
+                  {!server.github_connected ? (
+                    <button
+                      type="button"
+                      className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                      onClick={() => {
+                        void requestOptionalConnectorSkip("github");
+                      }}
+                    >
+                      Skip this step
+                    </button>
+                  ) : null}
+                </nav>
               </div>
             </div>
           </div>
+          ) : null}
         </div>
       </OnboardingChatLayout>
     );
   }
 
   if (displayStep === "CONNECT_LINEAR") {
+    const showLinearConnectorCard =
+      server.linear_connected || optionalSkipPromptProvider !== "linear";
     return (
       <OnboardingChatLayout>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ChatMessageList messages={messages} userDisplayName={userLabel} isTyping={isTyping} />
+          <ConnectorOptionalSkipTagBar
+            visible={optionalSkipPromptProvider === "linear"}
+            onKeepConnecting={resetOptionalSkipPrompt}
+            onSkipAnyway={() => confirmOptionalConnectorSkip("linear")}
+          />
+          {showLinearConnectorCard ? (
           <div className="shrink-0 px-4 pb-8 pt-1 sm:px-5">
             <div className="rounded-2xl border border-[#E878BE]/20 bg-white/95 p-6 text-center shadow-[0_16px_44px_-28px_rgba(232,120,190,0.45)] ring-1 ring-zinc-950/[0.04]">
               <h2 className="text-lg font-semibold text-zinc-900">Connect Linear</h2>
@@ -1032,7 +1407,10 @@ export default function OnboardingPage() {
                 Authorize Linear for this workspace so we can sync project and issue activity.
               </p>
               {server.linear_connected ? (
-                <p className="mt-3 text-sm font-medium text-emerald-700">Linear is connected.</p>
+                <div className="mt-3 space-y-1">
+                  <p className="text-sm font-medium text-emerald-700">Linear is connected to this workspace.</p>
+                  <p className="text-sm text-zinc-600">When you&apos;re ready, continue to the next step.</p>
+                </div>
               ) : null}
               <div className="mt-6 flex flex-col items-center gap-3">
                 {!server.linear_connected ? (
@@ -1048,48 +1426,102 @@ export default function OnboardingPage() {
                     className="rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03]"
                     onClick={() => continueAfterManualConnect("linear")}
                   >
-                    Continue
+                    Continue to next step
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="text-sm text-zinc-500 underline decoration-zinc-300"
-                  onClick={() => goToStep(previousConnectorStep("linear", server.answers))}
+                <nav
+                  className={
+                    !server.linear_connected
+                      ? "mx-auto mt-1 grid w-full max-w-lg grid-cols-3 items-center justify-items-center gap-x-2 px-1 sm:px-4"
+                      : "mx-auto mt-1 grid w-full max-w-xs grid-cols-2 items-center justify-items-center gap-x-6 px-2 sm:max-w-sm sm:gap-x-10"
+                  }
+                  aria-label="Linear step actions"
                 >
-                  Back
-                </button>
+                  <button
+                    type="button"
+                    className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                    onClick={() => navigateBackFromConnectorStep(goToStep, "linear", server)}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                    onClick={() => goToStep("CHAT_PROFILE", { ...server.answers, profile_phase: "tools" })}
+                  >
+                    Edit tools
+                  </button>
+                  {!server.linear_connected ? (
+                    <button
+                      type="button"
+                      className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                      onClick={() => {
+                        void requestOptionalConnectorSkip("linear");
+                      }}
+                    >
+                      Skip this step
+                    </button>
+                  ) : null}
+                </nav>
               </div>
             </div>
           </div>
+          ) : null}
         </div>
       </OnboardingChatLayout>
     );
   }
 
   if (displayStep === "SCANNING") {
-    const blockedByMissingGithub = Boolean(scanError && wantsGithubSync && !server.github_connected);
     const scanningIdle = !scanError;
+    const pendingOauth = scanningIdle ? [] : pendingOAuthConnectorsOrdered(server.answers, server);
+    const showOauthRecovery = !scanningIdle && pendingOauth.length > 0;
+    const oauthRecoveryMuted = showOauthRecovery;
     return (
       <OnboardingChatLayout>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ChatMessageList messages={messages} userDisplayName={userLabel} isTyping={isTyping} />
           <div className="shrink-0 px-4 pb-10 pt-3 text-center sm:px-5">
             <h2 className="text-lg font-semibold text-zinc-900">
-              {scanningIdle ? "We're syncing your workspace" : "We couldn't finish this step yet"}
+              {scanningIdle
+                ? "We're syncing your workspace"
+                : showOauthRecovery
+                  ? "Pick the next tool to connect"
+                  : "We couldn't finish this step yet"}
             </h2>
             <p
               className={
                 "mt-3 min-h-[1.75rem] text-sm " +
-                (scanningIdle || blockedByMissingGithub ? "text-zinc-600" : "text-red-700")
+                (scanningIdle || oauthRecoveryMuted ? "text-zinc-600" : "text-red-700")
               }
             >
               {scanningIdle ? (
                 scanMessages[scanBlurb]
-              ) : blockedByMissingGithub ? (
-                <>
-                  You chose GitHub for engineering, but this workspace isn&apos;t connected to GitHub yet.
-                  Connect it to pull activity, or go back and change your tools.
-                </>
+              ) : showOauthRecovery ? (
+                pendingOauth.length > 1 ? (
+                  <>
+                    The more tools we connect, the more accurate our signals and insights will be for you.
+                    <br />
+                    Pick the next one to connect - it only takes a minute!
+                  </>
+                ) : pendingOauth[0] === "github" && wantsGithubSync ? (
+                  <>
+                    You chose GitHub for engineering, but this workspace isn&apos;t connected to GitHub yet. Connect it
+                    to pull activity, or change your tools below.
+                  </>
+                ) : pendingOauth[0] === "linear" ? (
+                  <>
+                    Linear isn&apos;t connected to this workspace yet. Connect it to sync project activity, or change
+                    your tools below.
+                  </>
+                ) : pendingOauth[0] === "slack" ? (
+                  <>
+                    Slack isn&apos;t connected to this workspace yet. Connect it to pull messages and activity, or
+                    change your tools below.
+                  </>
+                ) : (
+                  <>Connect this tool to continue, or change your tools below.</>
+                )
               ) : (
                 scanError
               )}
@@ -1097,19 +1529,39 @@ export default function OnboardingPage() {
             {scanningIdle ? (
               <p className="mt-4 text-xs text-zinc-400">This usually takes under a minute.</p>
             ) : (
-              <div className="mt-6 flex flex-col items-center gap-3">
-                {blockedByMissingGithub ? (
-                  <a
-                    className="inline-flex rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white no-underline shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03]"
-                    href={`${apiBase}/connectors/github/install?return_to=${encodeURIComponent("/app/onboarding")}`}
-                  >
-                    Connect GitHub
-                  </a>
+              <div className="mt-6 flex flex-col items-center gap-5">
+                {showOauthRecovery ? (
+                  pendingOauth.length === 1 ? (
+                    <a
+                      className="inline-flex cursor-pointer rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white no-underline shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03]"
+                      href={oauthInstallHref(apiBase, pendingOauth[0]!)}
+                    >
+                      Connect {oauthConnectorLabel(pendingOauth[0]!)}
+                    </a>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {pendingOauth.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className={
+                            "cursor-pointer rounded-full border border-[#E878BE]/50 bg-[#E878BE]/12 px-3.5 py-1.5 text-sm font-semibold " +
+                            `${landingAccentText} shadow-[0_8px_24px_-14px_rgba(232,120,190,0.65)] transition ` +
+                            "hover:brightness-[1.03] active:scale-[0.99]"
+                          }
+                          onClick={() => pickOauthConnectorFromScanning(id)}
+                        >
+                          {oauthConnectorLabel(id)}
+                        </button>
+                      ))}
+                    </div>
+                  )
                 ) : null}
-                <div className="flex flex-wrap items-center justify-center gap-4">
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                   <button
                     type="button"
-                    className="rounded-full border border-zinc-200 bg-white px-6 py-2 text-sm font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50"
+                    disabled={scanSkipFinishBusy}
+                    className="text-sm text-zinc-500 underline decoration-zinc-300 decoration-1 underline-offset-2 hover:text-zinc-700 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
                     onClick={() => {
                       scanStarted.current = false;
                       setScanError(null);
@@ -1118,29 +1570,17 @@ export default function OnboardingPage() {
                   >
                     Edit tools
                   </button>
-                  {blockedByMissingGithub ? (
-                    <button
-                      type="button"
-                      className="rounded-full border border-zinc-200 bg-white px-6 py-2 text-sm font-semibold text-zinc-800 shadow-sm transition hover:bg-zinc-50"
-                      onClick={() => {
-                        scanStarted.current = false;
-                        setScanError(null);
-                        goToStep("CONNECT_GITHUB", server.answers);
-                      }}
-                    >
-                      Open GitHub step
-                    </button>
-                  ) : null}
+                  <span className="select-none text-zinc-300" aria-hidden>
+                    ·
+                  </span>
                   <button
                     type="button"
-                    className="rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-6 py-2 text-sm font-semibold text-white shadow-[0_12px_32px_-18px_rgba(232,120,190,0.5)]"
-                    onClick={() => {
-                      scanStarted.current = false;
-                      setScanError(null);
-                      setScanRetry((n) => n + 1);
-                    }}
+                    disabled={scanSkipFinishBusy}
+                    className="text-sm text-zinc-500 underline decoration-zinc-300 decoration-1 underline-offset-2 hover:text-zinc-700 disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
+                    title="Finish onboarding without connecting the rest. You can add tools anytime from Connectors."
+                    onClick={() => void skipConnectorStepAndFinish()}
                   >
-                    Retry sync
+                    {scanSkipFinishBusy ? "Finishing…" : "Skip this step"}
                   </button>
                 </div>
               </div>

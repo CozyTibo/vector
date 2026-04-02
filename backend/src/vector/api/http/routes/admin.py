@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
@@ -33,6 +33,7 @@ from vector.contracts.debug_canonical import (
 )
 from vector.contracts.debug_projections import ProjectionRowsResponse
 from vector.domains.canonical.worker import count_canonical_lag, drain_github_canonical
+from vector.domains.connectors.runtime import runtime_by_id
 from vector.domains.debug.github_pipeline_wipe import (
     rebuild_derived_from_step1_github,
     reset_github_pipeline_state,
@@ -226,6 +227,27 @@ def build_admin_router() -> APIRouter:
                 for row in rows
             ],
         )
+
+    @r.delete(
+        "/tenants/{tenant_id}/connections/{provider}",
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    def admin_disconnect_tenant_connector(
+        tenant_id: uuid.UUID,
+        provider: str,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> Response:
+        """Remove a workspace integration (GitHub, Linear, or Slack) for support / testing."""
+        _assert_tenant(db, tenant_id)
+        runtimes = runtime_by_id()
+        runtime = runtimes.get(provider)
+        if runtime is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail=f"Unknown connector provider: {provider!r}.",
+            ) from None
+        runtime.disconnect_tenant(db, tenant_id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @r.get("/tenants/{tenant_id}/raw-ingestion", response_model=RawIngestionAdminPage)
     def list_raw_ingestion(

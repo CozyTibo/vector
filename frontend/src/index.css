@@ -11,6 +11,19 @@
   body {
     @apply m-0 min-h-screen bg-stone-50 text-stone-900 antialiased;
   }
+
+  /** Match browser default for links; ensures pointer even when components omit cursor utilities. */
+  a[href] {
+    cursor: pointer;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
 }
 
 /* Marketing / auth — used by landing + login + signup only */

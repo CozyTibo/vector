@@ -39,7 +39,7 @@ export default function ToolSelectorBlock({ groups, value, onToggle, onConfirm, 
                       selected
                         ? `border-[#E878BE]/50 bg-[#E878BE]/12 ${landingAccentText} shadow-[0_8px_24px_-14px_rgba(232,120,190,0.65)] scale-[1.02]`
                         : "border-zinc-200/95 bg-white text-zinc-800 shadow-sm hover:border-[#E878BE]/30 hover:bg-zinc-50/90 active:scale-[0.99]",
-                      disabled ? "cursor-not-allowed opacity-45" : "",
+                      disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer",
                     ].join(" ")}
                   >
                     {item.label}
@@ -55,7 +55,7 @@ export default function ToolSelectorBlock({ groups, value, onToggle, onConfirm, 
             disabled={disabled}
             onClick={onConfirm}
             className={
-              "rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-9 py-2.5 text-sm font-semibold text-white " +
+              "cursor-pointer rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-9 py-2.5 text-sm font-semibold text-white " +
               "shadow-[0_14px_36px_-18px_rgba(232,120,190,0.75)] transition hover:brightness-[1.03] active:scale-[0.99] " +
               "disabled:cursor-not-allowed disabled:opacity-40"
             }
