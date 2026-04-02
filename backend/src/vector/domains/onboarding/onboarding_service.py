@@ -1,4 +1,4 @@
-"""Onboarding orchestration — state machine + persistence + LLM phrasing."""
+"""Onboarding orchestration: state machine + persistence + LLM phrasing."""
 
 from __future__ import annotations
 
@@ -11,12 +11,13 @@ from sqlalchemy.orm import Session
 from vector.contracts.onboarding import OnboardingChatRequest, OnboardingChatResponse
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.domains.onboarding.constants import (
+    PROFILE_PHASE_CONNECTORS_INTRO,
     PROFILE_PHASE_NAME,
     PROFILE_PHASE_TOOLS,
     STATUS_COMPLETED,
     STEP_CHAT_PROFILE,
 )
-from vector.domains.onboarding.onboarding_flow import handle_turn, _default_profile_phase
+from vector.domains.onboarding.onboarding_flow import _default_profile_phase, handle_turn
 from vector.domains.onboarding.onboarding_llm import generate_onboarding_reply
 from vector.infrastructure.db.repositories import onboarding as ob_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
@@ -67,14 +68,14 @@ def _user_turn_content(user_text: str | None, structured: dict[str, Any] | None)
     return None
 
 
-def _append_chat_log(
+def _append_chat_turn(
     session: Session,
     *,
     tenant_id: uuid.UUID,
     user_id: uuid.UUID,
     user_text: str | None,
     structured: dict[str, Any] | None,
-    assistant_text: str,
+    assistant_segments: list[str],
 ) -> None:
     if not ob_repo.onboarding_messages_table_exists(session):
         return
@@ -87,13 +88,16 @@ def _append_chat_log(
             role="user",
             content=logged,
         )
-    ob_repo.append_onboarding_message(
-        session,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        role="vector",
-        content=assistant_text.strip(),
-    )
+    for seg in assistant_segments:
+        t = seg.strip()
+        if t:
+            ob_repo.append_onboarding_message(
+                session,
+                tenant_id=tenant_id,
+                user_id=user_id,
+                role="vector",
+                content=t,
+            )
 
 
 def _last_vector_message_content(session: Session, tenant_id: uuid.UUID) -> str | None:
@@ -112,6 +116,12 @@ def _fallback_idle_assistant_text(profile_phase: str) -> str:
         return (
             "Pick the tools your team uses from the list below, then confirm your selection."
         )
+    if profile_phase == PROFILE_PHASE_CONNECTORS_INTRO:
+        return (
+            "Vector uses integrations for execution signals, not to warehouse your code or Slack "
+            "chats. Ask anything that helps you feel comfortable, then use the **I'm ready to choose "
+            "tools** tag in the chat when you want to continue."
+        )
     return "Continue from where you left off."
 
 
@@ -125,8 +135,10 @@ def process_onboarding_chat(
     row = ob_repo.get_or_create_onboarding(session, claims.tenant_id)
     if row.status == STATUS_COMPLETED:
         merged = dict(row.answers_json or {})
+        done_msg = "You're all set. Onboarding is already complete."
         return OnboardingChatResponse(
-            assistant_message="You're all set. Onboarding is already complete.",
+            assistant_message=done_msg,
+            assistant_messages=[done_msg],
             step=row.current_step,
             answers=merged,
         )
@@ -155,6 +167,7 @@ def process_onboarding_chat(
         msg = last_vec or _fallback_idle_assistant_text(profile_phase)
         return OnboardingChatResponse(
             assistant_message=msg,
+            assistant_messages=[msg],
             step=row.current_step,
             answers=answers_snapshot,
         )
@@ -178,28 +191,32 @@ def process_onboarding_chat(
     _denormalize_profile_to_user(session, claims.user_id, merged_answers)
     _denormalize_company_to_tenant(session, claims.tenant_id, merged_answers)
 
-    assistant = generate_onboarding_reply(
+    assistant_segments = generate_onboarding_reply(
         step=turn.next_step,
         answers_json=merged_answers,
         last_user_message=user_text,
         assistant_prompt_context=turn.assistant_prompt_context,
         settings=cfg,
     )
+    if not assistant_segments:
+        assistant_segments = ["Something went wrong. Try again in a moment."]
 
-    _append_chat_log(
+    _append_chat_turn(
         session,
         tenant_id=claims.tenant_id,
         user_id=claims.user_id,
         user_text=user_text,
         structured=structured,
-        assistant_text=assistant,
+        assistant_segments=assistant_segments,
     )
 
     session.commit()
     session.refresh(row)
 
+    first = assistant_segments[0] if assistant_segments else ""
     return OnboardingChatResponse(
-        assistant_message=assistant,
+        assistant_message=first,
+        assistant_messages=assistant_segments,
         step=row.current_step,
         answers=dict(row.answers_json or {}),
     )

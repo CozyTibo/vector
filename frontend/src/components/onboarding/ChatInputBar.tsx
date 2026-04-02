@@ -1,3 +1,5 @@
+import { forwardRef } from "react";
+
 import { landingAccentText } from "../landing/landingBrandPalette";
 
 type ChatInputBarProps = {
@@ -8,13 +10,10 @@ type ChatInputBarProps = {
   placeholder?: string;
 };
 
-export default function ChatInputBar({
-  value,
-  onChange,
-  onSend,
-  disabled = false,
-  placeholder = "Message Vector…",
-}: ChatInputBarProps) {
+const ChatInputBar = forwardRef<HTMLInputElement, ChatInputBarProps>(function ChatInputBar(
+  { value, onChange, onSend, disabled = false, placeholder = "Message Vector…" },
+  ref,
+) {
   return (
     <div className="px-4 py-3 sm:px-5">
       <div
@@ -25,6 +24,7 @@ export default function ChatInputBar({
         }
       >
         <input
+          ref={ref}
           type="text"
           className="min-h-10 min-w-0 flex-1 border-0 bg-transparent py-2 text-[15px] text-zinc-900 outline-none placeholder:text-zinc-400 disabled:opacity-50"
           value={value}
@@ -57,4 +57,6 @@ export default function ChatInputBar({
       </div>
     </div>
   );
-}
+});
+
+export default ChatInputBar;

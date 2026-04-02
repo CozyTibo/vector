@@ -6,6 +6,8 @@ import { labelsForToolsPayload } from "./onboardingToolGroups";
 type ChatMessageBubbleProps = {
   message: ChatMessage;
   userDisplayName: string;
+  /** Same role as the previous message: one avatar/header group for the run. */
+  isContinuation?: boolean;
 };
 
 function tryParseToolsSelectedContent(content: string): Record<string, string[]> | null {
@@ -46,23 +48,32 @@ function formatTime(ts: number): string {
   }
 }
 
-export default function ChatMessageBubble({ message, userDisplayName }: ChatMessageBubbleProps) {
+export default function ChatMessageBubble({
+  message,
+  userDisplayName,
+  isContinuation = false,
+}: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
   const toolsPick = isUser ? tryParseToolsSelectedContent(message.content) : null;
 
   if (isUser) {
     return (
-      <div className="onboarding-message-enter flex justify-end px-3 py-2.5">
+      <div
+        className={`onboarding-message-enter flex justify-end px-3 ${isContinuation ? "py-1" : "py-2.5"}`}
+      >
         <div className="flex min-w-0 max-w-[min(100%,32rem)] flex-col items-end gap-1.5">
-          <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
-            <span className={`font-semibold ${landingAccentText}`}>{userDisplayName}</span>
-            <time className="tabular-nums text-zinc-400" dateTime={new Date(message.timestamp).toISOString()}>
-              {formatTime(message.timestamp)}
-            </time>
-          </div>
+          {!isContinuation ? (
+            <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
+              <span className={`font-semibold ${landingAccentText}`}>{userDisplayName}</span>
+              <time className="tabular-nums text-zinc-400" dateTime={new Date(message.timestamp).toISOString()}>
+                {formatTime(message.timestamp)}
+              </time>
+            </div>
+          ) : null}
           <div
             className={
-              "rounded-2xl rounded-tr-md border border-[#E878BE]/25 bg-gradient-to-br from-[#FDE8F4] via-[#FCE8F2] " +
+              (isContinuation ? "rounded-2xl rounded-tr-sm " : "rounded-2xl rounded-tr-md ") +
+              "border border-[#E878BE]/25 bg-gradient-to-br from-[#FDE8F4] via-[#FCE8F2] " +
               "to-[#F8D4E8] px-4 py-2.5 text-[15px] leading-relaxed text-zinc-900 shadow-[0_10px_28px_-18px_rgba(232,120,190,0.55)]"
             }
           >
@@ -87,20 +98,31 @@ export default function ChatMessageBubble({ message, userDisplayName }: ChatMess
   }
 
   return (
-    <div className="onboarding-message-enter flex gap-3 px-3 py-2.5 sm:gap-3.5">
-      <ChatAvatar variant="vector" />
+    <div
+      className={`onboarding-message-enter flex gap-3 px-3 sm:gap-3.5 ${isContinuation ? "py-1" : "py-2.5"}`}
+    >
+      {isContinuation ? (
+        <div className="h-10 w-10 shrink-0" aria-hidden />
+      ) : (
+        <ChatAvatar variant="vector" />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
-          <span className={`font-semibold ${landingAccentText}`}>Vector</span>
-          <time className="tabular-nums text-zinc-400" dateTime={new Date(message.timestamp).toISOString()}>
-            {formatTime(message.timestamp)}
-          </time>
-        </div>
+        {!isContinuation ? (
+          <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
+            <span className={`font-semibold ${landingAccentText}`}>Vector</span>
+            <time className="tabular-nums text-zinc-400" dateTime={new Date(message.timestamp).toISOString()}>
+              {formatTime(message.timestamp)}
+            </time>
+          </div>
+        ) : null}
         <div className="relative inline-block max-w-[min(100%,32rem)] pl-[11px]">
           <div className={`pointer-events-none absolute bottom-1 left-0 top-1 w-[3px] rounded-full ${landingSubtleLineV}`} />
           <div
             className={
-              "rounded-2xl rounded-tl-md border border-zinc-200/85 bg-white/95 px-4 py-2.5 text-[15px] leading-relaxed " +
+              (isContinuation
+                ? "rounded-2xl rounded-tl-sm "
+                : "rounded-2xl rounded-tl-md ") +
+              "border border-zinc-200/85 bg-white/95 px-4 py-2.5 text-[15px] leading-relaxed " +
               "text-zinc-800 shadow-[0_12px_32px_-22px_rgba(15,23,42,0.35)] ring-1 ring-zinc-950/[0.04]"
             }
           >

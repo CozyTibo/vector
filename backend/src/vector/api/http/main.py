@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from vector.api.http.routes import admin, auth, health, me, onboarding
 from vector.api.http.routes.connectors import build_connectors_router
+from vector.api.http.routes.connectors import slack as slack_routes
 from vector.api.http.routes.debug_canonical import build_debug_canonical_router
 from vector.api.http.routes.debug_projections import build_debug_projections_router
 from vector.settings import get_settings
@@ -49,6 +50,7 @@ app.include_router(health.router)
 app.include_router(admin.build_admin_router())
 app.include_router(auth.router)
 app.include_router(build_connectors_router())
+app.include_router(slack_routes.build_slack_callback_router())
 app.include_router(build_debug_projections_router(), prefix="/debug", tags=["debug"])
 app.include_router(build_debug_canonical_router(), prefix="/debug", tags=["debug"])
 app.include_router(me.router)

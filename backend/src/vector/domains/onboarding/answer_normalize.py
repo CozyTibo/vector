@@ -183,12 +183,44 @@ def normalize_person_name(raw: str) -> str:
     return string.capwords(s)
 
 
+def _extract_company_name_core(raw: str) -> str:
+    """Strip conversational wrappers so we persist the name, not the full sentence."""
+    t = _norm_ws(raw)
+    if not t:
+        return t
+    t = re.sub(
+        r"^(?:sure|yes|yeah|yep|ok|okay|absolutely|definitely)[.!?,]?\s+",
+        "",
+        t,
+        flags=re.I,
+    )
+    t = _norm_ws(t)
+    # More specific patterns first (capture group = company name only).
+    patterns: tuple[str, ...] = (
+        r"^(?:it'?s|it is)\s+called\s+(.+)$",
+        r"^(?:we'?re|we are)\s+called\s+(.+)$",
+        r"^(?:the\s+)?(?:company|organization|organisation|org|firm)\s+is\s+called\s+(.+)$",
+        r"^(?:the\s+)?(?:company|organization|organisation|org|firm)\s+name\s+is\s+(.+)$",
+        r"^(?:company\s+)?name\s+is\s+(.+)$",
+        r"^(?:the\s+)?(?:company|organization|organisation|org|firm)\s+is\s+(.+)$",
+        r"^(?:we'?re|we are)\s+(.+)$",
+        r"^(?:it'?s|it is)\s+(.+)$",
+    )
+    for pat in patterns:
+        m = re.match(pat, t, re.I)
+        if m:
+            inner = _norm_ws(m.group(1)).rstrip(".,!?;:")
+            if inner:
+                return inner
+    return t
+
+
 def normalize_company_name(raw: str) -> str:
-    """Trim and sensible title casing for display (does not guess typos in brand names)."""
-    s = _norm_ws(raw)
-    if not s:
-        return s
-    return string.capwords(s)
+    """Trim conversational noise, then title-case for display."""
+    core = _extract_company_name_core(raw)
+    if not core:
+        return core
+    return string.capwords(core)
 
 
 def normalize_role(raw: str) -> str:

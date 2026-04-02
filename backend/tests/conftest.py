@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import os
+
+# Must run before any `vector.*` import: otherwise `Settings` loads repo `.env` and breaks tests that
+# `monkeypatch.delenv` / expect connectors to be unconfigured, and GitHub JWT tests (PEM vs path).
+os.environ.setdefault("VECTOR_SETTINGS_SKIP_DOTENV", "1")
+
 from collections.abc import Generator
 from typing import Any
 

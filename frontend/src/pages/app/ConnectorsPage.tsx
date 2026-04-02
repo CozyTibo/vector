@@ -20,6 +20,13 @@ type LinearDetails = {
   last_sync_at?: string | null;
 };
 
+type SlackDetails = {
+  connection_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  last_sync_at?: string | null;
+};
+
 type ConnectorRow =
   | {
       provider: "github";
@@ -34,6 +41,13 @@ type ConnectorRow =
       connector_configured: boolean;
       connected: boolean;
       details: LinearDetails | null;
+    }
+  | {
+      provider: "slack";
+      display_name: string;
+      connector_configured: boolean;
+      connected: boolean;
+      details: SlackDetails | null;
     };
 
 type ConnectorsResponse = { items: ConnectorRow[] };
@@ -62,7 +76,7 @@ const CATALOG: { category: string; items: CatalogItem[] }[] = [
   },
   {
     category: "Communication",
-    items: [{ id: "slack", name: "Slack", icon: "#", live: false }],
+    items: [{ id: "slack", name: "Slack", icon: "#", live: true }],
   },
   {
     category: "Documentation",
@@ -116,7 +130,9 @@ export default function ConnectorsPage() {
     const ghErr = params.get("github_error");
     const lin = params.get("linear_connected");
     const linErr = params.get("linear_error");
-    if (gh === "1" || lin === "1") {
+    const sl = params.get("slack_connected");
+    const slErr = params.get("slack_error");
+    if (gh === "1" || lin === "1" || sl === "1") {
       setBanner(null);
       void qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
     }
@@ -130,6 +146,14 @@ export default function ConnectorsPage() {
       setBanner("Linear connect failed (invalid or expired state).");
     } else if (linErr === "oauth") {
       setBanner("Linear OAuth failed. Check LINEAR_CLIENT_* and redirect URI.");
+    } else if (slErr === "state") {
+      setBanner("Slack connect failed (invalid or expired state).");
+    } else if (slErr === "oauth") {
+      setBanner("Slack OAuth failed. Check SLACK_* and redirect URI.");
+    } else if (slErr === "denied") {
+      setBanner("Slack connection was cancelled or denied.");
+    } else if (slErr === "workspace_taken") {
+      setBanner("This Slack workspace is already linked to another Vector workspace.");
     }
     if (
       oauthErr ||
@@ -139,7 +163,9 @@ export default function ConnectorsPage() {
       linErr ||
       params.get("oauth_ok") ||
       params.get("github_connected") ||
-      params.get("linear_connected")
+      params.get("linear_connected") ||
+      params.get("slack_connected") ||
+      params.get("slack_error")
     ) {
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -165,6 +191,11 @@ export default function ConnectorsPage() {
   });
   const linDisconnect = useMutation({
     mutationFn: () => disconnectProvider(apiBase, "linear"),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["connectors", apiBase] }),
+    onError: (e: Error) => setBanner(e.message),
+  });
+  const slackDisconnect = useMutation({
+    mutationFn: () => disconnectProvider(apiBase, "slack"),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["connectors", apiBase] }),
     onError: (e: Error) => setBanner(e.message),
   });
@@ -198,7 +229,9 @@ export default function ConnectorsPage() {
                     ? row.details?.last_sync_at
                     : row?.provider === "linear"
                       ? row.details?.last_sync_at
-                      : undefined;
+                      : row?.provider === "slack"
+                        ? row.details?.last_sync_at
+                        : undefined;
 
                 return (
                   <div
@@ -272,6 +305,26 @@ export default function ConnectorsPage() {
                         <a
                           className="mt-auto block w-full rounded-lg bg-stone-900 py-2 text-center text-sm font-medium text-white no-underline hover:bg-stone-800"
                           href={`${apiBase}/connectors/linear/install`}
+                        >
+                          Connect
+                        </a>
+                      )
+                    ) : item.id === "slack" ? (
+                      connected ? (
+                        <button
+                          type="button"
+                          className="mt-auto rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                          disabled={slackDisconnect.isPending}
+                          onClick={() => slackDisconnect.mutate()}
+                        >
+                          Disconnect
+                        </button>
+                      ) : !configured ? (
+                        <p className="mt-auto text-xs text-amber-800">Slack OAuth is not configured on the API.</p>
+                      ) : (
+                        <a
+                          className="mt-auto block w-full rounded-lg bg-stone-900 py-2 text-center text-sm font-medium text-white no-underline hover:bg-stone-800"
+                          href={`${apiBase}/connectors/slack/install`}
                         >
                           Connect
                         </a>

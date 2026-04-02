@@ -2,7 +2,7 @@ import { readErrorDetail } from "./canonicalApi";
 
 export type OnboardingStep =
   | "CHAT_PROFILE"
-  | "CONNECT_SLACK"
+  | "CONNECT_COMMUNICATION"
   | "CONNECT_GITHUB"
   | "CONNECT_LINEAR"
   | "SCANNING"
@@ -28,6 +28,7 @@ export type OnboardingStatePayload = {
   messages?: OnboardingMessagePayload[];
   github_connected: boolean;
   linear_connected: boolean;
+  slack_connected: boolean;
 };
 
 export async function fetchOnboarding(base: string): Promise<OnboardingStatePayload> {
@@ -57,7 +58,12 @@ export async function patchOnboarding(
 export async function postOnboardingChat(
   base: string,
   body: { message: string | null; structured_action?: Record<string, unknown> | null },
-): Promise<{ assistant_message: string; step: string; answers: Record<string, unknown> }> {
+): Promise<{
+  assistant_message: string;
+  assistant_messages: string[];
+  step: string;
+  answers: Record<string, unknown>;
+}> {
   const res = await fetch(`${base}/onboarding/chat`, {
     method: "POST",
     credentials: "include",
@@ -67,7 +73,12 @@ export async function postOnboardingChat(
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
-  return res.json() as Promise<{ assistant_message: string; step: string; answers: Record<string, unknown> }>;
+  return res.json() as Promise<{
+    assistant_message: string;
+    assistant_messages: string[];
+    step: string;
+    answers: Record<string, unknown>;
+  }>;
 }
 
 export async function completeOnboarding(base: string): Promise<{ status: string; current_step: string; completed_at: string }> {

@@ -478,7 +478,7 @@ const CORE_VALUE_BLOCKS_BY_ROLE: Record<CoreRoleId, readonly CoreValueBlock[]> =
     {
       icon: "chart",
       title: "Decide from real execution signals",
-      sentence: "Ground decisions in how work is really moving—not chasing updates.",
+      sentence: "Ground decisions in how work is really moving, not chasing updates.",
     },
     {
       icon: "inbox",
@@ -495,7 +495,7 @@ const CORE_VALUE_BLOCKS_BY_ROLE: Record<CoreRoleId, readonly CoreValueBlock[]> =
     {
       icon: "link",
       title: "Stop chasing updates",
-      sentence: "PRs, tickets, and threads—connected without manual roll-ups.",
+      sentence: "PRs, tickets, and threads, connected without manual roll-ups.",
     },
     {
       icon: "trend",

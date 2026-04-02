@@ -5,8 +5,9 @@ from __future__ import annotations
 # Chat-first profile collection (single step; phases live in answers_json.profile_phase).
 STEP_CHAT_PROFILE = "CHAT_PROFILE"
 
-# Connector nudges (Slack planned; GitHub/Linear use existing OAuth flows).
-STEP_CONNECT_SLACK = "CONNECT_SLACK"
+# Connector OAuth screens (order is driven by `connect_queue` in answers).
+# Communication phase: Slack OAuth and/or Teams+Discord placeholder share this step; branch on queue head.
+STEP_CONNECT_COMMUNICATION = "CONNECT_COMMUNICATION"
 STEP_CONNECT_GITHUB = "CONNECT_GITHUB"
 STEP_CONNECT_LINEAR = "CONNECT_LINEAR"
 
@@ -16,7 +17,7 @@ STEP_THANK_YOU = "THANK_YOU"
 ONBOARDING_STEPS: frozenset[str] = frozenset(
     {
         STEP_CHAT_PROFILE,
-        STEP_CONNECT_SLACK,
+        STEP_CONNECT_COMMUNICATION,
         STEP_CONNECT_GITHUB,
         STEP_CONNECT_LINEAR,
         STEP_SCANNING,
@@ -34,6 +35,8 @@ PROFILE_PHASE_ORG = "org"
 PROFILE_PHASE_ROLE = "role"
 PROFILE_PHASE_WEBSITE = "website"
 PROFILE_PHASE_SIZE = "size"
+# Privacy / connectors Q&A before tool picker (chat-only; advance via structured_action).
+PROFILE_PHASE_CONNECTORS_INTRO = "connectors_intro"
 PROFILE_PHASE_TOOLS = "tools"
 PROFILE_PHASE_DONE = "done"
 
@@ -41,8 +44,8 @@ PROFILE_PHASES_ORDER: tuple[str, ...] = (
     PROFILE_PHASE_NAME,
     PROFILE_PHASE_ORG,
     PROFILE_PHASE_ROLE,
-    PROFILE_PHASE_WEBSITE,
     PROFILE_PHASE_SIZE,
+    PROFILE_PHASE_CONNECTORS_INTRO,
     PROFILE_PHASE_TOOLS,
     PROFILE_PHASE_DONE,
 )

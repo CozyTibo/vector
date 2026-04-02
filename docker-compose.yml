@@ -21,6 +21,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    # Connector secrets (Slack, GitHub, etc.) come only from `env_file` — do NOT repeat them under
+    # `environment:` with `${VAR:-}`. Compose resolves `${VAR:-}` before the container starts; if that
+    # yields empty (shell/export quirks), those empty values OVERRIDE `env_file` and wipe real keys.
     env_file:
       - .env
     environment:
@@ -38,6 +41,8 @@ services:
       postgres:
         condition: service_healthy
     volumes:
+      # Uvicorn cwd is `/app`; `Settings` loads `./.env` so Slack/GitHub/etc. apply without Compose interpolation.
+      - ./.env:/app/.env:ro
       - ./backend/src:/app/src
       - ./backend/tests:/app/tests
       - ./backend/alembic:/app/alembic

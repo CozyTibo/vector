@@ -42,6 +42,19 @@ def test_normalize_company_name_case() -> None:
     assert normalize_company_name("ma super boite") == "Ma Super Boite"
 
 
+def test_normalize_company_name_strips_conversational_reply() -> None:
+    assert normalize_company_name("Sure. It's called Zoom Zoom Zem") == "Zoom Zoom Zem"
+    assert normalize_company_name("Yes, it's called Acme Inc.") == "Acme Inc"
+    assert normalize_company_name("we're called Contoso") == "Contoso"
+    assert normalize_company_name("The company is called Foo Bar") == "Foo Bar"
+    assert normalize_company_name("company name is Beta Co") == "Beta Co"
+
+
+def test_normalize_company_name_plain_short_answer_unchanged() -> None:
+    assert normalize_company_name("Acme") == "Acme"
+    assert normalize_company_name("zoom zoom zem") == "Zoom Zoom Zem"
+
+
 def test_normalize_website() -> None:
     assert normalize_website("vector.so") == "https://vector.so"
     assert normalize_website("HTTPS://Vector.So/path") == "https://vector.so/path"

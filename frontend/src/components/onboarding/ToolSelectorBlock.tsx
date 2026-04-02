@@ -19,7 +19,7 @@ export default function ToolSelectorBlock({ groups, value, onToggle, onConfirm, 
     <div className="max-h-[min(52vh,420px)] overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-5">
       <div className="mx-auto w-full max-w-full space-y-6">
         <p className="text-center text-[13px] font-medium leading-relaxed text-zinc-600">
-          Pick what your team uses — tap to toggle.
+          Pick what your team uses: one choice per row (tap again to clear).
         </p>
         {groups.map((g) => (
           <div key={g.key}>

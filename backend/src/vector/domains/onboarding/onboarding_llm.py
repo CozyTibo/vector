@@ -1,4 +1,4 @@
-"""Thin OpenAI adapter — phrasing only; does not decide onboarding steps."""
+"""Thin OpenAI adapter: phrasing only; does not decide onboarding steps."""
 
 from __future__ import annotations
 
@@ -8,12 +8,29 @@ from typing import Any
 from openai import OpenAI
 
 from vector.domains.onboarding.constants import (
+    PROFILE_PHASE_CONNECTORS_INTRO,
     PROFILE_PHASE_NAME,
     PROFILE_PHASE_ORG,
+    PROFILE_PHASE_SIZE,
+    PROFILE_PHASE_WEBSITE,
     PROFILE_PHASES_ORDER,
     STEP_CHAT_PROFILE,
 )
 from vector.settings import Settings, get_settings
+
+# Long dashes models use like em dashes; normalize to spaced hyphen for onboarding copy.
+_EM_DASH = "\u2014"
+_EN_DASH = "\u2013"
+
+
+def _strip_em_dash(text: str) -> str:
+    """Replace em/en dash with spaced hyphen (product rule: no U+2014/U+2013 in assistant copy)."""
+    return text.replace(_EM_DASH, " - ").replace(_EN_DASH, " - ")
+
+
+def _finalize_assistant_segments(segments: list[str]) -> list[str]:
+    return [_strip_em_dash(s) for s in segments]
+
 
 # Logged server-side; client may show richer static copy. No LLM on bootstrap (instant response).
 BOOTSTRAP_OPENING_REPLY_TEXT = (
@@ -26,8 +43,11 @@ BOOTSTRAP_OPENING_REPLY_TEXT = (
 def _effective_profile_phase(answers_json: dict[str, Any]) -> str:
     """Match `onboarding_flow._default_profile_phase` when `profile_phase` is unset."""
     raw = answers_json.get("profile_phase")
-    if isinstance(raw, str) and raw in PROFILE_PHASES_ORDER:
-        return raw
+    if isinstance(raw, str):
+        if raw == PROFILE_PHASE_WEBSITE:
+            return PROFILE_PHASE_SIZE
+        if raw in PROFILE_PHASES_ORDER:
+            return raw
     return PROFILE_PHASE_NAME
 
 
@@ -45,7 +65,7 @@ def _is_bootstrap_opening_turn(
 
 
 def extract_onboarding_known_facts(answers_json: dict[str, Any]) -> dict[str, Any]:
-    """Flat facts already collected — LLM must not ask for these again."""
+    """Flat facts already collected; LLM must not ask for these again."""
     profile = answers_json.get("profile")
     company = answers_json.get("company")
     out: dict[str, Any] = {
@@ -97,13 +117,28 @@ def _fallback_reply(
     last_user_message: str | None,
     assistant_prompt_context: dict[str, Any],
 ) -> str:
-    """When OpenAI is unavailable — short, in-character lines only."""
+    """When OpenAI is unavailable: short, in-character lines only."""
     instruction = assistant_prompt_context.get("instruction")
     facts = extract_onboarding_known_facts(answers_json)
     name = facts.get("user_name")
     phase_ctx = assistant_prompt_context.get("profile_phase")
     phase_ans = answers_json.get("profile_phase")
     phase = phase_ctx if isinstance(phase_ctx, str) else phase_ans
+
+    if phase == PROFILE_PHASE_CONNECTORS_INTRO:
+        kind = assistant_prompt_context.get("connectors_intro_kind")
+        if kind == "qa":
+            return (
+                "We focus on execution signals (what moved, lightweight metadata), not storing "
+                "your full code or Slack history. GitHub stays code-light; Slack is for working "
+                "with Vector in-channel. If you need legal or security paperwork, check our "
+                "published policies or ask your Vector contact. Still unsure? Keep asking, or use the "
+                "**I'm ready to choose tools** tag when you want to move on."
+            )
+        return (
+            "Same deal: signals, not a dump of private content. Ask anything else, or use the **I'm "
+            "ready to choose tools** tag to pick your integrations."
+        )
 
     if isinstance(instruction, str) and instruction.strip():
         base = instruction.strip()
@@ -153,8 +188,8 @@ start with "Yeah," "Makes sense," "Cool," or jump straight into the point. Nuanc
 good," "Nice," a short clause, or no opener at all) and do not put their first name at the \
 start of every reply. Using their name once in a while mid-reply is fine; repeating \
 "Got it, Name" back-to-back reads robotic.
-- Never use the em dash character (Unicode U+2014, looks like a long dash) in your replies. \
-Use commas, periods, or " - " with spaces if you need a break. Em dashes read as generic AI copy.
+- Never use the em dash (U+2014) or en dash (U+2013) as clause punctuation in your replies. Use commas, \
+periods, or " - " with spaces if you need a break. Those long dashes read as generic AI copy.
 - Emojis are optional: you may use one occasionally to feel warmer and more human (e.g. after \
 good news or a light moment). Keep them sparse (often zero; rarely more than one per message), \
 workplace-appropriate, and never replace substance with emoji walls or use them every line.
@@ -177,6 +212,7 @@ default crutch: starting consecutive questions with "Got it, [name]."
    - "I'm an AI"
    - "I'm here to help you with onboarding" (meta)
    - "As an AI assistant"
+   - The em dash (U+2014), en dash (U+2013), or any long dash used like that for punctuation
 6. When the instruction says the user changed tools again, do NOT chain the same opener as the \
 last message (avoid habitually starting with "Noticed you", "Looks like you've", or "I see you've"). \
 Rotate structure: sometimes no acknowledgment, sometimes a single word, sometimes a new angle.
@@ -187,6 +223,35 @@ Your job is only natural phrasing that matches Vector's voice and the instructio
 connector (e.g. Linear, GitHub) unless the instruction or deterministic context says it applies."""
 
 
+def _fallback_connectors_intro_after_size_bubbles() -> list[str]:
+    """Two chat bubbles: quick ack, then reassurance + CTA (offline / deterministic)."""
+    return [
+        "That's a solid team size.",
+        (
+            "Okay, now a quick note on how this works before we pick tools.\n\n"
+            "I pick up light signals from the stuff your team already uses so I can stay oriented "
+            "without digging into sensitive content. Think lightweight activity and metadata, not "
+            "your codebase or a copy of Slack.\n\n"
+            "Wiring that up takes about a minute when you're ready, or message me first if you want "
+            "to talk it through. There's an **I'm ready to choose tools** tag in the chat when you "
+            "want to move on."
+        ),
+    ]
+
+
+def split_connectors_intro_after_size(text: str) -> list[str]:
+    """Split model output into two UI bubbles (first \\n\\n only)."""
+    t = text.strip()
+    if "\n\n" not in t:
+        return [t] if t else _fallback_connectors_intro_after_size_bubbles()
+    first, rest = t.split("\n\n", 1)
+    first = first.strip()
+    rest = rest.strip()
+    if not first or not rest:
+        return [t] if t else _fallback_connectors_intro_after_size_bubbles()
+    return [first, rest]
+
+
 def generate_onboarding_reply(
     *,
     step: str,
@@ -194,19 +259,34 @@ def generate_onboarding_reply(
     last_user_message: str | None,
     assistant_prompt_context: dict[str, Any],
     settings: Settings | None = None,
-) -> str:
-    """Return assistant message text; never changes onboarding step."""
+) -> list[str]:
+    """Return one or more assistant message segments for this turn; never changes onboarding step."""
     if _is_bootstrap_opening_turn(last_user_message, answers_json, step):
-        return BOOTSTRAP_OPENING_REPLY_TEXT
+        return _finalize_assistant_segments([BOOTSTRAP_OPENING_REPLY_TEXT])
 
     cfg = settings or get_settings()
+    intro_kind = assistant_prompt_context.get("connectors_intro_kind")
     if not cfg.openai_api_key.strip():
-        return _fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)
+        if intro_kind == "after_size":
+            return _finalize_assistant_segments(_fallback_connectors_intro_after_size_bubbles())
+        return _finalize_assistant_segments(
+            [_fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)]
+        )
 
     facts = extract_onboarding_known_facts(answers_json)
     instruction = assistant_prompt_context.get("instruction")
     if not isinstance(instruction, str):
         instruction = ""
+
+    kb = assistant_prompt_context.get("connectors_privacy_kb")
+    system_prompt = SYSTEM_PROMPT
+    if isinstance(kb, str) and kb.strip():
+        system_prompt = (
+            f"{SYSTEM_PROMPT}\n\n## Ground truth: connectors and privacy (Q&A only)\n"
+            "Use this section only to answer questions during the connectors intro step. "
+            "Do not contradict it; if asked for something outside it, say so.\n"
+            f"{kb.strip()}"
+        )
 
     profile_phase = answers_json.get("profile_phase")
     phase_s = profile_phase if isinstance(profile_phase, str) else ""
@@ -215,7 +295,7 @@ def generate_onboarding_reply(
     context_extra = {
         k: v
         for k, v in assistant_prompt_context.items()
-        if k not in ("instruction",) and v is not None
+        if k not in ("instruction", "connectors_privacy_kb") and v is not None
     }
     context_json = json.dumps(context_extra, ensure_ascii=False, default=str)[:4000]
 
@@ -234,6 +314,23 @@ def generate_onboarding_reply(
         "Sound like the reference: a smooth coworker DM, not a form. "
         "Do not open with 'Got it, [first name].' if you already used that pattern recently."
     )
+    tail += (
+        "\n\nHard rule: never output the em dash (U+2014) or en dash (U+2013) as clause punctuation. "
+        'If you need a break, use a comma, period, or " - " with spaces.'
+    )
+
+    if intro_kind == "after_size":
+        tail += (
+            "\n\n## Format (this turn only: two chat bubbles)\n"
+            "The UI shows your reply as TWO separate messages. Write the headcount acknowledgment "
+            "as the first paragraph only (one short sentence), then a blank line, then everything "
+            "else in the second block. The app splits on the first double newline only; keep the "
+            "first block short. Inside the second block you may use blank lines for readability. "
+            "The first line of the second block (before its first blank line) must be a short bridge "
+            "from the headcount ack into the how-I-work topic, not an abrupt pivot. "
+            "Second block should feel like a chill Slack message from a coworker, not a policy memo. "
+            "Obey the word cap in the instruction above."
+        )
 
     revision_extra = ""
     if assistant_prompt_context.get("tools_selection_revision"):
@@ -242,11 +339,11 @@ def generate_onboarding_reply(
 ## Anti-repeat (this turn)
 The user changed tool picks again; your previous reply may have sounded similar.
 - Use a different opener than "Noticed", "Looks like", or "I see you've".
-- Prefer 1–2 short sentences. Do not restate the tool list.
+- Prefer one or two short sentences. Do not restate the tool list.
 - Do not end with the same generic priority question as before; change the question or use none.
 """
 
-    user_content = f"""## Known context — do NOT ask again for any field that is non-null below
+    user_content = f"""## Known context: do NOT ask again for any field that is non-null below
 {facts_block}
 
 Readable summary:
@@ -256,7 +353,7 @@ Readable summary:
 - onboarding_step: {step}
 - profile_phase: {phase_s or "(n/a)"}
 
-## What this message must accomplish (from product logic — follow this)
+## What this message must accomplish (from product logic; follow this)
 {instr}
 {revision_extra}
 ## Extra deterministic context (tools, connectors, etc.)
@@ -269,18 +366,31 @@ Readable summary:
 
     temp = 0.7 if assistant_prompt_context.get("tools_selection_revision") else 0.58
 
+    if intro_kind == "after_size":
+        max_out = 200
+    elif isinstance(kb, str) and kb.strip():
+        max_out = 280
+    else:
+        max_out = 220
+
     client = OpenAI(api_key=cfg.openai_api_key)
     resp = client.chat.completions.create(
         model=cfg.openai_model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
         temperature=temp,
-        max_tokens=220,
+        max_tokens=max_out,
     )
     choice = resp.choices[0].message.content
     text = (choice or "").strip()
     if not text:
-        return _fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)
-    return text
+        if intro_kind == "after_size":
+            return _finalize_assistant_segments(_fallback_connectors_intro_after_size_bubbles())
+        return _finalize_assistant_segments(
+            [_fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)]
+        )
+    if intro_kind == "after_size":
+        return _finalize_assistant_segments(split_connectors_intro_after_size(text))
+    return _finalize_assistant_segments([text])

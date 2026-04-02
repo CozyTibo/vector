@@ -144,7 +144,44 @@ class LinearConnectorStatusItem(BaseModel):
     )
 
 
-ConnectorStatusItem: TypeAlias = GithubConnectorStatusItem | LinearConnectorStatusItem
+class SlackConnectorDetails(BaseModel):
+    """Slack-specific payload when the Slack connector is connected."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection_id: uuid.UUID | None = Field(
+        default=None,
+        description="tenant_connections.id for this Slack link.",
+    )
+    team_id: str | None = None
+    team_name: str | None = None
+    last_sync_at: datetime | None = Field(
+        default=None,
+        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+    )
+
+
+class SlackConnectorStatusItem(BaseModel):
+    """Status row for the Slack integration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["slack"] = Field(
+        default="slack",
+        description="Stable id; matches URL segment DELETE /connectors/{provider}.",
+    )
+    display_name: str = Field(description="Human-readable label for UI.")
+    connector_configured: bool = Field(
+        description="Server has required credentials/env for this provider.",
+    )
+    connected: bool = Field(description="Tenant has completed connect for this provider.")
+    details: SlackConnectorDetails | None = Field(
+        default=None,
+        description="Provider-specific data when connected; null otherwise.",
+    )
+
+
+ConnectorStatusItem: TypeAlias = GithubConnectorStatusItem | LinearConnectorStatusItem | SlackConnectorStatusItem
 
 
 class ConnectorsListResponse(BaseModel):
@@ -152,7 +189,7 @@ class ConnectorsListResponse(BaseModel):
 
     items: list[
         Annotated[
-            GithubConnectorStatusItem | LinearConnectorStatusItem,
+            GithubConnectorStatusItem | LinearConnectorStatusItem | SlackConnectorStatusItem,
             Field(discriminator="provider"),
         ]
     ] = Field(description="One entry per registered runtime provider.")

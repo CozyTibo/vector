@@ -36,12 +36,16 @@ class OnboardingGetResponse(BaseModel):
     github_connected: bool = Field(
         default=False,
         description=(
-            "Derived from tenant_connections / GitHub detail — not stored in onboarding row."
+            "Derived from tenant_connections / GitHub detail; not stored in onboarding row."
         ),
     )
     linear_connected: bool = Field(
         default=False,
         description="Derived from Linear OAuth connection for tenant.",
+    )
+    slack_connected: bool = Field(
+        default=False,
+        description="Derived from Slack OAuth connection for tenant.",
     )
 
 
@@ -68,7 +72,10 @@ class OnboardingChatRequest(BaseModel):
     )
     structured_action: dict[str, Any] | None = Field(
         default=None,
-        description="Deterministic inputs (e.g. tools_selected).",
+        description=(
+            "Deterministic inputs: e.g. tools_selected; connectors_intro_ready (advance past "
+            "privacy/connectors Q&A to the tool picker)."
+        ),
     )
 
     @model_validator(mode="after")
@@ -82,6 +89,10 @@ class OnboardingChatRequest(BaseModel):
 class OnboardingChatResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    assistant_message: str
+    assistant_message: str = Field(description="First assistant bubble; same as assistant_messages[0].")
+    assistant_messages: list[str] = Field(
+        min_length=1,
+        description="All assistant bubbles for this turn (e.g. connectors intro after headcount).",
+    )
     step: str
     answers: dict[str, Any] = Field(description="Full merged answers_json after this turn.")

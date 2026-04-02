@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Self
 
@@ -10,11 +10,54 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _dotenv_file_paths() -> tuple[Path, ...]:
+    """Paths to load in order (later overrides earlier). Omit bogus paths.
+
+    - **Monorepo host:** ``.../backend/src/vector/settings.py`` → repo root ``.env``, then cwd ``.env``.
+    - **Docker image:** ``/app/src/vector/settings.py`` — ``parents[3]`` is ``/``; do **not** use it.
+      Slack/GitHub/etc. must come from process env (``docker compose`` ``env_file`` / ``environment``).
+
+    When ``VECTOR_SETTINGS_SKIP_DOTENV=1`` (set in ``tests/conftest.py`` before imports), skip files so
+    ``monkeypatch`` / unconfigured connector tests are not overridden by a developer's repo ``.env``.
+    """
+    if os.environ.get("VECTOR_SETTINGS_SKIP_DOTENV") == "1":
+        return ()
+    here = Path(__file__).resolve()
+    out: list[Path] = []
+    try:
+        if here.parents[2].name == "backend":
+            root_env = here.parents[3] / ".env"
+            if root_env.is_file():
+                out.append(root_env)
+    except IndexError:
+        pass
+    # Docker Compose mounts repo `.env` at `/app/.env`. Uvicorn `--reload` can run the worker with a
+    # cwd other than `/app`, so `./.env` would miss the file while `DATABASE_URL` still works (set in
+    # compose `environment:`). Always load the canonical mount when present.
+    docker_app_env = Path("/app/.env")
+    if docker_app_env.is_file():
+        resolved_docker = docker_app_env.resolve()
+        if not out or resolved_docker not in out:
+            out.append(resolved_docker)
+    cwd_env = Path(".env")
+    if cwd_env.is_file():
+        resolved = cwd_env.resolve()
+        if resolved not in out:
+            out.append(resolved)
+    return tuple(out)
+
+
+_DOTENV_FILES = _dotenv_file_paths()
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_DOTENV_FILES if _DOTENV_FILES else None,
         env_file_encoding="utf-8",
         extra="ignore",
+        # Docker / shells often export `FOO=` (empty). Without this, those override non-empty values
+        # from `.env` files and connectors look "unconfigured" even when `/app/.env` is correct.
+        env_ignore_empty=True,
     )
 
     database_url: str = Field(validation_alias="DATABASE_URL")
@@ -63,6 +106,23 @@ class Settings(BaseSettings):
     linear_client_id: str = Field(default="", validation_alias="LINEAR_CLIENT_ID")
     linear_client_secret: str = Field(default="", validation_alias="LINEAR_CLIENT_SECRET")
     linear_redirect_uri: str = Field(default="", validation_alias="LINEAR_REDIRECT_URI")
+    slack_client_id: str = Field(default="", validation_alias="SLACK_CLIENT_ID")
+    slack_client_secret: str = Field(default="", validation_alias="SLACK_CLIENT_SECRET")
+    slack_signing_secret: str = Field(
+        default="",
+        validation_alias="SLACK_SIGNING_SECRET",
+        description="For verifying Slack Events API requests (optional until events are wired).",
+    )
+    slack_callback_url: str = Field(
+        default="",
+        validation_alias="SLACK_CALLBACK_URL",
+        description="Full redirect URL registered in Slack app (e.g. https://xxx.ngrok-free.dev/slack/callback).",
+    )
+    slack_bot_scopes: str = Field(
+        default="channels:read,chat:write,users:read",
+        validation_alias="SLACK_BOT_SCOPES",
+        description="Comma-separated bot scopes for oauth.v2.authorize (must match Slack app).",
+    )
     admin_password: str = Field(
         default="",
         validation_alias="ADMIN_PASSWORD",
@@ -107,6 +167,13 @@ class Settings(BaseSettings):
             return value[1:-1]
         return value
 
+    @field_validator("slack_client_secret", mode="before")
+    @classmethod
+    def strip_slack_client_secret_quotes(cls, value: object) -> object:
+        if isinstance(value, str) and len(value) >= 2 and value[0] == value[-1] == '"':
+            return value[1:-1]
+        return value
+
     @model_validator(mode="after")
     def load_github_private_key_from_path(self) -> Self:
         """When set, load PEM from `GITHUB_APP_PRIVATE_KEY_PATH` (replaces env PEM)."""
@@ -146,6 +213,14 @@ class Settings(BaseSettings):
         return "https://api.linear.app/oauth/token"
 
 
-@lru_cache
 def get_settings() -> Settings:
+    """Build from current environment. Not cached — a stale `@lru_cache` hid edits to `.env`
+    until process restart; connector OAuth looked \"not configured\" after adding Slack keys."""
     return Settings()
+
+
+def _noop_settings_cache_clear() -> None:
+    """Tests call `get_settings.cache_clear()` between env changes; caching was removed."""
+
+
+get_settings.cache_clear = _noop_settings_cache_clear  # type: ignore[attr-defined]

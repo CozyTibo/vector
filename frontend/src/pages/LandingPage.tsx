@@ -192,7 +192,7 @@ function HeroChatThread() {
               </div>
               <div className="relative mt-1.5 overflow-hidden rounded-2xl rounded-tl-md border border-zinc-200/70 bg-zinc-50/90 pl-[13px] pr-3.5 py-2.5 text-[13px] font-normal leading-relaxed text-zinc-800 sm:text-[14px]">
                 <div className={heroVectorBubbleAccentClass} aria-hidden />
-                <p className="relative">I can ping Sam — he worked on the middleware last week and should have context.</p>
+                <p className="relative">I can ping Sam. He worked on the middleware last week and should have context.</p>
               </div>
             </div>
           </div>

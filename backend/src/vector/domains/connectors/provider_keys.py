@@ -6,3 +6,4 @@ from typing import Final
 
 CONNECTION_PROVIDER_GITHUB: Final[str] = "github"
 CONNECTION_PROVIDER_LINEAR: Final[str] = "linear"
+CONNECTION_PROVIDER_SLACK: Final[str] = "slack"

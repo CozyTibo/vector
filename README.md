@@ -44,3 +44,7 @@ After `make migrate`, set the `GITHUB_*` variables in `.env` (see `.env.example`
 ## Linear connector (OAuth, read scope)
 
 Create an OAuth app in [Linear → Settings → API](https://linear.app/settings/api/applications/new): **Public** on if other workspaces should connect; **Client credentials** off for the normal user OAuth flow. Set **redirect URL** to match `LINEAR_REDIRECT_URI`, or if unset, `{GITHUB_API_PUBLIC_BASE_URL}/connectors/linear/callback`. Put **`LINEAR_CLIENT_ID`** and **`LINEAR_CLIENT_SECRET`** in `.env`, run **`make migrate`**, then use **Connect Linear** in the UI or `GET /connectors/linear/install`. Callback redirects to the frontend with `linear_connected=1` or `linear_error=…`.
+
+## Slack connector (OAuth v2, bot)
+
+Create a [Slack app](https://api.slack.com/apps) and enable **OAuth & Permissions**. Set **Redirect URL** to **`SLACK_CALLBACK_URL`** in full (e.g. `https://<ngrok-host>/slack/callback` for local HTTPS). Bot scopes must include those in **`SLACK_BOT_SCOPES`** (default `channels:read,chat:write,users:read`). Put **`SLACK_CLIENT_ID`**, **`SLACK_CLIENT_SECRET`**, and optionally **`SLACK_SIGNING_SECRET`** (for Events API later) in `.env`, run **`make migrate`**, then use **Connect Slack** in the UI or `GET /connectors/slack/install`. The OAuth return is **`GET /slack/callback`** (mounted at app root so the URL matches your env). Redirect to the app includes `slack_connected=1` or `slack_error=…`.

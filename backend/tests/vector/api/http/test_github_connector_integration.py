@@ -302,4 +302,4 @@ def test_disconnect_unknown_provider_returns_404(
 
     tok = issue_session_token(settings, user.id, tenant.id)
     client.cookies.set(settings.session_cookie_name, tok)
-    assert client.delete("/connectors/slack").status_code == 404
+    assert client.delete("/connectors/not_a_provider").status_code == 404
