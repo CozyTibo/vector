@@ -90,47 +90,12 @@ def test_github_sync_not_connected_returns_400(
     assert "not connected" in (r.json().get("detail") or "").lower()
 
 
-def test_github_sync_ok_when_core_mocked(
+def test_github_sync_enqueues_returns_202_when_core_mocked(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
 ) -> None:
     _session_user_tenant(monkeypatch, client, db_session)
-    run_id = uuid.uuid4()
-    mock_run = MagicMock()
-    mock_run.id = run_id
-    mock_run.connection_id = uuid.uuid4()
-    mock_run.status = "succeeded"
-    mock_run.error_summary = None
-    mock_run.stats = {"records_written": 42}
-
-    def _stub(
-        session: Session,
-        settings: Any,
-        tenant_id: uuid.UUID,
-    ) -> MagicMock:
-        return mock_run
-
-    monkeypatch.setattr(connector_sync, "run_github_poll_sync_with_drains", _stub)
-    r = client.post("/connectors/github/sync")
-    assert r.status_code == 200
-    body = r.json()
-    assert body["run_id"] == str(run_id)
-    assert body["status"] == "succeeded"
-    assert body["error_summary"] is None
-    assert body["stats"] == {"records_written": 42}
-    assert body.get("accepted_async") is False
-
-
-def test_github_sync_async_returns_202_when_flag_on(
-    monkeypatch: pytest.MonkeyPatch,
-    client: TestClient,
-    db_session: Session,
-) -> None:
-    _session_user_tenant(monkeypatch, client, db_session)
-    monkeypatch.setenv("INGESTION_ASYNC_GITHUB", "true")
-    get_settings.cache_clear()
-
     run_id = uuid.uuid4()
 
     def _fake_enqueue(session: Session, *, tenant_id: uuid.UUID) -> MagicMock:
@@ -148,4 +113,5 @@ def test_github_sync_async_returns_202_when_flag_on(
     body = r.json()
     assert body["run_id"] == str(run_id)
     assert body["status"] == "running"
-    assert body["accepted_async"] is True
+    assert body["error_summary"] is None
+    assert body["stats"] is None

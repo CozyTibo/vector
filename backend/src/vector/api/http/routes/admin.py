@@ -6,11 +6,13 @@ import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
 from vector.api.http.deps import get_db, settings_dep
 from vector.api.http.serialization import orm_to_dict
+from vector.application.services import connector_sync
 from vector.contracts.admin import (
     AdminConnectionsResponse,
     AdminStep1RawResetRequest,
@@ -42,7 +44,6 @@ from vector.domains.debug.github_pipeline_wipe import (
     rebuild_derived_from_step1_github,
     reset_github_pipeline_state,
 )
-from vector.application.services import connector_sync
 from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
 from vector.domains.ingestion.http_fetch import FetchFatalError
 from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
@@ -361,20 +362,24 @@ def build_admin_router() -> APIRouter:
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> dict[str, Any]:
-        """GitHub poll Step 1; drain projection + canonical if run succeeds."""
+    ) -> JSONResponse:
+        """Enqueue GitHub ingestion (same strategy as POST /connectors/github/sync)."""
         _assert_tenant(db, tenant_id)
         preflight_mock_connectors_reachable(settings)
         try:
-            run = connector_sync.run_github_poll_sync_with_drains(db, settings, tenant_id)
+            run = connector_sync.enqueue_github_poll_sync(db, tenant_id=tenant_id)
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-        return {
-            "run_id": str(run.id),
-            "status": run.status,
-            "error_summary": run.error_summary,
-            "stats": run.stats,
-        }
+        db.commit()
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "run_id": str(run.id),
+                "status": run.status,
+                "error_summary": run.error_summary,
+                "stats": run.stats,
+            },
+        )
 
     @r.post("/tenants/{tenant_id}/ingestion/linear-sync")
     def admin_trigger_linear_step1_sync(

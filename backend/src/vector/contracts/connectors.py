@@ -28,7 +28,7 @@ class GithubConnectorDetails(BaseModel):
 
 
 class GithubIngestionSyncResponse(BaseModel):
-    """Result of POST /connectors/github/sync (Step 1 poll ingestion)."""
+    """Result of POST /connectors/github/sync (HTTP 202: run queued; poll ingestion runs)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -36,10 +36,6 @@ class GithubIngestionSyncResponse(BaseModel):
     status: str
     error_summary: str | None = None
     stats: dict[str, Any] | None = None
-    accepted_async: bool = Field(
-        default=False,
-        description="True when the pipeline was queued on the worker (HTTP 202).",
-    )
 
 
 class GithubIngestionRunListItem(BaseModel):

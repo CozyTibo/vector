@@ -133,10 +133,15 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://vector:vector@postgres:5432/vector}
       REDIS_URL: redis://redis:6379/0
+      # Same as `backend`: `.env` often has 127.0.0.1 for host dev; inside Docker the mock is a
+      # sibling service — without this, ingestion tasks cannot reach the mock GitHub/Linear APIs.
+      VECTOR_MOCK_CONNECTOR_BASE_URL: http://mock-connectors:9183
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      mock-connectors:
         condition: service_healthy
     volumes:
       - ./.env:/app/.env:ro

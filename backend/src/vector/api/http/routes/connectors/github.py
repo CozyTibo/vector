@@ -7,7 +7,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
@@ -136,48 +136,32 @@ def build_github_connector_router() -> APIRouter:
         )
         return RedirectResponse(url=ok, status_code=status.HTTP_302_FOUND)
 
-    @r.post("/sync", response_model=GithubIngestionSyncResponse)
+    @r.post(
+        "/sync",
+        response_model=GithubIngestionSyncResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
     def github_poll_sync(
         db: Annotated[Session, Depends(get_db)],
         claims: Annotated[SessionClaims, Depends(get_session_claims)],
         settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> GithubIngestionSyncResponse | JSONResponse:
-        """Poll GitHub REST and append resource-level raw ingestion rows (Step 1)."""
+    ) -> GithubIngestionSyncResponse:
+        """Enqueue GitHub poll ingestion (Step 1–3 run on the Celery worker)."""
         try:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         preflight_mock_connectors_reachable(settings)
-        if settings.ingestion_async_github:
-            try:
-                run = connector_sync.enqueue_github_poll_sync(db, tenant_id=claims.tenant_id)
-            except FetchFatalError as e:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-            db.commit()
-            return JSONResponse(
-                status_code=status.HTTP_202_ACCEPTED,
-                content=GithubIngestionSyncResponse(
-                    run_id=run.id,
-                    status=run.status,
-                    error_summary=run.error_summary,
-                    stats=run.stats,
-                    accepted_async=True,
-                ).model_dump(mode="json"),
-            )
         try:
-            run = connector_sync.run_github_poll_sync_with_drains(
-                db,
-                settings,
-                claims.tenant_id,
-            )
+            run = connector_sync.enqueue_github_poll_sync(db, tenant_id=claims.tenant_id)
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        db.commit()
         return GithubIngestionSyncResponse(
             run_id=run.id,
             status=run.status,
             error_summary=run.error_summary,
             stats=run.stats,
-            accepted_async=False,
         )
 
     @r.get("/ingestion/runs", response_model=GithubIngestionRunsListResponse)
