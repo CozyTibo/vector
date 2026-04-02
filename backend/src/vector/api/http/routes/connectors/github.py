@@ -7,10 +7,11 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
+from vector.application.services import connector_sync
 from vector.contracts.connectors import (
     GithubIngestionRecordsPageResponse,
     GithubIngestionRunListItem,
@@ -18,7 +19,6 @@ from vector.contracts.connectors import (
     GithubIngestionSyncResponse,
     GithubRawIngestionRecordItem,
 )
-from vector.domains.canonical.worker import drain_github_canonical
 from vector.domains.connectors.github.errors import (
     GitHubApiError,
     GitHubConnectorNotConfiguredError,
@@ -35,12 +35,9 @@ from vector.domains.connectors.github.install_flow import (
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
-from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
 from vector.domains.ingestion.http_fetch import FetchFatalError
 from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_reachable
-from vector.domains.projections.github.worker import drain_github_projections
 from vector.infrastructure.db.repositories import ingestion_queries as ing_queries
-from vector.infrastructure.db.repositories.ingestion import RUN_STATUS_SUCCEEDED
 from vector.settings import Settings
 
 _logger = logging.getLogger(__name__)
@@ -144,33 +141,43 @@ def build_github_connector_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         claims: Annotated[SessionClaims, Depends(get_session_claims)],
         settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> GithubIngestionSyncResponse:
+    ) -> GithubIngestionSyncResponse | JSONResponse:
         """Poll GitHub REST and append resource-level raw ingestion rows (Step 1)."""
         try:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         preflight_mock_connectors_reachable(settings)
+        if settings.ingestion_async_github:
+            try:
+                run = connector_sync.enqueue_github_poll_sync(db, tenant_id=claims.tenant_id)
+            except FetchFatalError as e:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+            db.commit()
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content=GithubIngestionSyncResponse(
+                    run_id=run.id,
+                    status=run.status,
+                    error_summary=run.error_summary,
+                    stats=run.stats,
+                    accepted_async=True,
+                ).model_dump(mode="json"),
+            )
         try:
-            run = run_github_poll_ingestion_for_tenant(db, settings, claims.tenant_id)
+            run = connector_sync.run_github_poll_sync_with_drains(
+                db,
+                settings,
+                claims.tenant_id,
+            )
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-        if run.status == RUN_STATUS_SUCCEEDED:
-            drain_github_projections(
-                db,
-                tenant_id=claims.tenant_id,
-                connection_id=run.connection_id,
-            )
-            drain_github_canonical(
-                db,
-                tenant_id=claims.tenant_id,
-                connection_id=run.connection_id,
-            )
         return GithubIngestionSyncResponse(
             run_id=run.id,
             status=run.status,
             error_summary=run.error_summary,
             stats=run.stats,
+            accepted_async=False,
         )
 
     @r.get("/ingestion/runs", response_model=GithubIngestionRunsListResponse)

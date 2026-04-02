@@ -36,6 +36,10 @@ class GithubIngestionSyncResponse(BaseModel):
     status: str
     error_summary: str | None = None
     stats: dict[str, Any] | None = None
+    accepted_async: bool = Field(
+        default=False,
+        description="True when the pipeline was queued on the worker (HTTP 202).",
+    )
 
 
 class GithubIngestionRunListItem(BaseModel):

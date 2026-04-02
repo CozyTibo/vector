@@ -17,6 +17,17 @@ services:
       retries: 15
       start_period: 5s
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 3s
+
   mock-connectors:
     build:
       context: ./backend
@@ -64,10 +75,13 @@ services:
       # Mock runs as `mock-connectors` below; process env overrides `.env` (pydantic-settings).
       # Remove this line if the API container must call a mock on the host instead.
       VECTOR_MOCK_CONNECTOR_BASE_URL: http://mock-connectors:9183
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       mock-connectors:
         condition: service_healthy
@@ -109,6 +123,30 @@ services:
       - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
     depends_on:
       - backend
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://vector:vector@postgres:5432/vector}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./backend/src:/app/src
+      - ./backend/alembic:/app/alembic
+      - ./backend/pyproject.toml:/app/pyproject.toml
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./secrets:/run/secrets:ro
+    command: >
+      celery -A app.worker worker --loglevel=info
 
 volumes:
   vector_pgdata:

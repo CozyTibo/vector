@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
-import vector.api.http.routes.connectors.github as github_routes
+from vector.application.services import connector_sync
 from vector.domains.identity_access.services.session_jwt import issue_session_token
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.tenant import Tenant
@@ -111,8 +111,7 @@ def test_github_sync_ok_when_core_mocked(
     ) -> MagicMock:
         return mock_run
 
-    monkeypatch.setattr(github_routes, "run_github_poll_ingestion_for_tenant", _stub)
-    monkeypatch.setattr(github_routes, "drain_github_projections", lambda *_a, **_k: None)
+    monkeypatch.setattr(connector_sync, "run_github_poll_sync_with_drains", _stub)
     r = client.post("/connectors/github/sync")
     assert r.status_code == 200
     body = r.json()
@@ -120,3 +119,33 @@ def test_github_sync_ok_when_core_mocked(
     assert body["status"] == "succeeded"
     assert body["error_summary"] is None
     assert body["stats"] == {"records_written": 42}
+    assert body.get("accepted_async") is False
+
+
+def test_github_sync_async_returns_202_when_flag_on(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    _session_user_tenant(monkeypatch, client, db_session)
+    monkeypatch.setenv("INGESTION_ASYNC_GITHUB", "true")
+    get_settings.cache_clear()
+
+    run_id = uuid.uuid4()
+
+    def _fake_enqueue(session: Session, *, tenant_id: uuid.UUID) -> MagicMock:
+        m = MagicMock()
+        m.id = run_id
+        m.connection_id = uuid.uuid4()
+        m.status = "running"
+        m.error_summary = None
+        m.stats = None
+        return m
+
+    monkeypatch.setattr(connector_sync, "enqueue_github_poll_sync", _fake_enqueue)
+    r = client.post("/connectors/github/sync")
+    assert r.status_code == 202
+    body = r.json()
+    assert body["run_id"] == str(run_id)
+    assert body["status"] == "running"
+    assert body["accepted_async"] is True

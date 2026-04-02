@@ -42,6 +42,7 @@ from vector.domains.debug.github_pipeline_wipe import (
     rebuild_derived_from_step1_github,
     reset_github_pipeline_state,
 )
+from vector.application.services import connector_sync
 from vector.domains.ingestion.github_poll_sync import run_github_poll_ingestion_for_tenant
 from vector.domains.ingestion.http_fetch import FetchFatalError
 from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
@@ -365,20 +366,9 @@ def build_admin_router() -> APIRouter:
         _assert_tenant(db, tenant_id)
         preflight_mock_connectors_reachable(settings)
         try:
-            run = run_github_poll_ingestion_for_tenant(db, settings, tenant_id)
+            run = connector_sync.run_github_poll_sync_with_drains(db, settings, tenant_id)
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-        if run.status == RUN_STATUS_SUCCEEDED:
-            drain_github_projections(
-                db,
-                tenant_id=tenant_id,
-                connection_id=run.connection_id,
-            )
-            drain_github_canonical(
-                db,
-                tenant_id=tenant_id,
-                connection_id=run.connection_id,
-            )
         return {
             "run_id": str(run.id),
             "status": run.status,

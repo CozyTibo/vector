@@ -5,6 +5,8 @@ COMPOSE ?= docker compose
 BACKEND_SERVICE := backend
 FRONTEND_SERVICE := frontend
 POSTGRES_SERVICE := postgres
+REDIS_SERVICE := redis
+CELERY_WORKER_SERVICE := celery-worker
 DOTENV := .env
 
 POSTGRES_USER ?= vector
@@ -13,7 +15,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build mock-help
+.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-inspect redis-monitor celery-logs
 
 mock-help:
 	@$(MAKE) -f Makefile.mock help-mock
@@ -43,6 +45,10 @@ help:
 	@echo "  make logs-frontend   docker compose logs -f frontend"
 	@echo "  Note: reinstall keeps DB volume; use 'docker compose down -v' to wipe data."
 	@echo "  make mock-help          local GitHub/Linear mocks (Makefile.mock; dev-only)"
+	@echo "  make celery-tasks       list Celery task names (from app.worker; no worker required)"
+	@echo "  make celery-inspect     ask running workers: registered / active / stats (stack + worker up)"
+	@echo "  make redis-monitor      stream all Redis commands (verbose; Ctrl+C to stop)"
+	@echo "  make celery-logs        follow celery-worker logs (readable task activity)"
 
 setup: $(DOTENV)
 	$(COMPOSE) build
@@ -137,3 +143,29 @@ fmt: $(DOTENV)
 
 check: mypy lint test
 	@echo "check: OK"
+
+# --- Celery / Redis (broker) — stack should be up for exec-based targets ---
+
+# Lists tasks registered on the Celery app (import-time); does not require a worker.
+celery-tasks: $(DOTENV)
+	@echo "Celery tasks (excluding celery.* builtins):"
+	@$(COMPOSE) run --rm $(BACKEND_SERVICE) python -c "from app.worker import app; print('\n'.join(sorted(k for k in app.tasks if not k.startswith('celery.'))))"
+
+# Broadcast to workers via Redis — requires celery-worker (and Redis) up.
+celery-inspect: $(DOTENV)
+	@echo "=== inspect registered ==="
+	@$(COMPOSE) exec $(CELERY_WORKER_SERVICE) celery -A app.worker inspect registered
+	@echo ""
+	@echo "=== inspect active ==="
+	@$(COMPOSE) exec $(CELERY_WORKER_SERVICE) celery -A app.worker inspect active
+	@echo ""
+	@echo "=== inspect stats ==="
+	@$(COMPOSE) exec $(CELERY_WORKER_SERVICE) celery -A app.worker inspect stats
+
+# Raw stream of every command Redis receives (includes Celery broker traffic). Very noisy.
+redis-monitor: $(DOTENV)
+	@$(COMPOSE) exec $(REDIS_SERVICE) redis-cli MONITOR
+
+# Human-readable: which tasks ran, errors, retries (requires celery-worker service).
+celery-logs: $(DOTENV)
+	@$(COMPOSE) logs -f $(CELERY_WORKER_SERVICE)

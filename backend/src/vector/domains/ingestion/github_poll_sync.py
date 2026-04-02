@@ -117,27 +117,26 @@ def _flush_batch(
     session.commit()
 
 
-def run_github_poll_ingestion_for_tenant(
+def execute_github_poll_ingestion_run(
     session: Session,
     settings: Settings,
-    tenant_id: uuid.UUID,
+    run: IngestionRun,
 ) -> IngestionRun:
-    """Poll GitHub for the tenant’s linked installation; append raw rows."""
-    link = gh_repo.get_github_connection_for_tenant(session, tenant_id)
-    if link is None:
-        msg = "GitHub is not connected for this tenant"
-        raise FetchFatalError(msg)
+    """Poll GitHub Step 1 for an existing `ingestion_runs` row (expected status: running)."""
+    link = gh_repo.get_github_connection_for_tenant(session, run.tenant_id)
+    if link is None or link.connection.id != run.connection_id:
+        stats: dict[str, int] = {"records_written": 0}
+        ing_repo.finish_ingestion_run(
+            session,
+            run,
+            status=ing_repo.RUN_STATUS_FAILED,
+            error_summary="GitHub connection not found or does not match this run",
+            stats=stats,
+        )
+        session.commit()
+        return run
 
-    run = ing_repo.create_ingestion_run(
-        session,
-        tenant_id=tenant_id,
-        connection_id=link.connection.id,
-        connector=CONNECTOR,
-        source_trigger=SOURCE_POLL,
-    )
-    session.commit()
-
-    stats: dict[str, int] = {"records_written": 0}
+    stats = {"records_written": 0}
     executor = FetchExecutor()
 
     try:
@@ -195,6 +194,29 @@ def run_github_poll_ingestion_for_tenant(
         session.commit()
 
     return run
+
+
+def run_github_poll_ingestion_for_tenant(
+    session: Session,
+    settings: Settings,
+    tenant_id: uuid.UUID,
+) -> IngestionRun:
+    """Poll GitHub for the tenant’s linked installation; append raw rows."""
+    link = gh_repo.get_github_connection_for_tenant(session, tenant_id)
+    if link is None:
+        msg = "GitHub is not connected for this tenant"
+        raise FetchFatalError(msg)
+
+    run = ing_repo.create_ingestion_run(
+        session,
+        tenant_id=tenant_id,
+        connection_id=link.connection.id,
+        connector=CONNECTOR,
+        source_trigger=SOURCE_POLL,
+    )
+    session.commit()
+
+    return execute_github_poll_ingestion_run(session, settings, run)
 
 
 def _run_with_token(
