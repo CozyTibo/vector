@@ -153,5 +153,26 @@ services:
     command: >
       celery -A app.worker worker --loglevel=info
 
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://vector:vector@postgres:5432/vector}
+      REDIS_URL: redis://redis:6379/0
+      VECTOR_MOCK_CONNECTOR_BASE_URL: http://mock-connectors:9183
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./backend/src:/app/src
+      - ./backend/pyproject.toml:/app/pyproject.toml
+      - ./backend/alembic.ini:/app/alembic.ini
+    command: >
+      celery -A app.worker beat --loglevel=info
+
 volumes:
   vector_pgdata:

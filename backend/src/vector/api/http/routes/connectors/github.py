@@ -129,6 +129,15 @@ def build_github_connector_router() -> APIRouter:
                 url=f"{front}/?github_error=server",
                 status_code=status.HTTP_302_FOUND,
             )
+        if settings.post_connect_enqueue_ingestion:
+            try:
+                preflight_mock_connectors_reachable(settings)
+                connector_sync.enqueue_github_poll_sync(db, tenant_id=_link.tenant_id)
+            except Exception as exc:
+                _logger.warning(
+                    "post-connect GitHub enqueue failed (POST /connectors/github/sync): %s",
+                    exc,
+                )
         ok = (
             f"{front}{return_to}?github_connected=1"
             if return_to

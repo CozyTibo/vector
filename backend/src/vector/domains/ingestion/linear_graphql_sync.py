@@ -552,28 +552,49 @@ def _ingest_paginated(
             session.commit()
 
 
-def run_linear_graphql_ingestion_for_tenant(
+def execute_linear_graphql_ingestion_run(
     session: Session,
     settings: Settings,
-    tenant_id: uuid.UUID,
+    run: IngestionRun,
 ) -> IngestionRun:
-    """POST GraphQL to Linear; one raw row per resource node (and one for viewer)."""
-    link = linear_repo.get_linear_connection_for_tenant(session, tenant_id)
-    if link is None:
-        raise FetchFatalError("Linear is not connected for this tenant")
+    """POST GraphQL Step 1 for an existing `ingestion_runs` row (expected status: running)."""
+    if run.connector != CONNECTOR:
+        stats: dict[str, int] = {"records_written": 0}
+        ing_repo.finish_ingestion_run(
+            session,
+            run,
+            status=ing_repo.RUN_STATUS_FAILED,
+            error_summary="ingestion run connector mismatch",
+            stats=stats,
+        )
+        session.commit()
+        return run
+
+    link = linear_repo.get_linear_connection_for_tenant(session, run.tenant_id)
+    if link is None or link.connection.id != run.connection_id:
+        stats = {"records_written": 0}
+        ing_repo.finish_ingestion_run(
+            session,
+            run,
+            status=ing_repo.RUN_STATUS_FAILED,
+            error_summary="Linear connection not found or does not match this run",
+            stats=stats,
+        )
+        session.commit()
+        return run
 
     token = link.detail.access_token
     if not token or not str(token).strip():
-        raise FetchFatalError("Linear access token is missing")
-
-    run = ing_repo.create_ingestion_run(
-        session,
-        tenant_id=tenant_id,
-        connection_id=link.connection.id,
-        connector=CONNECTOR,
-        source_trigger=SOURCE_POLL,
-    )
-    session.commit()
+        stats = {"records_written": 0}
+        ing_repo.finish_ingestion_run(
+            session,
+            run,
+            status=ing_repo.RUN_STATUS_FAILED,
+            error_summary="Linear access token is missing",
+            stats=stats,
+        )
+        session.commit()
+        return run
 
     stats: dict[str, int] = {"records_written": 0}
     executor = FetchExecutor()
@@ -775,3 +796,29 @@ def run_linear_graphql_ingestion_for_tenant(
         executor.close()
 
     return run
+
+
+def run_linear_graphql_ingestion_for_tenant(
+    session: Session,
+    settings: Settings,
+    tenant_id: uuid.UUID,
+) -> IngestionRun:
+    """POST GraphQL to Linear; one raw row per resource node (and one for viewer)."""
+    link = linear_repo.get_linear_connection_for_tenant(session, tenant_id)
+    if link is None:
+        raise FetchFatalError("Linear is not connected for this tenant")
+
+    token = link.detail.access_token
+    if not token or not str(token).strip():
+        raise FetchFatalError("Linear access token is missing")
+
+    run = ing_repo.create_ingestion_run(
+        session,
+        tenant_id=tenant_id,
+        connection_id=link.connection.id,
+        connector=CONNECTOR,
+        source_trigger=SOURCE_POLL,
+    )
+    session.commit()
+
+    return execute_linear_graphql_ingestion_run(session, settings, run)

@@ -11,10 +11,14 @@ from vector.domains.ingestion.github_poll_sync import (
     run_github_poll_ingestion_for_tenant,
 )
 from vector.domains.ingestion.http_fetch import FetchFatalError
-from vector.domains.ingestion.linear_graphql_sync import run_linear_graphql_ingestion_for_tenant
+from vector.domains.ingestion.linear_graphql_sync import (
+    execute_linear_graphql_ingestion_run,
+    run_linear_graphql_ingestion_for_tenant,
+)
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import ingestion as ing_repo
+from vector.infrastructure.db.repositories import linear_connection as linear_repo
 from vector.settings import Settings
 
 
@@ -43,6 +47,34 @@ def enqueue_github_poll_sync(
     )
     session.flush()
     github_execute_poll_run.delay(str(run.id))
+    return run
+
+
+def enqueue_linear_poll_sync(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> IngestionRun:
+    """Create a Linear ingestion run and queue Step 1 (+ drains) on the worker.
+
+    Caller must commit the session after this returns so the run is visible to the worker.
+    """
+    from app.tasks.ingestion import linear_execute_poll_run
+
+    link = linear_repo.get_linear_connection_for_tenant(session, tenant_id)
+    if link is None:
+        msg = "Linear is not connected for this tenant"
+        raise FetchFatalError(msg)
+
+    run = ing_repo.create_ingestion_run(
+        session,
+        tenant_id=tenant_id,
+        connection_id=link.connection.id,
+        connector=ing_repo.CONNECTOR_LINEAR,
+        source_trigger=ing_repo.SOURCE_TRIGGER_POLL,
+    )
+    session.flush()
+    linear_execute_poll_run.delay(str(run.id))
     return run
 
 
@@ -89,6 +121,30 @@ def run_linear_poll_sync_with_projections(
         drain_linear_canonical(
             session,
             tenant_id=tenant_id,
+            connection_id=run.connection_id,
+        )
+    return run
+
+
+def run_linear_execute_poll_run_inline(
+    session: Session,
+    settings: Settings,
+    run: IngestionRun,
+) -> IngestionRun:
+    """Linear Step 1 for an existing run, then projection + canonical (worker/admin parity)."""
+    from vector.domains.canonical.worker import drain_linear_canonical
+    from vector.domains.projections.linear.worker import drain_linear_projections
+
+    run = execute_linear_graphql_ingestion_run(session, settings, run)
+    if run.status == ing_repo.RUN_STATUS_SUCCEEDED:
+        drain_linear_projections(
+            session,
+            tenant_id=run.tenant_id,
+            connection_id=run.connection_id,
+        )
+        drain_linear_canonical(
+            session,
+            tenant_id=run.tenant_id,
             connection_id=run.connection_id,
         )
     return run

@@ -94,15 +94,15 @@ def test_linear_sync_ok_when_core_mocked(
 
     def _stub(
         session: Session,
-        settings: Any,
+        *,
         tenant_id: uuid.UUID,
     ) -> MagicMock:
         return mock_run
 
     monkeypatch.setattr(linear_routes, "preflight_mock_connectors_reachable", lambda *_a, **_k: None)
-    monkeypatch.setattr(connector_sync, "run_linear_poll_sync_with_projections", _stub)
+    monkeypatch.setattr(connector_sync, "enqueue_linear_poll_sync", _stub)
     r = client.post("/connectors/linear/sync")
-    assert r.status_code == 200
+    assert r.status_code == 202
     body = r.json()
     assert body["run_id"] == str(run_id)
     assert body["status"] == "succeeded"

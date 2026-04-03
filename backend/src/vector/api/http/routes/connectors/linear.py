@@ -104,6 +104,15 @@ def build_linear_connector_router() -> APIRouter:
                 url=f"{front}/?linear_error=server",
                 status_code=status.HTTP_302_FOUND,
             )
+        if settings.post_connect_enqueue_ingestion:
+            try:
+                preflight_mock_connectors_reachable(settings)
+                connector_sync.enqueue_linear_poll_sync(db, tenant_id=_link.tenant_id)
+            except Exception as exc:
+                _logger.warning(
+                    "post-connect Linear enqueue failed (POST /connectors/linear/sync): %s",
+                    exc,
+                )
         ok = (
             f"{front}{return_to}?linear_connected=1"
             if return_to
@@ -111,26 +120,27 @@ def build_linear_connector_router() -> APIRouter:
         )
         return RedirectResponse(url=ok, status_code=status.HTTP_302_FOUND)
 
-    @r.post("/sync", response_model=LinearIngestionSyncResponse)
+    @r.post(
+        "/sync",
+        response_model=LinearIngestionSyncResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
     def linear_graphql_sync(
         db: Annotated[Session, Depends(get_db)],
         claims: Annotated[SessionClaims, Depends(get_session_claims)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> LinearIngestionSyncResponse:
-        """Poll Linear GraphQL (Step 1), then drain Step 2 projections for this connection."""
+        """Enqueue Linear GraphQL ingestion (Step 1–3 run on the Celery worker)."""
         try:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         preflight_mock_connectors_reachable(settings)
         try:
-            run = connector_sync.run_linear_poll_sync_with_projections(
-                db,
-                settings,
-                claims.tenant_id,
-            )
+            run = connector_sync.enqueue_linear_poll_sync(db, tenant_id=claims.tenant_id)
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        db.commit()
         return LinearIngestionSyncResponse(
             run_id=run.id,
             status=run.status,

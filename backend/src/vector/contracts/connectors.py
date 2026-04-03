@@ -88,7 +88,7 @@ class GithubIngestionRecordsPageResponse(BaseModel):
 
 
 class LinearIngestionSyncResponse(BaseModel):
-    """Result of POST /connectors/linear/sync (Step 1 GraphQL ingestion)."""
+    """Result of POST /connectors/linear/sync — run is queued (HTTP 202); Step 1 runs on the worker."""
 
     model_config = ConfigDict(extra="forbid")
 

@@ -15,7 +15,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-inspect redis-monitor celery-logs
+.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-restart celery-inspect redis-monitor celery-logs
 
 mock-help:
 	@$(MAKE) -f Makefile.mock help-mock
@@ -150,6 +150,10 @@ check: mypy lint test
 celery-tasks: $(DOTENV)
 	@echo "Celery tasks (excluding celery.* builtins):"
 	@$(COMPOSE) run --rm $(BACKEND_SERVICE) python -c "from app.worker import app; print('\n'.join(sorted(k for k in app.tasks if not k.startswith('celery.'))))"
+
+# Celery does not reload Python when ./backend/src is bind-mounted; restart after task edits.
+celery-restart: $(DOTENV)
+	$(COMPOSE) restart $(CELERY_WORKER_SERVICE)
 
 # Broadcast to workers via Redis — requires celery-worker (and Redis) up.
 celery-inspect: $(DOTENV)

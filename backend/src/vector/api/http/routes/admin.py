@@ -32,7 +32,12 @@ from vector.contracts.admin import (
     TenantListItem,
     TenantListResponse,
 )
-from vector.contracts.connectors import GithubIngestionRunListItem, GithubIngestionRunsListResponse
+from vector.contracts.connectors import (
+    GithubIngestionRunListItem,
+    GithubIngestionRunsListResponse,
+    LinearIngestionRunListItem,
+    LinearIngestionRunsListResponse,
+)
 from vector.contracts.debug_canonical import (
     CanonicalStatusResponse,
     PaginatedResponse,
@@ -465,20 +470,24 @@ def build_admin_router() -> APIRouter:
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> dict[str, Any]:
-        """Linear GraphQL Step 1 raw rows only (product linear/sync parity)."""
+    ) -> JSONResponse:
+        """Enqueue Linear ingestion (same strategy as POST /connectors/linear/sync)."""
         _assert_tenant(db, tenant_id)
         preflight_mock_connectors_reachable(settings)
         try:
-            run = connector_sync.run_linear_poll_sync_with_projections(db, settings, tenant_id)
+            run = connector_sync.enqueue_linear_poll_sync(db, tenant_id=tenant_id)
         except FetchFatalError as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-        return {
-            "run_id": str(run.id),
-            "status": run.status,
-            "error_summary": run.error_summary,
-            "stats": run.stats,
-        }
+        db.commit()
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "run_id": str(run.id),
+                "status": run.status,
+                "error_summary": run.error_summary,
+                "stats": run.stats,
+            },
+        )
 
     @r.get(
         "/tenants/{tenant_id}/github/ingestion/runs",
@@ -511,6 +520,38 @@ def build_admin_router() -> APIRouter:
             for run in runs
         ]
         return GithubIngestionRunsListResponse(items=items)
+
+    @r.get(
+        "/tenants/{tenant_id}/linear/ingestion/runs",
+        response_model=LinearIngestionRunsListResponse,
+    )
+    def list_linear_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> LinearIngestionRunsListResponse:
+        _assert_tenant(db, tenant_id)
+        runs = ing_queries.list_linear_ingestion_runs_for_tenant(
+            db,
+            tenant_id,
+            limit=limit,
+        )
+        counts = ing_queries.record_counts_for_run_ids(db, [r.id for r in runs])
+        items = [
+            LinearIngestionRunListItem(
+                id=run.id,
+                connection_id=run.connection_id,
+                status=run.status,
+                source_trigger=run.source_trigger,
+                started_at=run.started_at,
+                finished_at=run.finished_at,
+                error_summary=run.error_summary,
+                stats=run.stats,
+                records_written=counts.get(run.id, 0),
+            )
+            for run in runs
+        ]
+        return LinearIngestionRunsListResponse(items=items)
 
     @r.get(
         "/tenants/{tenant_id}/projections/github/{connection_id}/rows",

@@ -13,6 +13,7 @@ import {
   fetchCanonicalStatus,
   fetchExternalReferencesPage,
   fetchGithubIngestionRuns,
+  fetchLinearIngestionRuns,
   fetchRelationshipsPage,
   fetchSubgraphByActor,
   fetchSubgraphByArtifact,
@@ -80,13 +81,21 @@ export default function CanonicalDebugPage({
   const connectionFromUrl = searchParams.get("connection_id") ?? "";
   const statusConnector = searchParams.get("connector") ?? "github";
 
-  const runsQuery = useQuery({
+  const githubRunsQuery = useQuery({
     queryKey: ["github-ingestion-runs", cqTag],
     queryFn: () => fetchGithubIngestionRuns(canonicalClient),
   });
 
+  const linearRunsQuery = useQuery({
+    queryKey: ["linear-ingestion-runs", cqTag],
+    queryFn: () => fetchLinearIngestionRuns(canonicalClient),
+  });
+
   const connectionOptions = useMemo(() => {
-    const items = runsQuery.data?.items ?? [];
+    const items =
+      statusConnector === "linear"
+        ? (linearRunsQuery.data?.items ?? [])
+        : (githubRunsQuery.data?.items ?? []);
     const seen = new Set<string>();
     const out: { id: string; label: string }[] = [];
     for (const r of items) {
@@ -96,7 +105,7 @@ export default function CanonicalDebugPage({
       }
     }
     return out;
-  }, [runsQuery.data?.items]);
+  }, [statusConnector, githubRunsQuery.data?.items, linearRunsQuery.data?.items]);
 
   const [statusConnectionId, setStatusConnectionId] = useState(connectionFromUrl);
   const [resetConfirmText, setResetConfirmText] = useState("");
@@ -197,7 +206,7 @@ export default function CanonicalDebugPage({
         `Reset complete. Ingestion run ${out.ingestion_run_id} (${out.ingestion_status}). ` +
         `Projected ${out.projection_rows_processed} raw rows; canonical processed ${out.canonical_rows_processed}.`;
       setResetMessage(out.warning ? `${msg} ${out.warning}` : msg);
-      await runsQuery.refetch();
+      await githubRunsQuery.refetch();
       await statusQuery.refetch();
     } catch (e) {
       setResetError((e as Error).message);
@@ -671,7 +680,8 @@ export default function CanonicalDebugPage({
         <section className="card">
           <p className="meta" style={{ marginBottom: "0.75rem" }}>
             Pipeline health for Step 3 (canonical) vs Step 2 (projections), per connector
-            connection. Choose a connection or paste its UUID. Deep link:{" "}
+            connection. The dropdown lists connection IDs from recent Step 1 ingestion runs for the
+            selected connector (GitHub vs Linear). You can also paste a UUID. Deep link:{" "}
             <code className="cell-muted">
               ?connection_id=&lt;uuid&gt;&amp;tab=status&amp;connector=linear
             </code>
@@ -684,8 +694,10 @@ export default function CanonicalDebugPage({
                 value={statusConnector}
                 onChange={(ev) => {
                   const v = ev.target.value;
+                  setStatusConnectionId("");
                   setSearchParams((prev) => {
                     const p = new URLSearchParams(prev);
+                    p.delete("connection_id");
                     if (v && v !== "github") {
                       p.set("connector", v);
                     } else {
@@ -757,8 +769,11 @@ export default function CanonicalDebugPage({
               }
             />
           </div>
-          {runsQuery.isError ? (
-            <p className="banner error">Could not load runs: {(runsQuery.error as Error).message}</p>
+          {(statusConnector === "linear" ? linearRunsQuery : githubRunsQuery).isError ? (
+            <p className="banner error">
+              Could not load runs:{" "}
+              {((statusConnector === "linear" ? linearRunsQuery : githubRunsQuery).error as Error).message}
+            </p>
           ) : null}
           {statusQuery.isError ? (
             <p className="banner error">{(statusQuery.error as Error).message}</p>

@@ -460,3 +460,30 @@ export async function fetchGithubIngestionRuns(c: CanonicalClient): Promise<Inge
   const body = (await res.json()) as { items: { id: string; connection_id: string }[] };
   return { items: body.items };
 }
+
+/** Same shape as GitHub — distinct connection_ids from recent Linear Step 1 runs. */
+export async function fetchLinearIngestionRuns(c: CanonicalClient): Promise<IngestionRunsResponse> {
+  if (c.kind === "session") {
+    const res = await fetch(`${c.base}/connectors/linear/ingestion/runs`, fetchInit(c));
+    if (res.status === 401) {
+      throw new Error("Not signed in");
+    }
+    if (!res.ok) {
+      throw new Error(await readErrorDetail(res));
+    }
+    const body = (await res.json()) as { items: { id: string; connection_id: string }[] };
+    return { items: body.items };
+  }
+  const res = await fetch(
+    `${c.base}/admin/tenants/${c.tenantId}/linear/ingestion/runs`,
+    fetchInit(c),
+  );
+  if (res.status === 401) {
+    throw new Error("Admin authentication failed");
+  }
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  const body = (await res.json()) as { items: { id: string; connection_id: string }[] };
+  return { items: body.items };
+}
