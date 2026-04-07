@@ -15,6 +15,8 @@ from vector.api.http.serialization import orm_to_dict
 from vector.application.services import connector_sync
 from vector.contracts.admin import (
     AdminConnectionsResponse,
+    AdminHardDeleteTenantRequest,
+    AdminHardDeleteTenantResponse,
     AdminStep1RawResetRequest,
     AdminStep1RawResetResponse,
     AdminStep2ProjectionsResetRequest,
@@ -27,6 +29,7 @@ from vector.contracts.admin import (
     RawIngestionAdminDetailResponse,
     RawIngestionAdminItem,
     RawIngestionAdminPage,
+    SlackStakeholdersSnapshot,
     TenantAdminDetailResponse,
     TenantConnectionAdminItem,
     TenantListItem,
@@ -71,6 +74,10 @@ from vector.domains.ingestion.step2_step3_reset import (
     wipe_step3_canonical_for_tenant,
 )
 from vector.domains.projections.github.worker import drain_github_projections
+from vector.domains.tenancy.hard_delete_tenant import (
+    HARD_DELETE_TENANT_CONFIRMATION_PHRASE,
+    hard_delete_tenant,
+)
 from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.repositories import canonical_debug_queries as cq
@@ -155,6 +162,24 @@ def _tools_category(ans: dict[str, object], key: str) -> list[str]:
     return [str(x) for x in v if isinstance(x, str)]
 
 
+def _slack_stakeholders_from_answers(ans: dict[str, object]) -> SlackStakeholdersSnapshot | None:
+    raw = ans.get("slack_stakeholders")
+    if not isinstance(raw, dict):
+        return None
+    rt = raw.get("raw_text")
+    ids = raw.get("slack_user_ids")
+    text_out: str | None = None
+    if isinstance(rt, str):
+        s = rt.strip()
+        text_out = s if s else None
+    uid_list: list[str] = []
+    if isinstance(ids, list):
+        uid_list = list(dict.fromkeys(str(x) for x in ids if isinstance(x, str)))
+    if text_out is None and not uid_list:
+        return None
+    return SlackStakeholdersSnapshot(raw_text=text_out, slack_user_ids=uid_list)
+
+
 def _snapshot_from_onboarding(
     session: Session, row: OnboardingState | None
 ) -> OnboardingAdminSnapshot | None:
@@ -184,7 +209,9 @@ def _snapshot_from_onboarding(
         tools_pm=_tools_category(ans, "pm"),
         tools_communication=_tools_category(ans, "communication"),
         tools_docs=_tools_category(ans, "docs"),
+        tools_crm=_tools_category(ans, "crm"),
         tools_stack=_tools_stack(ans),
+        slack_stakeholders=_slack_stakeholders_from_answers(ans),
         chat_messages=msgs,
     )
 
@@ -224,6 +251,61 @@ def build_admin_router() -> APIRouter:
                 ),
             )
         return TenantListResponse(items=items)
+
+    @r.post(
+        "/tenants/{tenant_id}/hard-delete",
+        response_model=AdminHardDeleteTenantResponse,
+    )
+    def admin_hard_delete_tenant(
+        tenant_id: uuid.UUID,
+        body: AdminHardDeleteTenantRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminHardDeleteTenantResponse:
+        """Hard-delete tenant and all tenant-scoped product data.
+
+        Users are kept; memberships for this tenant are removed via FK cascade.
+        """
+        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
+        if t is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        if body.confirmation != HARD_DELETE_TENANT_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        if t.company_name.strip() != body.company_name_confirmation.strip():
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Company name does not match this tenant.",
+            ) from None
+        try:
+            out = hard_delete_tenant(db, tenant_id=tenant_id)
+        except ValueError as e:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        db.commit()
+        s3 = out["step3"]
+        s2 = out["step2"]
+        s1 = out["step1"]
+        return AdminHardDeleteTenantResponse(
+            deleted_tenant_id=tenant_id,
+            deleted_company_name=out["deleted_company_name"],
+            deleted_relationships=s3["deleted_relationships"],
+            deleted_mapping_events=s3["deleted_mapping_events"],
+            deleted_current_mappings=s3["deleted_current_mappings"],
+            deleted_external_references=s3["deleted_external_references"],
+            deleted_actor_external_identities=s3["deleted_actor_external_identities"],
+            deleted_artifacts=s3["deleted_artifacts"],
+            deleted_actors=s3["deleted_actors"],
+            deleted_step3_canonical_cursors=s3["deleted_step3_canonical_cursors"],
+            deleted_github_projection_rows=s2["deleted_github_projection_rows"],
+            deleted_linear_projection_rows=s2["deleted_linear_projection_rows"],
+            deleted_connector_projection_progress_rows=s2[
+                "deleted_connector_projection_progress_rows"
+            ],
+            deleted_raw_records=s1["deleted_raw_records"],
+            deleted_ingestion_runs=s1["deleted_ingestion_runs"],
+            deleted_sync_state_rows=s1["deleted_sync_state_rows"],
+        )
 
     @r.get("/tenants/{tenant_id}", response_model=TenantAdminDetailResponse)
     def get_tenant(

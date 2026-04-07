@@ -7,6 +7,9 @@ from typing import Any
 
 from openai import OpenAI
 
+from vector.domains.onboarding.connectors_intro_qa_context import (
+    CONNECTORS_INTRO_QA_PRODUCT_GUIDE,
+)
 from vector.domains.onboarding.constants import (
     PROFILE_PHASE_CONNECTORS_INTRO,
     PROFILE_PHASE_NAME,
@@ -226,7 +229,7 @@ connector (e.g. Linear, GitHub) unless the instruction or deterministic context 
 def _fallback_connectors_intro_after_size_bubbles() -> list[str]:
     """Two chat bubbles: quick ack, then reassurance + CTA (offline / deterministic)."""
     return [
-        "That's a solid team size.",
+        "Thanks, that helps me understand the scale of the org.",
         (
             "Okay, now a quick note on how this works before we pick tools.\n\n"
             "I pick up light signals from the stuff your team already uses so I can stay oriented "
@@ -287,6 +290,16 @@ def generate_onboarding_reply(
             "Do not contradict it; if asked for something outside it, say so.\n"
             f"{kb.strip()}"
         )
+    if intro_kind == "qa" and isinstance(kb, str) and kb.strip():
+        guide = CONNECTORS_INTRO_QA_PRODUCT_GUIDE.strip()
+        if guide:
+            system_prompt = (
+                f"{system_prompt}\n\n## Pre-tools Q&A: product and trust (grounding)\n"
+                "The user chose to ask questions before picking tools. Use this for capabilities, "
+                "positioning, and how Vector works. For Slack/GitHub/Linear/docs specifics, prefer "
+                "the connectors and privacy block above when it applies.\n"
+                f"{guide}"
+            )
 
     profile_phase = answers_json.get("profile_phase")
     phase_s = profile_phase if isinstance(profile_phase, str) else ""
@@ -368,6 +381,8 @@ Readable summary:
 
     if intro_kind == "after_size":
         max_out = 200
+    elif intro_kind == "qa" and isinstance(kb, str) and kb.strip():
+        max_out = 320
     elif isinstance(kb, str) and kb.strip():
         max_out = 280
     else:

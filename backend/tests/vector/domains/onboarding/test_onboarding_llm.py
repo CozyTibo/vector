@@ -87,7 +87,7 @@ def test_connectors_intro_after_size_fallback_is_two_bubbles_without_openai() ->
         settings=no_ai,
     )
     assert len(out) == 2
-    assert "solid team size" in out[0].lower()
+    assert "scale of the org" in out[0].lower()
     assert "signal" in out[1].lower()
     assert "okay" in out[1].lower() or "quick" in out[1].lower()
 

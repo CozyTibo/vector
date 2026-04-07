@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from vector.domains.onboarding.answer_normalize import (
+    company_size_persisted_value,
     normalize_company_name,
-    normalize_company_size,
     normalize_person_name,
     normalize_role,
+    role_answer_looks_like_headcount_instead,
 )
 from vector.domains.onboarding.connectors_privacy_kb import (
     CONNECTORS_PRIVACY_KNOWLEDGE_BASE,
@@ -24,11 +25,11 @@ from vector.domains.onboarding.constants import (
     PROFILE_PHASE_TOOLS,
     PROFILE_PHASE_WEBSITE,
     PROFILE_PHASES_ORDER,
+    STEP_ADMIN_ACCESS,
     STEP_CHAT_PROFILE,
     STEP_CONNECT_COMMUNICATION,
-    STEP_CONNECT_GITHUB,
-    STEP_CONNECT_LINEAR,
     STEP_SCANNING,
+    STEP_SLACK_STAKEHOLDERS,
     STEP_THANK_YOU,
     TOOL_CATEGORY_KEYS,
 )
@@ -42,7 +43,7 @@ class OnboardingTurnResult:
 
 
 _CONNECTORS_INTRO_AFTER_SIZE_INSTRUCTION = (
-    "They just gave company headcount (latest user message). The UI sends this as TWO chat "
+    "They just gave organization-wide headcount (latest user message). The UI sends this as TWO chat "
     "bubbles (see format rules in your prompt tail).\n\n"
     "Voice: casual Slack DM from a teammate you like working with. Warm, a little human, not "
     "corporate and not a compliance readout. Do NOT open bubble 2 with stiff lines like "
@@ -64,8 +65,10 @@ _CONNECTORS_INTRO_AFTER_SIZE_INSTRUCTION = (
 )
 
 _CONNECTORS_INTRO_QA_INSTRUCTION = (
-    "Connectors/privacy Q&A. Answer ONLY from the ground-truth KB in your system prompt. "
-    "If not covered, say so and point to policies or their Vector contact for legal/DPA. "
+    "Pre-tools Q&A: the user unlocked chat to ask questions. Use the product guide AND the "
+    "connectors/privacy ground-truth KB in your system prompt. Do not contradict the KB on "
+    "tool-specific data posture; use the guide for big-picture product and trust. "
+    "If something is not covered, say so and point to policies or their Vector contact for legal/DPA. "
     "Tone: same casual Slack-coworker energy as the rest of onboarding, not formal support. "
     "Two to four short sentences, under 100 words, airy spacing: use a blank line between two thoughts if "
     "it helps scan. No em dash (U+2014). Remind once they can use the **I'm ready to choose tools** "
@@ -123,37 +126,21 @@ def _merge_tools_categories(
 
 
 def _connect_queue_from_tools(tools: dict[str, list[str]]) -> list[str]:
-    """Order: communication (Slack, or Teams/Discord placeholder) → Linear → GitHub."""
+    """Onboarding OAuth queue: Slack, or Teams/Discord placeholder only (no Linear/GitHub in-flow)."""
     q: list[str] = []
     comm = tools.get("communication") or []
-    pm = tools.get("pm") or []
-    eng = tools.get("engineering") or []
     if "slack" in comm:
         q.append("slack")
     elif "ms_teams" in comm or "discord" in comm:
         q.append("comm_placeholder")
-    if "linear" in pm:
-        q.append("linear")
-    if "github" in eng:
-        q.append("github")
     return q
 
 
-def _queue_skip_connected(
-    queue: list[str],
-    *,
-    slack_connected: bool,
-    linear_connected: bool,
-    github_connected: bool,
-) -> list[str]:
-    """Drop OAuth queue entries that are already linked for this workspace (e.g. after edit tools)."""
+def _queue_skip_connected(queue: list[str], *, slack_connected: bool) -> list[str]:
+    """Drop Slack from the queue when already linked (e.g. after edit tools)."""
     out: list[str] = []
     for item in queue:
         if item == "slack" and slack_connected:
-            continue
-        if item == "linear" and linear_connected:
-            continue
-        if item == "github" and github_connected:
             continue
         out.append(item)
     return out
@@ -165,10 +152,19 @@ def _first_connect_step(connect_queue: list[str]) -> str:
     head = connect_queue[0]
     if head in ("slack", "comm_placeholder"):
         return STEP_CONNECT_COMMUNICATION
-    if head == "linear":
-        return STEP_CONNECT_LINEAR
-    if head == "github":
-        return STEP_CONNECT_GITHUB
+    return STEP_SCANNING
+
+
+def _next_step_after_tool_connect_queue(
+    connect_queue: list[str],
+    tools: dict[str, list[str]],
+) -> str:
+    """When the OAuth queue is empty after tool selection, skip to the right post-connect step."""
+    if connect_queue:
+        return _first_connect_step(connect_queue)
+    comm = tools.get("communication") or []
+    if isinstance(comm, list) and "slack" in comm:
+        return STEP_SLACK_STAKEHOLDERS
     return STEP_SCANNING
 
 
@@ -176,8 +172,6 @@ def _oauth_connector_labels_in_order(connect_queue: list[str]) -> list[str]:
     mapping = {
         "slack": "Slack",
         "comm_placeholder": "Microsoft Teams or Discord",
-        "linear": "Linear",
-        "github": "GitHub",
     }
     return [mapping[x] for x in connect_queue if x in mapping]
 
@@ -185,8 +179,9 @@ def _oauth_connector_labels_in_order(connect_queue: list[str]) -> list[str]:
 def _tools_post_pick_instruction(*, prior: bool, oauth_labels: list[str]) -> str:
     """LLM instructions grounded in actual OAuth queue."""
     slack_line = (
-        "Connectors run in order: communication tools first (Slack when selected), "
-        "then project tools (Linear when selected), then engineering (GitHub when selected)."
+        "During onboarding we only connect communication tools in the product: Slack when selected, "
+        "or a short step for Microsoft Teams / Discord (in-product connect coming later). "
+        "Linear, GitHub, and other picks are saved as context; they can connect those from Settings later."
     )
     if oauth_labels:
         only_oauth = (
@@ -232,32 +227,19 @@ def _communication_transition_result(answers: dict[str, Any]) -> OnboardingTurnR
             assistant_prompt_context={
                 **ctx_base,
                 "instruction": (
-                    "No supported OAuth connectors matched their picks. "
-                    "They can connect integrations later from settings; offer to proceed."
+                    "No in-onboarding communication connector matched (e.g. they use tools we do not "
+                    "OAuth during setup). They can add Slack or other integrations from settings; "
+                    "offer to finish setup."
                 ),
             },
         )
     head = cq[0]
-    if head not in ("slack", "comm_placeholder"):
-        next_step = _first_connect_step(cq)
-        labs = _oauth_connector_labels_in_order(cq)
-        return OnboardingTurnResult(
-            next_step=next_step,
-            answers_updates=base_updates,
-            assistant_prompt_context={
-                **ctx_base,
-                "instruction": (
-                    "Guide them to use the in-app install buttons. Ground truth order: "
-                    + " → ".join(labs)
-                    + "."
-                ),
-                "connect_queue": cq,
-                "oauth_connector_labels_in_order": labs,
-            },
-        )
     rest = cq[1:]
     updates = {**base_updates, "connect_queue": rest, "connect_plan": list(rest)}
-    next_step = _first_connect_step(rest)
+    if not rest:
+        next_step = STEP_SLACK_STAKEHOLDERS if head == "slack" else STEP_SCANNING
+    else:
+        next_step = _first_connect_step(rest)
     rest_labs = _oauth_connector_labels_in_order(rest)
     return OnboardingTurnResult(
         next_step=next_step,
@@ -308,8 +290,6 @@ def handle_turn(
     answers_json: dict[str, Any],
     *,
     slack_connected: bool = False,
-    linear_connected: bool = False,
-    github_connected: bool = False,
 ) -> OnboardingTurnResult:
     """Pure deterministic transition for one chat turn."""
     msg = _norm_str(user_message or "")
@@ -327,6 +307,32 @@ def handle_turn(
                 "instruction": (
                     "Onboarding is complete. Briefly congratulate the user and invite them to "
                     "explore Vector."
+                ),
+            },
+        )
+
+    if current_step == STEP_ADMIN_ACCESS:
+        return OnboardingTurnResult(
+            next_step=STEP_ADMIN_ACCESS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are on the final onboarding screen. Tell them to use the on-screen control "
+                    "to continue to the app; do not promise more chat steps."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_STAKEHOLDERS:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_STAKEHOLDERS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "Stakeholder picking is done in the onboarding UI (mentions with @). "
+                    "If they sent chat here by mistake, nudge them to use Continue on screen."
                 ),
             },
         )
@@ -353,7 +359,7 @@ def handle_turn(
             if head_idle == "comm_placeholder":
                 ctx_comm["instruction"] = (
                     "Microsoft Teams and Discord are not connectable yet. "
-                    "Ask them to tap Continue to move on to the next integration."
+                    "Ask them to tap Finish setup when they are ready; they can add more tools from Connectors later."
                 )
                 ctx_comm["connector"] = "comm_placeholder"
             elif head_idle == "slack":
@@ -371,20 +377,6 @@ def handle_turn(
                 assistant_prompt_context=ctx_comm,
             )
         return _communication_transition_result(answers)
-
-    if current_step in (STEP_CONNECT_GITHUB, STEP_CONNECT_LINEAR):
-        return OnboardingTurnResult(
-            next_step=current_step,
-            answers_updates={},
-            assistant_prompt_context={
-                **ctx_base,
-                "instruction": (
-                    "Encourage the user to use the in-app install buttons to connect OAuth. "
-                    "Do not claim the connection is done until they finish in the browser."
-                ),
-                "connector": "github" if current_step == STEP_CONNECT_GITHUB else "linear",
-            },
-        )
 
     if current_step != STEP_CHAT_PROFILE:
         return OnboardingTurnResult(
@@ -410,10 +402,13 @@ def handle_turn(
                     **ctx_base,
                     "profile_phase": PROFILE_PHASE_TOOLS,
                     "instruction": (
-                        "They confirmed they are ready to pick tools after the privacy/connectors "
-                        "conversation. Briefly acknowledge with varied wording. Direct them to "
-                        "the tool picker below (communication, engineering, PM, docs). No filler; "
-                        "at most one short closing question or none."
+                        "They confirmed they are ready after the privacy/connectors conversation. "
+                        "Briefly acknowledge with varied wording. The point is to understand how you "
+                        "can help them and their organization, not to 'shop' for integrations. Ask "
+                        "them to use the tool picker below to list the tools their team actually "
+                        "uses so Vector has context (one communication tool required; other rows are "
+                        "optional). Do not sound like you are reciting product categories; frame it as "
+                        "context about how work runs. At most one short closing question or none."
                     ),
                 },
             )
@@ -459,14 +454,23 @@ def handle_turn(
                     },
                 )
             merged = _merge_tools_categories(answers, raw_tools)
+            comm_sel = merged.get("communication") or []
+            if not isinstance(comm_sel, list) or len(comm_sel) == 0:
+                return OnboardingTurnResult(
+                    next_step=STEP_CHAT_PROFILE,
+                    answers_updates={},
+                    assistant_prompt_context={
+                        **ctx_base,
+                        "profile_phase": PROFILE_PHASE_TOOLS,
+                        "instruction": (
+                            "They confirmed tool selection without choosing a communication tool. "
+                            "Ask them to pick one of Slack, Microsoft Teams, or Discord, then confirm again."
+                        ),
+                    },
+                )
             prior = _had_prior_tool_selection(answers)
             cq = _connect_queue_from_tools(merged)
-            cq = _queue_skip_connected(
-                cq,
-                slack_connected=slack_connected,
-                linear_connected=linear_connected,
-                github_connected=github_connected,
-            )
+            cq = _queue_skip_connected(cq, slack_connected=slack_connected)
             oauth_labels = _oauth_connector_labels_in_order(cq)
             instr = _tools_post_pick_instruction(prior=prior, oauth_labels=oauth_labels)
             ti = _tools_interest_flat(merged)
@@ -478,7 +482,7 @@ def handle_turn(
                 "tools_interest": ti,
             }
             return OnboardingTurnResult(
-                next_step=_first_connect_step(cq),
+                next_step=_next_step_after_tool_connect_queue(cq, merged),
                 answers_updates=updates,
                 assistant_prompt_context={
                     **ctx_base,
@@ -530,11 +534,25 @@ def handle_turn(
         updates["company"] = {**company, "name": normalize_company_name(msg)}
         new_phase = _next_profile_phase(PROFILE_PHASE_ORG)
     elif phase == PROFILE_PHASE_ROLE:
+        if role_answer_looks_like_headcount_instead(msg):
+            return OnboardingTurnResult(
+                next_step=STEP_CHAT_PROFILE,
+                answers_updates={},
+                assistant_prompt_context={
+                    **ctx_base,
+                    "profile_phase": PROFILE_PHASE_ROLE,
+                    "instruction": (
+                        "They sent something that looks like a headcount, but you asked for their job role. "
+                        "Briefly clarify you need a professional title (Founder, Engineer, PM, Ops…), "
+                        "not org or team size. Re-ask warmly in one or two short sentences."
+                    ),
+                },
+            )
         updates["profile"] = {**profile, "role": normalize_role(msg)}
         new_phase = _next_profile_phase(PROFILE_PHASE_ROLE)
     elif phase == PROFILE_PHASE_SIZE:
-        key = normalize_company_size(msg)
-        if key is None:
+        stored_size = company_size_persisted_value(msg)
+        if stored_size is None:
             return OnboardingTurnResult(
                 next_step=STEP_CHAT_PROFILE,
                 answers_updates={},
@@ -542,12 +560,12 @@ def handle_turn(
                     **ctx_base,
                     "profile_phase": PROFILE_PHASE_SIZE,
                     "instruction": (
-                        "Ask again for an approximate headcount (a whole number is fine). "
-                        "If they are vague, nudge them toward a ballpark number."
+                        "Ask again for an approximate headcount for the whole company or organization, "
+                        "not just their team or direct reports. A whole number or ballpark is fine."
                     ),
                 },
             )
-        updates["company"] = {**company, "size": key}
+        updates["company"] = {**company, "size": stored_size}
         new_phase = _next_profile_phase(PROFILE_PHASE_SIZE)
 
     merged_updates: dict[str, Any] = {"profile_phase": new_phase}
@@ -613,16 +631,37 @@ def _instruction_for_phase(phase: str, answers: dict[str, Any]) -> str:
             "Do not open with 'Got it, [first name].' or repeat that pattern if you used it before."
         )
     if phase == PROFILE_PHASE_SIZE:
+        company = answers.get("company")
+        org_name = ""
+        if isinstance(company, dict):
+            raw_name = company.get("name")
+            if isinstance(raw_name, str) and raw_name.strip():
+                org_name = _norm_str(raw_name)
+        org_clause = (
+            f" You may name the org ({org_name}) so it is obvious you mean everyone there, "
+            f"not only the group they manage."
+            if org_name
+            else (
+                " Name the company if you already know it so it is obvious you mean the whole "
+                "organization, not only the group they manage."
+            )
+        )
         return (
-            "Ask approximately how many people work at the company (rough headcount is fine: "
-            "a number like 12 or 86 is enough). Do not lead with a list of ranges like 1-5 / "
-            "5-15 unless they ask how we bucket it. "
+            "Ask how many people work at the company or organization in total (rough headcount is "
+            "fine: one number like 12 or 86 is enough)."
+            + org_clause
+            + " Be explicit that you want company-wide or org-wide scale, not their team, squad, "
+            "department headcount, or number of direct reports (managers often answer with "
+            "team size unless you steer them). "
+            "Do not lead with a list of ranges like 1-5 / 5-15 unless they ask how we bucket it. "
             "Keep the tone conversational; avoid opening with 'Got it, [first name].'"
         )
     if phase == PROFILE_PHASE_TOOLS:
         return (
-            "Direct the user to the tool picker to select communication, engineering, PM, and docs "
-            "tools."
+            "The user is on the tool picker step. If they seem lost, nudge them to list the tools "
+            "their organization actually uses so you can understand how to help, not to pick "
+            "products from a catalog. One communication tool is required; they can add PM, engineering, "
+            "docs, and CRM / support tools that reflect how work runs."
         )
     if phase == PROFILE_PHASE_DONE:
         return "Profile is complete; transition messaging is handled elsewhere."

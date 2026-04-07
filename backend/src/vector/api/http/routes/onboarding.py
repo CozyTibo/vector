@@ -17,18 +17,55 @@ from vector.contracts.onboarding import (
     OnboardingGetResponse,
     OnboardingMessageItem,
     OnboardingPatchBody,
+    SlackMembersResponse,
+    SlackWorkspaceMemberItem,
 )
+from vector.domains.connectors.slack.workspace_members import list_slack_workspace_members
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
-from vector.domains.onboarding.constants import ONBOARDING_STEPS, STATUS_COMPLETED, STEP_THANK_YOU
+from vector.domains.onboarding.constants import (
+    ONBOARDING_STEPS,
+    STATUS_COMPLETED,
+    STEP_ADMIN_ACCESS,
+    STEP_THANK_YOU,
+)
 from vector.domains.onboarding.onboarding_service import process_onboarding_chat
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import linear_connection as linear_repo
-from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import onboarding as ob_repo
+from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
+
+
+def _slack_stakeholders_user_chat_line(ss: Any) -> str | None:
+    """Readable line to persist as a user chat turn (matches what the Slack composer shows)."""
+    if not isinstance(ss, dict):
+        return None
+    raw = ss.get("raw_text")
+    if isinstance(raw, str):
+        t = raw.strip()
+        if t:
+            return t
+    labels = ss.get("mention_labels")
+    if isinstance(labels, list) and labels:
+        parts: list[str] = []
+        for x in labels:
+            if not isinstance(x, str):
+                continue
+            lab = x.strip()
+            if not lab:
+                continue
+            parts.append(lab if lab.startswith("@") else f"@{lab}")
+        if parts:
+            return " ".join(parts)
+    ids = ss.get("slack_user_ids")
+    if isinstance(ids, list) and ids:
+        id_strs = [str(x) for x in ids if x]
+        if id_strs:
+            return " ".join(id_strs)
+    return None
 
 
 def _load_onboarding_messages(db: Session, tenant_id: uuid.UUID) -> list[OnboardingMessageItem]:
@@ -131,6 +168,33 @@ def build_onboarding_router() -> APIRouter:
             messages=msgs,
         )
 
+    @r.post("/restart", response_model=OnboardingGetResponse)
+    def restart_onboarding(
+        db: Annotated[Session, Depends(get_db)],
+        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+    ) -> OnboardingGetResponse:
+        try:
+            assert_membership(db, claims)
+        except NoMembershipError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        row = ob_repo.hard_reset_onboarding_progress(db, tenant_id=claims.tenant_id)
+        first_user = tenancy_repo.get_first_user_for_tenant(db, claims.tenant_id)
+        if first_user is not None:
+            first_user.full_name = None
+        db.commit()
+        db.refresh(row)
+        gh = gh_repo.get_github_connection_for_tenant(db, claims.tenant_id)
+        lin = linear_repo.get_linear_connection_for_tenant(db, claims.tenant_id)
+        sl = slack_repo.get_slack_connection_for_tenant(db, claims.tenant_id)
+        msgs = _load_onboarding_messages(db, claims.tenant_id)
+        return _row_to_response(
+            row,
+            github_connected=gh is not None,
+            linear_connected=lin is not None,
+            slack_connected=sl is not None,
+            messages=msgs,
+        )
+
     @r.patch("", response_model=OnboardingGetResponse)
     def patch_onboarding(
         body: OnboardingPatchBody,
@@ -154,10 +218,37 @@ def build_onboarding_router() -> APIRouter:
                     detail=f"Invalid current_step: {body.current_step!r}.",
                 ) from None
             row.current_step = body.current_step
+        merged_snapshot: dict[str, Any] | None = None
         if body.answers is not None:
-            row.answers_json = ob_repo.deep_merge_answers_json(row.answers_json or {}, body.answers)
+            merged = ob_repo.deep_merge_answers_json(row.answers_json or {}, body.answers)
+            ob_repo.normalize_slack_stakeholders_in_place(merged)
+            row.answers_json = merged
+            merged_snapshot = merged
             _apply_profile_patch(db, claims.user_id, body.answers)
             _apply_company_patch(db, claims.tenant_id, body.answers)
+
+        if (
+            body.current_step == STEP_ADMIN_ACCESS
+            and body.answers is not None
+            and "slack_stakeholders" in body.answers
+            and merged_snapshot is not None
+            and ob_repo.onboarding_messages_table_exists(db)
+        ):
+            line = _slack_stakeholders_user_chat_line(merged_snapshot.get("slack_stakeholders"))
+            if line:
+                prior = ob_repo.list_onboarding_messages_chronological(
+                    db, claims.tenant_id, limit=200
+                )
+                last = prior[-1] if prior else None
+                if not (last is not None and last.role == "user" and last.content == line):
+                    ob_repo.append_onboarding_message(
+                        db,
+                        tenant_id=claims.tenant_id,
+                        user_id=claims.user_id,
+                        role="user",
+                        content=line,
+                    )
+
         row.version = int(row.version) + 1
         db.commit()
         db.refresh(row)
@@ -184,6 +275,41 @@ def build_onboarding_router() -> APIRouter:
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         return process_onboarding_chat(db, claims, body)
+
+    @r.get("/slack-members", response_model=SlackMembersResponse)
+    def get_slack_workspace_members(
+        db: Annotated[Session, Depends(get_db)],
+        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+    ) -> SlackMembersResponse:
+        try:
+            assert_membership(db, claims)
+        except NoMembershipError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        link = slack_repo.get_slack_connection_for_tenant(db, claims.tenant_id)
+        if link is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Slack is not connected for this workspace.",
+            ) from None
+        try:
+            raw = list_slack_workspace_members(link.detail.bot_access_token)
+        except Exception as e:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=f"Could not load Slack members: {e!s}",
+            ) from e
+        items = [
+            SlackWorkspaceMemberItem(
+                id=str(m["id"]),
+                label=str(m["label"]),
+                username=str(m.get("username") or m["id"]),
+                email=m.get("email") if isinstance(m.get("email"), str) else None,
+                image_48=m.get("image_48"),
+            )
+            for m in raw
+            if isinstance(m, dict) and m.get("id") and m.get("label")
+        ]
+        return SlackMembersResponse(members=items)
 
     @r.post("/complete", response_model=OnboardingCompleteResponse)
     def complete_onboarding(

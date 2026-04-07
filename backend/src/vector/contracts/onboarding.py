@@ -31,7 +31,9 @@ class OnboardingGetResponse(BaseModel):
     abandoned_at: datetime | None = None
     messages: list[OnboardingMessageItem] = Field(
         default_factory=list,
-        description="Persisted onboarding chat turns (chronological), when onboarding_messages table exists.",
+        description=(
+            "Persisted onboarding chat turns (chronological) when onboarding_messages exists."
+        ),
     )
     github_connected: bool = Field(
         default=False,
@@ -64,6 +66,27 @@ class OnboardingCompleteResponse(BaseModel):
     completed_at: datetime
 
 
+class SlackWorkspaceMemberItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Slack user id, e.g. U…")
+    label: str = Field(description="Display name for @ mention autocomplete.")
+    username: str = Field(description="Slack login name (shown as @username).")
+    email: str | None = Field(
+        default=None,
+        description=(
+            "Workspace email when visible to the bot (requires users:read.email on the Slack app)."
+        ),
+    )
+    image_48: str | None = Field(default=None, description="Avatar URL when available.")
+
+
+class SlackMembersResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    members: list[SlackWorkspaceMemberItem]
+
+
 class OnboardingChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -89,7 +112,9 @@ class OnboardingChatRequest(BaseModel):
 class OnboardingChatResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    assistant_message: str = Field(description="First assistant bubble; same as assistant_messages[0].")
+    assistant_message: str = Field(
+        description="First assistant bubble; same as assistant_messages[0].",
+    )
     assistant_messages: list[str] = Field(
         min_length=1,
         description="All assistant bubbles for this turn (e.g. connectors intro after headcount).",

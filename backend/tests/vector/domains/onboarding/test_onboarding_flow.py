@@ -10,10 +10,10 @@ from vector.domains.onboarding.constants import (
     PROFILE_PHASE_SIZE,
     PROFILE_PHASE_TOOLS,
     PROFILE_PHASE_WEBSITE,
+    STEP_ADMIN_ACCESS,
     STEP_CHAT_PROFILE,
     STEP_CONNECT_COMMUNICATION,
-    STEP_CONNECT_GITHUB,
-    STEP_CONNECT_LINEAR,
+    STEP_SLACK_STAKEHOLDERS,
     STEP_SCANNING,
 )
 from vector.domains.onboarding.onboarding_flow import handle_turn
@@ -23,14 +23,14 @@ def _base_answers() -> dict:
     return {"profile_phase": "name"}
 
 
-def test_company_size_numeric_86_maps_to_50_plus() -> None:
+def test_company_size_numeric_86_stores_exact_string() -> None:
     a = {
         "profile_phase": PROFILE_PHASE_SIZE,
         "profile": {"name": "Tibo", "role": "Founder"},
         "company": {"name": "LaboiteKiTue"},
     }
     r = handle_turn(STEP_CHAT_PROFILE, "86", None, a)
-    assert r.answers_updates["company"]["size"] == "50+"
+    assert r.answers_updates["company"]["size"] == "86"
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_CONNECTORS_INTRO
 
 
@@ -45,6 +45,19 @@ def test_role_typo_foundr_normalized_to_founder() -> None:
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_SIZE
 
 
+def test_role_pure_number_does_not_advance_or_store() -> None:
+    """Numeric replies on the role step are headcount confusion; stay on role."""
+    a = {
+        "profile_phase": PROFILE_PHASE_ROLE,
+        "profile": {"name": "Tobias"},
+        "company": {"name": "Lakaka"},
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, "345", None, a)
+    assert r.answers_updates == {}
+    assert r.assistant_prompt_context["profile_phase"] == PROFILE_PHASE_ROLE
+    assert "role" in r.assistant_prompt_context["instruction"].lower()
+
+
 def test_legacy_profile_phase_website_skips_to_company_size() -> None:
     """Stored answers from before website step removal advance to headcount."""
     a = {
@@ -53,7 +66,7 @@ def test_legacy_profile_phase_website_skips_to_company_size() -> None:
         "company": {"name": "Acme"},
     }
     r = handle_turn(STEP_CHAT_PROFILE, "12", None, a)
-    assert r.answers_updates["company"]["size"] == "5-15"
+    assert r.answers_updates["company"]["size"] == "12"
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_CONNECTORS_INTRO
 
 
@@ -92,6 +105,7 @@ def test_connectors_intro_question_does_not_advance_phase() -> None:
     r = handle_turn(STEP_CHAT_PROFILE, "Do you store our Slack messages?", None, a)
     assert r.answers_updates == {}
     assert r.assistant_prompt_context.get("connectors_privacy_kb")
+    assert r.assistant_prompt_context.get("connectors_intro_kind") == "qa"
 
 
 def test_connectors_intro_ready_advances_to_tools() -> None:
@@ -104,7 +118,8 @@ def test_connectors_intro_ready_advances_to_tools() -> None:
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_TOOLS
 
 
-def test_tools_selected_github_only_goes_connect_github() -> None:
+def test_tools_selected_without_communication_does_not_advance() -> None:
+    """At least one communication tool is required before confirming."""
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -120,9 +135,32 @@ def test_tools_selected_github_only_goes_connect_github() -> None:
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
-    assert r.next_step == STEP_CONNECT_GITHUB
+    assert r.next_step == STEP_CHAT_PROFILE
+    assert r.answers_updates == {}
+    assert r.assistant_prompt_context["profile_phase"] == PROFILE_PHASE_TOOLS
+
+
+def test_tools_selected_slack_and_github_engineering_queues_slack_only() -> None:
+    """GitHub is stored but not queued; Slack is the in-flow OAuth target."""
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": [],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.next_step == STEP_CONNECT_COMMUNICATION
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
     assert "github" in r.answers_updates["tools"]["engineering"]
+    assert r.answers_updates["connect_queue"] == ["slack"]
 
 
 def test_tools_selected_teams_only_goes_connect_comm() -> None:
@@ -164,11 +202,11 @@ def test_tools_selected_moves_to_connect_slack_with_tools_merged() -> None:
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
     assert "github" in r.answers_updates["tools"]["engineering"]
     assert "linear" in r.answers_updates["tools"]["pm"]
-    assert r.answers_updates["connect_queue"] == ["slack", "linear", "github"]
+    assert r.answers_updates["connect_queue"] == ["slack"]
 
 
 def test_tools_selected_skips_already_connected_slack() -> None:
-    """Re-confirming tools after Slack OAuth should not send user back to Connect Slack."""
+    """Slack already linked: empty queue and SCANNING. GitHub/Linear are never queued in onboarding."""
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -184,39 +222,12 @@ def test_tools_selected_skips_already_connected_slack() -> None:
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a, slack_connected=True)
-    assert r.next_step == STEP_CONNECT_LINEAR
-    assert r.answers_updates["connect_queue"] == ["linear", "github"]
-
-
-def test_tools_selected_all_live_connectors_linked_goes_scanning() -> None:
-    a = {
-        "profile_phase": PROFILE_PHASE_TOOLS,
-        "profile": {"name": "Ada", "role": "Founder"},
-        "company": {"name": "Acme", "size": "5-15"},
-    }
-    action = {
-        "type": "tools_selected",
-        "tools": {
-            "engineering": ["github"],
-            "pm": ["linear"],
-            "communication": ["slack"],
-            "docs": [],
-        },
-    }
-    r = handle_turn(
-        STEP_CHAT_PROFILE,
-        None,
-        action,
-        a,
-        slack_connected=True,
-        linear_connected=True,
-        github_connected=True,
-    )
-    assert r.next_step == STEP_SCANNING
+    assert r.next_step == STEP_SLACK_STAKEHOLDERS
     assert r.answers_updates["connect_queue"] == []
 
 
-def test_connect_slack_message_advances_to_github_when_github_selected() -> None:
+def test_connect_communication_message_with_github_in_tools_finishes_queue() -> None:
+    """Queue is communication-only; GitHub in tools does not appear in connect_queue."""
     a = {
         "tools": {
             "engineering": ["github"],
@@ -226,18 +237,24 @@ def test_connect_slack_message_advances_to_github_when_github_selected() -> None
         }
     }
     r = handle_turn(STEP_CONNECT_COMMUNICATION, "ok", None, a)
-    assert r.next_step == STEP_CONNECT_GITHUB
-    assert r.answers_updates["connect_queue"] == ["github"]
+    assert r.next_step == STEP_SCANNING
+    assert r.answers_updates["connect_queue"] == []
 
 
 def test_connect_slack_no_live_tools_goes_scanning() -> None:
     a = {"tools": {"engineering": [], "pm": [], "communication": ["slack"], "docs": []}}
     r = handle_turn(STEP_CONNECT_COMMUNICATION, "continue", None, a)
-    assert r.next_step == STEP_SCANNING
+    assert r.next_step == STEP_SLACK_STAKEHOLDERS
 
 
-def test_connect_slack_linear_only() -> None:
+def test_connect_communication_linear_only_goes_scanning() -> None:
     a = {"tools": {"engineering": [], "pm": ["linear"], "communication": [], "docs": []}}
     r = handle_turn(STEP_CONNECT_COMMUNICATION, "go", None, a)
-    assert r.next_step == STEP_CONNECT_LINEAR
-    assert r.answers_updates["connect_queue"] == ["linear"]
+    assert r.next_step == STEP_SCANNING
+    assert r.answers_updates["connect_queue"] == []
+
+
+def test_admin_access_step_stays_put() -> None:
+    r = handle_turn(STEP_ADMIN_ACCESS, "hello", None, {})
+    assert r.next_step == STEP_ADMIN_ACCESS
+    assert r.answers_updates == {}

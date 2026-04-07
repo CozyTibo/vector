@@ -1,14 +1,14 @@
 import type { ToolGroupDef } from "./ToolSelectorBlock";
 
-/** Backend keys: engineering, pm, communication, docs. CRM is UI-only until API stores it. */
+/** Backend keys: engineering, pm, communication, docs, crm. */
 export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
   {
-    key: "engineering",
-    label: "Engineering",
+    key: "communication",
+    label: "Communication",
     items: [
-      { id: "github", label: "GitHub" },
-      { id: "gitlab", label: "GitLab" },
-      { id: "bitbucket", label: "Bitbucket" },
+      { id: "slack", label: "Slack" },
+      { id: "ms_teams", label: "Microsoft Teams" },
+      { id: "discord", label: "Discord" },
     ],
   },
   {
@@ -21,12 +21,12 @@ export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
     ],
   },
   {
-    key: "communication",
-    label: "Communication",
+    key: "engineering",
+    label: "Engineering",
     items: [
-      { id: "slack", label: "Slack" },
-      { id: "ms_teams", label: "Microsoft Teams" },
-      { id: "discord", label: "Discord" },
+      { id: "github", label: "GitHub" },
+      { id: "gitlab", label: "GitLab" },
+      { id: "bitbucket", label: "Bitbucket" },
     ],
   },
   {
@@ -40,11 +40,13 @@ export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
   },
   {
     key: "crm",
-    label: "CRM",
+    label: "CRM & customer support",
     items: [
       { id: "salesforce", label: "Salesforce" },
       { id: "hubspot", label: "HubSpot" },
       { id: "pipedrive", label: "Pipedrive" },
+      { id: "zendesk", label: "Zendesk" },
+      { id: "intercom", label: "Intercom" },
     ],
   },
 ];
@@ -55,9 +57,9 @@ export function emptyToolPick(): ToolPickState {
   return Object.fromEntries(ONBOARDING_TOOL_GROUPS.map((g) => [g.key, [] as string[]]));
 }
 
-/** Payload keys accepted by backend onboarding_flow (crm omitted). */
+/** Payload keys sent to backend onboarding_flow `tools_selected`. */
 export function toolPickToBackendPayload(pick: ToolPickState): Record<string, string[]> {
-  const keys = ["engineering", "pm", "communication", "docs"] as const;
+  const keys = ["communication", "pm", "engineering", "docs", "crm"] as const;
   const out: Record<string, string[]> = {};
   for (const k of keys) {
     out[k] = [...(pick[k] ?? [])].sort();
@@ -75,6 +77,31 @@ for (const g of ONBOARDING_TOOL_GROUPS) {
 /** Human label for a stored tool id (e.g. `github` → GitHub). */
 export function labelForToolId(toolId: string): string {
   return TOOL_ID_TO_LABEL[toolId] ?? toolId;
+}
+
+/**
+ * Display name for the communication tool the user chose (Slack, Microsoft Teams, or Discord).
+ * Used for onboarding copy; order matches a single primary pick (slack, then Teams, then Discord).
+ */
+export function primaryCommunicationToolLabel(answers: Record<string, unknown>): string {
+  const raw = answers.tools;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return "Slack";
+  }
+  const comm = (raw as Record<string, unknown>).communication;
+  if (!Array.isArray(comm)) {
+    return "Slack";
+  }
+  if (comm.includes("slack")) {
+    return "Slack";
+  }
+  if (comm.includes("ms_teams")) {
+    return "Microsoft Teams";
+  }
+  if (comm.includes("discord")) {
+    return "Discord";
+  }
+  return "Slack";
 }
 
 /** Sorted unique display labels for a tools payload (same shape as backend `tools`). */

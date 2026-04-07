@@ -8,8 +8,12 @@ STEP_CHAT_PROFILE = "CHAT_PROFILE"
 # Connector OAuth screens (order is driven by `connect_queue` in answers).
 # Communication phase: Slack OAuth and/or Teams+Discord placeholder share this step; branch on queue head.
 STEP_CONNECT_COMMUNICATION = "CONNECT_COMMUNICATION"
-STEP_CONNECT_GITHUB = "CONNECT_GITHUB"
-STEP_CONNECT_LINEAR = "CONNECT_LINEAR"
+
+# After Slack OAuth: pick managers/people with @-mention autocomplete (Slack workspace roster).
+STEP_SLACK_STAKEHOLDERS = "SLACK_STAKEHOLDERS"
+
+# After stakeholders are saved: product UI shows a short in-chat farewell then app CTA.
+STEP_ADMIN_ACCESS = "ADMIN_ACCESS"
 
 STEP_SCANNING = "SCANNING"
 STEP_THANK_YOU = "THANK_YOU"
@@ -18,8 +22,8 @@ ONBOARDING_STEPS: frozenset[str] = frozenset(
     {
         STEP_CHAT_PROFILE,
         STEP_CONNECT_COMMUNICATION,
-        STEP_CONNECT_GITHUB,
-        STEP_CONNECT_LINEAR,
+        STEP_SLACK_STAKEHOLDERS,
+        STEP_ADMIN_ACCESS,
         STEP_SCANNING,
         STEP_THANK_YOU,
     },
@@ -118,5 +122,5 @@ ONBOARDING_PROFILE_ROLE_VALUES: frozenset[str] = frozenset(
 )
 
 TOOL_CATEGORY_KEYS: frozenset[str] = frozenset(
-    {"communication", "engineering", "pm", "docs"},
+    {"communication", "engineering", "pm", "docs", "crm"},
 )

@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import asc, desc, inspect, select
+from sqlalchemy import asc, delete, desc, inspect, select
 from sqlalchemy.orm import Session
 
-from vector.domains.onboarding.constants import STATUS_IN_PROGRESS, STEP_CHAT_PROFILE
+from vector.domains.onboarding.constants import (
+    PROFILE_PHASE_NAME,
+    STATUS_COMPLETED,
+    STATUS_IN_PROGRESS,
+    STEP_CHAT_PROFILE,
+    STEP_CONNECT_COMMUNICATION,
+    STEP_SCANNING,
+)
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
+
+log = logging.getLogger(__name__)
 
 
 def get_onboarding_for_tenant(session: Session, tenant_id: uuid.UUID) -> OnboardingState | None:
@@ -19,9 +29,43 @@ def get_onboarding_for_tenant(session: Session, tenant_id: uuid.UUID) -> Onboard
     return session.scalar(stmt)
 
 
+# Historical `current_step` values that may still exist in DB rows (never valid for new PATCHes).
+_LEGACY_DB_ONBOARDING_STEPS = frozenset({"CONNECT_GITHUB", "CONNECT_LINEAR"})
+_ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder"})
+
+
+def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
+    """Persisted rows may predate removal of GitHub/Linear onboarding steps; coerce in place."""
+    if row.status == STATUS_COMPLETED:
+        return
+    answers = dict(row.answers_json or {})
+    changed = False
+    for key in ("connect_queue", "connect_plan"):
+        raw = answers.get(key)
+        if not isinstance(raw, list):
+            continue
+        cleaned = [x for x in raw if isinstance(x, str) and x in _ALLOWED_CONNECT_QUEUE_IDS]
+        if cleaned != raw:
+            answers[key] = cleaned
+            changed = True
+    if row.current_step in _LEGACY_DB_ONBOARDING_STEPS:
+        cq = answers.get("connect_queue")
+        allowed = [
+            x
+            for x in (cq if isinstance(cq, list) else [])
+            if isinstance(x, str) and x in _ALLOWED_CONNECT_QUEUE_IDS
+        ]
+        row.current_step = STEP_CONNECT_COMMUNICATION if allowed else STEP_SCANNING
+        changed = True
+    if changed:
+        row.answers_json = answers
+        row.version = int(row.version) + 1
+
+
 def get_or_create_onboarding(session: Session, tenant_id: uuid.UUID) -> OnboardingState:
     row = get_onboarding_for_tenant(session, tenant_id)
     if row is not None:
+        normalize_onboarding_row_removed_steps(row)
         return row
     now = datetime.now(UTC)
     row = OnboardingState(
@@ -50,6 +94,66 @@ def deep_merge_answers_json(existing: dict[str, Any], patch: dict[str, Any]) -> 
         else:
             out[k] = v
     return out
+
+
+def normalize_slack_stakeholders_in_place(answers: dict[str, Any]) -> None:
+    """Dedupe slack_user_ids (first wins); keep mention_labels aligned when present."""
+    ss = answers.get("slack_stakeholders")
+    if not isinstance(ss, dict):
+        return
+    ids = ss.get("slack_user_ids")
+    if not isinstance(ids, list):
+        return
+    id_strs = [str(x) for x in ids if isinstance(x, str)]
+    raw_labels = ss.get("mention_labels")
+    label_strs: list[str] | None = None
+    if isinstance(raw_labels, list):
+        label_strs = [str(x) for x in raw_labels if isinstance(x, str)]
+        if len(label_strs) != len(id_strs):
+            label_strs = None
+    seen: set[str] = set()
+    out_ids: list[str] = []
+    out_labels: list[str] = []
+    for i, uid in enumerate(id_strs):
+        if uid in seen:
+            continue
+        seen.add(uid)
+        out_ids.append(uid)
+        if label_strs is not None and i < len(label_strs):
+            out_labels.append(label_strs[i])
+        else:
+            out_labels.append(uid)
+    ss["slack_user_ids"] = out_ids
+    if label_strs is not None:
+        ss["mention_labels"] = out_labels
+    elif "mention_labels" in ss:
+        del ss["mention_labels"]
+
+
+def hard_reset_onboarding_progress(session: Session, *, tenant_id: uuid.UUID) -> OnboardingState:
+    """Delete persisted chat rows and reset onboarding answers/step to a fresh chat-profile start.
+
+    Seeds ``profile_phase`` so admin and the chat FSM match a day-one name prompt. Connectors stay
+    linked. Display name copied from onboarding is cleared in ``POST /onboarding/restart``.
+    """
+    try:
+        session.execute(delete(OnboardingMessage).where(OnboardingMessage.tenant_id == tenant_id))
+    except Exception:
+        log.debug("onboarding_messages delete skipped for %s", tenant_id, exc_info=True)
+    row = get_onboarding_for_tenant(session, tenant_id)
+    now = datetime.now(UTC)
+    if row is None:
+        row = get_or_create_onboarding(session, tenant_id)
+        row.answers_json = {"profile_phase": PROFILE_PHASE_NAME}
+        return row
+    row.status = STATUS_IN_PROGRESS
+    row.current_step = STEP_CHAT_PROFILE
+    row.answers_json = {"profile_phase": PROFILE_PHASE_NAME}
+    row.completed_at = None
+    row.abandoned_at = None
+    row.started_at = now
+    row.version = int(row.version) + 1
+    return row
 
 
 def merge_answers_json(existing: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:

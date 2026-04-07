@@ -74,6 +74,23 @@ export default function ChatMessageBubble({
   userDisplayName,
   isContinuation = false,
 }: ChatMessageBubbleProps) {
+  if (message.role === "event") {
+    return (
+      <div className="onboarding-message-enter flex justify-center px-3 py-3" role="status">
+        <div
+          className={
+            "inline-flex max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-emerald-200/90 " +
+            "bg-gradient-to-r from-emerald-50/95 to-teal-50/90 px-4 py-2 text-[13px] font-medium " +
+            "leading-snug text-emerald-950 shadow-[0_8px_24px_-16px_rgba(5,150,105,0.35)]"
+          }
+        >
+          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
+          <span>{message.content}</span>
+        </div>
+      </div>
+    );
+  }
+
   const isUser = message.role === "user";
   const toolsPick = isUser ? tryParseToolsSelectedContent(message.content) : null;
   const structuredOnlyLabel =
@@ -82,7 +99,7 @@ export default function ChatMessageBubble({
   if (isUser) {
     return (
       <div
-        className={`onboarding-message-enter flex justify-end px-3 ${isContinuation ? "py-1" : "py-2.5"}`}
+        className={`onboarding-message-enter flex justify-end px-3 ${isContinuation ? "py-0.5" : "py-1.5"}`}
       >
         <div className="flex min-w-0 max-w-[min(100%,32rem)] flex-col items-end gap-1.5">
           {!isContinuation ? (
@@ -124,14 +141,18 @@ export default function ChatMessageBubble({
 
   return (
     <div
-      className={`onboarding-message-enter flex gap-3 px-3 sm:gap-3.5 ${isContinuation ? "py-1" : "py-2.5"}`}
+      className={`onboarding-message-enter flex gap-3 px-3 sm:gap-3.5 ${isContinuation ? "py-0.5" : "py-1.5"}`}
     >
       {isContinuation ? (
         <div className="h-10 w-10 shrink-0" aria-hidden />
       ) : (
         <ChatAvatar variant="vector" />
       )}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+      {/*
+        items-start: avoid flex-col stretch making the bubble row full viewport width (broke accent
+        bar height and left huge gaps). w-fit keeps the pink rail aligned to text block width.
+      */}
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
         {!isContinuation ? (
           <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
             <span className={`font-semibold ${landingAccentText}`}>Vector</span>
@@ -140,7 +161,7 @@ export default function ChatMessageBubble({
             </time>
           </div>
         ) : null}
-        <div className="relative inline-block max-w-[min(100%,32rem)] pl-[11px]">
+        <div className="relative w-fit max-w-[min(100%,32rem)] pl-[11px]">
           <div className={`pointer-events-none absolute bottom-1 left-0 top-1 w-[3px] rounded-full ${landingSubtleLineV}`} />
           <div
             className={

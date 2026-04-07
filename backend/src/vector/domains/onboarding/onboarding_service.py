@@ -19,8 +19,6 @@ from vector.domains.onboarding.constants import (
 )
 from vector.domains.onboarding.onboarding_flow import _default_profile_phase, handle_turn
 from vector.domains.onboarding.onboarding_llm import generate_onboarding_reply
-from vector.infrastructure.db.repositories import github_connection as gh_repo
-from vector.infrastructure.db.repositories import linear_connection as linear_repo
 from vector.infrastructure.db.repositories import onboarding as ob_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
@@ -120,7 +118,8 @@ def _fallback_idle_assistant_text(profile_phase: str) -> str:
     """When DB has no vector rows yet (empty POST past the name phase should not happen often)."""
     if profile_phase == PROFILE_PHASE_TOOLS:
         return (
-            "Pick the tools your team uses from the list below, then confirm your selection."
+            "Use the list below to share which tools your organization uses so we can understand "
+            "how to help. Then confirm your selection."
         )
     if profile_phase == PROFILE_PHASE_CONNECTORS_INTRO:
         return (
@@ -180,8 +179,6 @@ def process_onboarding_chat(
 
     cfg = settings or get_settings()
 
-    gh = gh_repo.get_github_connection_for_tenant(session, claims.tenant_id)
-    lin = linear_repo.get_linear_connection_for_tenant(session, claims.tenant_id)
     sl = slack_repo.get_slack_connection_for_tenant(session, claims.tenant_id)
 
     turn = handle_turn(
@@ -190,13 +187,12 @@ def process_onboarding_chat(
         structured,
         dict(row.answers_json or {}),
         slack_connected=sl is not None,
-        linear_connected=lin is not None,
-        github_connected=gh is not None,
     )
 
     merged_answers = ob_repo.deep_merge_answers_json(
         dict(row.answers_json or {}), turn.answers_updates
     )
+    ob_repo.normalize_slack_stakeholders_in_place(merged_answers)
     row.current_step = turn.next_step
     row.answers_json = merged_answers
     row.version = int(row.version) + 1

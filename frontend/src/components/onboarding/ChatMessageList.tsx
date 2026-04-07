@@ -12,10 +12,17 @@ type ChatMessageListProps = {
 
 export default function ChatMessageList({ messages, userDisplayName, isTyping = false }: ChatMessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  /** Only auto-scroll when the thread grows or typing starts; avoid re-running on `messages` reference changes (fights trackpad scroll). */
+  const prevLenRef = useRef(0);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, messages, isTyping]);
+    const len = messages.length;
+    const grew = len > prevLenRef.current;
+    prevLenRef.current = len;
+    if (grew || isTyping) {
+      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [messages.length, isTyping]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

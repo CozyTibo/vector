@@ -5,7 +5,6 @@ import vectorHqShowcaseUrl from "../../assets/vector-hq.png";
 import {
   landingAccentChipPurple,
   landingAccentText,
-  landingSubtleLineH,
   landingTitleKeywordGradient,
 } from "./landingBrandPalette";
 
@@ -75,8 +74,6 @@ const pipelineIntegrationChipNames = [
 const titleAccent = {
   howVector: landingTitleKeywordGradient,
   core: landingTitleKeywordGradient,
-  who: landingTitleKeywordGradient,
-  cta: landingTitleKeywordGradient,
   problem: landingTitleKeywordGradient,
   agent: landingTitleKeywordGradient,
   threeThings: landingTitleKeywordGradient,
@@ -211,11 +208,13 @@ function PipelineProductVisual({ size = "full" }: { size?: "full" | "mini" }) {
         ))}
       </div>
       <PipelineFlowArrow />
-      <p className={`text-center font-semibold ${landingAccentText} ${title}`}>Execution signals</p>
+      <p className={`text-center font-semibold text-zinc-900 ${title}`}>Execution signals</p>
       <PipelineFlowArrow />
       <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 text-center sm:py-4">
-        <p className={`font-bold ${landingAccentText} ${size === "mini" ? "text-xs" : "text-sm"}`}>Vector</p>
-        <p className={`mt-1 text-zinc-600 ${size === "mini" ? "text-[10px]" : "text-xs"}`}>Understands execution continuously</p>
+        <p className={`font-bold text-zinc-900 ${size === "mini" ? "text-xs" : "text-sm"}`}>Vector</p>
+        <p className={`mt-1 text-zinc-900 ${size === "mini" ? "text-[10px]" : "text-xs"}`}>
+          Understands execution continuously
+        </p>
       </div>
       <PipelineFlowArrow />
       <p className={`text-center font-semibold text-zinc-900 ${title}`}>Insights · Reports · Recommendations</p>
@@ -317,21 +316,9 @@ const CORE_ROLE_TABS: { id: CoreRoleId; label: string }[] = [
 ];
 
 const CORE_ROLE_CONTEXT: Record<CoreRoleId, ReactNode> = {
-  executive: (
-    <>
-      How <span className={`font-semibold ${landingAccentText}`}>Vector</span> helps leaders stay ahead of execution
-    </>
-  ),
-  leaders: (
-    <>
-      How <span className={`font-semibold ${landingAccentText}`}>Vector</span> helps managers run teams with clarity
-    </>
-  ),
-  teams: (
-    <>
-      How <span className={`font-semibold ${landingAccentText}`}>Vector</span> helps teams stay focused on what matters
-    </>
-  ),
+  executive: <>How Vector helps leaders stay ahead of execution</>,
+  leaders: <>How Vector helps managers run teams with clarity</>,
+  teams: <>How Vector helps teams stay focused on what matters</>,
 };
 
 /** Minimal monochrome strokes — symbolic only, not decorative mockups */
@@ -461,28 +448,37 @@ function CoreBenefitIcon({ id, className }: { id: CoreBenefitIconId; className?:
   }
 }
 
-type CoreValueBlock = { title: string; sentence: string; icon: CoreBenefitIconId };
+type CoreValueBlock = {
+  icon: CoreBenefitIconId;
+  title: string;
+  titleHighlight: string;
+  sentence: string;
+};
 
 const CORE_VALUE_BLOCKS_BY_ROLE: Record<CoreRoleId, readonly CoreValueBlock[]> = {
   executive: [
     {
       icon: "target",
       title: "See what actually needs attention",
+      titleHighlight: "attention",
       sentence: "Vector filters the noise and highlights what leaders actually need to look at.",
     },
     {
       icon: "alert",
       title: "Spot risks before they escalate",
+      titleHighlight: "risks",
       sentence: "Surface dependencies and delays early, while you still have room to act.",
     },
     {
       icon: "chart",
       title: "Decide from real execution signals",
+      titleHighlight: "execution signals",
       sentence: "Ground decisions in how work is really moving, not chasing updates.",
     },
     {
       icon: "inbox",
       title: "Automatic leadership updates",
+      titleHighlight: "leadership",
       sentence: "Clear briefings for leadership without pulling teams into another status cycle.",
     },
   ],
@@ -490,21 +486,25 @@ const CORE_VALUE_BLOCKS_BY_ROLE: Record<CoreRoleId, readonly CoreValueBlock[]> =
     {
       icon: "pulse",
       title: "Real-time signals from your teams",
+      titleHighlight: "signals",
       sentence: "Blockers and drift surface instantly from the tools your teams already use.",
     },
     {
       icon: "link",
       title: "Stop chasing updates",
+      titleHighlight: "updates",
       sentence: "PRs, tickets, and threads, connected without manual roll-ups.",
     },
     {
       icon: "trend",
       title: "Detect execution drift early",
+      titleHighlight: "execution drift",
       sentence: "Catch slowdowns and dependency pile-ups before the date slips.",
     },
     {
       icon: "coach",
       title: "More time for coaching and strategy",
+      titleHighlight: "strategy",
       sentence: "Less status gathering; more coaching and direction.",
     },
   ],
@@ -512,57 +512,40 @@ const CORE_VALUE_BLOCKS_BY_ROLE: Record<CoreRoleId, readonly CoreValueBlock[]> =
     {
       icon: "orbit",
       title: "A manager that is always available",
+      titleHighlight: "available",
       sentence: "Always-on help surfacing what needs attention next.",
     },
     {
       icon: "stream",
       title: "Less reporting",
+      titleHighlight: "reporting",
       sentence: "Your work signals replace endless “quick status” pings.",
     },
     {
       icon: "list",
       title: "Clear priorities",
+      titleHighlight: "priorities",
       sentence: "Blockers and priorities in one clear view.",
     },
     {
       icon: "shield",
       title: "Fewer interruptions",
+      titleHighlight: "interruptions",
       sentence: "Leaders get visibility without pinging you all day.",
     },
   ],
 };
 
-const executionSignalsPhrase = "execution signals";
-
-function AccentVectorInText({ text }: { text: string }) {
-  if (!text.includes("Vector")) {
-    return <>{text}</>;
-  }
-  return (
-    <>
-      {text.split(/(Vector)/g).map((segment, i) =>
-        segment === "Vector" ? (
-          <span key={`${i}-v`} className={landingAccentText}>
-            Vector
-          </span>
-        ) : (
-          <span key={`${i}-t`}>{segment}</span>
-        ),
-      )}
-    </>
-  );
-}
-
-function CoreBenefitCardTitle({ title }: { title: string }) {
-  if (!title.includes(executionSignalsPhrase)) {
+function CoreBenefitCardTitle({ title, highlight }: { title: string; highlight: string }) {
+  if (!highlight || !title.includes(highlight)) {
     return <>{title}</>;
   }
-  const i = title.indexOf(executionSignalsPhrase);
+  const i = title.indexOf(highlight);
   return (
     <>
       {title.slice(0, i)}
-      <span className={landingAccentText}>{executionSignalsPhrase}</span>
-      {title.slice(i + executionSignalsPhrase.length)}
+      <span className={landingTitleKeywordGradient}>{highlight}</span>
+      {title.slice(i + highlight.length)}
     </>
   );
 }
@@ -576,12 +559,10 @@ function CoreFeaturesSection() {
       <ScrollFade>
         <header className={sectionHeaderClass}>
           <h2 className={`${sectionTitleClass} max-w-4xl`}>
-            <span className={landingAccentText}>Vector</span>{" "}
-            <span className={titleAccent.core}>empowers</span> your teams
+            <span className={landingTitleKeywordGradient}>Vector</span> empowers your teams
           </h2>
           <p className={`mt-6 max-w-2xl text-pretty ${sectionLead}`}>
-            Same teammate, three lenses. Pick your role to see how{" "}
-            <span className={landingAccentText}>Vector</span> shows up for you.
+            Same teammate, three lenses. Pick your role to see how Vector shows up for you.
           </p>
           <div className="mt-10 pb-2">
             <div
@@ -604,10 +585,10 @@ function CoreFeaturesSection() {
                         : "text-zinc-500 hover:bg-white/40 hover:text-zinc-800"
                     }`}
                   >
-                    <span className={active ? landingAccentText : undefined}>{r.label}</span>
+                    <span className={active ? "text-zinc-900" : "text-zinc-500"}>{r.label}</span>
                     {active ? (
                       <span
-                        className={`pointer-events-none absolute bottom-1.5 left-1/2 h-0.5 w-[72%] max-w-[10rem] -translate-x-1/2 rounded-full ${landingSubtleLineH} sm:bottom-2`}
+                        className="pointer-events-none absolute bottom-1.5 left-1/2 h-0.5 w-[72%] max-w-[10rem] -translate-x-1/2 rounded-full bg-zinc-900 sm:bottom-2"
                         aria-hidden
                       />
                     ) : null}
@@ -650,10 +631,10 @@ function CoreFeaturesSection() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <h3 className="text-xl font-bold leading-snug tracking-tight text-zinc-900 sm:text-2xl">
-                        <CoreBenefitCardTitle title={b.title} />
+                        <CoreBenefitCardTitle title={b.title} highlight={b.titleHighlight} />
                       </h3>
                       <p className="mt-3 max-w-[26rem] text-pretty text-base leading-snug text-zinc-600 sm:text-[1.05rem] sm:leading-snug">
-                        <AccentVectorInText text={b.sentence} />
+                        {b.sentence}
                       </p>
                     </div>
                   </div>
@@ -772,26 +753,25 @@ function MeetVectorAgentSection() {
           <div className="min-w-0 lg:pl-2">
             <header className={sectionHeaderClass}>
               <h2 className={`${sectionTitleClass} max-w-4xl`}>
-                Meet <span className={titleAccent.agent}>Vector</span>
+                Meet <span className={landingTitleKeywordGradient}>Vector</span>
               </h2>
               <div className="mt-6 max-w-2xl space-y-6">
                 <p className="text-pretty text-lg font-bold leading-snug text-zinc-950 sm:text-xl">
                   Not a SaaS. Not a Dashboard.
                 </p>
                 <p className={sectionProseMuted}>
-                  <span className={landingAccentText}>Vector</span> is on your team, it lives inside your existing tools
-                  and adapts to your company&apos;s processes and routine.
+                  Vector is on your team, it lives inside your existing tools and adapts to your company&apos;s
+                  processes and routine.
                 </p>
               </div>
             </header>
-            <p className={`mt-10 sm:mt-12 ${sectionProseBody}`}>
-              <span className={landingAccentText}>Vector</span> always knows:
-            </p>
+            <p className={`mt-10 sm:mt-12 ${sectionProseBody}`}>Vector always knows:</p>
             <ul className={`mt-3 space-y-3 sm:mt-4 ${sectionListEmphasis}`}>
               {points.map((x) => (
                 <li key={x} className="flex items-start gap-3">
                   <span
-                    className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-zinc-200/80 bg-zinc-50 text-xs ${landingAccentText}`}
+                    className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-zinc-200/80 bg-zinc-50 text-xs text-zinc-500"
+                    aria-hidden
                   >
                     ✓
                   </span>
@@ -804,7 +784,7 @@ function MeetVectorAgentSection() {
                 to="/signup"
                 className="inline-flex items-center justify-center rounded-full bg-[#0F0F12] px-9 py-4 text-base font-semibold text-white no-underline shadow-[0_8px_24px_-12px_rgba(15,23,42,0.35)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_12px_32px_-12px_rgba(15,23,42,0.2)]"
               >
-                Get early access
+                Meet Vector
               </Link>
             </div>
           </div>
@@ -890,8 +870,7 @@ function StackSection() {
       <ScrollFade>
         <header className={sectionHeaderClass}>
           <h2 className={`${sectionTitleClass} max-w-4xl`}>
-            <span className={landingAccentText}>Vector</span> fits into your{" "}
-            <span className={titleAccent.stack}>stack</span>
+            Vector fits into your <span className={landingTitleKeywordGradient}>stack</span>
           </h2>
         </header>
         <div className="mt-12 grid items-center gap-12 lg:grid-cols-12 lg:gap-10 lg:pl-2">
@@ -900,8 +879,9 @@ function StackSection() {
               Slack, GitHub, Linear, Notion, Jira, and internal tools all emit signals about execution.
             </p>
             <p className={`mt-4 ${sectionProseBody}`}>
-              They flow into <span className={landingAccentText}>Vector</span>&apos;s brain, and he produces insights,
-              reports, and recommendations leaders can act on.
+              They flow into Vector&apos;s brain, and he produces{" "}
+              <span className={landingTitleKeywordGradient}>insights, reports, and recommendations</span> leaders can
+              act on.
             </p>
           </div>
           <div className="relative lg:col-span-7 lg:-mr-2 xl:-mr-4">
@@ -950,21 +930,35 @@ function PersonaLabelIcon({ kind }: { kind: "executives" | "leaders" | "teams" }
   );
 }
 
+function PersonaWinLine({ line, highlight }: { line: string; highlight?: string }) {
+  if (!highlight || !line.includes(highlight)) {
+    return <>{line}</>;
+  }
+  const i = line.indexOf(highlight);
+  return (
+    <>
+      {line.slice(0, i)}
+      <span className={landingTitleKeywordGradient}>{highlight}</span>
+      {line.slice(i + highlight.length)}
+    </>
+  );
+}
+
 /* Persona cards: payoff by audience */
 function WhoSection() {
   const personas: {
     label: string;
     hook: string;
-    wins: { lead: string; rest: string; restAccent?: string }[];
+    wins: { line: string; highlight?: string }[];
     iconKind: "executives" | "leaders" | "teams";
   }[] = [
     {
       label: "Executives",
       hook: "Run execution with clarity",
       wins: [
-        { lead: "Spot risks early", rest: " while there is still time to act" },
-        { lead: "Make decisions", rest: " from real ", restAccent: "execution signals" },
-        { lead: "See how the organization is delivering", rest: " in real time" },
+        { line: "Spot risks early while there is still time to act" },
+        { line: "Make decisions from real execution signals", highlight: "execution signals" },
+        { line: "See how the organization is delivering in real time" },
       ],
       iconKind: "executives",
     },
@@ -972,9 +966,9 @@ function WhoSection() {
       label: "Engineering & product leaders",
       hook: "Scale how you run teams",
       wins: [
-        { lead: "Save hours every week", rest: " chasing updates" },
-        { lead: "Detect work drift", rest: " before it turns into delays" },
-        { lead: "Spend more time", rest: " coaching and unblocking teams" },
+        { line: "Save hours every week chasing updates" },
+        { line: "Detect work drift before it turns into delays", highlight: "work drift" },
+        { line: "Spend more time coaching and unblocking teams" },
       ],
       iconKind: "leaders",
     },
@@ -982,9 +976,9 @@ function WhoSection() {
       label: "Teams",
       hook: "Ship work without meeting fatigue",
       wins: [
-        { lead: "Reduce \"where are we\"", rest: " interruptions" },
-        { lead: "Get clear visibility", rest: " without constant check-ins" },
-        { lead: "Surface blockers as they happen", rest: " and resolve them faster" },
+        { line: "Reduce “where are we” interruptions", highlight: "“where are we”" },
+        { line: "Get clear visibility without constant check-ins" },
+        { line: "Surface blockers as they happen and resolve them faster" },
       ],
       iconKind: "teams",
     },
@@ -994,7 +988,7 @@ function WhoSection() {
       <ScrollFade>
         <header className={sectionHeaderClass}>
           <h2 className={`${sectionTitleClass} max-w-none lg:whitespace-nowrap`}>
-            An AI manager that works for <span className={titleAccent.who}>everyone</span>
+            An <span className={landingTitleKeywordGradient}>AI manager</span> that works for everyone
           </h2>
         </header>
 
@@ -1004,11 +998,13 @@ function WhoSection() {
               key={p.label}
               className="group flex h-full flex-col overflow-hidden rounded-3xl border border-zinc-200/80 bg-white/90 shadow-[0_20px_50px_-32px_rgba(15,23,42,0.12)] backdrop-blur-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_56px_-36px_rgba(15,23,42,0.14)]"
             >
-              <div className={`h-1.5 w-full ${landingSubtleLineH}`} aria-hidden />
+              <div className="h-1.5 w-full bg-zinc-900" aria-hidden />
               <div className="flex flex-1 flex-col px-6 pb-7 pt-6 sm:px-7 sm:pt-7">
-                <div className={`flex items-center gap-2.5 ${landingAccentText}`}>
+                <div className="flex items-center gap-2.5 text-zinc-600">
                   <PersonaLabelIcon kind={p.iconKind} />
-                  <p className="text-xs font-semibold uppercase tracking-[0.11em] sm:text-[13px] sm:tracking-[0.13em]">
+                  <p
+                    className={`text-xs font-semibold uppercase tracking-[0.11em] sm:text-[13px] sm:tracking-[0.13em] ${landingTitleKeywordGradient}`}
+                  >
                     {p.label}
                   </p>
                 </div>
@@ -1018,25 +1014,17 @@ function WhoSection() {
                 <ul className="mt-6 flex flex-1 flex-col gap-3" role="list">
                   {p.wins.map((w) => (
                     <li
-                      key={w.lead + w.rest + (w.restAccent ?? "")}
+                      key={w.line}
                       className="flex items-start gap-3 rounded-2xl bg-zinc-50/80 px-3.5 py-2.5 text-sm leading-snug text-zinc-600 ring-1 ring-zinc-100/90 sm:text-[15px]"
                     >
                       <span
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-zinc-200/80 bg-zinc-50 text-[10px] font-bold ${landingAccentText}`}
+                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-zinc-200/80 bg-zinc-50 text-[10px] font-bold text-zinc-500"
                         aria-hidden
                       >
                         ✓
                       </span>
                       <span className="min-w-0">
-                        <span className="font-semibold text-zinc-900">{w.lead}</span>
-                        {w.restAccent ? (
-                          <>
-                            {w.rest}
-                            <span className={`font-semibold ${landingAccentText}`}>{w.restAccent}</span>
-                          </>
-                        ) : (
-                          w.rest
-                        )}
+                        <PersonaWinLine line={w.line} highlight={w.highlight} />
                       </span>
                     </li>
                   ))}
@@ -1058,9 +1046,11 @@ function CtaSection() {
         <div className="relative overflow-hidden rounded-3xl border border-zinc-200/70 bg-white px-6 py-14 text-left shadow-[0_20px_50px_-36px_rgba(15,23,42,0.08)] sm:px-12 sm:py-16">
         <div className="relative">
           <h2 className={`${sectionTitleClass} max-w-4xl`}>
-            <span className="block">Less time collecting signals.</span>
+            <span className="block">
+              Less time collecting <span className={landingTitleKeywordGradient}>signals</span>.
+            </span>
             <span className="block mt-1 sm:mt-0">
-              More time on <span className={titleAccent.cta}>strategy</span>.
+              More time on <span className={landingTitleKeywordGradient}>strategy</span>.
             </span>
           </h2>
           <p className={`mt-4 max-w-md ${sectionCtaMuted}`}>Setup takes minutes.</p>
@@ -1071,16 +1061,11 @@ function CtaSection() {
             </li>
             <li className="flex gap-3">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0F0F12] text-xs font-bold text-white">2</span>
-              <span>
-                <span className={`font-semibold ${landingAccentText}`}>Vector</span> analyzes{" "}
-                <span className={`font-semibold ${landingAccentText}`}>{executionSignalsPhrase}</span>
-              </span>
+              <span>Vector analyzes execution signals from your stack.</span>
             </li>
             <li className="flex gap-3">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0F0F12] text-xs font-bold text-white">3</span>
-              <span>
-                <span className={`font-semibold ${landingAccentText}`}>Vector</span> is ready to work
-              </span>
+              <span>Vector is ready to work.</span>
             </li>
           </ol>
           <div className="mt-10 flex flex-wrap gap-3">
@@ -1088,7 +1073,7 @@ function CtaSection() {
               to="/signup"
               className="inline-flex items-center justify-center rounded-full bg-[#0F0F12] px-8 py-3.5 text-sm font-semibold text-white no-underline shadow-[0_8px_24px_-12px_rgba(15,23,42,0.35)] transition-transform hover:scale-[1.02]"
             >
-              Get early access
+              Meet Vector
             </Link>
             <a
               href="https://calendar.app.google/1kwPDrjBZxVVaBAL6"

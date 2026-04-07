@@ -13,6 +13,7 @@ from vector.domains.onboarding.constants import (
     PROFILE_ROLE_OTHER,
 )
 
+
 def _infer_role_from_keywords(key: str) -> str | None:
     """
     Map common multi-word phrases and shorthands (key is lowercased, whitespace-normalized).
@@ -278,6 +279,22 @@ def normalize_role(raw: str) -> str:
     return PROFILE_ROLE_OTHER
 
 
+def role_answer_looks_like_headcount_instead(raw: str) -> bool:
+    """
+    True when the reply is almost certainly a headcount or size bucket, not a job title
+    (e.g. \"345\" or \"1,200\" on the role step).
+    """
+    s = _norm_ws(raw)
+    if not s:
+        return False
+    if re.search(r"[a-zA-Z]", s):
+        return False
+    flat_digits = re.sub(r"[\s,]", "", s)
+    if flat_digits.isdigit():
+        return True
+    return normalize_company_size(s) is not None
+
+
 def _headcount_to_bucket(n: int) -> str | None:
     """Map approximate headcount to stored size bucket."""
     if n <= 0:
@@ -355,6 +372,42 @@ def normalize_company_size(raw: str) -> str | None:
     if n is not None:
         return _headcount_to_bucket(n)
     return None
+
+
+def _is_explicit_company_size_band_label(raw: str) -> bool:
+    """True when the user picked a named band (e.g. 5-15, 50+), not a prose headcount."""
+    s = _norm_ws(raw)
+    if not s:
+        return False
+    t = s
+    for ch in ("—", "–", "−"):
+        t = t.replace(ch, "-")
+    key_compact = re.sub(r"\s+", "", t.lower().replace("to", "-"))
+    for syn in _SIZE_SYNONYMS:
+        if re.sub(r"\s+", "", syn.lower().replace("to", "-")) == key_compact:
+            return True
+    return s in ALLOWED_COMPANY_SIZES
+
+
+def company_size_persisted_value(raw: str) -> str | None:
+    """
+    Value stored in answers_json.company.size after validation.
+
+    When the reply is a clear numeric headcount (or prose containing one), store that integer
+    as a string (e.g. \"2345\"). When the user chose a named size band, store the band label.
+    """
+    s = _norm_ws(raw)
+    if not s:
+        return None
+    bucket = normalize_company_size(raw)
+    if bucket is None:
+        return None
+    if _is_explicit_company_size_band_label(raw):
+        return bucket
+    n = _parse_headcount_number(s)
+    if n is not None:
+        return str(n)
+    return bucket
 
 
 def normalize_website(raw: str) -> str:

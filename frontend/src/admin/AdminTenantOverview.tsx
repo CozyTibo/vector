@@ -9,6 +9,11 @@ type ChatMsg = {
   created_at: string;
 };
 
+type SlackStakeholdersSnap = {
+  raw_text: string | null;
+  slack_user_ids: string[];
+};
+
 type OnboardingSnap = {
   status: string;
   current_step: string;
@@ -25,7 +30,9 @@ type OnboardingSnap = {
   tools_pm: string[];
   tools_communication: string[];
   tools_docs: string[];
+  tools_crm: string[];
   tools_stack: Record<string, unknown> | null;
+  slack_stakeholders: SlackStakeholdersSnap | null;
   chat_messages: ChatMsg[];
 };
 
@@ -106,12 +113,33 @@ export default function AdminTenantOverview() {
               <dd>{ob.tools_communication.length ? ob.tools_communication.join(", ") : "—"}</dd>
               <dt className="text-stone-500">Docs</dt>
               <dd>{ob.tools_docs.length ? ob.tools_docs.join(", ") : "—"}</dd>
+              <dt className="text-stone-500">CRM &amp; customer support</dt>
+              <dd>{ob.tools_crm.length ? ob.tools_crm.join(", ") : "—"}</dd>
               <dt className="text-stone-500">Tools stack (legacy)</dt>
               <dd className="min-w-0">
                 {ob.tools_stack && Object.keys(ob.tools_stack).length > 0 ? (
                   <pre className="mt-1 max-h-64 overflow-auto rounded-md bg-stone-50 p-3 text-xs text-stone-800 whitespace-pre-wrap break-words">
                     {JSON.stringify(ob.tools_stack, null, 2)}
                   </pre>
+                ) : (
+                  "—"
+                )}
+              </dd>
+              <dt className="text-stone-500">Slack handoff (your member)</dt>
+              <dd className="min-w-0">
+                {ob.slack_stakeholders &&
+                (ob.slack_stakeholders.raw_text ||
+                  (ob.slack_stakeholders.slack_user_ids?.length ?? 0) > 0) ? (
+                  <div className="mt-1 space-y-2 rounded-md border border-stone-100 bg-stone-50 p-3 text-stone-800">
+                    {ob.slack_stakeholders.raw_text ? (
+                      <p className="whitespace-pre-wrap break-words text-xs">{ob.slack_stakeholders.raw_text}</p>
+                    ) : null}
+                    {(ob.slack_stakeholders.slack_user_ids?.length ?? 0) > 0 ? (
+                      <p className="font-mono text-xs text-stone-600">
+                        Slack user IDs: {ob.slack_stakeholders.slack_user_ids.join(", ")}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : (
                   "—"
                 )}

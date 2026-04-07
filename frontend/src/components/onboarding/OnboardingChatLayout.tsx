@@ -17,6 +17,8 @@ type OnboardingChatLayoutProps = {
   footer?: ReactNode;
   /** Hide in-card header (e.g. rare full-bleed variants) */
   showHeader?: boolean;
+  /** Right side of the in-card header (only when ``showHeader`` is true) */
+  headerTrailing?: ReactNode;
 };
 
 /**
@@ -26,6 +28,7 @@ export default function OnboardingChatLayout({
   children,
   footer,
   showHeader = true,
+  headerTrailing,
 }: OnboardingChatLayoutProps) {
   return (
     <div className="font-display relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
@@ -46,7 +49,7 @@ export default function OnboardingChatLayout({
             "ring-1 ring-zinc-950/[0.03]"
           }
         >
-          {showHeader ? <ChatHeader /> : null}
+          {showHeader ? <ChatHeader trailing={headerTrailing} /> : null}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-zinc-50/80 to-white">
             {children}
           </div>

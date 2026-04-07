@@ -334,13 +334,6 @@ export default function LandingPage() {
         <div className="mx-auto max-w-[96rem] px-5 pb-20 pt-6 sm:px-8 sm:pb-28 sm:pt-4 lg:pt-2">
           <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-12 lg:pt-4">
             <div className="relative z-[1] min-w-0 lg:col-span-6 lg:pl-2 lg:pr-2">
-              <p
-                className={`mb-6 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.25em] ${landingAccentText}`}
-              >
-                <span className="h-px w-10 bg-[#E878BE]" />
-                Early access
-              </p>
-
               <h1 className="max-w-none text-[clamp(1.35rem,4.35vw+0.85rem,4.1rem)] font-bold leading-[1.03] tracking-[-0.02em] text-[#0F0F12]">
                 <span className="whitespace-nowrap">Stop chasing updates.</span>
                 <br aria-hidden />
@@ -353,7 +346,7 @@ export default function LandingPage() {
                 </span>
               </h1>
               <p className="mt-7 max-w-2xl text-pretty text-xl leading-snug text-zinc-600 sm:mt-8 sm:text-2xl sm:leading-snug">
-                <span className={`font-semibold ${landingAccentText}`}>Vector</span> joins your team as an{" "}
+                <span className={`font-semibold ${landingTitleKeywordGradient}`}>Vector</span> joins your team as an{" "}
                 <span className="font-semibold text-[#0F0F12]">execution manager</span>, keeping track of progress
                 and <span className="font-semibold text-[#0F0F12]">tackling bottlenecks</span>.
               </p>
@@ -362,7 +355,7 @@ export default function LandingPage() {
                   to="/signup"
                   className="inline-flex items-center justify-center rounded-full bg-[#0F0F12] px-9 py-4 text-base font-semibold text-white no-underline shadow-[0_8px_28px_-12px_rgba(15,23,42,0.35)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_12px_36px_-12px_rgba(15,23,42,0.22)]"
                 >
-                  Get early access
+                  Meet Vector
                 </Link>
                 <a
                   href="#meet-vector-agent"

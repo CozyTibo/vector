@@ -3,10 +3,20 @@ import { readErrorDetail } from "./canonicalApi";
 export type OnboardingStep =
   | "CHAT_PROFILE"
   | "CONNECT_COMMUNICATION"
-  | "CONNECT_GITHUB"
-  | "CONNECT_LINEAR"
+  | "SLACK_STAKEHOLDERS"
+  | "ADMIN_ACCESS"
   | "SCANNING"
   | "THANK_YOU";
+
+export type SlackWorkspaceMember = {
+  id: string;
+  label: string;
+  /** Slack login name (without @); shown in confirmations and saved as @username in chat. */
+  username: string;
+  /** Lowercase email when the Slack app has users:read.email and the user exposes it. */
+  email: string | null;
+  image_48: string | null;
+};
 
 export type OnboardingMessagePayload = {
   id: string;
@@ -33,6 +43,18 @@ export type OnboardingStatePayload = {
 
 export async function fetchOnboarding(base: string): Promise<OnboardingStatePayload> {
   const res = await fetch(`${base}/onboarding`, { credentials: "include" });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return res.json() as Promise<OnboardingStatePayload>;
+}
+
+/** Hard reset: clears persisted chat and answers; connectors stay connected. */
+export async function postRestartOnboarding(base: string): Promise<OnboardingStatePayload> {
+  const res = await fetch(`${base}/onboarding/restart`, {
+    method: "POST",
+    credentials: "include",
+  });
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
@@ -79,6 +101,15 @@ export async function postOnboardingChat(
     step: string;
     answers: Record<string, unknown>;
   }>;
+}
+
+export async function fetchSlackWorkspaceMembers(base: string): Promise<SlackWorkspaceMember[]> {
+  const res = await fetch(`${base}/onboarding/slack-members`, { credentials: "include" });
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  const data = (await res.json()) as { members: SlackWorkspaceMember[] };
+  return data.members ?? [];
 }
 
 export async function completeOnboarding(base: string): Promise<{ status: string; current_step: string; completed_at: string }> {

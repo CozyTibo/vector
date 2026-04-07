@@ -17,6 +17,15 @@ class OnboardingChatMessageItem(BaseModel):
     created_at: datetime
 
 
+class SlackStakeholdersSnapshot(BaseModel):
+    """answers_json.slack_stakeholders: Slack member chosen for in-Slack onboarding handoff."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    raw_text: str | None = None
+    slack_user_ids: list[str] = Field(default_factory=list)
+
+
 class TenantListItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -55,15 +64,28 @@ class OnboardingAdminSnapshot(BaseModel):
         default=None,
         description="From answers_json.company.website (or legacy company_domain).",
     )
-    company_size: str | None = Field(default=None, description="From answers_json.company.size.")
+    company_size: str | None = Field(
+        default=None,
+        description="answers_json.company.size: exact headcount string, or band label (e.g. 5-15).",
+    )
     user_role: str | None = Field(default=None, description="From answers_json.profile.role.")
     tools_engineering: list[str] = Field(default_factory=list)
     tools_pm: list[str] = Field(default_factory=list)
     tools_communication: list[str] = Field(default_factory=list)
     tools_docs: list[str] = Field(default_factory=list)
+    tools_crm: list[str] = Field(
+        default_factory=list,
+        description="CRM / customer support tool ids from answers_json.tools.crm.",
+    )
     tools_stack: dict[str, Any] | None = Field(
         default=None,
         description="Legacy wizard: tools by category from answers_json.tools_stack.",
+    )
+    slack_stakeholders: SlackStakeholdersSnapshot | None = Field(
+        default=None,
+        description=(
+            "Slack handoff: Vector user mapped to a member (answers_json.slack_stakeholders)."
+        ),
     )
     chat_messages: list[OnboardingChatMessageItem] = Field(
         default_factory=list,
@@ -211,3 +233,37 @@ class AdminStep3CanonicalResetResponse(BaseModel):
     deleted_artifacts: int
     deleted_actors: int
     deleted_step3_canonical_cursors: int
+
+
+class AdminHardDeleteTenantRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match the server phrase shown in the admin delete dialog.",
+    )
+    company_name_confirmation: str = Field(
+        ...,
+        description="Must match the tenant company name (after trim) for an extra safeguard.",
+    )
+
+
+class AdminHardDeleteTenantResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    deleted_tenant_id: uuid.UUID
+    deleted_company_name: str
+    deleted_relationships: int
+    deleted_mapping_events: int
+    deleted_current_mappings: int
+    deleted_external_references: int
+    deleted_actor_external_identities: int
+    deleted_artifacts: int
+    deleted_actors: int
+    deleted_step3_canonical_cursors: int
+    deleted_github_projection_rows: int
+    deleted_linear_projection_rows: int
+    deleted_connector_projection_progress_rows: int
+    deleted_raw_records: int
+    deleted_ingestion_runs: int
+    deleted_sync_state_rows: int
