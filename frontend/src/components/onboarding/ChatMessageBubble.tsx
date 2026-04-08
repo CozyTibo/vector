@@ -63,9 +63,27 @@ function tryParseToolsSelectedContent(content: string): Record<string, string[]>
 
 function formatTime(ts: number): string {
   try {
+    if (!Number.isFinite(ts)) {
+      return "";
+    }
     return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(ts));
   } catch {
     return "";
+  }
+}
+
+function safeDateTimeIso(ts: number): string | undefined {
+  if (!Number.isFinite(ts)) {
+    return undefined;
+  }
+  try {
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) {
+      return undefined;
+    }
+    return d.toISOString();
+  } catch {
+    return undefined;
   }
 }
 
@@ -105,7 +123,7 @@ export default function ChatMessageBubble({
           {!isContinuation ? (
             <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
               <span className={`font-semibold ${landingAccentText}`}>{userDisplayName}</span>
-              <time className="tabular-nums text-zinc-400" dateTime={new Date(message.timestamp).toISOString()}>
+              <time className="tabular-nums text-zinc-400" dateTime={safeDateTimeIso(message.timestamp)}>
                 {formatTime(message.timestamp)}
               </time>
             </div>
@@ -156,7 +174,7 @@ export default function ChatMessageBubble({
         {!isContinuation ? (
           <div className="flex items-baseline gap-2 text-[11px] text-zinc-500">
             <span className={`font-semibold ${landingAccentText}`}>Vector</span>
-            <time className="tabular-nums text-zinc-400" dateTime={new Date(message.timestamp).toISOString()}>
+              <time className="tabular-nums text-zinc-400" dateTime={safeDateTimeIso(message.timestamp)}>
               {formatTime(message.timestamp)}
             </time>
           </div>

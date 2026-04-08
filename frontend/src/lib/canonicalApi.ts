@@ -1,7 +1,11 @@
 /** Fetch helpers for Step 3 canonical debug (session cookie or admin Basic). */
 
 export function getApiBase(): string {
-  return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, "");
+  const raw = import.meta.env.VITE_API_BASE_URL;
+  if (typeof raw !== "string" || !raw.trim()) {
+    return "http://localhost:8000";
+  }
+  return raw.replace(/\/$/, "");
 }
 
 /** Client for `/debug/canonical` (product session) or `/admin/tenants/:id/canonical` (Basic). */
@@ -17,7 +21,7 @@ export function adminCanonicalClient(tenantId: string, password: string): Canoni
   return { kind: "admin", base: getApiBase(), tenantId, password };
 }
 
-export function canonicalPrefix(c: CanonicalClient): string {
+function canonicalPrefix(c: CanonicalClient): string {
   if (c.kind === "session") {
     return `${c.base}/debug/canonical`;
   }
@@ -135,7 +139,7 @@ async function canonJson<T>(c: CanonicalClient, pathAndQuery: string): Promise<T
   return res.json() as Promise<T>;
 }
 
-export type Paginated<T> = {
+type Paginated<T> = {
   total: number;
   limit: number;
   offset: number;
@@ -143,25 +147,11 @@ export type Paginated<T> = {
 };
 
 /** Seeded registry ids — see migration `20260324_0011_step3_canonical_ontology`. */
-export const ARTIFACT_KIND_BY_ID: Record<number, string> = {
-  1: "repository",
-  2: "trackable_unit",
-  3: "changeset",
-  4: "revision",
-};
-
-export const RELATION_KIND_BY_ID: Record<number, string> = {
+const RELATION_KIND_BY_ID: Record<number, string> = {
   1: "authored_by",
   2: "associated_with",
   3: "contains",
 };
-
-export function artifactKindName(id: number | null | undefined): string {
-  if (id == null) {
-    return "—";
-  }
-  return ARTIFACT_KIND_BY_ID[id] ?? String(id);
-}
 
 export function relationKindName(id: number | null | undefined): string {
   if (id == null) {
@@ -280,7 +270,7 @@ export async function fetchActorDetail(
   return canonJson(c, `actors/${encodeURIComponent(actorId)}`);
 }
 
-export type MappingEventRow = {
+type MappingEventRow = {
   id: number;
   external_reference_id?: string;
   rule_version: string;
@@ -300,7 +290,7 @@ export async function fetchMappingEventsForXref(
   return canonJson(c, `mapping-events?${q}`);
 }
 
-export type CanonicalStatusResponse = {
+type CanonicalStatusResponse = {
   tenant_id: string;
   connection_id: string;
   connector: string;
@@ -324,7 +314,7 @@ export async function fetchCanonicalStatus(
   return canonJson(c, `status?${q}`);
 }
 
-export type CanonicalResetResyncResponse = {
+type CanonicalResetResyncResponse = {
   reset: boolean;
   connection_id: string;
   ingestion_run_id: string;
@@ -353,7 +343,7 @@ export async function resetAndResyncCanonical(
   return (await res.json()) as CanonicalResetResyncResponse;
 }
 
-export type RebuildFromStep1Response = {
+type RebuildFromStep1Response = {
   rebuilt_from_step1: boolean;
   connection_id: string;
   projection_rows_processed: number;
@@ -431,7 +421,7 @@ export async function fetchSubgraphByActor(
   return canonJson(c, `subgraph?${q}`);
 }
 
-export type IngestionRunsResponse = {
+type IngestionRunsResponse = {
   items: { id: string; connection_id: string }[];
 };
 

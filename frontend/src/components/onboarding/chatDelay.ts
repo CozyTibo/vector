@@ -5,8 +5,3 @@ export function minTypingDelay(minMs = 400, maxMs = 900): Promise<void> {
     window.setTimeout(resolve, ms);
   });
 }
-
-export async function withTypingDelay<T>(promise: Promise<T>, minMs = 400, maxMs = 900): Promise<T> {
-  const [result] = await Promise.all([promise, minTypingDelay(minMs, maxMs)]);
-  return result;
-}

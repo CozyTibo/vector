@@ -8,9 +8,19 @@ type ChatMessageListProps = {
   messages: ChatMessage[];
   userDisplayName: string;
   isTyping?: boolean;
+  /**
+   * When true (default), scroll to the latest message when the list grows or typing starts.
+   * Set false for read-only admin previews so the page does not jump on load.
+   */
+  autoScrollToBottom?: boolean;
 };
 
-export default function ChatMessageList({ messages, userDisplayName, isTyping = false }: ChatMessageListProps) {
+export default function ChatMessageList({
+  messages,
+  userDisplayName,
+  isTyping = false,
+  autoScrollToBottom = true,
+}: ChatMessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   /** Only auto-scroll when the thread grows or typing starts; avoid re-running on `messages` reference changes (fights trackpad scroll). */
   const prevLenRef = useRef(0);
@@ -19,10 +29,13 @@ export default function ChatMessageList({ messages, userDisplayName, isTyping = 
     const len = messages.length;
     const grew = len > prevLenRef.current;
     prevLenRef.current = len;
+    if (!autoScrollToBottom) {
+      return;
+    }
     if (grew || isTyping) {
       endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [messages.length, isTyping]);
+  }, [messages.length, isTyping, autoScrollToBottom]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

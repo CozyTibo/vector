@@ -192,10 +192,19 @@ def _snapshot_from_onboarding(
     ans = dict(row.answers_json or {})
     msgs: list[OnboardingChatMessageItem] = []
     if onboarding_repo.onboarding_messages_table_exists(session):
-        raw_rows = onboarding_repo.list_recent_onboarding_messages(session, row.tenant_id, limit=50)
-        for m in sorted(raw_rows, key=lambda x: x.created_at):
+        # Full transcript from the start, in DB order (created_at, id). Avoid "recent 200 DESC then
+        # sort", which drops early turns; tie-break id matches flush order within the same timestamp.
+        raw_rows = onboarding_repo.list_onboarding_messages_chronological(
+            session, row.tenant_id, limit=2000
+        )
+        for m in raw_rows:
             msgs.append(
-                OnboardingChatMessageItem(role=m.role, content=m.content, created_at=m.created_at)
+                OnboardingChatMessageItem(
+                    id=m.id,
+                    role=m.role,
+                    content=m.content,
+                    created_at=m.created_at,
+                )
             )
     return OnboardingAdminSnapshot(
         status=row.status,
@@ -330,9 +339,9 @@ def build_admin_router() -> APIRouter:
             created_at=t.created_at,
             onboarding=_snapshot_from_onboarding(db, ob),
             member_full_name=member.full_name if member else None,
+            member_email=member.email if member else None,
             connected_connectors=[c.provider for c in conns],
             slack_vector_paused=bool(t.slack_vector_paused),
-            manager_slack_onboarding_disabled=bool(t.manager_slack_onboarding_disabled),
         )
 
     @r.get("/tenants/{tenant_id}/connections", response_model=AdminConnectionsResponse)

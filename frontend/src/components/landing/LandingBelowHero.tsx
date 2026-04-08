@@ -34,7 +34,7 @@ const sectionHeaderClass = "w-full text-left lg:pl-2";
 /** Body copy - matches Vision (“Execution should be observable”) left column */
 const sectionProseBorder = "border-l-2 border-[#F5C8E0]/90 pl-7 sm:border-[#F5C8E0] sm:pl-9";
 const sectionProseStack = "space-y-6 sm:space-y-7";
-export const sectionProseMuted = "text-pretty text-lg leading-snug text-zinc-600 sm:text-xl";
+const sectionProseMuted = "text-pretty text-lg leading-snug text-zinc-600 sm:text-xl";
 const sectionProseBody = "text-pretty text-lg font-medium leading-snug text-zinc-800 sm:text-xl";
 const sectionProseStrong = "text-pretty text-lg font-semibold leading-snug text-zinc-950 sm:text-xl";
 

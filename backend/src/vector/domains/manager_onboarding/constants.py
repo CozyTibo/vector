@@ -38,6 +38,8 @@ SCOPE_OTHER_MANAGERS = "other_managers"
 # Safety (spec)
 MAX_CLARIFICATIONS_PER_STEP = 2
 MAX_MESSAGES_PER_STEP = 4
+# Q4 often needs back-and-forth (invites, plain #channel names); allow more before watchdog.
+MAX_MESSAGES_PER_STEP_Q4_CHANNELS = 12
 
 # Block Kit action_ids (each must be unique within a single message — duplicates → invalid_blocks)
 ACTION_SCOPE_JUST_ME = "manager_ob_scope_just_me"

@@ -18,6 +18,7 @@ from vector.domains.manager_onboarding.constants import (
     ACTION_SCOPE_JUST_ME,
     ACTION_SCOPE_OTHER_MGR,
     MAX_MESSAGES_PER_STEP,
+    MAX_MESSAGES_PER_STEP_Q4_CHANNELS,
     OUTBOUND_INTRO_KEY,
     OUTBOUND_STEP_REPLY_KEY,
     SCOPE_JUST_ME,
@@ -50,28 +51,86 @@ def slack_outbound_allowed(session: Session, sess: Any) -> bool:
         return False
     if bool(getattr(t, "slack_vector_paused", False)):
         return False
-    if bool(getattr(t, "manager_slack_onboarding_disabled", False)):
-        return False
     if bool(getattr(sess, "muted", False)):
         return False
     return True
 
-# Q4: user can bail out without channel IDs (reactions are not read — plain text only)
+# Q4: explicit opt-out only — "ok"/"done" are common acknowledgements and must not skip this step.
 _SKIP_OBSERVED_CHANNELS_RE = re.compile(
-    r"^\s*(skip|skipped|done|ok|none|later|pass|n/a|no\s*channels?|nothing|not\s*now)\s*[!.]*\s*$",
+    r"^\s*(skip|skipped|none|pass|n/a|no\s*channels?|nothing|not\s*now|without\s+channels?|later)\s*[!.]*\s*$",
     re.IGNORECASE,
 )
 
 USER_MENTION_RE = re.compile(r"<@(U[A-Z0-9]+)>")
 # Public channels C…, private (incl. converted) G… — capture optional |label for user-facing copy
-CHANNEL_MENTION_RE = re.compile(r"<#([CG][A-Z0-9]+)(?:\|([^>]+))?>")
+# Prefix may rarely be lowercase in some payloads; normalize after match.
+CHANNEL_MENTION_RE = re.compile(r"<#([cCgG][A-Za-z0-9]+)(?:\|([^>]+))?>")
+# Plain-text "#general" (Slack may not wrap in <#C…> if pasted); names are resolved via conversations.list.
+# Do not match the ``#`` inside Slack's ``<#C123|name>`` token (``#`` is preceded by ``<``).
+_PLAIN_HASH_CHANNEL_NAME_RE = re.compile(r"(?<!<)#([a-zA-Z0-9][a-zA-Z0-9._-]*)")
+
+
+def normalize_slack_conversation_id(raw: str) -> str:
+    """Canonical C…/G… id for API calls (Slack payloads are case-insensitive; normalize defensively)."""
+    return (raw or "").strip().upper()
+
+
+def extract_plain_hash_channel_names(text: str) -> list[str]:
+    """Lowercased channel names from ``#foo`` tokens (no leading # in output)."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for m in _PLAIN_HASH_CHANNEL_NAME_RE.finditer(text or ""):
+        name = m.group(1).strip().lower()
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def resolve_channel_names_to_ids(
+    token: str,
+    names: list[str],
+) -> tuple[list[str], list[str]]:
+    """
+    Map ``#name``-style channel names to Slack ids using ``conversations.list``.
+    Returns ``(resolved_ids, unresolved_normalized_names)``.
+    """
+    if not names:
+        return [], []
+    try:
+        all_ch = slack_web_api.conversations_list_public_private(token)
+    except Exception as e:
+        log.warning("conversations.list for plain #channel names failed: %s", e)
+        return [], names
+    name_to_id: dict[str, str] = {}
+    for ch in all_ch:
+        n = str(ch.get("name") or "").strip().lower()
+        cid = normalize_slack_conversation_id(str(ch.get("id") or ""))
+        if n and cid and n not in name_to_id:
+            name_to_id[n] = cid
+    resolved: list[str] = []
+    seen_ids: set[str] = set()
+    unresolved: list[str] = []
+    for raw in names:
+        key = raw.strip().lower()
+        cid = name_to_id.get(key)
+        if cid and cid not in seen_ids:
+            seen_ids.add(cid)
+            resolved.append(cid)
+        elif not cid:
+            unresolved.append(key)
+    return resolved, unresolved
 
 
 def extract_slack_tokens(text: str) -> tuple[list[str], list[str], str]:
     """Return (user_ids, channel_ids, remainder text with mentions stripped)."""
     uids = USER_MENTION_RE.findall(text or "")
     chan_tuples = CHANNEL_MENTION_RE.findall(text or "")
-    cids = list(dict.fromkeys(t[0].strip() for t in chan_tuples if t[0]))
+    cids = list(
+        dict.fromkeys(
+            normalize_slack_conversation_id(t[0]) for t in chan_tuples if t[0]
+        )
+    )
     remainder = USER_MENTION_RE.sub(" ", text or "")
     remainder = CHANNEL_MENTION_RE.sub(" ", remainder)
     remainder = " ".join(remainder.split()).strip()
@@ -84,7 +143,7 @@ def channel_mentions_with_labels(text: str) -> tuple[list[str], dict[str, str]]:
     seen: set[str] = set()
     labels: dict[str, str] = {}
     for m in CHANNEL_MENTION_RE.finditer(text or ""):
-        cid = m.group(1).strip()
+        cid = normalize_slack_conversation_id(m.group(1))
         lab = (m.group(2) or "").strip()
         if not cid:
             continue
@@ -202,8 +261,51 @@ def admin_mark_needs_review(sess: Any) -> None:
     sess.status = STATUS_NEEDS_REVIEW
 
 
+def reconcile_needs_review_if_manager_flow_complete(sess: Any) -> bool:
+    """If answers and step say the flow is done, drop stale ``needs_review`` status.
+
+    Rollup **Needs follow-up** keys off ``status`` only. A session can end up with
+    ``current_step == COMPLETED`` and full answers while ``status`` is still
+    ``needs_review`` after:
+
+    - An operator used **Mark needs review** on an already-finished thread, or
+    - The per-step message watchdog tripped and the manager later finished in Slack
+      (rare edge), or
+    - Admin **PATCH** merged answers / step without syncing status.
+
+    We only clear ``needs_review`` — not ``paused`` or ``failed`` — so real holds stay.
+    """
+    if sess.status != STATUS_NEEDS_REVIEW:
+        return False
+    if sess.current_step != STEP_COMPLETED:
+        return False
+    if first_unanswered_step(dict(sess.answers_json or {})) != STEP_COMPLETED:
+        return False
+    sess.status = STATUS_COMPLETED
+    if sess.completed_at is None:
+        sess.completed_at = datetime.now(UTC)
+    sess.version = int(sess.version) + 1
+    return True
+
+
 def admin_set_session_muted(sess: Any, muted: bool) -> None:
     sess.muted = bool(muted)
+
+
+def admin_wipe_session_restart(db: Session, sess: Any) -> None:
+    """Delete DM history, channel checks, parse artifacts; clear answers; restart at Q1."""
+    sid = sess.id
+    mo_repo.delete_messages_for_session(db, sid)
+    mo_repo.delete_channel_observations_for_session(db, sid)
+    mo_repo.delete_parse_artifacts_for_session(db, sid)
+    sess.answers_json = {}
+    sess.context_json = {}
+    sess.current_step = STEP_Q1_SCOPE_INTENT
+    sess.status = STATUS_WAITING_FOR_USER
+    sess.error_code = None
+    sess.error_detail = None
+    sess.completed_at = None
+    sess.version = int(sess.version) + 1
 
 
 def first_unanswered_step(answers: dict[str, Any]) -> str:
@@ -244,6 +346,14 @@ def _bump_step_counter(sess: Any, new_step: str) -> None:
     if prev != new_step:
         ctx["counter_step"] = new_step
         ctx["messages_this_step"] = 0
+    _set_context(sess, ctx)
+
+
+def _reset_messages_counter_for_step(sess: Any, step: str) -> None:
+    """Reset the per-step inbound message counter (e.g. after admin recompute / resume)."""
+    ctx = _context(sess)
+    ctx["counter_step"] = step
+    ctx["messages_this_step"] = 0
     _set_context(sess, ctx)
 
 
@@ -353,13 +463,38 @@ def validate_channels(
     """Return (ok_ids, failed_ids). Persists ManagerOnboardingChannelObservation rows."""
     ok: list[str] = []
     failed: list[str] = []
-    for cid in channel_ids:
-        cid = (cid or "").strip()
+    list_by_id: dict[str, dict[str, Any]] = {}
+    try:
+        for row in slack_web_api.conversations_list_public_private(bot_token):
+            lid = normalize_slack_conversation_id(str(row.get("id") or ""))
+            if lid:
+                list_by_id[lid] = row
+    except Exception as e:
+        log.warning("prefetch conversations.list for channel validation failed: %s", e)
+
+    for raw in channel_ids:
+        cid = normalize_slack_conversation_id(raw)
         if not cid:
             continue
         try:
-            info = slack_web_api.conversations_info(bot_token, channel=cid)
-            ch = info.get("channel") if isinstance(info, dict) else None
+            ch: dict[str, Any] | None = None
+            try:
+                info = slack_web_api.conversations_info(bot_token, channel=cid)
+                ch = info.get("channel") if isinstance(info, dict) else None
+            except RuntimeError as e:
+                em = str(e).lower()
+                if (
+                    ("invalid_arguments" in em or "channel_not_found" in em)
+                    and cid in list_by_id
+                ):
+                    ch = list_by_id[cid]
+                    log.info(
+                        "conversations.info failed for %s (%s); using conversations.list row",
+                        cid,
+                        e,
+                    )
+                else:
+                    raise
             is_member = bool(isinstance(ch, dict) and ch.get("is_member"))
             if is_member:
                 mo_repo.upsert_channel_observation(
@@ -491,7 +626,12 @@ def apply_text_turn(
     if sess.status == STATUS_COMPLETED:
         return
     n = _inc_messages_this_step(sess)
-    if n > MAX_MESSAGES_PER_STEP:
+    msg_cap = (
+        MAX_MESSAGES_PER_STEP_Q4_CHANNELS
+        if sess.current_step == STEP_Q4_OBSERVED_CHANNELS
+        else MAX_MESSAGES_PER_STEP
+    )
+    if n > msg_cap:
         ctx = _context(sess)
         ctx["watchdog_tripped"] = True
         _set_context(sess, ctx)
@@ -512,20 +652,41 @@ def apply_text_turn(
     merge_deterministic_multi_step(sess, text)
     answers = _answers(sess)
 
+    q4_sent_access_hints = False
     if sess.current_step == STEP_Q4_OBSERVED_CHANNELS:
         channels, mention_labels = channel_mentions_with_labels(text)
         pending = list(answers.get("_pending_channel_ids") or [])
         for c in channels:
             if c not in pending:
                 pending.append(c)
+        plain_names = extract_plain_hash_channel_names(text)
+        if plain_names:
+            extra_ids, unresolved_plain = resolve_channel_names_to_ids(bot_token, plain_names)
+            for cid in extra_ids:
+                if cid not in pending:
+                    pending.append(cid)
+            if unresolved_plain:
+                log.info(
+                    "manager_onboarding Q4: unresolved plain #channel names (not in workspace list): %s",
+                    unresolved_plain,
+                )
         if pending:
             ok, failed = validate_channels(session, bot_token, sess, pending)
-            answers["observed_channel_ids"] = ok
+            # Merge validated IDs across turns — replacing with only this message's `ok` wiped
+            # channels that validated on an earlier reply (common when fixing access per channel).
+            prev_ok = [str(x).strip() for x in (answers.get("observed_channel_ids") or []) if str(x).strip()]
+            merged_ok = list(prev_ok)
+            for cid in ok:
+                c = (cid or "").strip()
+                if c and c not in merged_ok:
+                    merged_ok.append(c)
+            answers["observed_channel_ids"] = merged_ok
             answers["_pending_channel_ids"] = []
-            if ok:
+            if merged_ok:
                 answers.pop("observed_channels_skipped", None)
             _set_answers(sess, answers)
             if failed:
+                q4_sent_access_hints = True
                 msg = _human_channel_access_message(failed, mention_labels)
                 _send_dm(
                     session,
@@ -572,7 +733,8 @@ def apply_text_turn(
             "That’s everything I need for now — thanks! I’ll start from here and we can refine anytime.",
             idempotency_suffix="done",
         )
-    else:
+    elif not (q4_sent_access_hints and next_step == STEP_Q4_OBSERVED_CHANNELS):
+        # Avoid a third DM repeating the full Q4 prompt right after access hints.
         _send_step_prompt(session, bot_token, sess, slack_channel_id, next_step)
     sess.version = int(sess.version) + 1
     sess.status = STATUS_WAITING_FOR_USER
@@ -823,6 +985,7 @@ def process_slack_message_event(
     channel_id: str,
     slack_event_id: str | None,
     bot_token: str,
+    message_ts: str | None = None,
 ) -> None:
     """Handle a user message in a DM (or thread — channel_id is conversation)."""
     link = slack_repo.get_slack_connection_by_team_id(session, team_id)
@@ -838,6 +1001,7 @@ def process_slack_message_event(
         slack_team_id=team_id,
         slack_user_id=slack_user_id,
     )
+    ts = (message_ts or "").strip() or None
     if slack_event_id:
         try:
             with session.begin_nested():
@@ -848,6 +1012,7 @@ def process_slack_message_event(
                     role="user",
                     text=text or "",
                     slack_channel_id=channel_id,
+                    slack_ts=ts,
                     slack_event_id=slack_event_id,
                 )
         except IntegrityError:
@@ -860,6 +1025,7 @@ def process_slack_message_event(
             role="user",
             text=text or "",
             slack_channel_id=channel_id,
+            slack_ts=ts,
             slack_event_id=None,
         )
     send_intro_message(session, bot_token, sess)
@@ -905,10 +1071,7 @@ def run_send_intro_task(*, tenant_id: uuid.UUID, slack_user_id: str) -> None:
         return
     for session in session_scope():
         t = session.get(Tenant, tenant_id)
-        if t is not None and (
-            bool(getattr(t, "slack_vector_paused", False))
-            or bool(getattr(t, "manager_slack_onboarding_disabled", False))
-        ):
+        if t is not None and bool(getattr(t, "slack_vector_paused", False)):
             return
         link = slack_repo.get_slack_connection_for_tenant(session, tenant_id)
         if link is None:
@@ -951,6 +1114,9 @@ def admin_retry_slack_prompt(session: Session, bot_token: str, sess: Any) -> dic
             slack_ts=str(data.get("ts") or ""),
             outbound_idempotency_key=f"{OUTBOUND_INTRO_KEY}:{sess.id}:{suffix}",
         )
+        ctx = _context(sess)
+        ctx["intro_sent"] = True
+        _set_context(sess, ctx)
         return {"ok": True, "ts": data.get("ts")}
     if step == STEP_Q5_REPORTS_TO:
         data = slack_web_api.chat_post_message(
@@ -983,3 +1149,37 @@ def admin_retry_slack_prompt(session: Session, bot_token: str, sess: Any) -> dic
         outbound_idempotency_key=f"{OUTBOUND_STEP_REPLY_KEY}:{sess.id}:{suffix}",
     )
     return {"ok": True, "ts": data.get("ts")}
+
+
+def admin_apply_recompute_current_step(
+    session: Session,
+    sess: Any,
+    *,
+    bot_token: str | None,
+) -> dict[str, Any]:
+    """
+    Re-sync ``current_step`` from answers, fix status, resend the current step in Slack.
+
+    Admin "Recompute step & resume". If ``bot_token`` is None (no Slack), only DB is updated.
+    """
+    step = first_unanswered_step(dict(sess.answers_json or {}))
+    sess.current_step = step
+    if step == STEP_COMPLETED:
+        sess.status = STATUS_COMPLETED
+        if sess.completed_at is None:
+            sess.completed_at = datetime.now(UTC)
+        _reset_messages_counter_for_step(sess, step)
+        sess.version = int(sess.version) + 1
+        return {"current_step": step, "slack": None}
+    sess.status = STATUS_WAITING_FOR_USER
+    sess.completed_at = None
+    _reset_messages_counter_for_step(sess, step)
+    sess.version = int(sess.version) + 1
+    if not bot_token:
+        return {"current_step": step, "slack": {"ok": False, "error": "no_slack_connection"}}
+    try:
+        slack_out = admin_retry_slack_prompt(session, bot_token, sess)
+    except Exception as e:
+        log.exception("admin recompute: Slack resend failed session=%s", sess.id)
+        return {"current_step": step, "slack": {"ok": False, "error": str(e)}}
+    return {"current_step": step, "slack": slack_out}

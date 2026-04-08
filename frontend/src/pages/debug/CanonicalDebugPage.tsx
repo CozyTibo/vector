@@ -35,37 +35,84 @@ const TABS = [
   { id: "status", label: UI_TAB_LABELS.status },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type CanonicalDebugTabId = (typeof TABS)[number]["id"];
+
+type TabId = CanonicalDebugTabId;
 
 function clientQueryTag(c: CanonicalClient): string {
   return c.kind === "session" ? "session" : `admin:${c.tenantId}`;
 }
 
-export type CanonicalDebugPageProps = {
+type CanonicalDebugPageProps = {
   client: CanonicalClient;
   /** Base path for in-app entity routes (no trailing slash). */
   entityBasePath: string;
   dashboardHref?: string;
   /** `admin` uses light chrome to match Vector Admin; `developer` keeps the dark debug HUD. */
   visualTheme?: "developer" | "admin";
+  /** Subset and order of tabs. Default: all tabs in standard order. */
+  visibleTabIds?: readonly TabId[];
+  /** Override tab button labels (e.g. operator-facing names). */
+  tabLabelOverrides?: Partial<Record<TabId, string>>;
+  /** Shorter header copy and hides deep-debug explainer cards (operator dashboard). */
+  operatorChrome?: boolean;
+  /** Link next to dashboard (defaults to rawIngestionHref logic). */
+  secondaryNavHref?: string;
+  secondaryNavLabel?: string;
+  /** Optional third link (e.g. tenant debug hub). */
+  tertiaryNavHref?: string;
+  tertiaryNavLabel?: string;
 };
+
+const DEFAULT_TAB_ORDER: readonly TabId[] = [
+  "artifacts",
+  "actors",
+  "relationships",
+  "xrefs",
+  "graph",
+  "status",
+];
 
 export default function CanonicalDebugPage({
   client: canonicalClient,
   entityBasePath,
   dashboardHref = "/app",
   visualTheme = "developer",
+  visibleTabIds,
+  tabLabelOverrides,
+  operatorChrome = false,
+  secondaryNavHref,
+  secondaryNavLabel,
+  tertiaryNavHref,
+  tertiaryNavLabel,
 }: CanonicalDebugPageProps) {
   const isAdminShell = visualTheme === "admin";
   const rawIngestionHref =
     canonicalClient.kind === "admin"
-      ? `/admin/tenants/${canonicalClient.tenantId}/step1`
+      ? `/admin/tenants/${canonicalClient.tenantId}/data-pipeline`
       : "/admin";
+  const pipelineHref = secondaryNavHref ?? rawIngestionHref;
+  const pipelineLabel = secondaryNavLabel ?? "Data pipeline";
+
+  const visibleTabs = useMemo(() => {
+    const order = visibleTabIds ?? DEFAULT_TAB_ORDER;
+    const allowed = new Set<TabId>(DEFAULT_TAB_ORDER);
+    return order.filter((id): id is TabId => allowed.has(id)).map((id) => {
+      const def = TABS.find((t) => t.id === id)!;
+      return {
+        id,
+        label: tabLabelOverrides?.[id] ?? def.label,
+      };
+    });
+  }, [visibleTabIds, tabLabelOverrides]);
+
   const cqTag = useMemo(() => clientQueryTag(canonicalClient), [canonicalClient]);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as TabId | null;
-  const tab: TabId = TABS.some((t) => t.id === tabParam) ? (tabParam as TabId) : "artifacts";
+  const tab: TabId = visibleTabs.some((t) => t.id === tabParam)
+    ? (tabParam as TabId)
+    : (visibleTabs[0]?.id ?? "artifacts");
 
   const [page, setPage] = useState(0);
   const [filterQ, setFilterQ] = useState("");
@@ -267,31 +314,57 @@ export default function CanonicalDebugPage({
   return (
     <div className={isAdminShell ? "canonical-admin-shell" : "app legacy-debug"}>
       <header className="header">
-        <h1>Execution Graph (Step 3)</h1>
-        <p className="subtitle">Inspect how people and work are connected in your system.</p>
-        <ul className="meta" style={{ marginTop: "0.35rem", paddingLeft: "1.25rem" }}>
-          <li>People (actors)</li>
-          <li>Work objects (repositories, commits, pull requests, issues)</li>
-          <li>Connections between them</li>
-        </ul>
-        <p className="meta">
-          <Link to={dashboardHref}>{isAdminShell ? "← Admin" : "← App"}</Link>
-          {" · "}
-          <Link to={rawIngestionHref}>Raw ingestion (admin)</Link>
-        </p>
+        {operatorChrome ? (
+          <>
+            <h1>Execution graph</h1>
+            <p className="subtitle">
+              This is Vector&apos;s canonical view of people, work items (repos, PRs, issues, commits),
+              and how they connect — built from ingested engineering data. Use it to verify the
+              workspace has been processed end-to-end.
+            </p>
+            <p className="meta">
+              <Link to={dashboardHref}>{isAdminShell ? "← Admin" : "← App"}</Link>
+              {" · "}
+              <Link to={pipelineHref}>{pipelineLabel}</Link>
+              {tertiaryNavHref ? (
+                <>
+                  {" · "}
+                  <Link to={tertiaryNavHref}>{tertiaryNavLabel ?? "Debug"}</Link>
+                </>
+              ) : null}
+            </p>
+          </>
+        ) : (
+          <>
+            <h1>Execution Graph (Step 3)</h1>
+            <p className="subtitle">Inspect how people and work are connected in your system.</p>
+            <ul className="meta" style={{ marginTop: "0.35rem", paddingLeft: "1.25rem" }}>
+              <li>People (actors)</li>
+              <li>Work objects (repositories, commits, pull requests, issues)</li>
+              <li>Connections between them</li>
+            </ul>
+            <p className="meta">
+              <Link to={dashboardHref}>{isAdminShell ? "← Admin" : "← App"}</Link>
+              {" · "}
+              <Link to={pipelineHref}>{pipelineLabel}</Link>
+            </p>
+          </>
+        )}
       </header>
 
-      <section className="card nested" style={{ marginBottom: "0.75rem" }}>
-        <h2 style={{ marginTop: 0, fontSize: "1rem" }}>How to read this page</h2>
-        <p className="meta" style={{ marginBottom: 0 }}>
-          People perform actions on work objects (repos, commits, PRs, issues). Connections record how
-          those objects relate — not raw database rows.
-        </p>
-      </section>
+      {!operatorChrome ? (
+        <section className="card nested" style={{ marginBottom: "0.75rem" }}>
+          <h2 style={{ marginTop: 0, fontSize: "1rem" }}>How to read this page</h2>
+          <p className="meta" style={{ marginBottom: 0 }}>
+            People perform actions on work objects (repos, commits, PRs, issues). Connections record how
+            those objects relate — not raw database rows.
+          </p>
+        </section>
+      ) : null}
 
       <section className="card">
         <div className="btn-row wrap" style={{ gap: "0.35rem", marginBottom: "0.75rem" }}>
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.id}
               type="button"
@@ -492,8 +565,8 @@ export default function CanonicalDebugPage({
           ) : relQuery.data ? (
             <>
               <p className="meta">
-                {relQuery.data.total} connections (current) — page {page + 1} of{" "}
-                {Math.max(1, Math.ceil(relQuery.data.total / PAGE_SIZE))}
+                {relQuery.data.total} {operatorChrome ? "relationships" : "connections"} (current) — page{" "}
+                {page + 1} of {Math.max(1, Math.ceil(relQuery.data.total / PAGE_SIZE))}
               </p>
               <div className="btn-row">
                 <button
@@ -679,13 +752,23 @@ export default function CanonicalDebugPage({
       {tab === "status" && (
         <section className="card">
           <p className="meta" style={{ marginBottom: "0.75rem" }}>
-            Pipeline health for Step 3 (canonical) vs Step 2 (projections), per connector
-            connection. The dropdown lists connection IDs from recent Step 1 ingestion runs for the
-            selected connector (GitHub vs Linear). You can also paste a UUID. Deep link:{" "}
-            <code className="cell-muted">
-              ?connection_id=&lt;uuid&gt;&amp;tab=status&amp;connector=linear
-            </code>
-            .
+            {operatorChrome ? (
+              <>
+                Compare canonical processing (execution graph) with projection watermarks for one
+                GitHub or Linear connection. Pick a connection from recent ingestion runs, or paste a
+                connection id. Advanced reset actions are below.
+              </>
+            ) : (
+              <>
+                Pipeline health for Step 3 (canonical) vs Step 2 (projections), per connector
+                connection. The dropdown lists connection IDs from recent Step 1 ingestion runs for the
+                selected connector (GitHub vs Linear). You can also paste a UUID. Deep link:{" "}
+                <code className="cell-muted">
+                  ?connection_id=&lt;uuid&gt;&amp;tab=status&amp;connector=linear
+                </code>
+                .
+              </>
+            )}
           </p>
           <div className="btn-row wrap" style={{ gap: "0.5rem", alignItems: "center" }}>
             <label className="meta" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

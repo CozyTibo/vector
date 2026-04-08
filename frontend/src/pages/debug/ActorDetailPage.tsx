@@ -70,7 +70,9 @@ export default function ActorDetailPage() {
     }
     return sessionCanonicalClient();
   }, [tenantId, adminPw]);
-  const entityBase = tenantId ? `/admin/tenants/${tenantId}/step3` : `/debug/canonical`;
+  const entityBase = tenantId
+    ? `/admin/tenants/${tenantId}/data-pipeline/execution-graph`
+    : `/debug/canonical`;
   const cqTag = client ? clientTag(client) : "none";
 
   const detailQuery = useQuery({

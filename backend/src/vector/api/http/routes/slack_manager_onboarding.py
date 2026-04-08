@@ -89,6 +89,9 @@ def build_slack_manager_onboarding_router() -> APIRouter:
         event_id = body.get("event_id")
         event_id_str = event_id if isinstance(event_id, str) else None
 
+        raw_ts = event.get("ts")
+        message_ts = raw_ts.strip() if isinstance(raw_ts, str) and raw_ts.strip() else None
+
         from app.tasks.manager_onboarding import process_manager_slack_event_task
 
         process_manager_slack_event_task.delay(
@@ -97,6 +100,7 @@ def build_slack_manager_onboarding_router() -> APIRouter:
             text=text,
             channel_id=channel_id,
             slack_event_id=event_id_str,
+            message_ts=message_ts,
         )
         return JSONResponse({"ok": True})
 

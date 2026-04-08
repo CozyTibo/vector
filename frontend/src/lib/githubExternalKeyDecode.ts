@@ -3,7 +3,7 @@
  * Format: `{connection_uuid}:repo:{id}` | `:pr:` | `:issue:` | `:commit:` | `:user:`
  */
 
-export type DecodedExternalKey = {
+type DecodedExternalKey = {
   headline: string;
   lines: string[];
 };

@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class OnboardingChatMessageItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
+    id: uuid.UUID
     role: str
     content: str
     created_at: datetime
@@ -104,14 +105,14 @@ class TenantAdminDetailResponse(BaseModel):
         default=None,
         description="First membership user's full_name (users.full_name).",
     )
+    member_email: str | None = Field(
+        default=None,
+        description="First membership user's email (users.email).",
+    )
     connected_connectors: list[str] = Field(default_factory=list)
     slack_vector_paused: bool = Field(
         default=False,
-        description="When true, manager Slack onboarding skips outbound Slack sends for this tenant.",
-    )
-    manager_slack_onboarding_disabled: bool = Field(
-        default=False,
-        description="When true, manager Slack onboarding intro enqueue and outbound prompts are skipped.",
+        description="When true, Vector skips outbound Slack sends for this tenant (including manager onboarding DMs).",
     )
 
 

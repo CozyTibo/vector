@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -67,7 +68,20 @@ def reactions_add(
 
 
 def conversations_info(token: str, *, channel: str) -> dict[str, Any]:
-    data = _post(token, "conversations.info", {"channel": channel})
+    """
+    Slack accepts JSON or form bodies; form-encoded avoids rare ``invalid_arguments``
+    responses some workspaces return for JSON POSTs on this method.
+    """
+    ch = (channel or "").strip().upper()
+    if not ch:
+        raise ValueError("channel is required")
+    headers = {"Authorization": f"Bearer {token}"}
+    with httpx.Client(timeout=30.0) as client:
+        r = client.post(f"{SLACK_API}/conversations.info", headers=headers, data={"channel": ch})
+    r.raise_for_status()
+    data = r.json()
+    if not isinstance(data, dict):
+        raise RuntimeError("slack conversations.info: invalid json")
     if not data.get("ok"):
         err = data.get("error", "unknown")
         raise RuntimeError(f"conversations.info failed: {err}")
@@ -75,7 +89,16 @@ def conversations_info(token: str, *, channel: str) -> dict[str, Any]:
 
 
 def conversations_join(token: str, *, channel: str) -> dict[str, Any]:
-    data = _post(token, "conversations.join", {"channel": channel})
+    ch = (channel or "").strip().upper()
+    if not ch:
+        return {"ok": False, "error": "channel_required"}
+    headers = {"Authorization": f"Bearer {token}"}
+    with httpx.Client(timeout=30.0) as client:
+        r = client.post(f"{SLACK_API}/conversations.join", headers=headers, data={"channel": ch})
+    r.raise_for_status()
+    data = r.json()
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "invalid_json"}
     if not data.get("ok"):
         err = data.get("error", "unknown")
         return {"ok": False, "error": err}
@@ -88,3 +111,60 @@ def users_info(token: str, *, user: str) -> dict[str, Any]:
         err = data.get("error", "unknown")
         raise RuntimeError(f"users.info failed: {err}")
     return data
+
+
+def iter_users_list(token: str) -> Iterator[dict[str, Any]]:
+    """Yield workspace member dicts from paginated ``users.list`` (needs ``users:read``)."""
+    cursor: str | None = None
+    while True:
+        body: dict[str, Any] = {"limit": 200}
+        if cursor:
+            body["cursor"] = cursor
+        data = _post(token, "users.list", body)
+        if not data.get("ok"):
+            err = data.get("error", "unknown")
+            raise RuntimeError(f"users.list failed: {err}")
+        members = data.get("members")
+        if isinstance(members, list):
+            for m in members:
+                if isinstance(m, dict):
+                    yield m
+        meta = data.get("response_metadata")
+        cursor = None
+        if isinstance(meta, dict):
+            nc = meta.get("next_cursor")
+            if isinstance(nc, str) and nc.strip():
+                cursor = nc.strip()
+        if not cursor:
+            break
+
+
+def conversations_list_public_private(token: str) -> list[dict[str, Any]]:
+    """
+    Paginated ``conversations.list`` for public + private channels the token can see.
+    Each item is a channel dict with at least ``id`` and ``name``.
+    """
+    out: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        body: dict[str, Any] = {"types": "public_channel,private_channel", "limit": 200}
+        if cursor:
+            body["cursor"] = cursor
+        data = _post(token, "conversations.list", body)
+        if not data.get("ok"):
+            err = data.get("error", "unknown")
+            raise RuntimeError(f"conversations.list failed: {err}")
+        chans = data.get("channels")
+        if isinstance(chans, list):
+            for ch in chans:
+                if isinstance(ch, dict) and ch.get("id") and ch.get("name"):
+                    out.append(ch)
+        meta = data.get("response_metadata")
+        cursor = None
+        if isinstance(meta, dict):
+            nc = meta.get("next_cursor")
+            if isinstance(nc, str) and nc.strip():
+                cursor = nc.strip()
+        if not cursor:
+            break
+    return out

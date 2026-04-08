@@ -12,7 +12,7 @@ export const UI_TAB_LABELS = {
 } as const;
 
 /** Backend artifact_kind ids (seeded). */
-export const ARTIFACT_KIND_ID = {
+const ARTIFACT_KIND_ID = {
   repository: 1,
   trackable_unit: 2,
   changeset: 3,
@@ -66,15 +66,6 @@ export function formatArtifactListLine(row: {
   }
 }
 
-/** @deprecated alias — use {@link formatArtifactListLine} */
-export function formatArtifactPrimaryLabel(row: {
-  artifact_kind_id?: number | null;
-  title?: string | null;
-  summary?: string | null;
-}): string {
-  return formatArtifactListLine(row);
-}
-
 export function entityRoleLabel(type: string): string {
   if (type === "artifact") {
     return "Work object";
@@ -83,11 +74,6 @@ export function entityRoleLabel(type: string): string {
     return "Person";
   }
   return type;
-}
-
-/** Show backend relation_kind names as-is (authored_by, associated_with). */
-export function relationKindRaw(kind: string): string {
-  return kind;
 }
 
 export function graphEdgeLabelRaw(relationKind: string): string {

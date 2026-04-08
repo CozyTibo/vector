@@ -75,7 +75,7 @@ for (const g of ONBOARDING_TOOL_GROUPS) {
 }
 
 /** Human label for a stored tool id (e.g. `github` → GitHub). */
-export function labelForToolId(toolId: string): string {
+function labelForToolId(toolId: string): string {
   return TOOL_ID_TO_LABEL[toolId] ?? toolId;
 }
 

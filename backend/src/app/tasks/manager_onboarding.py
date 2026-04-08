@@ -38,6 +38,7 @@ def process_manager_slack_event_task(
     text: str,
     channel_id: str,
     slack_event_id: str | None,
+    message_ts: str | None = None,
 ) -> None:
     """Process a user DM after Slack Events API enqueue."""
     try:
@@ -55,6 +56,7 @@ def process_manager_slack_event_task(
                 channel_id=channel_id,
                 slack_event_id=slack_event_id,
                 bot_token=tok,
+                message_ts=message_ts,
             )
     except Exception:
         _logger.exception("manager_onboarding process_slack_event failed team=%s", team_id)

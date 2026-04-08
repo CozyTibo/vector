@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -125,19 +125,53 @@ def get_outbound_by_idempotency_key(
     return session.scalar(stmt)
 
 
+def delete_messages_for_session(session: Session, session_id: uuid.UUID) -> None:
+    session.execute(
+        delete(ManagerOnboardingMessage).where(ManagerOnboardingMessage.session_id == session_id),
+    )
+
+
+def delete_channel_observations_for_session(session: Session, session_id: uuid.UUID) -> None:
+    session.execute(
+        delete(ManagerOnboardingChannelObservation).where(
+            ManagerOnboardingChannelObservation.session_id == session_id,
+        ),
+    )
+
+
+def delete_parse_artifacts_for_session(session: Session, session_id: uuid.UUID) -> None:
+    session.execute(
+        delete(ManagerOnboardingParseArtifact).where(
+            ManagerOnboardingParseArtifact.session_id == session_id,
+        ),
+    )
+
+
+def _message_transcript_order_key(m: ManagerOnboardingMessage) -> tuple[float, str]:
+    """Slack ``ts`` is authoritative; fall back to insert time for legacy rows."""
+    raw = (m.slack_ts or "").strip()
+    if raw:
+        try:
+            return (float(raw), str(m.id))
+        except ValueError:
+            pass
+    if m.created_at is not None:
+        return (m.created_at.timestamp(), str(m.id))
+    return (0.0, str(m.id))
+
+
 def list_messages_chronological(
     session: Session,
     session_id: uuid.UUID,
     *,
     limit: int = 500,
 ) -> list[ManagerOnboardingMessage]:
-    stmt = (
-        select(ManagerOnboardingMessage)
-        .where(ManagerOnboardingMessage.session_id == session_id)
-        .order_by(ManagerOnboardingMessage.created_at.asc())
-        .limit(limit)
+    stmt = select(ManagerOnboardingMessage).where(
+        ManagerOnboardingMessage.session_id == session_id,
     )
-    return list(session.scalars(stmt).all())
+    rows = list(session.scalars(stmt).all())
+    rows.sort(key=_message_transcript_order_key)
+    return rows[:limit]
 
 
 def list_sessions_for_tenant(
@@ -194,6 +228,18 @@ def list_channel_observations_for_tenant(
         .where(ManagerOnboardingChannelObservation.tenant_id == tenant_id)
         .order_by(ManagerOnboardingChannelObservation.slack_channel_id.asc())
         .limit(limit)
+    )
+    return list(session.scalars(stmt).all())
+
+
+def list_channel_observations_for_session(
+    session: Session,
+    session_id: uuid.UUID,
+) -> list[ManagerOnboardingChannelObservation]:
+    stmt = (
+        select(ManagerOnboardingChannelObservation)
+        .where(ManagerOnboardingChannelObservation.session_id == session_id)
+        .order_by(ManagerOnboardingChannelObservation.slack_channel_id.asc())
     )
     return list(session.scalars(stmt).all())
 

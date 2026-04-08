@@ -1,42 +1,16 @@
 import { useState } from "react";
-import { Link, Outlet, useMatch } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 
 import { getApiBase, readErrorDetail } from "../lib/canonicalApi";
 import { getAdminPassword, setAdminPassword } from "../lib/adminCredentials";
 
 function AdminTopNav() {
-  const m = useMatch("/admin/tenants/:tenantId/*");
-  const tenantId = m?.params.tenantId;
-  const linkCls =
-    "text-sm font-medium text-stone-700 no-underline hover:text-stone-950 hover:underline";
-
   return (
     <header className="border-b border-stone-200 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center px-4 py-3">
         <Link to="/admin" className="text-sm font-semibold text-red-800 no-underline">
           Vector Admin
         </Link>
-        <nav className="flex flex-wrap items-center gap-4">
-          <Link to="/admin" className={linkCls}>
-            Tenants
-          </Link>
-          <Link to="/admin/manager-onboarding" className={linkCls}>
-            Manager Slack OB
-          </Link>
-          {tenantId ? (
-            <>
-              <Link to={`/admin/tenants/${tenantId}/step1`} className={linkCls}>
-                Raw
-              </Link>
-              <Link to={`/admin/tenants/${tenantId}/step2`} className={linkCls}>
-                Projections
-              </Link>
-              <Link to={`/admin/tenants/${tenantId}/step3`} className={linkCls}>
-                Canonical
-              </Link>
-            </>
-          ) : null}
-        </nav>
       </div>
     </header>
   );

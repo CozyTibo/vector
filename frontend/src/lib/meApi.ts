@@ -1,6 +1,6 @@
 import { getApiBase } from "./canonicalApi";
 
-export type MeResponse = {
+type MeResponse = {
   user_id: string;
   email: string;
   full_name: string | null;

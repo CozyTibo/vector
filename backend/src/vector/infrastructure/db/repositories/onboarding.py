@@ -179,11 +179,16 @@ def append_onboarding_message(
     role: str,
     content: str,
 ) -> OnboardingMessage:
+    # Use a fresh clock time per row. PostgreSQL ``now()`` / ``server_default`` is fixed for the
+    # whole transaction, so user + assistant lines from one /onboarding/chat commit would otherwise
+    # share identical ``created_at``; tie-breaking by UUID is not insertion order and scrambles the
+    # transcript (admin + product history).
     row = OnboardingMessage(
         tenant_id=tenant_id,
         user_id=user_id,
         role=role,
         content=content,
+        created_at=datetime.now(UTC),
     )
     session.add(row)
     session.flush()
@@ -199,7 +204,7 @@ def list_recent_onboarding_messages(
     stmt = (
         select(OnboardingMessage)
         .where(OnboardingMessage.tenant_id == tenant_id)
-        .order_by(desc(OnboardingMessage.created_at))
+        .order_by(desc(OnboardingMessage.created_at), desc(OnboardingMessage.id))
         .limit(limit)
     )
     return list(session.scalars(stmt).all())
@@ -214,7 +219,7 @@ def list_onboarding_messages_chronological(
     stmt = (
         select(OnboardingMessage)
         .where(OnboardingMessage.tenant_id == tenant_id)
-        .order_by(asc(OnboardingMessage.created_at))
+        .order_by(asc(OnboardingMessage.created_at), asc(OnboardingMessage.id))
         .limit(limit)
     )
     return list(session.scalars(stmt).all())

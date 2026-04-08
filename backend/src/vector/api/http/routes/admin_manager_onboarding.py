@@ -2,33 +2,81 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+log = logging.getLogger(__name__)
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
 from vector.api.http.deps import get_db
-from vector.domains.manager_onboarding.constants import STEP_COMPLETED, STEP_ORDER
+from vector.domains.manager_onboarding.constants import (
+    STATUS_ACTIVE,
+    STATUS_COMPLETED,
+    STATUS_FAILED,
+    STATUS_NEEDS_REVIEW,
+    STATUS_PAUSED,
+    STATUS_WAITING_FOR_USER,
+    STEP_COMPLETED,
+    STEP_ORDER,
+)
 from vector.domains.manager_onboarding.service import (
+    admin_apply_recompute_current_step,
     admin_force_complete,
     admin_mark_needs_review,
     admin_merge_answers,
     admin_restart_at_step,
     admin_retry_slack_prompt,
     admin_set_session_muted,
-    first_unanswered_step,
+    admin_wipe_session_restart,
+    reconcile_needs_review_if_manager_flow_complete,
+)
+from vector.domains.manager_onboarding.slack_admin_display import (
+    build_slack_label_maps_for_admin,
+    collect_slack_channel_ids_from_answers,
+    collect_slack_user_ids_from_answers,
+    enrich_slack_dm_text_for_admin,
+    resolve_slack_channel_labels_for_session,
+    resolve_slack_user_labels_for_ids,
 )
 from vector.infrastructure.db.models.manager_onboarding_session import ManagerOnboardingSession
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.repositories import manager_onboarding as mo_repo
-from vector.infrastructure.db.repositories import onboarding as onboarding_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 
 _VALID_RESTART_STEPS = frozenset(s for s in STEP_ORDER if s != STEP_COMPLETED)
+
+_MANAGER_OB_IN_PROGRESS = frozenset({STATUS_ACTIVE, STATUS_WAITING_FOR_USER})
+_MANAGER_OB_NEEDS_ATTENTION = frozenset({STATUS_PAUSED, STATUS_FAILED, STATUS_NEEDS_REVIEW})
+
+
+def _manager_onboarding_rollup_counts(
+    sessions: list[ManagerOnboardingSession],
+) -> dict[str, int]:
+    """Business-facing counts: one session row ≈ one manager in Slack onboarding.
+
+    **In progress** = ``active`` or ``waiting_for_user`` (conversation still running).
+
+    **Needs follow-up** = ``needs_review``, ``paused``, or ``failed`` (not based on idle time).
+    """
+    total = len(sessions)
+    completed = sum(1 for s in sessions if s.status == STATUS_COMPLETED)
+    in_progress = sum(1 for s in sessions if s.status in _MANAGER_OB_IN_PROGRESS)
+    needs_attention = sum(1 for s in sessions if s.status in _MANAGER_OB_NEEDS_ATTENTION)
+    accounted = completed + in_progress + needs_attention
+    if accounted < total:
+        needs_attention += total - accounted
+    return {
+        "managers_with_sessions": total,
+        "managers_completed": completed,
+        "managers_in_progress": in_progress,
+        "managers_needs_attention": needs_attention,
+    }
 
 
 def _session_or_404(db: Session, session_id: uuid.UUID) -> ManagerOnboardingSession:
@@ -36,6 +84,21 @@ def _session_or_404(db: Session, session_id: uuid.UUID) -> ManagerOnboardingSess
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Session not found") from None
     return row
+
+
+def _attach_slack_answer_labels(db: Session, row: ManagerOnboardingSession, out: dict[str, Any]) -> None:
+    uid_set = collect_slack_user_ids_from_answers(dict(row.answers_json or {}))
+    su = (row.slack_user_id or "").strip().upper()
+    if su:
+        uid_set.add(su)
+    out["slack_user_labels"] = resolve_slack_user_labels_for_ids(db, row.tenant_id, uid_set)
+    cid_set = collect_slack_channel_ids_from_answers(dict(row.answers_json or {}))
+    out["slack_channel_labels"] = resolve_slack_channel_labels_for_session(
+        db,
+        row.tenant_id,
+        row.id,
+        cid_set,
+    )
 
 
 def _session_dict(row: ManagerOnboardingSession) -> dict[str, Any]:
@@ -73,28 +136,6 @@ class RestartStepBody(BaseModel):
 
 class SlackOnboardingPolicyBody(BaseModel):
     slack_vector_paused: bool | None = None
-    manager_slack_onboarding_disabled: bool | None = None
-
-
-class TriggerManagerIntroBody(BaseModel):
-    """Optional override; otherwise first id from onboarding ``slack_stakeholders``."""
-
-    slack_user_id: str | None = Field(default=None, max_length=32)
-
-
-def _primary_slack_user_from_onboarding(db: Session, tenant_id: uuid.UUID) -> str | None:
-    row = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
-    if row is None:
-        return None
-    answers = row.answers_json or {}
-    ss = answers.get("slack_stakeholders")
-    if not isinstance(ss, dict):
-        return None
-    ids = ss.get("slack_user_ids")
-    if not isinstance(ids, list) or not ids:
-        return None
-    u = str(ids[0]).strip()
-    return u or None
 
 
 def build_admin_manager_onboarding_router() -> APIRouter:
@@ -136,7 +177,10 @@ def build_admin_manager_onboarding_router() -> APIRouter:
         session_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
     ) -> dict[str, Any]:
-        return _session_dict(_session_or_404(db, session_id))
+        row = _session_or_404(db, session_id)
+        out = _session_dict(row)
+        _attach_slack_answer_labels(db, row, out)
+        return out
 
     @r.patch("/sessions/{session_id}")
     def patch_manager_onboarding_session(
@@ -145,6 +189,7 @@ def build_admin_manager_onboarding_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> dict[str, Any]:
         row = _session_or_404(db, session_id)
+        recompute_info: dict[str, Any] | None = None
         if body.answers_patch is not None:
             admin_merge_answers(row, body.answers_patch)
         if body.muted is not None:
@@ -158,9 +203,41 @@ def build_admin_manager_onboarding_router() -> APIRouter:
                 ) from None
             row.current_step = body.current_step
         if body.recompute_current_step:
-            row.current_step = first_unanswered_step(dict(row.answers_json or {}))
+            link = slack_repo.get_slack_connection_for_tenant(db, row.tenant_id)
+            tok = ((link.detail.bot_access_token or "").strip()) if link else ""
+            recompute_info = admin_apply_recompute_current_step(db, row, bot_token=tok or None)
+        reconcile_needs_review_if_manager_flow_complete(row)
         db.flush()
-        return _session_dict(row)
+        out = _session_dict(row)
+        _attach_slack_answer_labels(db, row, out)
+        if recompute_info is not None:
+            out["recompute"] = recompute_info
+        return out
+
+    @r.post("/sessions/{session_id}/admin-wipe-restart")
+    def wipe_manager_onboarding_session(
+        session_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> dict[str, Any]:
+        row = _session_or_404(db, session_id)
+        admin_wipe_session_restart(db, row)
+        db.flush()
+        slack_out: dict[str, Any] | None = None
+        link = slack_repo.get_slack_connection_for_tenant(db, row.tenant_id)
+        tok = ((link.detail.bot_access_token or "").strip()) if link else ""
+        if tok:
+            try:
+                slack_out = admin_retry_slack_prompt(db, tok, row)
+            except Exception as e:
+                log.exception("admin wipe: Slack intro resend failed session=%s", row.id)
+                slack_out = {"ok": False, "error": str(e)}
+        else:
+            slack_out = {"ok": False, "error": "no_slack_connection"}
+        db.flush()
+        out = _session_dict(row)
+        _attach_slack_answer_labels(db, row, out)
+        out["slack"] = slack_out
+        return out
 
     @r.post("/sessions/{session_id}/restart-step")
     def restart_manager_onboarding_step(
@@ -250,16 +327,26 @@ def build_admin_manager_onboarding_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         limit: Annotated[int, Query(ge=1, le=1000)] = 500,
     ) -> dict[str, Any]:
-        if db.get(ManagerOnboardingSession, session_id) is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Session not found")
+        sess = _session_or_404(db, session_id)
         rows = mo_repo.list_messages_chronological(db, session_id, limit=limit)
+        texts = [m.text for m in rows]
+        ch_map, u_map = build_slack_label_maps_for_admin(
+            db,
+            tenant_id=sess.tenant_id,
+            texts=texts,
+            session_slack_user_id=sess.slack_user_id or "",
+        )
         return {
             "items": [
                 {
                     "id": str(m.id),
                     "direction": m.direction,
                     "role": m.role,
-                    "text": m.text,
+                    "text": enrich_slack_dm_text_for_admin(
+                        m.text,
+                        channel_labels=ch_map,
+                        user_labels=u_map,
+                    ),
                     "slack_channel_id": m.slack_channel_id,
                     "slack_ts": m.slack_ts,
                     "thread_ts": m.thread_ts,
@@ -290,17 +377,30 @@ def build_admin_manager_onboarding_tenant_router() -> APIRouter:
         if t is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found") from None
         sessions = mo_repo.list_sessions_for_tenant(db, tenant_id, limit=session_limit)
+        for s in sessions:
+            reconcile_needs_review_if_manager_flow_complete(s)
+        db.flush()
+        roll = _manager_onboarding_rollup_counts(sessions)
+        uids: set[str] = set()
+        for s in sessions:
+            u = (s.slack_user_id or "").strip().upper()
+            if u:
+                uids.add(u)
+        slack_labels = resolve_slack_user_labels_for_ids(db, tenant_id, uids)
         return {
             "tenant_id": str(tenant_id),
             "slack_vector_paused": bool(t.slack_vector_paused),
-            "manager_slack_onboarding_disabled": bool(t.manager_slack_onboarding_disabled),
-            "suggested_slack_user_id": _primary_slack_user_from_onboarding(db, tenant_id),
             "session_count": len(sessions),
+            "managers_with_sessions": roll["managers_with_sessions"],
+            "managers_completed": roll["managers_completed"],
+            "managers_in_progress": roll["managers_in_progress"],
+            "managers_needs_attention": roll["managers_needs_attention"],
             "invitation_count": mo_repo.count_invitations_for_tenant(db, tenant_id),
             "sessions": [
                 {
                     "id": str(s.id),
                     "slack_user_id": s.slack_user_id,
+                    "slack_display_name": slack_labels.get((s.slack_user_id or "").strip().upper()),
                     "status": s.status,
                     "current_step": s.current_step,
                     "muted": bool(s.muted),
@@ -345,59 +445,10 @@ def build_admin_manager_onboarding_tenant_router() -> APIRouter:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found") from None
         if body.slack_vector_paused is not None:
             t.slack_vector_paused = body.slack_vector_paused
-        if body.manager_slack_onboarding_disabled is not None:
-            t.manager_slack_onboarding_disabled = body.manager_slack_onboarding_disabled
         db.flush()
         return {
             "tenant_id": str(tenant_id),
             "slack_vector_paused": bool(t.slack_vector_paused),
-            "manager_slack_onboarding_disabled": bool(t.manager_slack_onboarding_disabled),
-        }
-
-    @r.post("/{tenant_id}/manager-onboarding/trigger-intro")
-    def trigger_manager_onboarding_intro(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        body: Annotated[TriggerManagerIntroBody | None, Body()] = None,
-    ) -> dict[str, Any]:
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found") from None
-        from vector.settings import get_settings
-
-        if not get_settings().manager_slack_onboarding_enabled:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail="MANAGER_SLACK_ONBOARDING_ENABLED is false on this API instance.",
-            ) from None
-        if slack_repo.get_slack_connection_for_tenant(db, tenant_id) is None:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail="Slack is not connected for this tenant.",
-            ) from None
-        b = body or TriggerManagerIntroBody()
-        raw = (b.slack_user_id or "").strip()
-        uid = raw if raw else (_primary_slack_user_from_onboarding(db, tenant_id) or "")
-        if not uid:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "No Slack user id: pass slack_user_id or save slack stakeholders "
-                    "in website onboarding."
-                ),
-            ) from None
-        try:
-            from app.tasks.manager_onboarding import send_manager_onboarding_intro_task
-
-            send_manager_onboarding_intro_task.delay(str(tenant_id), uid)
-        except Exception as e:
-            raise HTTPException(
-                status.HTTP_502_BAD_GATEWAY,
-                detail=f"Could not enqueue Celery task: {e!s}",
-            ) from e
-        return {
-            "ok": True,
-            "slack_user_id": uid,
-            "task": "vector.manager_onboarding.send_intro",
         }
 
     return r
