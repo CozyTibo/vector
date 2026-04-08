@@ -129,9 +129,18 @@ class Settings(BaseSettings):
         description="Full redirect URL registered in Slack app (e.g. https://xxx.ngrok-free.dev/slack/callback).",
     )
     slack_bot_scopes: str = Field(
-        default="channels:read,chat:write,users:read",
+        default="channels:read,channels:join,chat:write,im:history,im:write,users:read",
         validation_alias="SLACK_BOT_SCOPES",
-        description="Comma-separated bot scopes for oauth.v2.authorize (must match Slack app).",
+        description=(
+            "Comma-separated bot scopes for oauth.v2.authorize (must match Slack app). "
+            "channels:join for joining public channels in onboarding; im:history for message.im."
+        ),
+    )
+    manager_slack_onboarding_enabled: bool = Field(
+        default=False,
+        validation_alias="MANAGER_SLACK_ONBOARDING_ENABLED",
+        description="When true, enqueue Slack manager onboarding intro after website handoff DM; "
+        "Slack Events + Interactivity must be configured.",
     )
     admin_password: str = Field(
         default="",

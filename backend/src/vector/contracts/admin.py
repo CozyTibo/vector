@@ -105,6 +105,14 @@ class TenantAdminDetailResponse(BaseModel):
         description="First membership user's full_name (users.full_name).",
     )
     connected_connectors: list[str] = Field(default_factory=list)
+    slack_vector_paused: bool = Field(
+        default=False,
+        description="When true, manager Slack onboarding skips outbound Slack sends for this tenant.",
+    )
+    manager_slack_onboarding_disabled: bool = Field(
+        default=False,
+        description="When true, manager Slack onboarding intro enqueue and outbound prompts are skipped.",
+    )
 
 
 class TenantConnectionAdminItem(BaseModel):

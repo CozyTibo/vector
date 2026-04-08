@@ -10,6 +10,9 @@ import AdminTenantOverview from "./admin/AdminTenantOverview.tsx";
 import AdminTenantsPage from "./admin/AdminTenantsPage.tsx";
 import AdminTenantStep1 from "./admin/AdminTenantStep1.tsx";
 import AdminTenantStep2 from "./admin/AdminTenantStep2.tsx";
+import AdminManagerOnboardingList from "./admin/AdminManagerOnboardingList.tsx";
+import AdminManagerOnboardingSessionPage from "./admin/AdminManagerOnboardingSessionPage.tsx";
+import AdminTenantManagerOnboarding from "./admin/AdminTenantManagerOnboarding.tsx";
 import AdminTenantStep3 from "./admin/AdminTenantStep3.tsx";
 import RequireAuth from "./layouts/RequireAuth.tsx";
 import { sessionCanonicalClient } from "./lib/canonicalApi.ts";
@@ -53,10 +56,13 @@ createRoot(document.getElementById("root")!).render(
 
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminTenantsPage />} />
+            <Route path="manager-onboarding" element={<AdminManagerOnboardingList />} />
+            <Route path="manager-onboarding/sessions/:sessionId" element={<AdminManagerOnboardingSessionPage />} />
             <Route path="tenants/:tenantId" element={<AdminTenantLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="overview" element={<AdminTenantOverview />} />
               <Route path="connections" element={<AdminTenantConnections />} />
+              <Route path="manager-onboarding" element={<AdminTenantManagerOnboarding />} />
               <Route path="step1" element={<AdminTenantStep1 />} />
               <Route path="step2" element={<AdminTenantStep2 />} />
               <Route path="step3" element={<AdminTenantStep3 />} />

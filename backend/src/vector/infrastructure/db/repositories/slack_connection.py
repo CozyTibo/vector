@@ -23,6 +23,30 @@ class SlackTenantLink:
         return self.connection.tenant_id
 
 
+def get_slack_connection_by_team_id(session: Session, team_id: str) -> SlackTenantLink | None:
+    tid = team_id.strip()
+    if not tid:
+        return None
+    stmt = (
+        select(TenantConnection, SlackConnectionDetail)
+        .outerjoin(
+            SlackConnectionDetail,
+            SlackConnectionDetail.connection_id == TenantConnection.id,
+        )
+        .where(
+            TenantConnection.provider == CONNECTION_PROVIDER_SLACK,
+            SlackConnectionDetail.team_id == tid,
+        )
+    )
+    row = session.execute(stmt).one_or_none()
+    if row is None:
+        return None
+    conn, detail = row
+    if detail is None:
+        return None
+    return SlackTenantLink(connection=conn, detail=detail)
+
+
 def get_slack_connection_for_tenant(
     session: Session,
     tenant_id: uuid.UUID,

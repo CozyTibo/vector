@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any
@@ -20,6 +21,10 @@ from vector.contracts.onboarding import (
     SlackMembersResponse,
     SlackWorkspaceMemberItem,
 )
+from vector.domains.connectors.slack.onboarding_dm import (
+    SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY,
+    send_slack_handoff_welcome_dm,
+)
 from vector.domains.connectors.slack.workspace_members import list_slack_workspace_members
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
@@ -37,6 +42,48 @@ from vector.infrastructure.db.repositories import linear_connection as linear_re
 from vector.infrastructure.db.repositories import onboarding as ob_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
+
+_logger = logging.getLogger(__name__)
+
+
+def _manager_ob_intro_already_sent(db: Session, tenant_id: uuid.UUID, slack_user_id: str) -> bool:
+    """True when a manager OB session exists and the Slack intro was already posted."""
+    from vector.infrastructure.db.repositories import manager_onboarding as mo_repo
+
+    sess = mo_repo.get_session_for_tenant_slack_user(
+        db,
+        tenant_id=tenant_id,
+        slack_user_id=slack_user_id,
+    )
+    if sess is None:
+        return False
+    ctx = dict(sess.context_json or {})
+    return bool(ctx.get("intro_sent"))
+
+
+def _enqueue_manager_slack_onboarding_intro_if_needed(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    slack_user_id: str,
+) -> None:
+    """Queue Celery intro when the feature flag is on and we have not posted intro yet."""
+    try:
+        from vector.settings import get_settings
+
+        if not get_settings().manager_slack_onboarding_enabled:
+            return
+        if _manager_ob_intro_already_sent(db, tenant_id, slack_user_id):
+            return
+        from app.tasks.manager_onboarding import send_manager_onboarding_intro_task
+
+        send_manager_onboarding_intro_task.delay(str(tenant_id), slack_user_id)
+    except Exception as exc:
+        _logger.warning(
+            "Could not enqueue manager Slack onboarding intro tenant=%s: %s",
+            tenant_id,
+            exc,
+        )
 
 
 def _slack_stakeholders_user_chat_line(ss: Any) -> str | None:
@@ -141,6 +188,52 @@ def _apply_company_patch(session: Session, tenant_id: uuid.UUID, patch: dict[str
                 tenant.company_name = name2
 
 
+def _maybe_send_slack_handoff_welcome_dm(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    merged_answers: dict[str, Any],
+) -> None:
+    """DM the mapped Slack user as soon as handoff is saved (before /onboarding/complete)."""
+    sl = slack_repo.get_slack_connection_for_tenant(db, tenant_id)
+    if sl is None:
+        return
+    ss = merged_answers.get("slack_stakeholders")
+    if not isinstance(ss, dict):
+        return
+    ids = ss.get("slack_user_ids")
+    if not isinstance(ids, list) or not ids:
+        return
+    primary = str(ids[0]).strip()
+    if not primary:
+        return
+    if merged_answers.get(SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY) == primary:
+        # Welcome DM was already sent; still enqueue manager OB if the flag was turned on later
+        # (intro enqueue used to run only after the first Hi, so it was skipped forever).
+        _enqueue_manager_slack_onboarding_intro_if_needed(
+            db,
+            tenant_id=tenant_id,
+            slack_user_id=primary,
+        )
+        return
+    try:
+        send_slack_handoff_welcome_dm(sl.detail.bot_access_token, primary)
+    except Exception as e:
+        _logger.warning(
+            "Slack onboarding handoff welcome DM failed for tenant=%s slack_user=%s: %s",
+            tenant_id,
+            primary,
+            e,
+        )
+        return
+    merged_answers[SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY] = primary
+    _enqueue_manager_slack_onboarding_intro_if_needed(
+        db,
+        tenant_id=tenant_id,
+        slack_user_id=primary,
+    )
+
+
 def build_onboarding_router() -> APIRouter:
     r = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -232,22 +325,28 @@ def build_onboarding_router() -> APIRouter:
             and body.answers is not None
             and "slack_stakeholders" in body.answers
             and merged_snapshot is not None
-            and ob_repo.onboarding_messages_table_exists(db)
         ):
-            line = _slack_stakeholders_user_chat_line(merged_snapshot.get("slack_stakeholders"))
-            if line:
-                prior = ob_repo.list_onboarding_messages_chronological(
-                    db, claims.tenant_id, limit=200
-                )
-                last = prior[-1] if prior else None
-                if not (last is not None and last.role == "user" and last.content == line):
-                    ob_repo.append_onboarding_message(
-                        db,
-                        tenant_id=claims.tenant_id,
-                        user_id=claims.user_id,
-                        role="user",
-                        content=line,
+            if ob_repo.onboarding_messages_table_exists(db):
+                line = _slack_stakeholders_user_chat_line(merged_snapshot.get("slack_stakeholders"))
+                if line:
+                    prior = ob_repo.list_onboarding_messages_chronological(
+                        db, claims.tenant_id, limit=200
                     )
+                    last = prior[-1] if prior else None
+                    if not (last is not None and last.role == "user" and last.content == line):
+                        ob_repo.append_onboarding_message(
+                            db,
+                            tenant_id=claims.tenant_id,
+                            user_id=claims.user_id,
+                            role="user",
+                            content=line,
+                        )
+
+            _maybe_send_slack_handoff_welcome_dm(
+                db,
+                tenant_id=claims.tenant_id,
+                merged_answers=merged_snapshot,
+            )
 
         row.version = int(row.version) + 1
         db.commit()
@@ -323,6 +422,14 @@ def build_onboarding_router() -> APIRouter:
         row = ob_repo.get_or_create_onboarding(db, claims.tenant_id)
         now = datetime.now(UTC)
         if row.status != STATUS_COMPLETED:
+            # Second chance if PATCH → ADMIN_ACCESS missed the DM (transient Slack error, etc.).
+            merged = dict(row.answers_json or {})
+            _maybe_send_slack_handoff_welcome_dm(
+                db,
+                tenant_id=claims.tenant_id,
+                merged_answers=merged,
+            )
+            row.answers_json = merged
             row.status = STATUS_COMPLETED
             row.current_step = STEP_THANK_YOU
             row.completed_at = now

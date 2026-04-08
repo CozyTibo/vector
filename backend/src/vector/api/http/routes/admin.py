@@ -10,6 +10,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
+from vector.api.http.routes.admin_manager_onboarding import (
+    build_admin_manager_onboarding_router,
+    build_admin_manager_onboarding_tenant_router,
+)
 from vector.api.http.deps import get_db, settings_dep
 from vector.api.http.serialization import orm_to_dict
 from vector.application.services import connector_sync
@@ -227,6 +231,8 @@ def build_admin_router() -> APIRouter:
         tags=["admin"],
         dependencies=[Depends(require_admin_basic)],
     )
+    r.include_router(build_admin_manager_onboarding_router())
+    r.include_router(build_admin_manager_onboarding_tenant_router())
 
     @r.get("/tenants", response_model=TenantListResponse)
     def list_tenants(
@@ -325,6 +331,8 @@ def build_admin_router() -> APIRouter:
             onboarding=_snapshot_from_onboarding(db, ob),
             member_full_name=member.full_name if member else None,
             connected_connectors=[c.provider for c in conns],
+            slack_vector_paused=bool(t.slack_vector_paused),
+            manager_slack_onboarding_disabled=bool(t.manager_slack_onboarding_disabled),
         )
 
     @r.get("/tenants/{tenant_id}/connections", response_model=AdminConnectionsResponse)

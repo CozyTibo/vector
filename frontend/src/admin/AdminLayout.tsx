@@ -20,6 +20,9 @@ function AdminTopNav() {
           <Link to="/admin" className={linkCls}>
             Tenants
           </Link>
+          <Link to="/admin/manager-onboarding" className={linkCls}>
+            Manager Slack OB
+          </Link>
           {tenantId ? (
             <>
               <Link to={`/admin/tenants/${tenantId}/step1`} className={linkCls}>

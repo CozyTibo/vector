@@ -19,6 +19,9 @@ export default function AdminTenantLayout() {
         <NavLink to={`/admin/tenants/${tenantId}/connections`} className={tabCls}>
           Connections
         </NavLink>
+        <NavLink to={`/admin/tenants/${tenantId}/manager-onboarding`} className={tabCls}>
+          Mgr Slack OB
+        </NavLink>
         <NavLink to={`/admin/tenants/${tenantId}/step1`} className={tabCls}>
           Step1 Raw
         </NavLink>
