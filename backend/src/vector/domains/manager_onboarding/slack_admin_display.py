@@ -77,7 +77,7 @@ def _resolve_slack_user_labels_with_token(token: str, user_ids: set[str]) -> dic
     missing = set(need)
     try:
         for member in slack_web_api.iter_users_list(token):
-            uid = str(member.get("id") or "").strip()
+            uid = str(member.get("id") or "").strip().upper()
             if uid not in missing:
                 continue
             label = _user_label_from_slack_user_dict(member)
@@ -242,6 +242,27 @@ def build_slack_label_maps_for_admin(
 
 _SLACK_USER_ID_RE = re.compile(r"^[UW][A-Z0-9]+$")
 _SLACK_CHANNEL_ID_RE = re.compile(r"^[CG][A-Z0-9]+$")
+
+
+def slack_user_labels_from_answers_cache(answers: dict[str, Any]) -> dict[str, str]:
+    """
+    Labels persisted from Slack ``<@U…|handle>`` tokens while processing DMs.
+
+    Keys are uppercased Slack user ids; values are ``@…`` display strings.
+    """
+    raw = answers.get("_slack_user_labels")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for k, v in raw.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            continue
+        ku = k.strip().upper()
+        vs = v.strip()
+        if not ku or not vs:
+            continue
+        out[ku] = vs if vs.startswith("@") else f"@{vs}"
+    return out
 
 
 def collect_slack_user_ids_from_answers(answers: dict[str, Any]) -> set[str]:

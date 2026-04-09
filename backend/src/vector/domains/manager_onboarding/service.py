@@ -61,7 +61,8 @@ _SKIP_OBSERVED_CHANNELS_RE = re.compile(
     re.IGNORECASE,
 )
 
-USER_MENTION_RE = re.compile(r"<@(U[A-Z0-9]+)>")
+# Slack sends ``<@U123>`` or ``<@U123|real.username>`` (label is the human-facing handle in clients).
+USER_MENTION_RE = re.compile(r"<@([UW][A-Z0-9]+)(?:\|([^>]*))?>")
 # Public channels C…, private (incl. converted) G… — capture optional |label for user-facing copy
 # Prefix may rarely be lowercase in some payloads; normalize after match.
 CHANNEL_MENTION_RE = re.compile(r"<#([cCgG][A-Za-z0-9]+)(?:\|([^>]+))?>")
@@ -124,7 +125,13 @@ def resolve_channel_names_to_ids(
 
 def extract_slack_tokens(text: str) -> tuple[list[str], list[str], str]:
     """Return (user_ids, channel_ids, remainder text with mentions stripped)."""
-    uids = USER_MENTION_RE.findall(text or "")
+    uids: list[str] = []
+    seen_u: set[str] = set()
+    for m in USER_MENTION_RE.finditer(text or ""):
+        raw_id = (m.group(1) or "").strip().upper()
+        if raw_id and raw_id not in seen_u:
+            seen_u.add(raw_id)
+            uids.append(raw_id)
     chan_tuples = CHANNEL_MENTION_RE.findall(text or "")
     cids = list(
         dict.fromkeys(
@@ -134,7 +141,20 @@ def extract_slack_tokens(text: str) -> tuple[list[str], list[str], str]:
     remainder = USER_MENTION_RE.sub(" ", text or "")
     remainder = CHANNEL_MENTION_RE.sub(" ", remainder)
     remainder = " ".join(remainder.split()).strip()
-    return list(dict.fromkeys(uids)), cids, remainder
+    return uids, cids, remainder
+
+
+def merge_slack_user_labels_from_mention_text(answers: dict[str, Any], text: str) -> None:
+    """Store ``<@U…|name>`` labels from Slack for admin UI (no extra users.info round-trip)."""
+    for m in USER_MENTION_RE.finditer(text or ""):
+        uid = (m.group(1) or "").strip().upper()
+        embedded = (m.group(2) or "").strip()
+        if not uid or not embedded:
+            continue
+        lab = embedded if embedded.startswith("@") else f"@{embedded}"
+        cache = answers.setdefault("_slack_user_labels", {})
+        if isinstance(cache, dict):
+            cache[uid] = lab
 
 
 def channel_mentions_with_labels(text: str) -> tuple[list[str], dict[str, str]]:
@@ -611,6 +631,7 @@ def merge_deterministic_multi_step(sess: Any, text: str) -> None:
                     cur.append(c)
             answers["_pending_channel_ids"] = cur
 
+    merge_slack_user_labels_from_mention_text(answers, text)
     _set_answers(sess, answers)
 
 
