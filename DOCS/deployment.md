@@ -42,7 +42,7 @@ Build context for both images is the **`backend/`** directory.
 
 ECS or an ALB should use:
 
-- **`GET /health`** → `{"status":"ok"}` when DB is reachable; **`503`** with `{"status":"error","error":"…"}` on failure (primary target health)
+- **`GET /health`** → always **`200`** with `{"status":"ok","database":"ok"|"failed"}` (DB check via `SELECT 1`; use `database` for ALB/ECS routing if you need strict readiness)
 
 ## Frontend build
 
