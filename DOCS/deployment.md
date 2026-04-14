@@ -42,8 +42,7 @@ Build context for both images is the **`backend/`** directory.
 
 ECS or an ALB should use:
 
-- **`GET /health`** → `{"status":"ok"}` (primary target health)
-- **`GET /health/live`** → same payload (optional alias)
+- **`GET /health`** → `{"status":"ok"}` when DB is reachable; **`503`** with `{"status":"error","error":"…"}` on failure (primary target health)
 
 ## Frontend build
 

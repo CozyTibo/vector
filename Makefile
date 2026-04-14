@@ -78,7 +78,7 @@ logs-frontend:
 restart: down up
 
 install: $(DOTENV) build up migrate
-	@echo "OK — API http://localhost:$${BACKEND_PORT:-8000}/health/live"
+	@echo "OK — API http://localhost:$${BACKEND_PORT:-8000}/health"
 	@echo "    UI  http://localhost:$${FRONTEND_PORT:-5173}/"
 
 reinstall: down
