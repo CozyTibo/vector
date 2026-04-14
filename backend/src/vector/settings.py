@@ -129,11 +129,14 @@ class Settings(BaseSettings):
         description="Full redirect URL registered in Slack app (e.g. https://xxx.ngrok-free.dev/slack/callback).",
     )
     slack_bot_scopes: str = Field(
-        default="channels:read,channels:join,chat:write,im:history,im:write,users:read",
+        default=(
+            "channels:read,channels:join,chat:write,im:history,im:write,users:read,usergroups:read"
+        ),
         validation_alias="SLACK_BOT_SCOPES",
         description=(
             "Comma-separated bot scopes for oauth.v2.authorize (must match Slack app). "
-            "channels:join for joining public channels in onboarding; im:history for message.im."
+            "channels:join for joining public channels in onboarding; im:history for message.im; "
+            "usergroups:read for expanding @usergroup mentions in manager onboarding."
         ),
     )
     manager_slack_onboarding_enabled: bool = Field(

@@ -10,6 +10,7 @@ from urllib.parse import parse_qs
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
+from vector.domains.manager_onboarding.engine.tokens import augment_slack_message_text_with_block_users
 from vector.domains.manager_onboarding.slack_signing import verify_slack_signature
 from vector.settings import get_settings
 
@@ -71,6 +72,7 @@ def build_slack_manager_onboarding_router() -> APIRouter:
         text = event.get("text")
         if not isinstance(text, str):
             text = ""
+        text = augment_slack_message_text_with_block_users(text, event.get("blocks"))
 
         channel_id = event.get("channel")
         if not isinstance(channel_id, str) or not channel_id.startswith("D"):

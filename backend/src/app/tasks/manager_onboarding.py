@@ -40,7 +40,12 @@ def process_manager_slack_event_task(
     slack_event_id: str | None,
     message_ts: str | None = None,
 ) -> None:
-    """Process a user DM after Slack Events API enqueue."""
+    """Process a user DM after Slack Events API enqueue.
+
+    ``message_ts`` must stay in sync with ``slack_manager_onboarding`` (Events API).
+    If workers log "unexpected keyword argument 'message_ts'", rebuild or restart
+    Celery so they load this module version.
+    """
     try:
         for session in session_scope():
             link = slack_repo.get_slack_connection_by_team_id(session, team_id)

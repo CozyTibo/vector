@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -251,6 +252,35 @@ def count_invitations_for_tenant(session: Session, tenant_id: uuid.UUID) -> int:
         .where(ManagerOnboardingInvitation.tenant_id == tenant_id)
     )
     return int(session.scalar(stmt) or 0)
+
+
+def append_parse_artifact(
+    session: Session,
+    *,
+    session_id: uuid.UUID,
+    trigger: str,
+    input_text: str,
+    structured_output_json: dict[str, Any] | None = None,
+    confidence: float | None = None,
+    model: str | None = None,
+    token_usage: int | None = None,
+    fallback_attempts: int = 0,
+    error: str | None = None,
+) -> ManagerOnboardingParseArtifact:
+    row = ManagerOnboardingParseArtifact(
+        session_id=session_id,
+        trigger=trigger,
+        input_text=input_text,
+        structured_output_json=structured_output_json,
+        confidence=confidence,
+        model=model,
+        token_usage=token_usage,
+        fallback_attempts=fallback_attempts,
+        error=error,
+    )
+    session.add(row)
+    session.flush()
+    return row
 
 
 def upsert_channel_observation(

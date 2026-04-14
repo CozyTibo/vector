@@ -106,10 +106,30 @@ def conversations_join(token: str, *, channel: str) -> dict[str, Any]:
 
 
 def users_info(token: str, *, user: str) -> dict[str, Any]:
-    data = _post(token, "users.info", {"user": user})
+    data = users_info_raw(token, user=user)
     if not data.get("ok"):
         err = data.get("error", "unknown")
         raise RuntimeError(f"users.info failed: {err}")
+    return data
+
+
+def users_info_raw(token: str, *, user: str) -> dict[str, Any]:
+    """``users.info`` payload without raising (check ``ok`` / ``error``)."""
+    u = (user or "").strip().upper()
+    if not u:
+        return {"ok": False, "error": "user_required"}
+    return _post(token, "users.info", {"user": u})
+
+
+def usergroups_users_list(token: str, *, usergroup: str) -> dict[str, Any]:
+    """
+    List user ids in a Slack user group (subteam). Requires ``usergroups:read``.
+    Returns Slack payload; check ``ok`` and read ``users`` (list of user id strings).
+    """
+    ug = (usergroup or "").strip().upper()
+    if not ug:
+        return {"ok": False, "error": "missing_usergroup"}
+    data = _post(token, "usergroups.users.list", {"usergroup": ug})
     return data
 
 

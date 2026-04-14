@@ -19,6 +19,7 @@ from vector.domains.onboarding.constants import (
     PROFILE_PHASES_ORDER,
     STEP_CHAT_PROFILE,
 )
+from vector.openai_chat_params import temperature_for_chat_model
 from vector.settings import Settings, get_settings
 
 # Long dashes models use like em dashes; normalize to spaced hyphen for onboarding copy.
@@ -389,15 +390,18 @@ Readable summary:
         max_out = 220
 
     client = OpenAI(api_key=cfg.openai_api_key)
-    resp = client.chat.completions.create(
-        model=cfg.openai_model,
-        messages=[
+    kwargs = {
+        "model": cfg.openai_model,
+        "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
-        temperature=temp,
-        max_tokens=max_out,
-    )
+        "max_completion_tokens": max_out,
+    }
+    t = temperature_for_chat_model(cfg.openai_model, temp)
+    if t is not None:
+        kwargs["temperature"] = t
+    resp = client.chat.completions.create(**kwargs)
     choice = resp.choices[0].message.content
     text = (choice or "").strip()
     if not text:
