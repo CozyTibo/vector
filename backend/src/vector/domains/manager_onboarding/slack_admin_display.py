@@ -14,7 +14,7 @@ from vector.domains.manager_onboarding import slack_web_api
 from vector.infrastructure.db.repositories import manager_onboarding as mo_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 # <#C09ABC|optional-label> — label is already human-readable when present.
 _CHANNEL_MENTION_RE = re.compile(r"<#([A-Z0-9]+)(?:\|([^>]*))?>")

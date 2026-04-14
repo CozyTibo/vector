@@ -25,7 +25,7 @@ from vector.infrastructure.db.repositories import ingestion as ing_repo
 from vector.infrastructure.db.repositories import linear_connection as linear_repo
 from vector.settings import Settings
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 CONNECTOR = ing_repo.CONNECTOR_LINEAR
 SOURCE_POLL = ing_repo.SOURCE_TRIGGER_POLL

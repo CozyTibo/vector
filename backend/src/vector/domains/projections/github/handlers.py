@@ -25,7 +25,7 @@ from vector.infrastructure.db.models.github_projection import GithubRepository
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.infrastructure.db.repositories import github_projection_upsert as gh_upsert
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 
 def _as_int(value: Any) -> int | None:

@@ -21,7 +21,7 @@ from vector.domains.onboarding.constants import (
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 
 def get_onboarding_for_tenant(session: Session, tenant_id: uuid.UUID) -> OnboardingState | None:

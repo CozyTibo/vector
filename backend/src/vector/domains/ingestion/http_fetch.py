@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 
 class FetchTransientError(Exception):

@@ -43,7 +43,7 @@ from vector.infrastructure.db.repositories import onboarding as ob_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.settings import get_settings
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 
 def slack_outbound_allowed(session: Session, sess: Any) -> bool:

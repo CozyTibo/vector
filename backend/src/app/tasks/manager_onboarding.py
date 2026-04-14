@@ -14,7 +14,7 @@ from vector.domains.manager_onboarding.service import (
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.session import session_scope
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 _TASK_INTRO = "vector.manager_onboarding.send_intro"
 _TASK_EVENT = "vector.manager_onboarding.process_slack_event"

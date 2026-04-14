@@ -17,7 +17,7 @@ from vector.domains.manager_onboarding.engine.requirements import (
     REQ_TEAM_MEMBERS,
 )
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 # primary_requirement id (from ``missing_requirements``) → patch list field
 _PRIMARY_TO_LIST_PATCH_KEY: dict[str, str] = {

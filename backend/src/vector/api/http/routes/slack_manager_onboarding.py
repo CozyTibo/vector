@@ -14,7 +14,7 @@ from vector.domains.manager_onboarding.engine.tokens import augment_slack_messag
 from vector.domains.manager_onboarding.slack_signing import verify_slack_signature
 from vector.settings import get_settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("app")
 
 
 def build_slack_manager_onboarding_router() -> APIRouter:

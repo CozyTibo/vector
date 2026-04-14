@@ -18,7 +18,7 @@ from vector.api.http.routes.debug_canonical import build_debug_canonical_router
 from vector.api.http.routes.debug_projections import build_debug_projections_router
 from vector.settings import get_settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("app")
 
 
 def _cors_allow_origins() -> list[str]:

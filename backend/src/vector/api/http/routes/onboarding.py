@@ -43,7 +43,7 @@ from vector.infrastructure.db.repositories import onboarding as ob_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 
 def _manager_ob_intro_already_sent(db: Session, tenant_id: uuid.UUID, slack_user_id: str) -> bool:

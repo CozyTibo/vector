@@ -24,7 +24,7 @@ from vector.domains.projections.linear.resource_types import (
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.infrastructure.db.repositories import linear_projection_upsert as ln_upsert
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 
 def _as_str(value: Any) -> str | None:

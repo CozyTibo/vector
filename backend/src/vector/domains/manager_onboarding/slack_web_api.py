@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 SLACK_API = "https://slack.com/api"
 

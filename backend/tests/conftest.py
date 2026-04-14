@@ -8,6 +8,10 @@ import os
 # `monkeypatch.delenv` / expect connectors to be unconfigured, and GitHub JWT tests (PEM vs path).
 os.environ.setdefault("VECTOR_SETTINGS_SKIP_DOTENV", "1")
 
+from app.core.logging import setup_logging
+
+setup_logging()
+
 from collections.abc import Generator
 from typing import Any
 

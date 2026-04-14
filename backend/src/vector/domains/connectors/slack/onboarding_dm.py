@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY = "slack_handoff_welcome_dm_sent_for"
 

@@ -6,7 +6,7 @@ import logging
 import uuid
 from typing import Annotated, Any
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field

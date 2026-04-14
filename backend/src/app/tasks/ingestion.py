@@ -26,7 +26,7 @@ from vector.infrastructure.observability.ingestion_tasks import (
 )
 from vector.settings import get_settings
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 _TASK_GITHUB = "vector.ingestion.github_execute_poll_run"
 _TASK_LINEAR = "vector.ingestion.linear_execute_poll_run"

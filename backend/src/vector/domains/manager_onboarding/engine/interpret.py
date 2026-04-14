@@ -11,7 +11,7 @@ from vector.openai_chat_params import (
     temperature_for_chat_model,
 )
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app")
 
 _MAX_USER_CHARS = 12_000
 _MAX_ASSISTANT_CHARS = 4_000

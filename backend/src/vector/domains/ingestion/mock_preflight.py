@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 
 from vector.settings import Settings
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 
 def _docker_loopback_hint(url: str) -> str:

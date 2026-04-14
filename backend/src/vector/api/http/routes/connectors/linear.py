@@ -37,7 +37,7 @@ from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_re
 from vector.infrastructure.db.repositories import ingestion_queries as ing_queries
 from vector.settings import Settings
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 
 def build_linear_connector_router() -> APIRouter:

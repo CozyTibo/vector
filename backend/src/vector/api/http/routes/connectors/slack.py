@@ -26,7 +26,7 @@ from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.settings import Settings
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 
 def build_slack_connector_router() -> APIRouter:

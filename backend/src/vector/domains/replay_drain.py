@@ -23,7 +23,7 @@ from vector.infrastructure.db.models.connector_projection_progress import (
 )
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 
-_logger = logging.getLogger(__name__)
+_logger = logging.getLogger("app")
 
 LEASE_TTL = timedelta(minutes=5)
 DEFAULT_BATCH_SIZE = 500
