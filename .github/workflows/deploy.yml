@@ -10,6 +10,7 @@ env:
   WORKER_REPOSITORY: vector-worker
   ECS_CLUSTER: vector-prod
   ECS_SERVICE: vector-backend-service
+  ECS_TASK_DEFINITION: vector-backend
 
 jobs:
   deploy:
@@ -41,6 +42,52 @@ jobs:
         run: |
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f backend/Dockerfile backend
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Get current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_DEFINITION" \
+            --region "$AWS_REGION" \
+            --query taskDefinition \
+            > task-def.json
+
+      - name: Clean task definition
+        run: |
+          jq 'del(
+            .taskDefinitionArn,
+            .revision,
+            .status,
+            .requiresAttributes,
+            .compatibilities,
+            .registeredAt,
+            .registeredBy
+          )' task-def.json > clean-task-def.json
+
+      - name: Update image in task definition
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          jq --arg IMAGE "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            '.containerDefinitions[0].image = $IMAGE' \
+            clean-task-def.json > new-task-def.json
+
+      - name: Register new task definition
+        run: |
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --region "$AWS_REGION" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "REGISTERED_TASK_DEFINITION_ARN=$NEW_ARN" >> "$GITHUB_ENV"
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$REGISTERED_TASK_DEFINITION_ARN" \
+            --force-new-deployment \
+            --region "$AWS_REGION"
 
       - name: Build and push worker image
         env:
@@ -79,10 +126,3 @@ jobs:
       #       --distribution-id "$DISTRIBUTION_ID" \
       #       --paths "/*"
 
-      - name: Force ECS service redeploy (API)
-        run: |
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$ECS_SERVICE" \
-            --force-new-deployment \
-            --region "$AWS_REGION"
