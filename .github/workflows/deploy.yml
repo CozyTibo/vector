@@ -32,25 +32,22 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f backend/Dockerfile backend
-          docker tag "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
           docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
       - name: Build and push worker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" -f backend/worker.Dockerfile backend
-          docker tag "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$WORKER_REPOSITORY:latest"
           docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG"
-          docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:latest"
 
       # Frontend / static hosting — re-enable when S3 + CloudFront infra exists
       # - name: Set up Node.js
