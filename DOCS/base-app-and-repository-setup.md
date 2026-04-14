@@ -35,7 +35,7 @@ vector/
 
 Goal: a **runnable** backend shell with **no business features**, proving:
 
-- HTTP API process (e.g. FastAPI) with **`GET /health`** (includes a DB `SELECT 1` check).
+- HTTP API process (e.g. FastAPI) with **`GET /health`** (liveness, no DB) and **`GET /ready`** (DB `SELECT 1`).
 - **Postgres** with two logical databases: **`vector`** (dev/default) and **`vector_test`** (tests only) — per engineering guidelines §7.3.
 - **Alembic** migrations on **`vector`** and **`vector_test`** in CI/Make targets.
 - **Structured package layout** matching the guidelines: `domains/` (empty or stub packages), `api/http/` (routers only), `infrastructure/db/` (Base, future models), `settings`, `contracts` as needed later.

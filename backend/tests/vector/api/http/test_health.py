@@ -1,4 +1,4 @@
-"""HTTP health routes."""
+"""HTTP health and readiness routes."""
 
 from __future__ import annotations
 
@@ -9,15 +9,24 @@ from vector.api.http.main import app
 from vector.api.http.routes import health as health_routes
 
 
-@pytest.mark.integration
-def test_health_returns_ok_when_db_up() -> None:
+def test_health_liveness_always_200() -> None:
     client = TestClient(app)
     response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "alive"}
+
+
+@pytest.mark.integration
+def test_ready_returns_database_ok_when_db_up() -> None:
+    client = TestClient(app)
+    response = client.get("/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "ok"}
 
 
-def test_health_returns_200_when_db_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ready_returns_database_failed_when_db_unreachable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _BadConn:
         def __enter__(self) -> None:
             raise OSError("connection refused")
@@ -32,6 +41,6 @@ def test_health_returns_200_when_db_unreachable(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(health_routes, "get_engine", lambda: _BadEngine())
 
     client = TestClient(app)
-    response = client.get("/health")
+    response = client.get("/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "failed"}
