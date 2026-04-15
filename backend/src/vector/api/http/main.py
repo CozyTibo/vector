@@ -22,7 +22,14 @@ logger = logging.getLogger("app")
 
 
 def _cors_allow_origins() -> list[str]:
-    raw = os.environ.get("CORS_ORIGINS", "http://localhost:5173")
+    # Comma-separated; override entirely with CORS_ORIGINS in ECS (e.g. staging-only list).
+    default = (
+        "http://localhost:5173,"
+        "https://d3lwynjhzjqd60.cloudfront.net,"
+        "https://www.myvector.co,"
+        "https://myvector.co"
+    )
+    raw = os.environ.get("CORS_ORIGINS", default)
     return [o.strip() for o in raw.split(",") if o.strip()]
 
 
