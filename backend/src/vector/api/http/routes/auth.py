@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
-from vector.api.http.cookie_utils import set_session_cookie
+from vector.api.http.cookie_utils import clear_session_cookie, set_session_cookie
 from vector.api.http.deps import get_db, settings_dep
 from vector.contracts.auth_payloads import AuthOkResponse, LoginRequest, RegisterRequest
 from vector.domains.identity_access.errors import (
@@ -132,5 +132,5 @@ def logout(
     settings: Annotated[Settings, Depends(settings_dep)],
 ) -> Response:
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    response.delete_cookie(key=settings.session_cookie_name, path="/")
+    clear_session_cookie(response, settings)
     return response
