@@ -43,7 +43,7 @@ Build context for both images is the **`backend/`** directory.
 ECS or an ALB should use:
 
 - **`GET /health`** → liveness: always **`200`**, instant `{"status":"alive"}` (no DB; use for ECS/ALB health checks).
-- **`GET /ready`** → readiness: always **`200`** with `{"status":"ok","database":"ok"|"failed"}` after `SELECT 1` (optional LB matcher or internal checks).
+- **`GET /ready`** → readiness: always **`200`** with `database` / `redis` each `ok` \| `failed` \| `skipped` (Redis skipped when `REDIS_URL` unset); DB via `SELECT 1`, Redis via `PING` (optional LB matcher or internal checks).
 
 ## Frontend build
 
