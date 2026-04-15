@@ -11,6 +11,8 @@ env:
   ECS_CLUSTER: vector-prod
   ECS_SERVICE: vector-backend-service
   ECS_TASK_DEFINITION: vector-backend
+  # Container name in the API task definition (used for run-task overrides)
+  ECS_CONTAINER_NAME: backend
 
 jobs:
   deploy:
@@ -79,6 +81,74 @@ jobs:
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
           echo "REGISTERED_TASK_DEFINITION_ARN=$NEW_ARN" >> "$GITHUB_ENV"
+
+      - name: Run database migrations (Alembic)
+        run: |
+          set -euo pipefail
+          NETCFG=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration' \
+            --output json)
+          if [ "$NETCFG" = "null" ] || [ "$NETCFG" = "" ]; then
+            echo "Could not read networkConfiguration from service $ECS_SERVICE"
+            exit 1
+          fi
+          jq -n \
+            --arg cluster "$ECS_CLUSTER" \
+            --arg taskdef "$REGISTERED_TASK_DEFINITION_ARN" \
+            --arg name "$ECS_CONTAINER_NAME" \
+            --argjson vpc "$NETCFG" \
+            '{
+              cluster: $cluster,
+              taskDefinition: $taskdef,
+              launchType: "FARGATE",
+              networkConfiguration: { awsvpcConfiguration: $vpc },
+              overrides: {
+                containerOverrides: [
+                  { name: $name, command: ["alembic", "upgrade", "head"] }
+                ]
+              }
+            }' > run-migration-task.json
+          echo "Starting migration task…"
+          TASK_ARN=$(aws ecs run-task \
+            --cli-input-json file://run-migration-task.json \
+            --region "$AWS_REGION" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+          if [ "$TASK_ARN" = "None" ] || [ -z "$TASK_ARN" ]; then
+            echo "run-task did not return a task ARN"
+            exit 1
+          fi
+          echo "Migration task: $TASK_ARN"
+          aws ecs wait tasks-stopped \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$TASK_ARN" \
+            --region "$AWS_REGION"
+          TASK_JSON=$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$TASK_ARN" \
+            --region "$AWS_REGION" \
+            --output json)
+          EXIT=$(echo "$TASK_JSON" | jq -r --arg n "$ECS_CONTAINER_NAME" \
+            '.tasks[0].containers[] | select(.name == $n) | .exitCode')
+          if [ "$EXIT" = "null" ] || [ -z "$EXIT" ]; then
+            echo "Could not read exitCode for container $ECS_CONTAINER_NAME"
+            echo "$TASK_JSON" | jq '.tasks[0]' || true
+            exit 1
+          fi
+          if [ "$EXIT" != "0" ]; then
+            echo "alembic upgrade head failed (exit=$EXIT)"
+            aws ecs describe-tasks \
+              --cluster "$ECS_CLUSTER" \
+              --tasks "$TASK_ARN" \
+              --region "$AWS_REGION" \
+              --query 'tasks[0].containers' \
+              --output json || true
+            exit 1
+          fi
+          echo "Migrations applied successfully."
 
       - name: Deploy to ECS
         run: |
