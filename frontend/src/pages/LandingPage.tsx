@@ -84,7 +84,7 @@ export default function LandingPage() {
 
   if (me.isLoading) {
     return (
-      <MarketingLayout bareBackground>
+      <MarketingLayout bareBackground accentJoinListCta>
         <main className="flex min-h-[60vh] flex-col items-center justify-center px-6">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-pink-100 border-t-[#E878BE]" />
           <p className="mt-4 text-sm text-zinc-500">Loading…</p>
@@ -98,7 +98,7 @@ export default function LandingPage() {
   }
 
   return (
-    <MarketingLayout bareBackground>
+    <MarketingLayout bareBackground accentJoinListCta>
       <VectorLandingBody />
     </MarketingLayout>
   );

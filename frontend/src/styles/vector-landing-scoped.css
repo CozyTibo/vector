@@ -274,6 +274,15 @@
   background: #1e293b;
   color: #fff;
 }
+#vector-landing .btn-pill--hero.btn-pill--join-list {
+  background: #e878be;
+  color: #fff;
+  box-shadow: 0 12px 32px -16px rgba(232, 120, 190, 0.55);
+}
+#vector-landing .btn-pill--hero.btn-pill--join-list:hover {
+  background: #df6aad;
+  color: #fff;
+}
 @media (max-width: 767px) {
   #vector-landing .hero-cta-row {
     flex-direction: column;

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import vectorHeroAvatarUrl from "../../assets/vector-hero-avatar.png";
 import vectorLogoUrl from "../../assets/vector-logo.png";
 
 type Props = {
@@ -8,9 +9,21 @@ type Props = {
   showChrome?: boolean;
   /** When true, skip the fixed marketing grid (e.g. home uses vector-landing’s own backdrop). */
   bareBackground?: boolean;
+  /** Landing only: pink “Join the list” header CTA to match in-page CTAs. */
+  accentJoinListCta?: boolean;
 };
 
-export default function MarketingLayout({ children, showChrome = true, bareBackground = false }: Props) {
+const joinListNavDefault =
+  "rounded-full bg-[#0F0F12] px-4 py-2 text-sm font-semibold text-white no-underline shadow-[0_6px_20px_-8px_rgba(15,23,42,0.35)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.25)] sm:px-5";
+const joinListNavAccent =
+  "rounded-full bg-[#E878BE] px-4 py-2 text-sm font-semibold text-white no-underline shadow-[0_6px_20px_-8px_rgba(232,120,190,0.45)] transition-[transform,box-shadow] hover:scale-[1.02] hover:bg-[#df6aad] hover:text-white hover:shadow-[0_8px_28px_-8px_rgba(232,120,190,0.4)] sm:px-5";
+
+export default function MarketingLayout({
+  children,
+  showChrome = true,
+  bareBackground = false,
+  accentJoinListCta = false,
+}: Props) {
   return (
     <div className="font-display relative min-h-screen overflow-x-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
       {!bareBackground ? (
@@ -36,13 +49,27 @@ export default function MarketingLayout({ children, showChrome = true, bareBackg
             className="group flex items-center gap-2.5 no-underline outline-none transition-opacity hover:opacity-90"
             aria-label="Vector home"
           >
-            <img
-              src={vectorLogoUrl}
-              alt=""
-              className="h-9 w-auto shrink-0 transition-transform duration-300 group-hover:scale-105 sm:h-10"
-              decoding="async"
-            />
-            <span className="text-lg font-semibold tracking-tight text-[#0F0F12] sm:text-xl">Vector</span>
+            {accentJoinListCta ? (
+              <>
+                <img
+                  src={vectorHeroAvatarUrl}
+                  alt=""
+                  className="h-9 w-9 shrink-0 rounded-full border-2 border-white object-cover shadow-[0_1px_3px_rgba(0,0,0,0.08)] outline outline-1 outline-offset-0 outline-zinc-200/80 transition-transform duration-300 group-hover:scale-105 sm:h-10 sm:w-10"
+                  decoding="async"
+                />
+                <span className="text-lg font-semibold tracking-tight text-[#0F0F12] sm:text-xl">Vector</span>
+              </>
+            ) : (
+              <>
+                <img
+                  src={vectorLogoUrl}
+                  alt=""
+                  className="h-9 w-auto shrink-0 transition-transform duration-300 group-hover:scale-105 sm:h-10"
+                  decoding="async"
+                />
+                <span className="text-lg font-semibold tracking-tight text-[#0F0F12] sm:text-xl">Vector</span>
+              </>
+            )}
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
             <Link
@@ -51,11 +78,8 @@ export default function MarketingLayout({ children, showChrome = true, bareBackg
             >
               Sign in
             </Link>
-            <Link
-              to="/signup"
-              className="rounded-full bg-[#0F0F12] px-4 py-2 text-sm font-semibold text-white no-underline shadow-[0_6px_20px_-8px_rgba(15,23,42,0.35)] transition-[transform,box-shadow] hover:scale-[1.02] hover:shadow-[0_8px_28px_-8px_rgba(15,23,42,0.25)] sm:px-5"
-            >
-              Get started
+            <Link to="/signup" className={accentJoinListCta ? joinListNavAccent : joinListNavDefault}>
+              Join the list
             </Link>
           </nav>
         </header>

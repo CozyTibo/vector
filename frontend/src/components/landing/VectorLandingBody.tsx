@@ -345,7 +345,7 @@ export function VectorLandingBody() {
           <div className="problem-banner__inner">
             <div className="problem-banner__block problem-banner__block--focus">
               <p className="problem-banner__text">Everything looks in progress, but nothing is moving.</p>
-              <p className="problem-banner__text">It’s just another day figuring it out.</p>
+              <p className="problem-banner__text">Just another day figuring things out...</p>
             </div>
           </div>
         </section>
@@ -721,8 +721,8 @@ export function VectorLandingBody() {
                 </li>
               </ol>
               <div className="cta-actions">
-                <Link className="btn-pill btn-pill--hero" to="/signup">
-                  Get started
+                <Link className="btn-pill btn-pill--hero btn-pill--join-list" to="/signup">
+                  Join the list
                 </Link>
                 <a className="btn-light" href={DEMO_CAL_URL} target="_blank" rel="noopener noreferrer">
                   Book a demo

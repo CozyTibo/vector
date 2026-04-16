@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import MarketingLayout from "../components/marketing/MarketingLayout";
+import { SHOW_GOOGLE_OAUTH } from "../lib/authUi";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { fetchMe, productApiBase } from "../lib/meApi";
 
@@ -58,7 +59,7 @@ export default function LoginPage() {
           <p className="mt-2 text-sm text-zinc-600">
             New here?{" "}
             <Link to="/signup" className="font-medium text-teal-600 no-underline hover:text-teal-700">
-              Create an account
+              Join the list
             </Link>
           </p>
           {notice ? (
@@ -95,14 +96,16 @@ export default function LoginPage() {
           >
             {login.isPending ? "Signing in…" : "Sign in"}
           </button>
-          <p className="mt-6 text-center text-xs text-zinc-500">
-            <a
-              className="font-medium text-teal-600 no-underline hover:text-teal-700"
-              href={`${apiBase}/auth/google/start`}
-            >
-              Continue with Google
-            </a>
-          </p>
+          {SHOW_GOOGLE_OAUTH ? (
+            <p className="mt-6 text-center text-xs text-zinc-500">
+              <a
+                className="font-medium text-teal-600 no-underline hover:text-teal-700"
+                href={`${apiBase}/auth/google/start`}
+              >
+                Continue with Google
+              </a>
+            </p>
+          ) : null}
         </div>
         <p className="mt-8 text-center text-sm text-zinc-500">
           <Link to="/" className="text-zinc-600 no-underline hover:text-zinc-900">

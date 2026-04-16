@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import MarketingLayout from "../components/marketing/MarketingLayout";
+import { SHOW_GOOGLE_OAUTH } from "../lib/authUi";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { fetchMe, productApiBase } from "../lib/meApi";
 
@@ -56,8 +57,16 @@ export default function SignupPage() {
     <MarketingLayout>
       <main className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-md flex-col justify-center px-5 py-12 sm:px-8">
         <div className="rounded-3xl border border-zinc-200/80 bg-white/85 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.12),inset_0_0_0_1px_rgba(139,92,246,0.07)] backdrop-blur-2xl sm:p-9">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Create account</h1>
-          <p className="mt-2 text-sm text-zinc-600">
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-teal-700">
+            Early access waitlist
+          </p>
+          <h1 className="mt-3 text-2xl font-bold tracking-tight text-zinc-900">Join the list</h1>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+            Sign up for an early-stage access to Vector.
+            <br />
+            We currently onboard companies in batches as we finalize the product roll out.
+          </p>
+          <p className="mt-4 text-sm text-zinc-600">
             Already have one?{" "}
             <Link to="/login" className="font-medium text-teal-600 no-underline hover:text-teal-700">
               Sign in
@@ -102,17 +111,19 @@ export default function SignupPage() {
               disabled={register.isPending}
               className="mt-8 w-full rounded-full bg-zinc-900 py-3.5 text-sm font-semibold text-white shadow-[0_6px_28px_-8px_rgba(20,184,166,0.32),0_2px_10px_-6px_rgba(124,58,237,0.16)] transition-transform hover:scale-[1.01] disabled:opacity-50"
             >
-              {register.isPending ? "Creating…" : "Get started"}
+              {register.isPending ? "Joining…" : "Join the list"}
             </button>
           </form>
-          <p className="mt-6 text-center text-xs text-zinc-500">
-            <a
-              className="font-medium text-teal-600 no-underline hover:text-teal-700"
-              href={`${apiBase}/auth/google/start`}
-            >
-              Continue with Google
-            </a>
-          </p>
+          {SHOW_GOOGLE_OAUTH ? (
+            <p className="mt-6 text-center text-xs text-zinc-500">
+              <a
+                className="font-medium text-teal-600 no-underline hover:text-teal-700"
+                href={`${apiBase}/auth/google/start`}
+              >
+                Continue with Google
+              </a>
+            </p>
+          ) : null}
         </div>
         <p className="mt-8 text-center text-sm text-zinc-500">
           <Link to="/" className="text-zinc-600 no-underline hover:text-zinc-900">
