@@ -41,7 +41,12 @@ export default function SignupWaitlistPage() {
     },
   });
 
-  if (me.isPending) {
+  // After signup, `me` can still be stale `null` while the post-cookie refetch runs; `isPending` is
+  // false in that case (query already resolved unauthenticated once). Treat fetching + no payload
+  // as loading so we do not redirect to login on slower networks (common on mobile).
+  const meStillResolving = me.isPending || (me.isFetching && !me.data);
+
+  if (meStillResolving) {
     return (
       <MarketingLayout accentJoinListCta signedSession="pending">
         <main className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-4xl flex-col justify-center px-5 py-12 sm:px-8">

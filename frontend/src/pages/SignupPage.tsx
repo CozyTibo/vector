@@ -53,7 +53,8 @@ export default function SignupPage() {
       setNotice(null);
       void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
       void qc.removeQueries({ queryKey: ["connectors", apiBase] });
-      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      // Wait for `/me` with the new session cookie (invalidate alone can resolve before refetch ends).
+      await qc.refetchQueries({ queryKey: ["me", apiBase] });
       navigate("/signup/waitlist", { replace: true });
     },
     onError: (e: Error) => {
