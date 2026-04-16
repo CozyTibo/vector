@@ -6,24 +6,28 @@ type Props = {
   children: React.ReactNode;
   /** When false, only background + font (e.g. nested use). Default shows top chrome. */
   showChrome?: boolean;
+  /** When true, skip the fixed marketing grid (e.g. home uses vector-landing’s own backdrop). */
+  bareBackground?: boolean;
 };
 
-export default function MarketingLayout({ children, showChrome = true }: Props) {
+export default function MarketingLayout({ children, showChrome = true, bareBackground = false }: Props) {
   return (
     <div className="font-display relative min-h-screen overflow-x-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
-      <div className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 bg-[#FFFFFF]" />
-        <div
-          className="absolute inset-0 opacity-[0.5]"
-          style={{
-            backgroundImage: `
+      {!bareBackground ? (
+        <div className="pointer-events-none fixed inset-0">
+          <div className="absolute inset-0 bg-[#FFFFFF]" />
+          <div
+            className="absolute inset-0 opacity-[0.5]"
+            style={{
+              backgroundImage: `
               linear-gradient(rgba(15,15,18,0.05) 1px, transparent 1px),
               linear-gradient(90deg, rgba(15,15,18,0.05) 1px, transparent 1px)
             `,
-            backgroundSize: "72px 72px",
-          }}
-        />
-      </div>
+              backgroundSize: "72px 72px",
+            }}
+          />
+        </div>
+      ) : null}
 
       {showChrome ? (
         <header className="relative z-20 mx-auto flex max-w-[96rem] items-center justify-between gap-4 px-5 pt-7 pb-4 sm:px-8 sm:pt-8">
