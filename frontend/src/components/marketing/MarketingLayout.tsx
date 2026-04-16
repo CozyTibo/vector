@@ -22,6 +22,13 @@ type Props = {
    * Omit for default Sign in + Join the list.
    */
   signedSession?: MarketingLayoutSignedSession;
+  /**
+   * With a non-pending `signedSession`, show this primary CTA (e.g. “Go to your workspace”) instead of
+   * anonymous Sign in / Join — used on the marketing landing when already authenticated.
+   */
+  workspaceNavCta?: { to: string; label: string };
+  /** Signed-in header only: hide the email chip (e.g. marketing `/` landing). */
+  hideHeaderEmail?: boolean;
 };
 
 const joinListNavCta =
@@ -33,6 +40,8 @@ export default function MarketingLayout({
   bareBackground = false,
   accentJoinListCta = false,
   signedSession,
+  workspaceNavCta,
+  hideHeaderEmail = false,
 }: Props) {
   return (
     <div className="font-display relative min-h-screen overflow-x-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
@@ -83,20 +92,29 @@ export default function MarketingLayout({
             )}
           </Link>
           {signedSession ? (
-            <nav className="flex min-w-0 max-w-[min(100%,28rem)] items-center justify-end gap-3 sm:gap-4">
+            <nav className="flex min-w-0 max-w-[min(100%,36rem)] flex-wrap items-center justify-end gap-2 sm:gap-3">
               {signedSession === "pending" ? (
                 <span className="text-sm text-[#52525B]">Loading…</span>
               ) : (
                 <>
-                  <span
-                    className="min-w-0 max-w-[11rem] truncate text-sm text-[#52525B] sm:max-w-[18rem]"
-                    title={signedSession.email}
-                  >
-                    {signedSession.email}
-                  </span>
+                  {workspaceNavCta ? (
+                    <Link to={workspaceNavCta.to} className={joinListNavCta}>
+                      {workspaceNavCta.label}
+                    </Link>
+                  ) : null}
+                  {!hideHeaderEmail ? (
+                    <span
+                      className="min-w-0 max-w-[11rem] truncate text-sm text-[#52525B] sm:max-w-[18rem]"
+                      title={signedSession.email}
+                    >
+                      {signedSession.email}
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     disabled={Boolean(signedSession.signOutPending)}
+                    title={hideHeaderEmail ? signedSession.email : undefined}
+                    aria-label={hideHeaderEmail ? `Sign out (${signedSession.email})` : undefined}
                     className="shrink-0 rounded-full border border-zinc-200/90 bg-white/90 px-4 py-2 text-sm font-semibold text-[#27272a] transition-[border-color,background-color] hover:border-zinc-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => signedSession.onSignOut()}
                   >

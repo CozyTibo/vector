@@ -6,6 +6,12 @@ import { Link, useNavigate } from "react-router-dom";
 import ChatInputBar from "../../components/onboarding/ChatInputBar";
 import ChatMessageList from "../../components/onboarding/ChatMessageList";
 import OnboardingChatLayout from "../../components/onboarding/OnboardingChatLayout";
+import {
+  CONNECTOR_STEP_FOOTER_LINK_CLASS,
+  ONBOARDING_CONNECTOR_PROMPT_CARD_CLASS,
+  ONBOARDING_PRIMARY_CTA_GRADIENT_BUTTON_CLASS,
+  ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS,
+} from "../../components/onboarding/onboardingUiConstants";
 import SlackStakeholdersPanel from "../../components/onboarding/SlackStakeholdersPanel";
 import {
   ONB_SLACK_HANDOFF_EVENT_ID,
@@ -99,9 +105,6 @@ function liveProviderConnected(provider: LiveConnectorId, server: OnboardingStat
   }
   return server.github_connected;
 }
-
-const CONNECTOR_STEP_FOOTER_LINK_CLASS =
-  "text-center text-sm leading-snug text-zinc-500 underline decoration-zinc-300 decoration-1 underline-offset-2 hover:text-zinc-700";
 
 /** Display name for the communication tool when the queue is the Teams/Discord placeholder. */
 function unsupportedCommunicationPickLabel(answers: Record<string, unknown>): string {
@@ -1399,7 +1402,7 @@ export default function OnboardingPage() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ChatMessageList messages={messages} userDisplayName={userLabel} isTyping={isTyping} />
           <div className="shrink-0 px-4 pb-8 pt-1 sm:px-5">
-            <div className="rounded-2xl border border-[#E878BE]/20 bg-white/95 p-6 text-center shadow-[0_16px_44px_-28px_rgba(232,120,190,0.45)] ring-1 ring-zinc-950/[0.04]">
+            <div className={ONBOARDING_CONNECTOR_PROMPT_CARD_CLASS}>
               {oauthReturnError ? (
                 <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-950">
                   {oauthReturnError}
@@ -1425,7 +1428,7 @@ export default function OnboardingPage() {
               <div className="mt-6 flex flex-col items-center gap-3">
                 {!server.slack_connected ? (
                   <a
-                    className="inline-flex rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white no-underline shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03]"
+                    className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
                     href={`${apiBase}/connectors/slack/install?return_to=${encodeURIComponent("/app/onboarding")}`}
                   >
                     Connect Slack
@@ -1434,7 +1437,7 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     disabled={finishOnboardingMut.isPending}
-                    className="rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
+                    className={`${ONBOARDING_PRIMARY_CTA_GRADIENT_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
                     onClick={() => continueAfterManualConnect("slack")}
                   >
                     {finishOnboardingMut.isPending ? "Finishing…" : "Finish setup"}

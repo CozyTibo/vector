@@ -11,14 +11,45 @@ const gridBgStyle = {
   backgroundSize: "72px 72px",
 } as const;
 
+function ChannelBar({ label, trailing }: { label: string; trailing?: ReactNode }) {
+  return (
+    <header className="shrink-0 border-b border-zinc-100/95 bg-white/90 px-4 py-3 sm:px-5">
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className="truncate font-mono text-[13px] font-semibold tracking-tight text-zinc-600"
+          aria-label={`Channel ${label}`}
+        >
+          {label}
+        </p>
+        {trailing ? <div className="shrink-0">{trailing}</div> : null}
+      </div>
+    </header>
+  );
+}
+
 type OnboardingChatLayoutProps = {
   children: ReactNode;
   /** Bottom slot (input bar, tool selector, or connector actions) */
   footer?: ReactNode;
   /** Hide in-card header (e.g. rare full-bleed variants) */
   showHeader?: boolean;
-  /** Right side of the in-card header (only when ``showHeader`` is true) */
+  /** Right side of the in-card header (Vector header or channel bar) */
   headerTrailing?: ReactNode;
+  /**
+   * When set, shows a compact channel bar instead of the Vector DM header (avatar + title).
+   * Use on marketing waitlist chat to avoid duplicating Vector’s avatar above the thread.
+   */
+  channelLabel?: string;
+  /**
+   * Tailwind `top-*` for the fixed grid backdrop (below the global chrome).
+   * Default `top-16` matches RequireAuth `PublicNav`. Use e.g. `top-[5.5rem]` under `MarketingLayout`.
+   */
+  backdropTopClassName?: string;
+  /**
+   * `grid` = subtle grid behind the card (in-app onboarding). `solid` = flat white like sign-in /
+   * sign-up / marketing pages (e.g. waitlist chat under `MarketingLayout`).
+   */
+  backdropStyle?: "grid" | "solid";
 };
 
 /**
@@ -29,16 +60,23 @@ export default function OnboardingChatLayout({
   footer,
   showHeader = true,
   headerTrailing,
+  channelLabel,
+  backdropTopClassName = "top-16",
+  backdropStyle = "grid",
 }: OnboardingChatLayoutProps) {
+  const solidBackdrop = backdropStyle === "solid";
+
   return (
     <div className="font-display relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
       {/*
-        Full-viewport fixed layers must start below RequireAuth’s PublicNav (~4rem), or they paint
-        over the logo / email / sign out bar.
+        Full-viewport fixed layers must start below the global header (PublicNav ~4rem, or
+        marketing chrome when `backdropTopClassName` is overridden), or they paint over it.
       */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 top-16 z-0">
+      <div className={`pointer-events-none fixed inset-x-0 bottom-0 z-0 ${backdropTopClassName}`}>
         <div className="absolute inset-0 bg-[#FFFFFF]" />
-        <div className="absolute inset-0 opacity-[0.5]" style={gridBgStyle} />
+        {!solidBackdrop ? (
+          <div className="absolute inset-0 opacity-[0.5]" style={gridBgStyle} />
+        ) : null}
       </div>
 
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col items-center px-4 py-3 sm:px-6 sm:py-4">
@@ -49,8 +87,18 @@ export default function OnboardingChatLayout({
             "ring-1 ring-zinc-950/[0.03]"
           }
         >
-          {showHeader ? <ChatHeader trailing={headerTrailing} /> : null}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-zinc-50/80 to-white">
+          {channelLabel ? (
+            <ChannelBar label={channelLabel} trailing={headerTrailing} />
+          ) : showHeader ? (
+            <ChatHeader trailing={headerTrailing} />
+          ) : null}
+          <div
+            className={
+              solidBackdrop
+                ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-white"
+                : "flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-zinc-50/80 to-white"
+            }
+          >
             {children}
           </div>
           {footer ? (

@@ -220,7 +220,14 @@ function useMeetVectorSnippetInView() {
   return ref;
 }
 
-export function VectorLandingBody() {
+export type VectorLandingSignedCta = { to: string; label: string };
+
+type VectorLandingBodyProps = {
+  /** When set, bottom CTA becomes entry to the product instead of “Join the list”. */
+  signedInWorkspaceCta?: VectorLandingSignedCta;
+};
+
+export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyProps) {
   const visibleSteps = useHeroChatReveal();
   const problemBannerRef = useProblemBannerInView();
   const meetSnippetRef = useMeetVectorSnippetInView();
@@ -721,9 +728,18 @@ export function VectorLandingBody() {
                 </li>
               </ol>
               <div className="cta-actions">
-                <Link className="btn-pill btn-pill--hero btn-pill--join-list" to="/signup">
-                  Join the list
-                </Link>
+                {signedInWorkspaceCta ? (
+                  <Link
+                    className="btn-pill btn-pill--hero btn-pill--join-list"
+                    to={signedInWorkspaceCta.to}
+                  >
+                    {signedInWorkspaceCta.label}
+                  </Link>
+                ) : (
+                  <Link className="btn-pill btn-pill--hero btn-pill--join-list" to="/signup">
+                    Join the list
+                  </Link>
+                )}
                 <a className="btn-light" href={DEMO_CAL_URL} target="_blank" rel="noopener noreferrer">
                   Book a demo
                 </a>
