@@ -1,16 +1,34 @@
 import { useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { getApiBase, readErrorDetail } from "../lib/canonicalApi";
 import { getAdminPassword, setAdminPassword } from "../lib/adminCredentials";
 
+function adminNavLinkClass({ isActive }: { isActive: boolean }): string {
+  return [
+    "text-sm font-medium no-underline transition-colors",
+    isActive ? "text-red-900" : "text-stone-600 hover:text-stone-900",
+  ].join(" ");
+}
+
 function AdminTopNav() {
   return (
     <header className="border-b border-stone-200 bg-white">
-      <div className="mx-auto flex max-w-6xl items-center px-4 py-3">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
         <Link to="/admin" className="text-sm font-semibold text-red-800 no-underline">
           Vector Admin
         </Link>
+        <nav
+          className="flex items-center gap-4 border-l border-stone-200 pl-5"
+          aria-label="Admin sections"
+        >
+          <NavLink to="/admin" end className={adminNavLinkClass}>
+            Workspaces
+          </NavLink>
+          <NavLink to="/admin/users" className={adminNavLinkClass}>
+            Users
+          </NavLink>
+        </nav>
       </div>
     </header>
   );

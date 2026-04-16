@@ -81,6 +81,11 @@ def list_all_tenants(session: Session, *, limit: int = 500) -> list[Tenant]:
     return list(session.scalars(stmt).all())
 
 
+def list_all_users(session: Session, *, limit: int = 500) -> list[User]:
+    stmt = select(User).order_by(User.created_at.desc()).limit(limit)
+    return list(session.scalars(stmt).all())
+
+
 def list_connected_connector_providers(session: Session, tenant_id: uuid.UUID) -> list[str]:
     """Provider keys from active tenant_connections (e.g. github, linear)."""
     stmt = (

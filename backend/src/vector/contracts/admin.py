@@ -45,6 +45,25 @@ class TenantListResponse(BaseModel):
     items: list[TenantListItem]
 
 
+class AdminUserListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: uuid.UUID
+    email: str
+    full_name: str | None = None
+    created_at: datetime
+    has_password: bool = Field(
+        default=False,
+        description="True when users.password_hash is set (email/password accounts).",
+    )
+
+
+class AdminUserListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[AdminUserListItem]
+
+
 class OnboardingAdminSnapshot(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

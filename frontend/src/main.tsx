@@ -15,6 +15,7 @@ import AdminTenantDataSectionLayout from "./admin/AdminTenantDataSectionLayout.t
 import AdminTenantManagerOnboarding from "./admin/AdminTenantManagerOnboarding.tsx";
 import AdminTenantStep3 from "./admin/AdminTenantStep3.tsx";
 import AdminWorkspacePage from "./admin/AdminWorkspacePage.tsx";
+import AdminUsersPage from "./admin/AdminUsersPage.tsx";
 import AdminWorkspacesPage from "./admin/AdminWorkspacesPage.tsx";
 import {
   LegacyExecutionGraphRedirect,
@@ -72,6 +73,7 @@ createRoot(document.getElementById("root")!).render(
 
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminWorkspacesPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
             <Route path="workspaces" element={<Navigate to="/admin" replace />} />
             <Route path="manager-onboarding" element={<Navigate to="/admin" replace />} />
             <Route path="slack-onboarding" element={<Navigate to="/admin" replace />} />

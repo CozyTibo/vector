@@ -28,6 +28,8 @@ from vector.contracts.admin import (
     AdminStep3CanonicalResetRequest,
     AdminStep3CanonicalResetResponse,
     AdminTenantWorkspaceAccessRequest,
+    AdminUserListItem,
+    AdminUserListResponse,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
     RawIngestionAdminDetail,
@@ -268,6 +270,25 @@ def build_admin_router() -> APIRouter:
                 ),
             )
         return TenantListResponse(items=items)
+
+    @r.get("/users", response_model=AdminUserListResponse)
+    def list_users(
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=500)] = 500,
+    ) -> AdminUserListResponse:
+        rows = tenancy_repo.list_all_users(db, limit=limit)
+        return AdminUserListResponse(
+            items=[
+                AdminUserListItem(
+                    id=u.id,
+                    email=u.email,
+                    full_name=u.full_name,
+                    created_at=u.created_at,
+                    has_password=u.password_hash is not None,
+                )
+                for u in rows
+            ],
+        )
 
     @r.post(
         "/tenants/{tenant_id}/hard-delete",
