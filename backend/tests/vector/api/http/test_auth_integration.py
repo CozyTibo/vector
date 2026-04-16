@@ -63,7 +63,9 @@ def test_google_oauth_flow_creates_tenant_and_session(
         follow_redirects=False,
     )
     assert r2.status_code == 302
-    assert "oauth_ok=1" in r2.headers["location"]
+    loc = r2.headers["location"]
+    assert "oauth_ok=1" in loc
+    assert "#st=" in loc
 
     r3 = client.get("/me")
     assert r3.status_code == 200
@@ -128,6 +130,7 @@ def test_register_and_login_with_password(client: TestClient) -> None:
         },
     )
     assert reg.status_code == 200
+    assert reg.json().get("session_token")
     me = client.get("/me")
     assert me.status_code == 200
     body = me.json()
@@ -144,6 +147,7 @@ def test_register_and_login_with_password(client: TestClient) -> None:
 
     log = client.post("/auth/login", json={"email": email, "password": "secure-pass-1"})
     assert log.status_code == 200
+    assert log.json().get("session_token")
     me2 = client.get("/me")
     assert me2.status_code == 200
     assert me2.json()["email"] == email
@@ -155,6 +159,27 @@ def test_register_duplicate_email_conflict(client: TestClient) -> None:
     assert client.post("/auth/register", json=body).status_code == 200
     dup = client.post("/auth/register", json=body)
     assert dup.status_code == 409
+
+
+def test_me_accepts_bearer_without_cookie(client: TestClient) -> None:
+    email = f"bearer-{uuid.uuid4().hex[:12]}@example.com"
+    reg = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "secure-pass-1",
+            "full_name": "Bearer User",
+            "company_name": "Bearer Co",
+        },
+    )
+    assert reg.status_code == 200
+    token = reg.json()["session_token"]
+    assert isinstance(token, str) and len(token) > 10
+    client.post("/auth/logout")
+    assert client.get("/me").status_code == 401
+    me = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
+    assert me.json()["email"] == email
 
 
 def test_login_wrong_password(client: TestClient) -> None:

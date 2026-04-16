@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { mergeProductSessionAuth } from "../lib/sessionToken";
+
 const ENTITIES = [
   { id: "repositories", label: "Repositories" },
   { id: "pull_requests", label: "Pull requests" },
@@ -157,7 +159,7 @@ export default function ProjectionDebugPage() {
       }
       const res = await fetch(
         `${apiBase}/debug/connectors/${encodeURIComponent(connector)}/connections/${encodeURIComponent(connectionId)}/projections/rows?${q}`,
-        { credentials: "include" },
+        mergeProductSessionAuth(),
       );
       if (res.status === 401) {
         throw new Error("Not signed in");
@@ -178,7 +180,7 @@ export default function ProjectionDebugPage() {
   async function openRawRecord(recordId: number) {
     const res = await fetch(
       `${apiBase}/debug/connectors/${encodeURIComponent(connector)}/connections/${encodeURIComponent(connectionId)}/raw-records/${recordId}`,
-      { credentials: "include" },
+      mergeProductSessionAuth(),
     );
     if (!res.ok) {
       setRawModal(await readErrorDetail(res));

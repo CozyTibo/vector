@@ -1,11 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import PublicNav from "../components/PublicNav";
-import { fetchMe, productApiBase } from "../lib/meApi";
+import { productApiBase, useProductMeQuery } from "../lib/meApi";
+import { mergeProductSessionAuth, setStoredSessionToken } from "../lib/sessionToken";
 
 async function logoutRequest(base: string): Promise<void> {
-  const res = await fetch(`${base}/auth/logout`, { method: "POST", credentials: "include" });
+  const res = await fetch(`${base}/auth/logout`, mergeProductSessionAuth({ method: "POST" }));
   if (!res.ok && res.status !== 204) {
     throw new Error(`HTTP ${res.status}`);
   }
@@ -16,14 +17,12 @@ export default function RequireAuth() {
   const qc = useQueryClient();
   const loc = useLocation();
   const navigate = useNavigate();
-  const me = useQuery({
-    queryKey: ["me", apiBase],
-    queryFn: () => fetchMe(apiBase),
-  });
+  const me = useProductMeQuery(apiBase);
 
   const lo = useMutation({
     mutationFn: () => logoutRequest(apiBase),
     onSuccess: async () => {
+      setStoredSessionToken(null);
       void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
       void qc.removeQueries({ queryKey: ["connectors", apiBase] });
       await qc.invalidateQueries({ queryKey: ["me", apiBase] });

@@ -1,4 +1,5 @@
 import { readErrorDetail } from "./canonicalApi";
+import { mergeProductSessionAuth } from "./sessionToken";
 
 export type OnboardingStep =
   | "CHAT_PROFILE"
@@ -42,7 +43,7 @@ export type OnboardingStatePayload = {
 };
 
 export async function fetchOnboarding(base: string): Promise<OnboardingStatePayload> {
-  const res = await fetch(`${base}/onboarding`, { credentials: "include" });
+  const res = await fetch(`${base}/onboarding`, mergeProductSessionAuth());
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
@@ -51,10 +52,7 @@ export async function fetchOnboarding(base: string): Promise<OnboardingStatePayl
 
 /** Hard reset: clears persisted chat and answers; connectors stay connected. */
 export async function postRestartOnboarding(base: string): Promise<OnboardingStatePayload> {
-  const res = await fetch(`${base}/onboarding/restart`, {
-    method: "POST",
-    credentials: "include",
-  });
+  const res = await fetch(`${base}/onboarding/restart`, mergeProductSessionAuth({ method: "POST" }));
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
@@ -65,12 +63,14 @@ export async function patchOnboarding(
   base: string,
   body: { current_step?: string; answers?: Record<string, unknown> },
 ): Promise<OnboardingStatePayload> {
-  const res = await fetch(`${base}/onboarding`, {
-    method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const res = await fetch(
+    `${base}/onboarding`,
+    mergeProductSessionAuth({
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
@@ -86,12 +86,14 @@ export async function postOnboardingChat(
   step: string;
   answers: Record<string, unknown>;
 }> {
-  const res = await fetch(`${base}/onboarding/chat`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const res = await fetch(
+    `${base}/onboarding/chat`,
+    mergeProductSessionAuth({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
@@ -104,7 +106,7 @@ export async function postOnboardingChat(
 }
 
 export async function fetchSlackWorkspaceMembers(base: string): Promise<SlackWorkspaceMember[]> {
-  const res = await fetch(`${base}/onboarding/slack-members`, { credentials: "include" });
+  const res = await fetch(`${base}/onboarding/slack-members`, mergeProductSessionAuth());
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
@@ -113,10 +115,7 @@ export async function fetchSlackWorkspaceMembers(base: string): Promise<SlackWor
 }
 
 export async function completeOnboarding(base: string): Promise<{ status: string; current_step: string; completed_at: string }> {
-  const res = await fetch(`${base}/onboarding/complete`, {
-    method: "POST",
-    credentials: "include",
-  });
+  const res = await fetch(`${base}/onboarding/complete`, mergeProductSessionAuth({ method: "POST" }));
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { readErrorDetail } from "../../lib/canonicalApi";
 import { productApiBase } from "../../lib/meApi";
+import { mergeProductSessionAuth } from "../../lib/sessionToken";
 
 type GithubDetails = {
   connection_id: string | null;
@@ -85,7 +86,7 @@ const CATALOG: { category: string; items: CatalogItem[] }[] = [
 ];
 
 async function fetchConnectors(base: string): Promise<ConnectorsResponse> {
-  const res = await fetch(`${base}/connectors`, { credentials: "include" });
+  const res = await fetch(`${base}/connectors`, mergeProductSessionAuth());
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
@@ -93,10 +94,7 @@ async function fetchConnectors(base: string): Promise<ConnectorsResponse> {
 }
 
 async function disconnectProvider(base: string, provider: string): Promise<void> {
-  const res = await fetch(`${base}/connectors/${provider}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
+  const res = await fetch(`${base}/connectors/${provider}`, mergeProductSessionAuth({ method: "DELETE" }));
   if (!res.ok && res.status !== 204) {
     throw new Error(await readErrorDetail(res));
   }

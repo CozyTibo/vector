@@ -1,11 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import {
   landingAccentText,
   landingSubtleLineH,
 } from "../../components/landing/landingBrandPalette";
-import { fetchMe, productApiBase } from "../../lib/meApi";
+import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
 const CONNECTOR_LABELS: Record<string, string> = {
   github: "GitHub",
@@ -40,10 +39,7 @@ function formatMembershipRole(role: string): string {
 
 export default function AppHomePage() {
   const apiBase = productApiBase();
-  const me = useQuery({
-    queryKey: ["me", apiBase],
-    queryFn: () => fetchMe(apiBase),
-  });
+  const me = useProductMeQuery(apiBase);
 
   const connected = me.data?.connected_connectors ?? [];
 

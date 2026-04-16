@@ -1,10 +1,11 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { VectorLandingBody } from "../components/landing/VectorLandingBody.tsx";
 import MarketingLayout from "../components/marketing/MarketingLayout.tsx";
-import { fetchMe, productApiBase, signedInDestination } from "../lib/meApi.ts";
+import { fetchMe, productApiBase, signedInDestination, useProductMeQuery } from "../lib/meApi.ts";
+import { consumeSessionTokenFromOAuthRedirect } from "../lib/sessionToken.ts";
 
 const LANDING_SCROLL_KEY = "vector:landing-scroll-y";
 
@@ -13,9 +14,7 @@ export default function LandingPage() {
   const qc = useQueryClient();
   const apiBase = productApiBase();
 
-  const me = useQuery({
-    queryKey: ["me", apiBase],
-    queryFn: () => fetchMe(apiBase),
+  const me = useProductMeQuery(apiBase, {
     staleTime: 5 * 60_000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -27,6 +26,7 @@ export default function LandingPage() {
       return;
     }
     void (async () => {
+      consumeSessionTokenFromOAuthRedirect();
       void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
       void qc.removeQueries({ queryKey: ["connectors", apiBase] });
       await qc.invalidateQueries({ queryKey: ["me", apiBase] });

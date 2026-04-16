@@ -1,5 +1,7 @@
 /** Fetch helpers for Step 3 canonical debug (session cookie or admin Basic). */
 
+import { mergeProductSessionAuth } from "./sessionToken";
+
 export function getApiBase(): string {
   const raw = import.meta.env.VITE_API_BASE_URL;
   if (typeof raw !== "string" || !raw.trim()) {
@@ -30,7 +32,7 @@ function canonicalPrefix(c: CanonicalClient): string {
 
 function fetchInit(c: CanonicalClient, init?: RequestInit): RequestInit {
   if (c.kind === "session") {
-    return { ...init, credentials: "include" };
+    return mergeProductSessionAuth(init);
   }
   const u = c.basicUser ?? "admin";
   const headers = new Headers(init?.headers);

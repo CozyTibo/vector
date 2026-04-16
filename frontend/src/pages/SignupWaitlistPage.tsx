@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import MarketingLayout from "../components/marketing/MarketingLayout";
@@ -9,10 +9,11 @@ import {
   marketingCardLg,
   marketingKicker,
 } from "../components/marketing/marketingStyles";
-import { fetchMe, productApiBase, signedInDestination } from "../lib/meApi";
+import { productApiBase, signedInDestination, useProductMeQuery } from "../lib/meApi";
+import { mergeProductSessionAuth, setStoredSessionToken } from "../lib/sessionToken";
 
 async function logoutRequest(base: string): Promise<void> {
-  const res = await fetch(`${base}/auth/logout`, { method: "POST", credentials: "include" });
+  const res = await fetch(`${base}/auth/logout`, mergeProductSessionAuth({ method: "POST" }));
   if (!res.ok && res.status !== 204) {
     throw new Error(`HTTP ${res.status}`);
   }
@@ -22,9 +23,7 @@ export default function SignupWaitlistPage() {
   const apiBase = productApiBase();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const me = useQuery({
-    queryKey: ["me", apiBase],
-    queryFn: () => fetchMe(apiBase),
+  const me = useProductMeQuery(apiBase, {
     refetchInterval: (q) => {
       const d = q.state.data;
       return d && d.workspace_access_enabled === false ? 30_000 : false;
@@ -34,6 +33,7 @@ export default function SignupWaitlistPage() {
   const lo = useMutation({
     mutationFn: () => logoutRequest(apiBase),
     onSuccess: async () => {
+      setStoredSessionToken(null);
       void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
       void qc.removeQueries({ queryKey: ["connectors", apiBase] });
       await qc.invalidateQueries({ queryKey: ["me", apiBase] });

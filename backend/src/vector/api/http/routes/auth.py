@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse, Response
@@ -52,7 +53,7 @@ def register_email_password(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(e)) from e
     except WeakPasswordError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
-    resp = JSONResponse(content=AuthOkResponse().model_dump())
+    resp = JSONResponse(content=AuthOkResponse(session_token=token).model_dump())
     set_session_cookie(resp, settings, token, request=request)
     return resp
 
@@ -73,7 +74,7 @@ def login_email_password(
         )
     except InvalidCredentialsError as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(e)) from e
-    resp = JSONResponse(content=AuthOkResponse().model_dump())
+    resp = JSONResponse(content=AuthOkResponse(session_token=token).model_dump())
     set_session_cookie(resp, settings, token, request=request)
     return resp
 
@@ -123,7 +124,9 @@ def google_oauth_callback(
     except GoogleOAuthError:
         dest = f"{front}/?oauth_error=token"
         return RedirectResponse(url=dest, status_code=status.HTTP_302_FOUND)
-    response = RedirectResponse(url=f"{front}/?oauth_ok=1", status_code=status.HTTP_302_FOUND)
+    # Fragment: SPA can persist JWT when session cookie is not stored (cross-site / ITP).
+    dest = f"{front}/?oauth_ok=1#st={quote(token, safe='')}"
+    response = RedirectResponse(url=dest, status_code=status.HTTP_302_FOUND)
     set_session_cookie(response, settings, token, request=request)
     response.delete_cookie(key=settings.oauth_state_cookie_name, path="/")
     return response

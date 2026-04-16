@@ -34,7 +34,7 @@ import {
   type OnboardingStatePayload,
   type OnboardingStep,
 } from "../../lib/onboardingApi";
-import { fetchMe, productApiBase } from "../../lib/meApi";
+import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
 /** Branded opening copy (display only; FSM still driven by the bootstrap chat response). */
 const ONBOARDING_OPENING_MESSAGE = `Hey! I'm Vector, your execution manager.
@@ -258,10 +258,7 @@ export default function OnboardingPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
-  const me = useQuery({
-    queryKey: ["me", apiBase],
-    queryFn: () => fetchMe(apiBase),
-  });
+  const me = useProductMeQuery(apiBase);
   const tenantId = me.data?.tenant_id;
 
   const ob = useQuery({

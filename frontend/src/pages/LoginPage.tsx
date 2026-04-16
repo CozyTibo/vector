@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
@@ -16,7 +16,8 @@ import {
 } from "../components/marketing/marketingStyles";
 import { SHOW_GOOGLE_OAUTH } from "../lib/authUi";
 import { readErrorDetail } from "../lib/canonicalApi";
-import { fetchMe, productApiBase, signedInDestination } from "../lib/meApi";
+import { productApiBase, signedInDestination, useProductMeQuery } from "../lib/meApi";
+import { getStoredSessionToken, setStoredSessionToken } from "../lib/sessionToken";
 
 export default function LoginPage() {
   const apiBase = productApiBase();
@@ -29,10 +30,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
-  const already = useQuery({
-    queryKey: ["me", apiBase],
-    queryFn: () => fetchMe(apiBase),
-  });
+  const already = useProductMeQuery(apiBase);
 
   const login = useMutation({
     mutationFn: async () => {
@@ -44,6 +42,15 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         throw new Error(await readErrorDetail(res));
+      }
+      const body = (await res.json()) as { session_token?: string | null };
+      if (body.session_token) {
+        setStoredSessionToken(body.session_token);
+        if (!getStoredSessionToken()) {
+          throw new Error(
+            "Your browser blocked saving the session. Allow site data for this site and try again.",
+          );
+        }
       }
     },
     onSuccess: async () => {

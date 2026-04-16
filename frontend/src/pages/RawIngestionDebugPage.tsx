@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
+import { mergeProductSessionAuth } from "../lib/sessionToken";
+
 async function readErrorDetail(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as { detail?: string | unknown };
@@ -32,7 +34,7 @@ export default function RawIngestionDebugPage() {
     queryFn: async () => {
       const res = await fetch(
         `${apiBase}/debug/connectors/${encodeURIComponent(connector)}/connections/${encodeURIComponent(connectionId)}/raw-records/${encodeURIComponent(recordId)}`,
-        { credentials: "include" },
+        mergeProductSessionAuth(),
       );
       if (res.status === 401) {
         throw new Error("Not signed in");

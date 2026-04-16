@@ -1,4 +1,13 @@
+import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
+
 import { getApiBase } from "./canonicalApi";
+import {
+  getSessionAuthSlot,
+  mergeProductSessionAuth,
+  setStoredSessionToken,
+  subscribeSessionToken,
+} from "./sessionToken";
 
 export type MeResponse = {
   user_id: string;
@@ -28,8 +37,18 @@ export function signedInDestination(me: MeResponse): string {
 }
 
 export async function fetchMe(base: string): Promise<MeResponse | null> {
-  const res = await fetch(`${base}/me`, { credentials: "include" });
-  if (res.status === 401 || res.status === 403) {
+  const init = mergeProductSessionAuth();
+  const hadBearer = Boolean(
+    new Headers(init.headers).get("Authorization")?.toLowerCase().startsWith("bearer "),
+  );
+  const res = await fetch(`${base}/me`, init);
+  if (res.status === 401) {
+    if (hadBearer) {
+      setStoredSessionToken(null);
+    }
+    return null;
+  }
+  if (res.status === 403) {
     return null;
   }
   if (!res.ok) {
@@ -40,4 +59,19 @@ export async function fetchMe(base: string): Promise<MeResponse | null> {
 
 export function productApiBase(): string {
   return getApiBase();
+}
+
+type MeQueryOpts = Omit<UseQueryOptions<MeResponse | null, Error>, "queryKey" | "queryFn">;
+
+/**
+ * Session-aware `/me` query: key includes whether a bearer token is stored so React Query refetches
+ * immediately after login/register (cookie alone is unreliable cross-site on mobile).
+ */
+export function useProductMeQuery(apiBase: string, options?: MeQueryOpts) {
+  const authSlot = useSyncExternalStore(subscribeSessionToken, getSessionAuthSlot, getSessionAuthSlot);
+  return useQuery({
+    queryKey: ["me", apiBase, authSlot],
+    queryFn: () => fetchMe(apiBase),
+    ...options,
+  });
 }

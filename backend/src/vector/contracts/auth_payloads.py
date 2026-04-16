@@ -19,3 +19,7 @@ class LoginRequest(BaseModel):
 
 class AuthOkResponse(BaseModel):
     status: str = "ok"
+    session_token: str | None = Field(
+        default=None,
+        description="Session JWT; use Authorization Bearer when cross-site cookies fail.",
+    )
