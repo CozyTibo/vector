@@ -23,6 +23,7 @@ def test_hard_delete_tenant_removes_tenant_and_membership(db_session: Session) -
         email_domain="example.com",
         slug=f"wipe-{uuid.uuid4().hex[:10]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant])
     db_session.flush()

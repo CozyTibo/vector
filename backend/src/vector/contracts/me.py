@@ -32,3 +32,10 @@ class MeResponse(BaseModel):
             "UI may gate local-only flows (e.g. onboarding sync against the mock stack)."
         ),
     )
+    workspace_access_enabled: bool = Field(
+        default=False,
+        description=(
+            "When false, the workspace is on the waitlist: product UI shows the thank-you state "
+            "until an operator enables access in admin."
+        ),
+    )

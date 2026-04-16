@@ -38,6 +38,7 @@ def test_pr_contains_commit_edge(db_session: Session) -> None:
             email_domain="example.com",
             slug=f"t-{suffix}",
             status="active",
+            workspace_access_enabled=True,
         ),
     )
     db_session.add(

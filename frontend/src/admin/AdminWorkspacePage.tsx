@@ -15,6 +15,7 @@ type TenantDetail = {
   id: string;
   company_name: string;
   created_at: string;
+  workspace_access_enabled: boolean;
   onboarding: OnboardingBrief;
   member_full_name: string | null;
   member_email: string | null;
@@ -78,6 +79,24 @@ export default function AdminWorkspacePage() {
     enabled: Boolean(tenantId),
   });
 
+  const workspaceAccessMut = useMutation({
+    mutationFn: async (workspace_access_enabled: boolean) => {
+      const res = await adminFetch(`/admin/tenants/${tenantId}/workspace-access`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace_access_enabled }),
+      });
+      if (!res.ok) {
+        throw new Error(await readErrorDetail(res));
+      }
+      return res.json() as Promise<unknown>;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin-tenant", tenantId] });
+      void qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    },
+  });
+
   const slackPauseMut = useMutation({
     mutationFn: async (slack_vector_paused: boolean) => {
       const res = await adminFetch(`/admin/tenants/${tenantId}/manager-onboarding/slack-policy`, {
@@ -116,6 +135,12 @@ export default function AdminWorkspacePage() {
     (t.slack_vector_paused
       ? "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800"
       : "border-amber-700 bg-amber-600 text-white hover:bg-amber-700");
+
+  const accessBtn =
+    "rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50 " +
+    (t.workspace_access_enabled
+      ? "border-amber-700 bg-amber-600 text-white hover:bg-amber-700"
+      : "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800");
 
   const ob = t.onboarding;
   const websiteObBadge = !ob ? "Not started" : `${ob.status} · ${ob.current_step}`;
@@ -195,6 +220,34 @@ export default function AdminWorkspacePage() {
 
       {/* Info tiles: 3 across on xl; connectors full width below */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3 xl:gap-2 xl:items-stretch">
+        <Tile title="Product access">
+          <div className="flex flex-wrap gap-1.5">
+            <StatusBadge tone={t.workspace_access_enabled ? "ok" : "warn"}>
+              {t.workspace_access_enabled ? "Active" : "Waitlist"}
+            </StatusBadge>
+          </div>
+          <p className="mt-2 text-xs text-stone-600">
+            {t.workspace_access_enabled
+              ? "Members can use the app and website onboarding."
+              : "Signed-in members only see the waitlist thank-you page until you activate this workspace."}
+          </p>
+          {workspaceAccessMut.isError ? (
+            <p className="mt-2 text-xs text-red-700">{(workspaceAccessMut.error as Error).message}</p>
+          ) : null}
+          <button
+            type="button"
+            className={`mt-3 w-fit ${accessBtn}`}
+            disabled={workspaceAccessMut.isPending}
+            onClick={() => workspaceAccessMut.mutate(!t.workspace_access_enabled)}
+          >
+            {workspaceAccessMut.isPending
+              ? "Updating…"
+              : t.workspace_access_enabled
+                ? "Move workspace to waitlist (deactivate)"
+                : "Activate workspace for product access"}
+          </button>
+        </Tile>
+
         <Tile title="Company & contact">
           <p className="font-medium text-stone-900">{t.company_name}</p>
           <p className="mt-1 text-xs text-stone-600">

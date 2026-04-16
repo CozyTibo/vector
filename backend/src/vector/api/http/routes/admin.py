@@ -10,11 +10,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
+from vector.api.http.deps import get_db, settings_dep
 from vector.api.http.routes.admin_manager_onboarding import (
     build_admin_manager_onboarding_router,
     build_admin_manager_onboarding_tenant_router,
 )
-from vector.api.http.deps import get_db, settings_dep
 from vector.api.http.serialization import orm_to_dict
 from vector.application.services import connector_sync
 from vector.contracts.admin import (
@@ -27,6 +27,7 @@ from vector.contracts.admin import (
     AdminStep2ProjectionsResetResponse,
     AdminStep3CanonicalResetRequest,
     AdminStep3CanonicalResetResponse,
+    AdminTenantWorkspaceAccessRequest,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
     RawIngestionAdminDetail,
@@ -260,6 +261,7 @@ def build_admin_router() -> APIRouter:
                     id=t.id,
                     company_name=t.company_name,
                     created_at=t.created_at,
+                    workspace_access_enabled=bool(t.workspace_access_enabled),
                     onboarding_status=ob.status if ob else None,
                     onboarding_current_step=ob.current_step if ob else None,
                     connected_connectors=[c.provider for c in conns],
@@ -337,6 +339,37 @@ def build_admin_router() -> APIRouter:
             id=t.id,
             company_name=t.company_name,
             created_at=t.created_at,
+            workspace_access_enabled=bool(t.workspace_access_enabled),
+            onboarding=_snapshot_from_onboarding(db, ob),
+            member_full_name=member.full_name if member else None,
+            member_email=member.email if member else None,
+            connected_connectors=[c.provider for c in conns],
+            slack_vector_paused=bool(t.slack_vector_paused),
+        )
+
+    @r.patch(
+        "/tenants/{tenant_id}/workspace-access",
+        response_model=TenantAdminDetailResponse,
+    )
+    def set_tenant_workspace_access(
+        tenant_id: uuid.UUID,
+        body: AdminTenantWorkspaceAccessRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> TenantAdminDetailResponse:
+        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
+        if t is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        t.workspace_access_enabled = body.workspace_access_enabled
+        db.commit()
+        db.refresh(t)
+        ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
+        conns = dbg.list_tenant_connections_for_tenant(db, tenant_id=tenant_id)
+        member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
+        return TenantAdminDetailResponse(
+            id=t.id,
+            company_name=t.company_name,
+            created_at=t.created_at,
+            workspace_access_enabled=bool(t.workspace_access_enabled),
             onboarding=_snapshot_from_onboarding(db, ob),
             member_full_name=member.full_name if member else None,
             member_email=member.email if member else None,

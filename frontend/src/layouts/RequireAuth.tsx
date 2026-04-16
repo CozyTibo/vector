@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import PublicNav from "../components/PublicNav";
 import { fetchMe, productApiBase } from "../lib/meApi";
@@ -15,6 +15,7 @@ export default function RequireAuth() {
   const apiBase = productApiBase();
   const qc = useQueryClient();
   const loc = useLocation();
+  const navigate = useNavigate();
   const me = useQuery({
     queryKey: ["me", apiBase],
     queryFn: () => fetchMe(apiBase),
@@ -22,10 +23,11 @@ export default function RequireAuth() {
 
   const lo = useMutation({
     mutationFn: () => logoutRequest(apiBase),
-    onSuccess: () => {
+    onSuccess: async () => {
       void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
       void qc.removeQueries({ queryKey: ["connectors", apiBase] });
-      void qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      navigate("/", { replace: true });
     },
   });
 
@@ -42,6 +44,10 @@ export default function RequireAuth() {
 
   if (!me.data) {
     return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+  }
+
+  if (me.data.workspace_access_enabled === false) {
+    return <Navigate to="/signup/waitlist" replace />;
   }
 
   const onOnboardingRoute = loc.pathname === "/app/onboarding" || loc.pathname.startsWith("/app/onboarding/");

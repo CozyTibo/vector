@@ -15,5 +15,5 @@ def test_gpt4o_passes_requested_temperature() -> None:
 
 def test_gpt5_higher_completion_cap() -> None:
     assert manager_onboarding_completion_cap("gpt-5-mini", interpret=True) == 4096
-    assert manager_onboarding_completion_cap("gpt-5-mini", interpret=False) == 2048
+    assert manager_onboarding_completion_cap("gpt-5-mini", interpret=False) == 3072
     assert manager_onboarding_completion_cap("gpt-4o-mini", interpret=True) == 900

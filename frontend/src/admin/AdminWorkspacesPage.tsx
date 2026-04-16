@@ -9,6 +9,7 @@ type TenantRow = {
   id: string;
   company_name: string;
   created_at: string;
+  workspace_access_enabled: boolean;
   onboarding_status: string | null;
   onboarding_current_step: string | null;
   connected_connectors: string[];
@@ -51,9 +52,14 @@ export default function AdminWorkspacesPage() {
                   <h3 className="text-lg font-semibold text-stone-900 group-hover:text-blue-800">
                     {t.company_name}
                   </h3>
-                  <StatusBadge tone={t.connected_connectors.length ? "ok" : "neutral"}>
-                    {t.connected_connectors.length ? "Connected" : "No connectors"}
-                  </StatusBadge>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <StatusBadge tone={t.workspace_access_enabled ? "ok" : "warn"}>
+                      {t.workspace_access_enabled ? "Active" : "Waitlist"}
+                    </StatusBadge>
+                    <StatusBadge tone={t.connected_connectors.length ? "ok" : "neutral"}>
+                      {t.connected_connectors.length ? "Connected" : "No connectors"}
+                    </StatusBadge>
+                  </div>
                 </div>
                 <p className="mt-2 text-sm text-stone-600">
                   Onboarding: {t.onboarding_status ?? "—"}

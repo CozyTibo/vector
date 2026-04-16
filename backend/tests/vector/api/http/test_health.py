@@ -42,6 +42,7 @@ def test_ready_returns_database_failed_when_db_unreachable(
             return _BadConn()
 
     monkeypatch.setattr(health_routes, "get_engine", lambda: _BadEngine())
+    monkeypatch.delenv("REDIS_URL", raising=False)
 
     client = TestClient(app)
     response = client.get("/ready")

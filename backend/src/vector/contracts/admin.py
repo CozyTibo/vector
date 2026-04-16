@@ -33,6 +33,7 @@ class TenantListItem(BaseModel):
     id: uuid.UUID
     company_name: str
     created_at: datetime
+    workspace_access_enabled: bool = False
     onboarding_status: str | None = None
     onboarding_current_step: str | None = None
     connected_connectors: list[str] = Field(default_factory=list)
@@ -100,6 +101,7 @@ class TenantAdminDetailResponse(BaseModel):
     id: uuid.UUID
     company_name: str
     created_at: datetime
+    workspace_access_enabled: bool = False
     onboarding: OnboardingAdminSnapshot | None = None
     member_full_name: str | None = Field(
         default=None,
@@ -112,8 +114,17 @@ class TenantAdminDetailResponse(BaseModel):
     connected_connectors: list[str] = Field(default_factory=list)
     slack_vector_paused: bool = Field(
         default=False,
-        description="When true, Vector skips outbound Slack sends for this tenant (including manager onboarding DMs).",
+        description=(
+            "When true, Vector skips outbound Slack sends for this tenant "
+            "(including manager onboarding DMs)."
+        ),
     )
+
+
+class AdminTenantWorkspaceAccessRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    workspace_access_enabled: bool
 
 
 class TenantConnectionAdminItem(BaseModel):

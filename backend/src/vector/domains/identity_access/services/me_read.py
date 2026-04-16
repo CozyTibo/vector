@@ -48,4 +48,5 @@ def build_me_response(session: Session, claims: SessionClaims) -> MeResponse:
         onboarding_completed=onboarding_completed,
         connected_connectors=connected,
         use_mock_connectors=use_mock,
+        workspace_access_enabled=bool(tenant.workspace_access_enabled),
     )

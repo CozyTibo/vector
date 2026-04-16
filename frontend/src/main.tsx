@@ -41,6 +41,7 @@ import LoginPage from "./pages/LoginPage.tsx";
 import ProjectionDebugPage from "./pages/ProjectionDebugPage.tsx";
 import RawIngestionDebugPage from "./pages/RawIngestionDebugPage.tsx";
 import SignupPage from "./pages/SignupPage.tsx";
+import SignupWaitlistPage from "./pages/SignupWaitlistPage.tsx";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -60,6 +61,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/signup/waitlist" element={<SignupWaitlistPage />} />
 
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<AppHomePage />} />

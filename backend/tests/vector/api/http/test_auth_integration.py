@@ -74,6 +74,7 @@ def test_google_oauth_flow_creates_tenant_and_session(
     assert body.get("onboarding_completed") is False
     assert body.get("connected_connectors") == []
     assert body.get("use_mock_connectors") is False
+    assert body.get("workspace_access_enabled") is False
 
 
 def test_me_rejects_session_for_wrong_tenant(
@@ -92,6 +93,7 @@ def test_me_rejects_session_for_wrong_tenant(
         email_domain="x.example",
         slug=f"a-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     tenant_b = Tenant(
         company_name="B",
@@ -99,6 +101,7 @@ def test_me_rejects_session_for_wrong_tenant(
         email_domain="x.example",
         slug=f"b-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant_a, tenant_b])
     db_session.flush()
@@ -133,6 +136,7 @@ def test_register_and_login_with_password(client: TestClient) -> None:
     assert body.get("onboarding_completed") is False
     assert body.get("connected_connectors") == []
     assert body.get("use_mock_connectors") is False
+    assert body.get("workspace_access_enabled") is False
 
     out = client.post("/auth/logout")
     assert out.status_code == 204

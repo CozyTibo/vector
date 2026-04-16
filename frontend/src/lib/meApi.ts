@@ -1,6 +1,6 @@
 import { getApiBase } from "./canonicalApi";
 
-type MeResponse = {
+export type MeResponse = {
   user_id: string;
   email: string;
   full_name: string | null;
@@ -14,7 +14,18 @@ type MeResponse = {
   connected_connectors?: string[];
   /** True when backend uses local mock GitHub/Linear URLs (development only). */
   use_mock_connectors?: boolean;
+  /** False = waitlist: no product shell until an operator enables the workspace. */
+  workspace_access_enabled?: boolean;
 };
+
+/** Where to send a signed-in user (landing after OAuth, login, signup, waitlist unlock). */
+export function signedInDestination(me: MeResponse): string {
+  if (me.workspace_access_enabled === false) {
+    return "/signup/waitlist";
+  }
+  const mustFinishOnboarding = "onboarding_completed" in me && me.onboarding_completed !== true;
+  return mustFinishOnboarding ? "/app/onboarding" : "/app";
+}
 
 export async function fetchMe(base: string): Promise<MeResponse | null> {
   const res = await fetch(`${base}/me`, { credentials: "include" });

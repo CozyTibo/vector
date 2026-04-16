@@ -4,14 +4,9 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 import { VectorLandingBody } from "../components/landing/VectorLandingBody.tsx";
 import MarketingLayout from "../components/marketing/MarketingLayout.tsx";
-import { fetchMe, productApiBase } from "../lib/meApi.ts";
+import { fetchMe, productApiBase, signedInDestination } from "../lib/meApi.ts";
 
 const LANDING_SCROLL_KEY = "vector:landing-scroll-y";
-
-function signedInDestination(me: NonNullable<Awaited<ReturnType<typeof fetchMe>>>): string {
-  const mustFinishOnboarding = "onboarding_completed" in me && me.onboarding_completed !== true;
-  return mustFinishOnboarding ? "/app/onboarding" : "/app";
-}
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -28,13 +23,17 @@ export default function LandingPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("oauth_ok") === "1") {
+    if (params.get("oauth_ok") !== "1") {
+      return;
+    }
+    void (async () => {
       void qc.removeQueries({ queryKey: ["onboarding", apiBase] });
       void qc.removeQueries({ queryKey: ["connectors", apiBase] });
-      void qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      const fresh = await fetchMe(apiBase);
       window.history.replaceState({}, "", window.location.pathname);
-      navigate("/app", { replace: true });
-    }
+      navigate(fresh ? signedInDestination(fresh) : "/login", { replace: true });
+    })();
   }, [apiBase, navigate, qc]);
 
   const showLanding = !me.isLoading && !me.data;

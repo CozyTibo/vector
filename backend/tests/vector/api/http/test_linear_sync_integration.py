@@ -51,6 +51,7 @@ def _session_user_tenant(
         email_domain="t.example",
         slug=f"l-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant])
     db_session.flush()

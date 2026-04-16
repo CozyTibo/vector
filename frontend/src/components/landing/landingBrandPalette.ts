@@ -2,7 +2,6 @@
  * Lighter marketing accent (replaces legacy deep magenta #C0009A).
  * Keeps headline gradients readable on white while feeling like soft pink.
  */
-export const landingAccentRgb = "232, 120, 190";
 
 /** Thin horizontal rails (tabs, persona card caps) */
 export const landingSubtleLineH =

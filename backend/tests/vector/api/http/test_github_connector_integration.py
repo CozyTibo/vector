@@ -83,6 +83,7 @@ def test_github_status_not_configured(
         email_domain="t.example",
         slug=f"t-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant])
     db_session.flush()
@@ -128,6 +129,7 @@ def test_github_install_redirect_when_configured(
         email_domain="t.example",
         slug=f"t-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant])
     db_session.flush()
@@ -170,6 +172,7 @@ def test_github_install_service_unavailable_when_unconfigured(
         email_domain="t.example",
         slug=f"t-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant])
     db_session.flush()
@@ -210,6 +213,7 @@ def test_github_callback_persists_connection(
         email_domain="t.example",
         slug=f"t-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant])
     db_session.flush()
@@ -292,6 +296,7 @@ def test_disconnect_unknown_provider_returns_404(
         email_domain="t.example",
         slug=f"t-{uuid.uuid4().hex[:8]}",
         status="active",
+        workspace_access_enabled=True,
     )
     db_session.add_all([user, tenant])
     db_session.flush()

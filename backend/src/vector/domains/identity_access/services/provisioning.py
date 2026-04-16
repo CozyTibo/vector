@@ -110,6 +110,7 @@ def _create_tenant_with_owner(
         email_domain=domain,
         slug=slug,
         status="active",
+        workspace_access_enabled=False,
     )
     session.add(tenant)
     session.flush()

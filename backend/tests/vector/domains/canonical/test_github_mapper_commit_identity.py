@@ -32,6 +32,7 @@ def _seed_github_scaffold(db: Session) -> tuple[uuid.UUID, uuid.UUID]:
             email_domain="example.com",
             slug=f"vector-{suffix}",
             status="active",
+            workspace_access_enabled=True,
         ),
     )
     db.add(

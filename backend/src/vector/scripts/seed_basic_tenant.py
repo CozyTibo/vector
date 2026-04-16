@@ -51,6 +51,7 @@ def main() -> None:
             email_domain=domain,
             slug=slug,
             status="active",
+            workspace_access_enabled=True,
         )
         session.add(tenant)
         session.flush()
