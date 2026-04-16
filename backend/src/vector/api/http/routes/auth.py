@@ -34,6 +34,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=AuthOkResponse)
 def register_email_password(
+    request: Request,
     body: RegisterRequest,
     settings: Annotated[Settings, Depends(settings_dep)],
     db: Annotated[Session, Depends(get_db)],
@@ -52,12 +53,13 @@ def register_email_password(
     except WeakPasswordError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     resp = JSONResponse(content=AuthOkResponse().model_dump())
-    set_session_cookie(resp, settings, token)
+    set_session_cookie(resp, settings, token, request=request)
     return resp
 
 
 @router.post("/login", response_model=AuthOkResponse)
 def login_email_password(
+    request: Request,
     body: LoginRequest,
     settings: Annotated[Settings, Depends(settings_dep)],
     db: Annotated[Session, Depends(get_db)],
@@ -72,7 +74,7 @@ def login_email_password(
     except InvalidCredentialsError as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=str(e)) from e
     resp = JSONResponse(content=AuthOkResponse().model_dump())
-    set_session_cookie(resp, settings, token)
+    set_session_cookie(resp, settings, token, request=request)
     return resp
 
 
@@ -122,15 +124,16 @@ def google_oauth_callback(
         dest = f"{front}/?oauth_error=token"
         return RedirectResponse(url=dest, status_code=status.HTTP_302_FOUND)
     response = RedirectResponse(url=f"{front}/?oauth_ok=1", status_code=status.HTTP_302_FOUND)
-    set_session_cookie(response, settings, token)
+    set_session_cookie(response, settings, token, request=request)
     response.delete_cookie(key=settings.oauth_state_cookie_name, path="/")
     return response
 
 
 @router.post("/logout")
 def logout(
+    request: Request,
     settings: Annotated[Settings, Depends(settings_dep)],
 ) -> Response:
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    clear_session_cookie(response, settings)
+    clear_session_cookie(response, settings, request=request)
     return response

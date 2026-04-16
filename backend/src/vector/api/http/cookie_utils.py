@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from starlette.requests import Request
 from starlette.responses import Response
 
 from vector.settings import Settings
@@ -26,9 +27,38 @@ def session_cookie_cross_site(settings: Settings) -> bool:
     return settings.env in ("production", "staging")
 
 
-def set_session_cookie(response: Response, settings: Settings, token: str) -> None:
+def request_indicates_https(request: Request | None) -> bool:
+    """True when the inbound request is HTTPS (direct TLS or behind TLS-terminating proxy)."""
+    if request is None:
+        return False
+    forwarded = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    if forwarded == "https":
+        return True
+    return request.url.scheme == "https"
+
+
+def _effective_cross_site(settings: Settings, request: Request | None) -> bool:
+    """
+    SameSite=None + Secure must not be emitted over plain HTTP: mobile and desktop
+    browsers will drop the Set-Cookie, so login/register appear to succeed in the DB
+    but ``/me`` stays anonymous.
+    """
     cross = session_cookie_cross_site(settings)
-    # SameSite=None is ignored unless Secure is true (HTTPS).
+    if not cross:
+        return False
+    if not request_indicates_https(request):
+        return False
+    return True
+
+
+def set_session_cookie(
+    response: Response,
+    settings: Settings,
+    token: str,
+    *,
+    request: Request | None = None,
+) -> None:
+    cross = _effective_cross_site(settings, request)
     response.set_cookie(
         key=settings.session_cookie_name,
         value=token,
@@ -40,9 +70,14 @@ def set_session_cookie(response: Response, settings: Settings, token: str) -> No
     )
 
 
-def clear_session_cookie(response: Response, settings: Settings) -> None:
+def clear_session_cookie(
+    response: Response,
+    settings: Settings,
+    *,
+    request: Request | None = None,
+) -> None:
     """Clear session cookie with attributes matching :func:`set_session_cookie`."""
-    cross = session_cookie_cross_site(settings)
+    cross = _effective_cross_site(settings, request)
     response.delete_cookie(
         key=settings.session_cookie_name,
         path="/",
