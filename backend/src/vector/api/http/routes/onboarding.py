@@ -19,12 +19,26 @@ from vector.contracts.onboarding import (
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
-from vector.domains.onboarding import onboarding_commands as ob_commands
 from vector.domains.onboarding.errors import (
     InvalidOnboardingStepError,
     OnboardingAlreadyCompletedError,
     SlackMembersLoadError,
     SlackNotConnectedForWorkspaceError,
+)
+from vector.domains.onboarding.onboarding_commands import (
+    complete_onboarding as ob_complete_onboarding,
+)
+from vector.domains.onboarding.onboarding_commands import (
+    get_onboarding_state as ob_get_onboarding_state,
+)
+from vector.domains.onboarding.onboarding_commands import (
+    list_slack_workspace_members_for_onboarding as ob_list_slack_workspace_members,
+)
+from vector.domains.onboarding.onboarding_commands import (
+    patch_onboarding as ob_patch_onboarding,
+)
+from vector.domains.onboarding.onboarding_commands import (
+    restart_onboarding as ob_restart_onboarding,
 )
 from vector.domains.onboarding.onboarding_service import process_onboarding_chat
 
@@ -41,7 +55,7 @@ def build_onboarding_router() -> APIRouter:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-        return ob_commands.get_onboarding_state(db, claims)
+        return ob_get_onboarding_state(db, claims)
 
     @r.post("/restart", response_model=OnboardingGetResponse)
     def restart_onboarding(
@@ -52,7 +66,7 @@ def build_onboarding_router() -> APIRouter:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-        return ob_commands.restart_onboarding(db, claims)
+        return ob_restart_onboarding(db, claims)
 
     @r.patch("", response_model=OnboardingGetResponse)
     def patch_onboarding(
@@ -65,7 +79,7 @@ def build_onboarding_router() -> APIRouter:
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         try:
-            return ob_commands.patch_onboarding(db, claims, body)
+            return ob_patch_onboarding(db, claims, body)
         except OnboardingAlreadyCompletedError as e:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
@@ -99,7 +113,7 @@ def build_onboarding_router() -> APIRouter:
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         try:
-            return ob_commands.list_slack_workspace_members_for_onboarding(db, claims)
+            return ob_list_slack_workspace_members(db, claims)
         except SlackNotConnectedForWorkspaceError:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -120,6 +134,6 @@ def build_onboarding_router() -> APIRouter:
             assert_membership(db, claims)
         except NoMembershipError as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
-        return ob_commands.complete_onboarding(db, claims)
+        return ob_complete_onboarding(db, claims)
 
     return r
