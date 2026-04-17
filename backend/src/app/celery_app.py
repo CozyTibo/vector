@@ -7,15 +7,35 @@ import os
 
 from celery import Celery
 
+
+def _redis_url_for_celery(url: str) -> str:
+    """Normalize Redis URL for Celery.
+
+    Celery's Redis SSL backend requires ``ssl_cert_reqs`` on ``rediss://`` URLs
+    (see ``celery/backends/redis.py``).
+    """
+    stripped = url.strip()
+    if not stripped.lower().startswith("rediss://"):
+        return stripped
+    if "ssl_cert_reqs=" in stripped.lower():
+        return stripped
+    sep = "&" if "?" in stripped else "?"
+    # ElastiCache / many managed TLS Redis: skip CA verification unless you pin a CA.
+    # Override by adding ``ssl_cert_reqs=CERT_REQUIRED`` (or ``required``) to ``REDIS_URL``.
+    return f"{stripped}{sep}ssl_cert_reqs=CERT_NONE"
+
+
 # Default for local dev when REDIS_URL is unset (Docker Compose sets it explicitly).
-_redis = os.environ.get("REDIS_URL", "").strip() or "redis://127.0.0.1:6379/0"
+_broker = _redis_url_for_celery(os.environ.get("REDIS_URL", "").strip() or "redis://127.0.0.1:6379/0")
+_backend_raw = os.environ.get("CELERY_RESULT_BACKEND", "").strip()
+_backend = _redis_url_for_celery(_backend_raw) if _backend_raw else _broker
 
 # Name is `celery_app`, not `app`, so a future `import app.tasks…` at module level cannot
 # shadow the Celery instance (that would drop all @app.task registrations).
 celery_app = Celery(
     "vector",
-    broker=_redis,
-    backend=os.environ.get("CELERY_RESULT_BACKEND", _redis),
+    broker=_broker,
+    backend=_backend,
 )
 celery_app.conf.broker_connection_retry_on_startup = True
 celery_app.conf.task_default_queue = "vector"
