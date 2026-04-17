@@ -25,6 +25,30 @@ def _redis_url_for_celery(url: str) -> str:
     return f"{stripped}{sep}ssl_cert_reqs=CERT_NONE"
 
 
+def _patch_rediss_urls_in_environ() -> None:
+    """Celery reads ``CELERY_*`` URLs from ``os.environ`` first (see ``celery.app.utils.Settings``).
+
+    A normalized ``backend=`` / ``broker=`` passed to ``Celery()`` is ignored for
+    ``result_backend`` / ``broker_url`` when the matching env var is set, so we
+    rewrite those env values when they use ``rediss://`` without ``ssl_cert_reqs``.
+    """
+    for key in (
+        "CELERY_RESULT_BACKEND",
+        "CELERY_BROKER_URL",
+        "CELERY_BROKER_READ_URL",
+        "CELERY_BROKER_WRITE_URL",
+        "REDIS_URL",
+    ):
+        raw = os.environ.get(key, "").strip()
+        if not raw:
+            continue
+        normalized = _redis_url_for_celery(raw)
+        if normalized != raw:
+            os.environ[key] = normalized
+
+
+_patch_rediss_urls_in_environ()
+
 # Default for local dev when REDIS_URL is unset (Docker Compose sets it explicitly).
 _broker = _redis_url_for_celery(os.environ.get("REDIS_URL", "").strip() or "redis://127.0.0.1:6379/0")
 _backend_raw = os.environ.get("CELERY_RESULT_BACKEND", "").strip()
