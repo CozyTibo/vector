@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from vector.infrastructure.db.models.identity import UserIdentity
@@ -84,6 +84,48 @@ def list_all_tenants(session: Session, *, limit: int = 500) -> list[Tenant]:
 def list_all_users(session: Session, *, limit: int = 500) -> list[User]:
     stmt = select(User).order_by(User.created_at.desc()).limit(limit)
     return list(session.scalars(stmt).all())
+
+
+def membership_counts_for_user_ids(
+    session: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Row counts in ``tenant_memberships`` per user."""
+    if not user_ids:
+        return {}
+    stmt = (
+        select(TenantMembership.user_id, func.count(TenantMembership.id))
+        .where(TenantMembership.user_id.in_(user_ids))
+        .group_by(TenantMembership.user_id)
+    )
+    rows = session.execute(stmt).all()
+    return {uid: int(n) for uid, n in rows}
+
+
+def tenant_connection_counts_for_connected_user_ids(
+    session: Session, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Counts ``tenant_connections`` rows where ``connected_by_user_id`` is this user."""
+    if not user_ids:
+        return {}
+    stmt = (
+        select(TenantConnection.connected_by_user_id, func.count(TenantConnection.id))
+        .where(TenantConnection.connected_by_user_id.in_(user_ids))
+        .group_by(TenantConnection.connected_by_user_id)
+    )
+    rows = session.execute(stmt).all()
+    return {uid: int(n) for uid, n in rows}
+
+
+def count_memberships_for_user(session: Session, user_id: uuid.UUID) -> int:
+    stmt = select(func.count(TenantMembership.id)).where(TenantMembership.user_id == user_id)
+    return int(session.scalar(stmt) or 0)
+
+
+def count_tenant_connections_for_connected_user(session: Session, user_id: uuid.UUID) -> int:
+    stmt = select(func.count(TenantConnection.id)).where(
+        TenantConnection.connected_by_user_id == user_id
+    )
+    return int(session.scalar(stmt) or 0)
 
 
 def list_connected_connector_providers(session: Session, tenant_id: uuid.UUID) -> list[str]:

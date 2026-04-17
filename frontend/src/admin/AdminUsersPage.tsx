@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { adminJson } from "../lib/adminFetch";
+import AdminUserHardDelete from "./AdminUserHardDelete";
+import AdminFeedbackBanner from "./ui/AdminFeedbackBanner";
 import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
+
+type AdminFlash = { kind: "success" | "error"; text: string };
 
 type UserRow = {
   id: string;
@@ -9,9 +14,13 @@ type UserRow = {
   full_name: string | null;
   created_at: string;
   has_password: boolean;
+  membership_count: number;
+  tenant_connections_as_connector_count: number;
+  orphan_eligible: boolean;
 };
 
 export default function AdminUsersPage() {
+  const [flash, setFlash] = useState<AdminFlash | null>(null);
   const q = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => adminJson<{ items: UserRow[] }>("/admin/users"),
@@ -28,9 +37,18 @@ export default function AdminUsersPage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      {flash ? (
+        <AdminFeedbackBanner
+          kind={flash.kind}
+          message={flash.text}
+          onDismiss={() => setFlash(null)}
+        />
+      ) : null}
       <OperatorIntro title="Users">
         All rows in the <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">users</code> table
         (product accounts). Password column is not exposed; “Password” indicates a stored hash exists.
+        If someone has no workspaces and no connector rows (e.g. after a tenant was deleted), you can remove
+        their account from the Actions column.
       </OperatorIntro>
 
       <OperatorSection
@@ -48,12 +66,13 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 font-mono text-[11px] font-normal normal-case text-stone-500">
                   user_id
                 </th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {q.data.items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-stone-500">
+                  <td colSpan={6} className="px-4 py-6 text-center text-stone-500">
                     No users yet.
                   </td>
                 </tr>
@@ -74,6 +93,22 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="max-w-[8rem] truncate px-4 py-2.5 font-mono text-[11px] text-stone-500">
                       {u.id}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right align-middle">
+                      {u.orphan_eligible ? (
+                        <AdminUserHardDelete
+                          userId={u.id}
+                          email={u.email}
+                          onDeleted={({ email }) =>
+                            setFlash({
+                              kind: "success",
+                              text: `Successfully deleted account ${email}.`,
+                            })
+                          }
+                        />
+                      ) : (
+                        <span className="text-xs text-stone-400">—</span>
+                      )}
                     </td>
                   </tr>
                 ))

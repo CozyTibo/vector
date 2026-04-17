@@ -1,29 +1,27 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { adminFetch } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
-import { HARD_DELETE_TENANT_CONFIRMATION_PHRASE } from "./adminConstants";
+import { HARD_DELETE_ORPHAN_USER_CONFIRMATION_PHRASE } from "./adminConstants";
 
 type Props = {
-  tenantId: string;
-  companyName: string;
-  /** Tighter chrome for dashboard grids (workspace tab). */
-  compact?: boolean;
+  userId: string;
+  email: string;
+  /** Called after the server deletes the user (modal closes). */
+  onDeleted?: (info: { email: string }) => void;
 };
 
-export default function AdminTenantHardDelete({ tenantId, companyName, compact = false }: Props) {
-  const navigate = useNavigate();
+export default function AdminUserHardDelete({ userId, email, onDeleted }: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [companyConfirm, setCompanyConfirm] = useState("");
+  const [emailConfirm, setEmailConfirm] = useState("");
   const [phraseConfirm, setPhraseConfirm] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setCompanyConfirm("");
+      setEmailConfirm("");
       setPhraseConfirm("");
       setErr(null);
     }
@@ -31,12 +29,12 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
 
   const deleteMut = useMutation({
     mutationFn: async () => {
-      const res = await adminFetch(`/admin/tenants/${tenantId}/hard-delete`, {
+      const res = await adminFetch(`/admin/users/${userId}/hard-delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           confirmation: phraseConfirm.trim(),
-          company_name_confirmation: companyConfirm.trim(),
+          email_confirmation: emailConfirm.trim(),
         }),
       });
       if (res.status === 401) {
@@ -47,15 +45,9 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
       }
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["admin-tenants"] });
-      navigate("/admin", {
-        state: {
-          adminFlash: {
-            kind: "success" as const,
-            text: `Workspace “${companyName}” was permanently deleted.`,
-          },
-        },
-      });
+      await qc.invalidateQueries({ queryKey: ["admin-users"] });
+      setOpen(false);
+      onDeleted?.({ email });
     },
     onError: (e: unknown) => {
       setErr(e instanceof Error ? e.message : "Delete failed.");
@@ -63,50 +55,17 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
   });
 
   const canSubmit =
-    companyConfirm.trim() === companyName.trim() && phraseConfirm === HARD_DELETE_TENANT_CONFIRMATION_PHRASE;
+    emailConfirm.trim() === email.trim() && phraseConfirm === HARD_DELETE_ORPHAN_USER_CONFIRMATION_PHRASE;
 
   return (
-    <section
-      className={
-        compact
-          ? "rounded-lg border border-red-200 bg-red-50/50 p-3 shadow-sm"
-          : "rounded-xl border border-red-200 bg-red-50/40 p-6 shadow-sm"
-      }
-    >
-      <h2 className={compact ? "text-sm font-semibold text-red-950" : "text-base font-semibold text-red-950"}>
-        Delete this company
-      </h2>
-      <p
-        className={
-          compact
-            ? "mt-1 text-[11px] leading-snug text-red-900/90"
-            : "mt-2 text-sm leading-relaxed text-red-900/90"
-        }
-      >
-        {compact ? (
-          <>
-            Removes <strong>all</strong> workspace data (irreversible). Accounts stay; membership here is
-            removed.
-          </>
-        ) : (
-          <>
-            Permanently remove this workspace and <strong>all</strong> related data (connectors, onboarding,
-            Slack sessions, raw ingestion, projections, canonical graph). User accounts are kept but lose
-            membership here. This cannot be undone.
-          </>
-        )}
-      </p>
+    <>
       <button
         type="button"
-        className={
-          compact
-            ? "mt-2 rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:opacity-50"
-            : "mt-4 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:opacity-50"
-        }
+        className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-900 hover:bg-red-100 disabled:opacity-50"
         disabled={deleteMut.isPending}
         onClick={() => setOpen(true)}
       >
-        Delete company…
+        Delete account…
       </button>
 
       {open ? (
@@ -122,24 +81,24 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
           <div
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-stone-200 bg-white p-6 shadow-xl"
             role="dialog"
-            aria-labelledby="ws-delete-tenant-title"
+            aria-labelledby="admin-delete-user-title"
             aria-modal="true"
           >
-            <h2 id="ws-delete-tenant-title" className="text-lg font-semibold text-stone-900">
-              Delete company permanently
+            <h2 id="admin-delete-user-title" className="text-lg font-semibold text-stone-900">
+              Delete user account permanently
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-stone-700">
-              This removes <span className="font-semibold">{companyName}</span> and all tenant-scoped
-              data. Confirm in two steps below.
+              Only available when the user is not in any workspace and has no connector rows. Removes the
+              account, OAuth identities, and related rows (e.g. onboarding messages) tied to this user.
             </p>
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
               <ol className="list-decimal space-y-1 pl-5">
                 <li>
-                  Type the company name exactly: <span className="font-mono">{companyName}</span>
+                  Type the email exactly: <span className="font-mono">{email}</span>
                 </li>
                 <li>
                   Type the phrase{" "}
-                  <span className="font-mono font-semibold">{HARD_DELETE_TENANT_CONFIRMATION_PHRASE}</span>{" "}
+                  <span className="font-mono font-semibold">{HARD_DELETE_ORPHAN_USER_CONFIRMATION_PHRASE}</span>{" "}
                   (case-sensitive)
                 </li>
               </ol>
@@ -150,14 +109,14 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
               </p>
             ) : null}
             <label className="mt-4 block text-sm font-medium text-stone-800">
-              Company name
+              Email
               <input
-                type="text"
-                value={companyConfirm}
-                onChange={(e) => setCompanyConfirm(e.target.value)}
+                type="email"
+                value={emailConfirm}
+                onChange={(e) => setEmailConfirm(e.target.value)}
                 className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2 text-sm"
                 autoComplete="off"
-                placeholder={companyName}
+                placeholder={email}
               />
             </label>
             <label className="mt-3 block text-sm font-medium text-stone-800">
@@ -168,7 +127,7 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
                 onChange={(e) => setPhraseConfirm(e.target.value)}
                 className="mt-1 w-full rounded-md border border-stone-300 px-3 py-2 font-mono text-sm"
                 autoComplete="off"
-                placeholder={HARD_DELETE_TENANT_CONFIRMATION_PHRASE}
+                placeholder={HARD_DELETE_ORPHAN_USER_CONFIRMATION_PHRASE}
               />
             </label>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -186,12 +145,12 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
                 disabled={!canSubmit || deleteMut.isPending}
                 onClick={() => deleteMut.mutate()}
               >
-                {deleteMut.isPending ? "Deleting…" : "Delete company forever"}
+                {deleteMut.isPending ? "Deleting…" : "Delete user forever"}
               </button>
             </div>
           </div>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }

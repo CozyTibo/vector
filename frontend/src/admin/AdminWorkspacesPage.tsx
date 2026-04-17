@@ -1,9 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
+import AdminTenantsBulkHardDelete from "./AdminTenantsBulkHardDelete";
+import AdminFeedbackBanner from "./ui/AdminFeedbackBanner";
 import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 import { StatusBadge } from "./ui/StatusBadge";
+
+type AdminFlash = { kind: "success" | "error"; text: string };
 
 type TenantRow = {
   id: string;
@@ -16,10 +21,53 @@ type TenantRow = {
 };
 
 export default function AdminWorkspacesPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const q = useQuery({
     queryKey: ["admin-tenants"],
     queryFn: () => adminJson<{ items: TenantRow[] }>("/admin/tenants"),
   });
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [flash, setFlash] = useState<AdminFlash | null>(null);
+
+  useEffect(() => {
+    const st = location.state as { adminFlash?: AdminFlash } | null | undefined;
+    if (!st?.adminFlash) {
+      return;
+    }
+    setFlash(st.adminFlash);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: {} });
+  }, [location, navigate]);
+
+  const selectedTenants = useMemo(() => {
+    if (!q.data) {
+      return [];
+    }
+    const map = new Map(q.data.items.map((t) => [t.id, t]));
+    return [...selected].map((id) => map.get(id)).filter(Boolean) as TenantRow[];
+  }, [q.data, selected]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (!q.data?.items.length) {
+      return;
+    }
+    setSelected(new Set(q.data.items.map((t) => t.id)));
+  };
+
+  const clearSelection = () => setSelected(new Set());
 
   if (q.isPending) {
     return <p className="mx-auto max-w-6xl px-4 py-8 text-sm text-stone-600">Loading workspaces…</p>;
@@ -32,50 +80,115 @@ export default function AdminWorkspacesPage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      {flash ? (
+        <AdminFeedbackBanner
+          kind={flash.kind}
+          message={flash.text}
+          onDismiss={() => setFlash(null)}
+        />
+      ) : null}
       <OperatorIntro title="Workspaces">
         Each workspace is one company using Vector. Open a card to see health, onboarding, and pipeline
         state — this is the main operator entry point after you pick who you are helping.
       </OperatorIntro>
 
       <OperatorSection title="All workspaces" description="Open a workspace to manage onboarding, integrations, and data.">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+            disabled={!q.data.items.length}
+            onClick={selectAll}
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+            disabled={selected.size === 0}
+            onClick={clearSelection}
+          >
+            Clear selection
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-900 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={selected.size === 0}
+            onClick={() => setBulkOpen(true)}
+          >
+            Delete selected… ({selected.size})
+          </button>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           {q.data.items.length === 0 ? (
             <p className="text-sm text-stone-500">No workspaces yet.</p>
           ) : (
             q.data.items.map((t) => (
-              <Link
+              <div
                 key={t.id}
-                to={`/admin/tenants/${t.id}/workspace`}
-                className="group rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-stone-300 hover:shadow"
+                className="flex gap-2 rounded-xl border border-stone-200 bg-white shadow-sm transition hover:border-stone-300 hover:shadow"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-lg font-semibold text-stone-900 group-hover:text-blue-800">
-                    {t.company_name}
-                  </h3>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <StatusBadge tone={t.workspace_access_enabled ? "ok" : "warn"}>
-                      {t.workspace_access_enabled ? "Active" : "Waitlist"}
-                    </StatusBadge>
-                    <StatusBadge tone={t.connected_connectors.length ? "ok" : "neutral"}>
-                      {t.connected_connectors.length ? "Connected" : "No connectors"}
-                    </StatusBadge>
+                <label className="flex shrink-0 cursor-pointer items-start pt-5 pl-3">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 rounded border-stone-400 text-red-700 focus:ring-red-600"
+                    checked={selected.has(t.id)}
+                    onChange={() => toggle(t.id)}
+                    aria-label={`Select ${t.company_name}`}
+                  />
+                </label>
+                <Link
+                  to={`/admin/tenants/${t.id}/workspace`}
+                  className="group min-w-0 flex-1 p-5 pl-0"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-lg font-semibold text-stone-900 group-hover:text-blue-800">
+                      {t.company_name}
+                    </h3>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <StatusBadge tone={t.workspace_access_enabled ? "ok" : "warn"}>
+                        {t.workspace_access_enabled ? "Active" : "Waitlist"}
+                      </StatusBadge>
+                      <StatusBadge tone={t.connected_connectors.length ? "ok" : "neutral"}>
+                        {t.connected_connectors.length ? "Connected" : "No connectors"}
+                      </StatusBadge>
+                    </div>
                   </div>
-                </div>
-                <p className="mt-2 text-sm text-stone-600">
-                  Onboarding: {t.onboarding_status ?? "—"}
-                  {t.onboarding_current_step ? (
-                    <span className="block text-xs text-stone-500">{t.onboarding_current_step}</span>
-                  ) : null}
-                </p>
-                <p className="mt-2 text-xs text-stone-500">
-                  Connectors:{" "}
-                  {t.connected_connectors.length ? t.connected_connectors.join(", ") : "none"}
-                </p>
-              </Link>
+                  <p className="mt-2 text-sm text-stone-600">
+                    Onboarding: {t.onboarding_status ?? "—"}
+                    {t.onboarding_current_step ? (
+                      <span className="block text-xs text-stone-500">{t.onboarding_current_step}</span>
+                    ) : null}
+                  </p>
+                  <p className="mt-2 text-xs text-stone-500">
+                    Connectors:{" "}
+                    {t.connected_connectors.length ? t.connected_connectors.join(", ") : "none"}
+                  </p>
+                </Link>
+              </div>
             ))
           )}
         </div>
       </OperatorSection>
+
+      {bulkOpen && selectedTenants.length > 0 ? (
+        <AdminTenantsBulkHardDelete
+          tenants={selectedTenants.map((t) => ({ id: t.id, company_name: t.company_name }))}
+          onCancel={() => setBulkOpen(false)}
+          onCompleted={({ deletedCount }) => {
+            setBulkOpen(false);
+            clearSelection();
+            setFlash({
+              kind: "success",
+              text:
+                deletedCount === 1
+                  ? "Successfully deleted 1 workspace."
+                  : `Successfully deleted ${deletedCount} workspaces.`,
+            });
+          }}
+        />
+      ) : null}
     </main>
   );
 }

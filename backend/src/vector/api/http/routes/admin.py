@@ -19,8 +19,12 @@ from vector.api.http.serialization import orm_to_dict
 from vector.application.services import connector_sync
 from vector.contracts.admin import (
     AdminConnectionsResponse,
+    AdminHardDeleteOrphanUserRequest,
+    AdminHardDeleteOrphanUserResponse,
     AdminHardDeleteTenantRequest,
     AdminHardDeleteTenantResponse,
+    AdminHardDeleteTenantsBulkRequest,
+    AdminHardDeleteTenantsBulkResponse,
     AdminStep1RawResetRequest,
     AdminStep1RawResetResponse,
     AdminStep2ProjectionsResetRequest,
@@ -81,6 +85,10 @@ from vector.domains.ingestion.step2_step3_reset import (
     wipe_step3_canonical_for_tenant,
 )
 from vector.domains.projections.github.worker import drain_github_projections
+from vector.domains.tenancy.hard_delete_orphan_user import (
+    HARD_DELETE_ORPHAN_USER_CONFIRMATION_PHRASE,
+    hard_delete_orphan_user,
+)
 from vector.domains.tenancy.hard_delete_tenant import (
     HARD_DELETE_TENANT_CONFIRMATION_PHRASE,
     hard_delete_tenant,
@@ -101,6 +109,30 @@ from vector.settings import Settings
 
 GITHUB_ENTITIES = frozenset({"repositories", "pull_requests", "issues", "commits", "users"})
 LINEAR_ENTITIES = frozenset({"teams", "projects", "issues", "users", "issue_comments"})
+
+
+def _admin_hard_delete_tenant_response(tenant_id: uuid.UUID, out: dict[str, Any]) -> AdminHardDeleteTenantResponse:
+    s3 = out["step3"]
+    s2 = out["step2"]
+    s1 = out["step1"]
+    return AdminHardDeleteTenantResponse(
+        deleted_tenant_id=tenant_id,
+        deleted_company_name=out["deleted_company_name"],
+        deleted_relationships=s3["deleted_relationships"],
+        deleted_mapping_events=s3["deleted_mapping_events"],
+        deleted_current_mappings=s3["deleted_current_mappings"],
+        deleted_external_references=s3["deleted_external_references"],
+        deleted_actor_external_identities=s3["deleted_actor_external_identities"],
+        deleted_artifacts=s3["deleted_artifacts"],
+        deleted_actors=s3["deleted_actors"],
+        deleted_step3_canonical_cursors=s3["deleted_step3_canonical_cursors"],
+        deleted_github_projection_rows=s2["deleted_github_projection_rows"],
+        deleted_linear_projection_rows=s2["deleted_linear_projection_rows"],
+        deleted_connector_projection_progress_rows=s2["deleted_connector_projection_progress_rows"],
+        deleted_raw_records=s1["deleted_raw_records"],
+        deleted_ingestion_runs=s1["deleted_ingestion_runs"],
+        deleted_sync_state_rows=s1["deleted_sync_state_rows"],
+    )
 
 
 def _tools_interest(ans: dict[str, object]) -> list[str]:
@@ -277,18 +309,26 @@ def build_admin_router() -> APIRouter:
         limit: Annotated[int, Query(ge=1, le=500)] = 500,
     ) -> AdminUserListResponse:
         rows = tenancy_repo.list_all_users(db, limit=limit)
-        return AdminUserListResponse(
-            items=[
+        u_ids = [u.id for u in rows]
+        m_counts = tenancy_repo.membership_counts_for_user_ids(db, u_ids)
+        c_counts = tenancy_repo.tenant_connection_counts_for_connected_user_ids(db, u_ids)
+        items: list[AdminUserListItem] = []
+        for u in rows:
+            mc = m_counts.get(u.id, 0)
+            cc = c_counts.get(u.id, 0)
+            items.append(
                 AdminUserListItem(
                     id=u.id,
                     email=u.email,
                     full_name=u.full_name,
                     created_at=u.created_at,
                     has_password=u.password_hash is not None,
-                )
-                for u in rows
-            ],
-        )
+                    membership_count=mc,
+                    tenant_connections_as_connector_count=cc,
+                    orphan_eligible=mc == 0 and cc == 0,
+                ),
+            )
+        return AdminUserListResponse(items=items)
 
     @r.post(
         "/tenants/{tenant_id}/hard-delete",
@@ -321,29 +361,88 @@ def build_admin_router() -> APIRouter:
         except ValueError as e:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
         db.commit()
-        s3 = out["step3"]
-        s2 = out["step2"]
-        s1 = out["step1"]
-        return AdminHardDeleteTenantResponse(
-            deleted_tenant_id=tenant_id,
-            deleted_company_name=out["deleted_company_name"],
-            deleted_relationships=s3["deleted_relationships"],
-            deleted_mapping_events=s3["deleted_mapping_events"],
-            deleted_current_mappings=s3["deleted_current_mappings"],
-            deleted_external_references=s3["deleted_external_references"],
-            deleted_actor_external_identities=s3["deleted_actor_external_identities"],
-            deleted_artifacts=s3["deleted_artifacts"],
-            deleted_actors=s3["deleted_actors"],
-            deleted_step3_canonical_cursors=s3["deleted_step3_canonical_cursors"],
-            deleted_github_projection_rows=s2["deleted_github_projection_rows"],
-            deleted_linear_projection_rows=s2["deleted_linear_projection_rows"],
-            deleted_connector_projection_progress_rows=s2[
-                "deleted_connector_projection_progress_rows"
-            ],
-            deleted_raw_records=s1["deleted_raw_records"],
-            deleted_ingestion_runs=s1["deleted_ingestion_runs"],
-            deleted_sync_state_rows=s1["deleted_sync_state_rows"],
-        )
+        return _admin_hard_delete_tenant_response(tenant_id, out)
+
+    @r.post(
+        "/tenants/hard-delete-bulk",
+        response_model=AdminHardDeleteTenantsBulkResponse,
+    )
+    def admin_hard_delete_tenants_bulk(
+        body: AdminHardDeleteTenantsBulkRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminHardDeleteTenantsBulkResponse:
+        """Hard-delete many tenants in one transaction (same checks as single delete)."""
+        if body.confirmation != HARD_DELETE_TENANT_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        seen: set[uuid.UUID] = set()
+        for item in body.tenants:
+            if item.tenant_id in seen:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="Duplicate tenant_id in request.",
+                ) from None
+            seen.add(item.tenant_id)
+
+        results: list[AdminHardDeleteTenantResponse] = []
+        try:
+            for item in body.tenants:
+                t = tenancy_repo.get_tenant_by_id(db, item.tenant_id)
+                if t is None:
+                    raise HTTPException(
+                        status.HTTP_404_NOT_FOUND,
+                        detail=f"Tenant not found: {item.tenant_id}",
+                    ) from None
+                if t.company_name.strip() != item.company_name_confirmation.strip():
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        detail=f"Company name does not match tenant {item.tenant_id}.",
+                    ) from None
+                out = hard_delete_tenant(db, tenant_id=item.tenant_id)
+                results.append(_admin_hard_delete_tenant_response(item.tenant_id, out))
+            db.commit()
+        except HTTPException:
+            db.rollback()
+            raise
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        except Exception:
+            db.rollback()
+            raise
+        return AdminHardDeleteTenantsBulkResponse(results=results)
+
+    @r.post(
+        "/users/{user_id}/hard-delete",
+        response_model=AdminHardDeleteOrphanUserResponse,
+    )
+    def admin_hard_delete_orphan_user(
+        user_id: uuid.UUID,
+        body: AdminHardDeleteOrphanUserRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminHardDeleteOrphanUserResponse:
+        """Delete a user only when they have no memberships and no tenant_connections as connector."""
+        u = tenancy_repo.get_user_by_id(db, user_id)
+        if u is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found.") from None
+        if body.confirmation != HARD_DELETE_ORPHAN_USER_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        if u.email.strip() != body.email_confirmation.strip():
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Email does not match this user.",
+            ) from None
+        try:
+            deleted_email = hard_delete_orphan_user(db, user_id=user_id)
+        except ValueError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        db.commit()
+        return AdminHardDeleteOrphanUserResponse(deleted_user_id=user_id, deleted_email=deleted_email)
 
     @r.get("/tenants/{tenant_id}", response_model=TenantAdminDetailResponse)
     def get_tenant(

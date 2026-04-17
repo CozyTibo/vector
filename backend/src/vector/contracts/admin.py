@@ -56,6 +56,20 @@ class AdminUserListItem(BaseModel):
         default=False,
         description="True when users.password_hash is set (email/password accounts).",
     )
+    membership_count: int = Field(
+        default=0,
+        ge=0,
+        description="Rows in tenant_memberships for this user.",
+    )
+    tenant_connections_as_connector_count: int = Field(
+        default=0,
+        ge=0,
+        description="tenant_connections rows with connected_by_user_id = this user.",
+    )
+    orphan_eligible: bool = Field(
+        default=False,
+        description="True when the user can be hard-deleted (no memberships, no connector rows).",
+    )
 
 
 class AdminUserListResponse(BaseModel):
@@ -306,3 +320,54 @@ class AdminHardDeleteTenantResponse(BaseModel):
     deleted_raw_records: int
     deleted_ingestion_runs: int
     deleted_sync_state_rows: int
+
+
+class AdminHardDeleteTenantBulkItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    company_name_confirmation: str = Field(
+        ...,
+        description="Must match that tenant's company name (after trim).",
+    )
+
+
+class AdminHardDeleteTenantsBulkRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match HARD_DELETE_TENANT_CONFIRMATION_PHRASE.",
+    )
+    tenants: list[AdminHardDeleteTenantBulkItem] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Each tenant is validated and deleted in order within one transaction.",
+    )
+
+
+class AdminHardDeleteTenantsBulkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    results: list[AdminHardDeleteTenantResponse]
+
+
+class AdminHardDeleteOrphanUserRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match HARD_DELETE_ORPHAN_USER_CONFIRMATION_PHRASE.",
+    )
+    email_confirmation: str = Field(
+        ...,
+        description="Must match the user's email (after trim).",
+    )
+
+
+class AdminHardDeleteOrphanUserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    deleted_user_id: uuid.UUID
+    deleted_email: str
