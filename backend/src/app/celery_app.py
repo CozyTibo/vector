@@ -7,6 +7,8 @@ import os
 
 from celery import Celery
 
+from vector.infrastructure.redis_url import normalize_rediss_url
+
 
 def _redis_url_for_celery(url: str) -> str:
     """Normalize Redis URL for Celery.
@@ -14,15 +16,10 @@ def _redis_url_for_celery(url: str) -> str:
     Celery's Redis SSL backend requires ``ssl_cert_reqs`` on ``rediss://`` URLs
     (see ``celery/backends/redis.py``).
     """
-    stripped = url.strip()
-    if not stripped.lower().startswith("rediss://"):
-        return stripped
-    if "ssl_cert_reqs=" in stripped.lower():
-        return stripped
-    sep = "&" if "?" in stripped else "?"
+    stripped = normalize_rediss_url(url)
     # ElastiCache / many managed TLS Redis: skip CA verification unless you pin a CA.
     # Override by adding ``ssl_cert_reqs=CERT_REQUIRED`` (or ``required``) to ``REDIS_URL``.
-    return f"{stripped}{sep}ssl_cert_reqs=CERT_NONE"
+    return stripped
 
 
 def _patch_rediss_urls_in_environ() -> None:

@@ -15,6 +15,7 @@ from fastapi import APIRouter, Response
 from sqlalchemy import text
 
 from vector.infrastructure.db.session import get_engine
+from vector.infrastructure.redis_url import normalize_rediss_url
 
 logger = logging.getLogger("app")
 
@@ -30,7 +31,7 @@ def _redis_status() -> str:
         return "skipped"
     client: redis.Redis | None = None
     try:
-        client = redis.from_url(url)
+        client = redis.from_url(normalize_rediss_url(url))
         client.ping()
         logger.info("ready: redis connection OK")
         return "ok"
