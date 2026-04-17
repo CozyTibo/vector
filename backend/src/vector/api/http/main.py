@@ -26,8 +26,9 @@ def _cors_allow_origins() -> list[str]:
     default = (
         "http://localhost:5173,"
         "https://d3lwynjhzjqd60.cloudfront.net,"
-        "https://www.myvector.co,"
-        "https://myvector.co"
+        "https://vector.angelcorp.ai,"
+        "https://wwww.angelcorp.ai,"
+        "https://angelcorp.ai"
     )
     raw = os.environ.get("CORS_ORIGINS", default)
     return [o.strip() for o in raw.split(",") if o.strip()]
