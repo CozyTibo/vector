@@ -23,13 +23,14 @@ celery_app.conf.task_serializer = "json"
 celery_app.conf.accept_content = ["json"]
 celery_app.conf.result_serializer = "json"
 # Ensure task modules load on every worker process (avoids "unregistered task" if imports differ).
-celery_app.conf.imports = ("app.tasks.ingestion", "app.tasks.manager_onboarding")
+celery_app.conf.imports = ("app.tasks.ingestion", "app.tasks.manager_onboarding", "app.tasks.email")
 
 
 def _register_tasks() -> None:
     """Import task modules so they bind to ``celery_app``."""
     importlib.import_module("app.tasks.ingestion")
     importlib.import_module("app.tasks.manager_onboarding")
+    importlib.import_module("app.tasks.email")
 
 
 def _configure_beat_schedule() -> None:

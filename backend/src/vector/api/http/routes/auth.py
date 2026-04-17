@@ -28,6 +28,7 @@ from vector.domains.identity_access.services.local_auth import (
     login_with_email_password,
     register_with_email_password,
 )
+from vector.infrastructure.email.waitlist_confirmation import enqueue_waitlist_signup_confirmation
 from vector.settings import Settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -53,6 +54,7 @@ def register_email_password(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(e)) from e
     except WeakPasswordError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    enqueue_waitlist_signup_confirmation(str(body.email), body.full_name)
     resp = JSONResponse(content=AuthOkResponse(session_token=token).model_dump())
     set_session_cookie(resp, settings, token, request=request)
     return resp

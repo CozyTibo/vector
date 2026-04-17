@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -171,6 +171,33 @@ class Settings(BaseSettings):
     )
     openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_MODEL")
+    smtp_host: str = Field(
+        default="",
+        validation_alias="SMTP_HOST",
+        description="SMTP host (Mailtrap dev or SES email-smtp.<region>.amazonaws.com).",
+    )
+    smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
+    smtp_user: str = Field(default="", validation_alias="SMTP_USER")
+    smtp_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("SMTP_PASSWORD", "SMTP_PASS"),
+    )
+    smtp_use_tls: bool = Field(default=True, validation_alias="SMTP_USE_TLS")
+    email_from_address: str = Field(
+        default="",
+        validation_alias=AliasChoices("EMAIL_FROM_ADDRESS", "EMAIL_FROM"),
+        description="RFC5322 From address (e.g. vector@angelcorp.ai).",
+    )
+    email_from_name: str = Field(default="Vector", validation_alias="EMAIL_FROM_NAME")
+    waitlist_signup_email_enabled: bool = Field(
+        default=True,
+        validation_alias="VECTOR_WAITLIST_SIGNUP_EMAIL",
+        description=(
+            "Send the waitlist confirmation after email/password signup. "
+            "Set false in pytest (or CI) to avoid real SMTP when integration tests register users."
+        ),
+    )
+
     @field_validator("github_app_private_key", mode="before")
     @classmethod
     def expand_pem_newlines(cls, value: object) -> object:
@@ -253,6 +280,11 @@ class Settings(BaseSettings):
     def linear_oauth_token_url(self) -> str:
         """Always real Linear — OAuth codes are issued by linear.app, not the mock."""
         return "https://api.linear.app/oauth/token"
+
+    @property
+    def email_is_configured(self) -> bool:
+        """True when SMTP + From are set (Mailtrap, SES SMTP, etc.)."""
+        return bool(self.smtp_host.strip() and self.email_from_address.strip())
 
 
 def get_settings() -> Settings:
