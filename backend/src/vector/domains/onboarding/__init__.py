@@ -1,1 +1,1 @@
-"""Onboarding domain (chat FSM, LLM phrasing, constants)."""
+"""Onboarding domain (chat FSM, LLM phrasing, HTTP orchestration commands, constants)."""

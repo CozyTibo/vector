@@ -25,40 +25,41 @@ from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 from vector.settings import Settings, get_settings
 
 
-def _denormalize_profile_to_user(
-    session: Session, user_id: uuid.UUID, answers: dict[str, Any]
+def apply_patch_answers_to_profile_and_company(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    answers: dict[str, Any],
 ) -> None:
+    """Sync ``profile.name``, ``company_name``, and ``company.name`` from answers into ORM rows."""
     prof = answers.get("profile")
-    if not isinstance(prof, dict):
-        return
-    raw = prof.get("name")
-    if not isinstance(raw, str):
-        return
-    name = raw.strip()
-    if not name:
-        return
-    user = tenancy_repo.get_user_by_id(session, user_id)
-    if user is None:
-        return
-    user.full_name = name
+    if isinstance(prof, dict):
+        raw = prof.get("name")
+        if isinstance(raw, str):
+            name = raw.strip()
+            if name:
+                user = tenancy_repo.get_user_by_id(session, user_id)
+                if user is not None:
+                    user.full_name = name
 
-
-def _denormalize_company_to_tenant(
-    session: Session, tenant_id: uuid.UUID, answers: dict[str, Any]
-) -> None:
-    comp = answers.get("company")
-    if not isinstance(comp, dict):
-        return
-    raw = comp.get("name")
-    if not isinstance(raw, str):
-        return
-    name = raw.strip()
-    if not name:
-        return
     tenant = tenancy_repo.get_tenant_by_id(session, tenant_id)
     if tenant is None:
         return
-    tenant.company_name = name
+
+    raw_top = answers.get("company_name")
+    if isinstance(raw_top, str):
+        cn = raw_top.strip()
+        if cn:
+            tenant.company_name = cn
+
+    comp = answers.get("company")
+    if isinstance(comp, dict):
+        n = comp.get("name")
+        if isinstance(n, str):
+            name2 = n.strip()
+            if name2:
+                tenant.company_name = name2
 
 
 def _user_turn_content(user_text: str | None, structured: dict[str, Any] | None) -> str | None:
@@ -197,8 +198,12 @@ def process_onboarding_chat(
     row.answers_json = merged_answers
     row.version = int(row.version) + 1
 
-    _denormalize_profile_to_user(session, claims.user_id, merged_answers)
-    _denormalize_company_to_tenant(session, claims.tenant_id, merged_answers)
+    apply_patch_answers_to_profile_and_company(
+        session,
+        user_id=claims.user_id,
+        tenant_id=claims.tenant_id,
+        answers=merged_answers,
+    )
 
     assistant_segments = generate_onboarding_reply(
         step=turn.next_step,
