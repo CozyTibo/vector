@@ -11,6 +11,9 @@ env:
   ECS_CLUSTER: vector-prod
   ECS_SERVICE: vector-backend-service
   ECS_TASK_DEFINITION: vector-backend
+  # Worker: same cluster; task definition family name in ECS (must match console)
+  ECS_WORKER_SERVICE: vector-worker-service
+  ECS_WORKER_TASK_DEFINITION: vector-backend-worker
   # Container name in the API task definition (used for run-task overrides)
   ECS_CONTAINER_NAME: backend
   S3_FRONTEND_BUCKET: vector-frontend-prod
@@ -166,6 +169,52 @@ jobs:
         run: |
           docker build -t "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" -f backend/worker.Dockerfile backend
           docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG"
+
+      - name: Get current worker task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_WORKER_TASK_DEFINITION" \
+            --region "$AWS_REGION" \
+            --query taskDefinition \
+            > worker-task-def.json
+
+      - name: Clean worker task definition
+        run: |
+          jq 'del(
+            .taskDefinitionArn,
+            .revision,
+            .status,
+            .requiresAttributes,
+            .compatibilities,
+            .registeredAt,
+            .registeredBy
+          )' worker-task-def.json > clean-worker-task-def.json
+
+      - name: Update worker image in task definition
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          jq --arg IMAGE "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
+            '.containerDefinitions[0].image = $IMAGE' \
+            clean-worker-task-def.json > new-worker-task-def.json
+
+      - name: Register new worker task definition
+        run: |
+          WORKER_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-worker-task-def.json \
+            --region "$AWS_REGION" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "REGISTERED_WORKER_TASK_DEFINITION_ARN=$WORKER_TASK_DEF_ARN" >> "$GITHUB_ENV"
+
+      - name: Deploy worker to ECS
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_WORKER_SERVICE" \
+            --task-definition "$REGISTERED_WORKER_TASK_DEFINITION_ARN" \
+            --force-new-deployment \
+            --region "$AWS_REGION"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
