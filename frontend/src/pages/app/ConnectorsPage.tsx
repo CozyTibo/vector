@@ -2,8 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { landingSubtleLineH } from "../../components/landing/landingBrandPalette";
+import {
+  marketingBody,
+  marketingCard,
+  marketingKicker,
+  marketingMutedLink,
+  marketingPageTitle,
+} from "../../components/marketing/marketingStyles";
+import { ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS } from "../../components/onboarding/onboardingUiConstants";
 import { readErrorDetail } from "../../lib/canonicalApi";
-import { productApiBase } from "../../lib/meApi";
+import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 import { mergeProductSessionAuth } from "../../lib/sessionToken";
 
 type GithubDetails = {
@@ -69,7 +78,7 @@ const CATALOG: { category: string; items: CatalogItem[] }[] = [
     ],
   },
   {
-    category: "Project Management",
+    category: "Project management",
     items: [
       { id: "linear", name: "Linear", icon: "◎", live: true },
       { id: "jira", name: "Jira", icon: "▤", live: false },
@@ -84,6 +93,24 @@ const CATALOG: { category: string; items: CatalogItem[] }[] = [
     items: [{ id: "notion", name: "Notion", icon: "N", live: false }],
   },
 ];
+
+const connectorTileClass =
+  "flex min-h-[11rem] flex-col rounded-2xl border border-zinc-200/90 bg-white/90 p-4 shadow-[0_12px_40px_-28px_rgba(15,23,42,0.14)] ring-1 ring-zinc-950/[0.03] sm:min-h-[12rem] sm:p-5";
+
+const iconLiveClass =
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FDF4F8] text-lg font-semibold text-[#E878BE] ring-1 ring-[#E878BE]/25";
+
+const iconSoonClass =
+  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-lg font-semibold text-zinc-400 ring-1 ring-zinc-200/80";
+
+const disconnectBtnClass =
+  "mt-auto w-full rounded-full border border-zinc-200/90 bg-white px-4 py-2.5 text-sm font-medium text-[#0F0F12] shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50/90 disabled:cursor-not-allowed disabled:opacity-50";
+
+const connectGradientClass =
+  `${ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS} mt-auto flex w-full justify-center py-2.5 text-center sm:py-3`;
+
+const disabledConnectClass =
+  "mt-auto w-full cursor-not-allowed rounded-full border border-zinc-200/90 bg-zinc-50 py-2.5 text-sm font-medium text-zinc-400 sm:py-3";
 
 async function fetchConnectors(base: string): Promise<ConnectorsResponse> {
   const res = await fetch(`${base}/connectors`, mergeProductSessionAuth());
@@ -114,6 +141,7 @@ function formatSync(iso: string | null | undefined): string {
 export default function ConnectorsPage() {
   const apiBase = productApiBase();
   const qc = useQueryClient();
+  const me = useProductMeQuery(apiBase);
   const [banner, setBanner] = useState<string | null>(null);
 
   useEffect(() => {
@@ -198,156 +226,173 @@ export default function ConnectorsPage() {
     onError: (e: Error) => setBanner(e.message),
   });
 
+  if (q.isPending) {
+    return (
+      <main className="relative mx-auto flex min-h-0 max-w-3xl flex-1 flex-col items-center justify-center overflow-y-auto px-5 py-16 sm:px-8">
+        <div
+          className="h-9 w-9 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
+          aria-hidden
+        />
+        <p className={`${marketingBody} mt-5 text-center`}>Loading connectors…</p>
+      </main>
+    );
+  }
+
   return (
-    <main className="mx-auto max-w-4xl min-h-0 flex-1 overflow-y-auto px-4 py-10">
-      <h1 className="mb-2 text-2xl font-semibold text-stone-900">Connectors</h1>
-      <p className="mb-6 text-sm text-stone-600">Link tools to your workspace.</p>
-      {banner ? (
-        <p className="mb-6 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          {banner}
-        </p>
-      ) : null}
-      {q.isError ? (
-        <p className="text-sm text-red-700">{(q.error as Error).message}</p>
-      ) : null}
+    <main className="relative mx-auto max-w-3xl min-h-0 flex-1 overflow-y-auto px-5 py-10 sm:px-8 sm:py-14">
+      <div className="relative space-y-7 sm:space-y-8">
+        <section className={`${marketingCard} overflow-hidden !p-0 sm:!p-0`}>
+          <div className={`h-1 w-full ${landingSubtleLineH}`} aria-hidden />
+          <div className="px-7 py-8 sm:px-10 sm:py-10">
+            <p className={marketingKicker}>Integrations</p>
+            <h1 className={`${marketingPageTitle} mt-3`}>Connectors</h1>
+            <p className={`${marketingBody} mt-4`}>
+              Link the tools your team already uses. Vector syncs activity in the background so your
+              workspace stays current.
+            </p>
+          </div>
+        </section>
 
-      <div className="space-y-10">
-        {CATALOG.map((group) => (
-          <section key={group.category}>
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-500">
-              {group.category}
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {group.items.map((item) => {
-                const row = statusById.get(item.id);
-                const connected = row?.connected === true;
-                const configured = row?.connector_configured !== false;
-                const last =
-                  row?.provider === "github"
-                    ? row.details?.last_sync_at
-                    : row?.provider === "linear"
+        {me.data?.use_mock_connectors ? (
+          <div className="rounded-2xl border border-rose-200/80 bg-rose-50/90 px-4 py-3 text-sm text-rose-900">
+            Development mode: mock connectors are enabled. OAuth flows may still hit real services; data
+            can be sample-only.
+          </div>
+        ) : null}
+
+        {banner ? (
+          <div className="rounded-2xl border border-amber-200/90 bg-amber-50/95 px-4 py-3 text-sm text-amber-950">
+            {banner}
+          </div>
+        ) : null}
+
+        {q.isError ? (
+          <p className="rounded-2xl border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-900">
+            {(q.error as Error).message}
+          </p>
+        ) : null}
+
+        <div className="space-y-10 sm:space-y-12">
+          {CATALOG.map((group) => (
+            <section key={group.category} className="space-y-4">
+              <h2 className={marketingKicker}>{group.category}</h2>
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+                {group.items.map((item) => {
+                  const row = statusById.get(item.id);
+                  const connected = row?.connected === true;
+                  const configured = row?.connector_configured !== false;
+                  const last =
+                    row?.provider === "github"
                       ? row.details?.last_sync_at
-                      : row?.provider === "slack"
+                      : row?.provider === "linear"
                         ? row.details?.last_sync_at
-                        : undefined;
+                        : row?.provider === "slack"
+                          ? row.details?.last_sync_at
+                          : undefined;
 
-                return (
-                  <div
-                    key={item.id}
-                    className="flex flex-col rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="mb-3 flex items-start gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-stone-100 text-lg text-stone-600">
-                        {item.icon}
-                      </span>
-                      <div>
-                        <div className="font-medium text-stone-900">{item.name}</div>
-                        {connected ? (
-                          <div className="mt-1 text-xs text-green-700">Connected</div>
-                        ) : item.live ? (
-                          <div className="mt-1 text-xs text-stone-500">Not connected</div>
-                        ) : (
-                          <div className="mt-1 text-xs text-stone-400">Coming soon</div>
-                        )}
+                  return (
+                    <div key={item.id} className={connectorTileClass}>
+                      <div className="flex items-start gap-3">
+                        <span className={item.live ? iconLiveClass : iconSoonClass} aria-hidden>
+                          {item.icon}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-base font-semibold tracking-tight text-[#0F0F12]">{item.name}</p>
+                          {connected ? (
+                            <p className="mt-1 text-xs font-medium text-emerald-700">Connected</p>
+                          ) : item.live ? (
+                            <p className="mt-1 text-xs text-[#52525B]">Not connected</p>
+                          ) : (
+                            <p className="mt-1 text-xs text-zinc-400">Coming soon</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    {connected && last !== undefined ? (
-                      <p className="mb-3 text-xs text-stone-500">
-                        Last sync:{" "}
-                        <span className="font-medium text-stone-700">{formatSync(last)}</span>
-                      </p>
-                    ) : null}
-                    {!item.live ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="mt-auto w-full rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm text-stone-400"
-                      >
-                        Connect
-                      </button>
-                    ) : item.id === "github" ? (
-                      connected ? (
-                        <div className="mt-auto flex flex-wrap gap-2">
+                      {connected && last !== undefined ? (
+                        <p className="mt-3 text-xs leading-relaxed text-[#52525B]">
+                          Last sync{" "}
+                          <span className="font-medium text-[#0F0F12]">{formatSync(last)}</span>
+                        </p>
+                      ) : null}
+                      {!item.live ? (
+                        <button type="button" disabled className={disabledConnectClass}>
+                          Connect
+                        </button>
+                      ) : item.id === "github" ? (
+                        connected ? (
                           <button
                             type="button"
-                            className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                            className={disconnectBtnClass}
                             disabled={ghDisconnect.isPending}
                             onClick={() => ghDisconnect.mutate()}
                           >
-                            Disconnect
+                            {ghDisconnect.isPending ? "Disconnecting…" : "Disconnect"}
                           </button>
-                        </div>
-                      ) : !configured ? (
-                        <p className="mt-auto text-xs text-amber-800">GitHub is not configured on the API.</p>
+                        ) : !configured ? (
+                          <p className="mt-auto text-xs leading-snug text-amber-900">
+                            GitHub is not configured on the API.
+                          </p>
+                        ) : (
+                          <a className={connectGradientClass} href={`${apiBase}/connectors/github/install`}>
+                            Connect GitHub
+                          </a>
+                        )
+                      ) : item.id === "linear" ? (
+                        connected ? (
+                          <button
+                            type="button"
+                            className={disconnectBtnClass}
+                            disabled={linDisconnect.isPending}
+                            onClick={() => linDisconnect.mutate()}
+                          >
+                            {linDisconnect.isPending ? "Disconnecting…" : "Disconnect"}
+                          </button>
+                        ) : !configured ? (
+                          <p className="mt-auto text-xs leading-snug text-amber-900">
+                            Linear OAuth is not configured on the API.
+                          </p>
+                        ) : (
+                          <a className={connectGradientClass} href={`${apiBase}/connectors/linear/install`}>
+                            Connect Linear
+                          </a>
+                        )
+                      ) : item.id === "slack" ? (
+                        connected ? (
+                          <button
+                            type="button"
+                            className={disconnectBtnClass}
+                            disabled={slackDisconnect.isPending}
+                            onClick={() => slackDisconnect.mutate()}
+                          >
+                            {slackDisconnect.isPending ? "Disconnecting…" : "Disconnect"}
+                          </button>
+                        ) : !configured ? (
+                          <p className="mt-auto text-xs leading-snug text-amber-900">
+                            Slack OAuth is not configured on the API.
+                          </p>
+                        ) : (
+                          <a className={connectGradientClass} href={`${apiBase}/connectors/slack/install`}>
+                            Connect Slack
+                          </a>
+                        )
                       ) : (
-                        <a
-                          className="mt-auto block w-full rounded-lg bg-stone-900 py-2 text-center text-sm font-medium text-white no-underline hover:bg-stone-800"
-                          href={`${apiBase}/connectors/github/install`}
-                        >
+                        <button type="button" disabled className={disabledConnectClass}>
                           Connect
-                        </a>
-                      )
-                    ) : item.id === "linear" ? (
-                      connected ? (
-                        <button
-                          type="button"
-                          className="mt-auto rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-800 hover:bg-stone-50 disabled:opacity-50"
-                          disabled={linDisconnect.isPending}
-                          onClick={() => linDisconnect.mutate()}
-                        >
-                          Disconnect
                         </button>
-                      ) : !configured ? (
-                        <p className="mt-auto text-xs text-amber-800">Linear OAuth is not configured on the API.</p>
-                      ) : (
-                        <a
-                          className="mt-auto block w-full rounded-lg bg-stone-900 py-2 text-center text-sm font-medium text-white no-underline hover:bg-stone-800"
-                          href={`${apiBase}/connectors/linear/install`}
-                        >
-                          Connect
-                        </a>
-                      )
-                    ) : item.id === "slack" ? (
-                      connected ? (
-                        <button
-                          type="button"
-                          className="mt-auto rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-800 hover:bg-stone-50 disabled:opacity-50"
-                          disabled={slackDisconnect.isPending}
-                          onClick={() => slackDisconnect.mutate()}
-                        >
-                          Disconnect
-                        </button>
-                      ) : !configured ? (
-                        <p className="mt-auto text-xs text-amber-800">Slack OAuth is not configured on the API.</p>
-                      ) : (
-                        <a
-                          className="mt-auto block w-full rounded-lg bg-stone-900 py-2 text-center text-sm font-medium text-white no-underline hover:bg-stone-800"
-                          href={`${apiBase}/connectors/slack/install`}
-                        >
-                          Connect
-                        </a>
-                      )
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="mt-auto w-full rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm text-stone-400"
-                      >
-                        Connect
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <p className="pt-2">
+          <Link to="/app" className={`${marketingMutedLink} text-sm underline decoration-zinc-300`}>
+            ← Back to workspace
+          </Link>
+        </p>
       </div>
-      <p className="mt-10 text-sm text-stone-500">
-        <Link to="/app" className="text-blue-600 underline">
-          ← App home
-        </Link>
-      </p>
     </main>
   );
 }

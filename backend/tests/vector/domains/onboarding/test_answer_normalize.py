@@ -18,6 +18,16 @@ def test_normalize_role_foundr() -> None:
     assert normalize_role("foundr") == "Founder"
 
 
+def test_normalize_role_im_the_founder() -> None:
+    assert normalize_role("I'm the founder") == "Founder"
+    assert normalize_role("I am the founder") == "Founder"
+    assert normalize_role("the founder") == "Founder"
+
+
+def test_normalize_role_playful_founder_spelling() -> None:
+    assert normalize_role("Founndeerrr baby") == "Founder"
+
+
 def test_normalize_role_unknown_maps_to_other() -> None:
     assert normalize_role("Head of Platform") == "Other"
 

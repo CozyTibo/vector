@@ -143,9 +143,8 @@ def _norm_ws(value: str) -> str:
 
 
 def _strip_role_boilerplate(s: str) -> str:
-    """Remove leading 'I'm a …' style noise so 'I'm a PM' can match aliases."""
+    """Remove leading 'I'm a …' / articles so 'I'm the founder' -> 'founder' and 'I'm a PM' -> 'PM'."""
     t = s.strip()
-    tl = t.lower()
     prefixes = (
         "i'm a ",
         "i'm an ",
@@ -159,11 +158,29 @@ def _strip_role_boilerplate(s: str) -> str:
         "a ",
         "an ",
     )
-    for p in prefixes:
-        if tl.startswith(p):
-            t = t[len(p) :].lstrip()
-            tl = t.lower()
+    while True:
+        tl = t.lower()
+        matched = False
+        for p in prefixes:
+            if tl.startswith(p):
+                t = t[len(p) :].lstrip()
+                matched = True
+                break
+        if not matched:
             break
+    # "I'm the founder" leaves "the founder" after the first loop; strip leading articles once more.
+    while True:
+        tl = t.lower()
+        if tl.startswith("the "):
+            t = t[4:].lstrip()
+            continue
+        if tl.startswith("a ") and len(t) > 2:
+            t = t[2:].lstrip()
+            continue
+        if tl.startswith("an ") and len(t) > 3:
+            t = t[3:].lstrip()
+            continue
+        break
     return _norm_ws(t)
 
 
@@ -247,6 +264,15 @@ def normalize_role(raw: str) -> str:
     inferred = _infer_role_from_keywords(key)
     if inferred:
         return inferred
+
+    # Elongated / playful "founder" ("founndeerrr baby") after token-fix still misses fuzzy match.
+    if (
+        "co-founder" not in key
+        and "cofounder" not in key.replace(" ", "")
+        and "founding engineer" not in key
+        and re.search(r"\bfoun+[de]+r+\w*", key)
+    ):
+        return "Founder"
 
     if _ambiguous_head_of_free_text(key):
         return PROFILE_ROLE_OTHER

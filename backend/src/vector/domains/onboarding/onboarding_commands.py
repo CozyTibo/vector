@@ -337,3 +337,28 @@ def complete_onboarding(db: Session, claims: SessionClaims) -> OnboardingComplet
         current_step=row.current_step,
         completed_at=row.completed_at or now,
     )
+
+
+def dev_force_complete_website_onboarding_for_tenant(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> OnboardingCompleteResponse:
+    """Mark website onboarding completed without Slack handoff (admin / local dev only).
+
+    Call sites must enforce ``ENV=development``; does not send Slack DMs or enqueue manager intro.
+    """
+    row = ob_repo.get_or_create_onboarding(db, tenant_id)
+    now = datetime.now(UTC)
+    if row.status != STATUS_COMPLETED:
+        row.status = STATUS_COMPLETED
+        row.current_step = STEP_THANK_YOU
+        row.completed_at = now
+        row.version = int(row.version) + 1
+    db.flush()
+    db.refresh(row)
+    return OnboardingCompleteResponse(
+        status=row.status,
+        current_step=row.current_step,
+        completed_at=row.completed_at or now,
+    )

@@ -48,6 +48,7 @@ from vector.contracts.admin import (
     TenantListItem,
     TenantListResponse,
 )
+from vector.contracts.onboarding import OnboardingCompleteResponse
 from vector.contracts.connectors import (
     GithubIngestionRunListItem,
     GithubIngestionRunsListResponse,
@@ -80,6 +81,7 @@ from vector.domains.ingestion.step1_reset import (
     STEP1_RAW_RESET_CONFIRMATION_PHRASE,
     wipe_step1_raw_for_tenant,
 )
+from vector.domains.onboarding.onboarding_commands import dev_force_complete_website_onboarding_for_tenant
 from vector.domains.ingestion.step2_step3_reset import (
     STEP2_PROJECTIONS_RESET_CONFIRMATION_PHRASE,
     STEP3_CANONICAL_RESET_CONFIRMATION_PHRASE,
@@ -558,6 +560,28 @@ def build_admin_router() -> APIRouter:
             connected_connectors=[c.provider for c in conns],
             slack_vector_paused=bool(t.slack_vector_paused),
         )
+
+    @r.post(
+        "/tenants/{tenant_id}/dev-complete-website-onboarding",
+        response_model=OnboardingCompleteResponse,
+    )
+    def admin_dev_complete_website_onboarding(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> OnboardingCompleteResponse:
+        """Development only: mark website onboarding completed so /me sees onboarding_completed (dashboard)."""
+        if settings.env.strip().lower() != "development":
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="This endpoint is only available when ENV=development.",
+            ) from None
+        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
+        if t is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        out = dev_force_complete_website_onboarding_for_tenant(db, tenant_id=tenant_id)
+        db.commit()
+        return out
 
     @r.get("/tenants/{tenant_id}/connections", response_model=AdminConnectionsResponse)
     def list_connections(

@@ -116,6 +116,22 @@ export default function AdminWorkspacePage() {
     },
   });
 
+  const devCompleteWebsiteObMut = useMutation({
+    mutationFn: async () => {
+      const res = await adminFetch(`/admin/tenants/${tenantId}/dev-complete-website-onboarding`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(await readErrorDetail(res));
+      }
+      return res.json() as Promise<unknown>;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin-tenant", tenantId] });
+      void qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+    },
+  });
+
   if (!tenantId) {
     return <p className="text-sm text-red-700">Missing tenant.</p>;
   }
@@ -271,6 +287,35 @@ export default function AdminWorkspacePage() {
           </div>
           <p className="mt-2 line-clamp-2 text-xs text-stone-600">{websiteObLine}</p>
           <TileLink to={`/admin/tenants/${tenantId}/onboarding`}>Transcript &amp; answers →</TileLink>
+          {import.meta.env.DEV ? (
+            <div className="mt-3 rounded border border-violet-200 bg-violet-50/80 p-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-violet-700">
+                Local dev only
+              </p>
+              <p className="mt-1 text-[11px] leading-snug text-violet-900/90">
+                Marks website onboarding completed so the member lands on the app dashboard (no Slack
+                handoff). Backend requires <span className="font-mono">ENV=development</span>.
+              </p>
+              {devCompleteWebsiteObMut.isError ? (
+                <p className="mt-1 text-xs text-red-700">{(devCompleteWebsiteObMut.error as Error).message}</p>
+              ) : null}
+              <button
+                type="button"
+                className="mt-2 rounded border border-violet-600 bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                disabled={
+                  devCompleteWebsiteObMut.isPending ||
+                  (ob !== null && ob.status.toLowerCase() === "completed")
+                }
+                onClick={() => devCompleteWebsiteObMut.mutate()}
+              >
+                {devCompleteWebsiteObMut.isPending
+                  ? "Updating…"
+                  : ob !== null && ob.status.toLowerCase() === "completed"
+                    ? "Already on dashboard path"
+                    : "Skip website onboarding → dashboard"}
+              </button>
+            </div>
+          ) : null}
         </Tile>
 
         <Tile title="Manager onboarding (Slack)">
