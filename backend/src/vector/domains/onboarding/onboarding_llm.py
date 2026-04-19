@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from openai import OpenAI
@@ -19,8 +20,10 @@ from vector.domains.onboarding.constants import (
     PROFILE_PHASES_ORDER,
     STEP_CHAT_PROFILE,
 )
-from vector.openai_chat_params import temperature_for_chat_model
+from vector.openai_chat_params import onboarding_chat_max_completion_tokens, temperature_for_chat_model
 from vector.settings import Settings, get_settings
+
+logger = logging.getLogger(__name__)
 
 # Long dashes models use like em dashes; normalize to spaced hyphen for onboarding copy.
 _EM_DASH = "\u2014"
@@ -380,14 +383,12 @@ Readable summary:
 
     temp = 0.7 if assistant_prompt_context.get("tools_selection_revision") else 0.58
 
-    if intro_kind == "after_size":
-        max_out = 200
-    elif intro_kind == "qa" and isinstance(kb, str) and kb.strip():
-        max_out = 320
-    elif isinstance(kb, str) and kb.strip():
-        max_out = 280
-    else:
-        max_out = 220
+    has_kb = isinstance(kb, str) and bool(kb.strip())
+    max_out = onboarding_chat_max_completion_tokens(
+        cfg.openai_model,
+        intro_kind=intro_kind if isinstance(intro_kind, str) else None,
+        has_connectors_privacy_kb=has_kb,
+    )
 
     client = OpenAI(api_key=cfg.openai_api_key)
     kwargs = {
@@ -405,6 +406,13 @@ Readable summary:
     choice = resp.choices[0].message.content
     text = (choice or "").strip()
     if not text:
+        logger.warning(
+            "onboarding_llm: empty OpenAI message.content (model=%s intro_kind=%r max_out=%s); "
+            "using deterministic fallback (user may see internal instruction copy)",
+            cfg.openai_model,
+            intro_kind,
+            max_out,
+        )
         if intro_kind == "after_size":
             return _finalize_assistant_segments(_fallback_connectors_intro_after_size_bubbles())
         return _finalize_assistant_segments(

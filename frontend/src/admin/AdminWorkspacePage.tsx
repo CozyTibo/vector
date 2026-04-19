@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 import AdminTenantHardDelete from "./AdminTenantHardDelete";
+import AdminTenantResetToSignup from "./AdminTenantResetToSignup";
 import { StatusBadge } from "./ui/StatusBadge";
 
 type OnboardingBrief = {
@@ -326,9 +327,12 @@ export default function AdminWorkspacePage() {
           Sensitive workspace actions
         </h2>
         <p className="mt-1 text-xs text-stone-500">
-          Pause Slack delivery or delete company data — use only when you intend to change production
-          behavior for this workspace.
+          Pause Slack delivery, reset product data to a day-one state, or permanently delete the company —
+          use only when you intend to change production behavior for this workspace.
         </p>
+        <div className="mt-3">
+          <AdminTenantResetToSignup tenantId={tenantId} companyName={t.company_name} />
+        </div>
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-stretch">
           <div
             className={[

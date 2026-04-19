@@ -301,6 +301,42 @@ class AdminHardDeleteTenantRequest(BaseModel):
     )
 
 
+class AdminResetTenantToSignupRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match RESET_TENANT_TO_SIGNUP_CONFIRMATION_PHRASE in the admin UI.",
+    )
+    company_name_confirmation: str = Field(
+        ...,
+        description="Must match the tenant company name (after trim) for an extra safeguard.",
+    )
+
+
+class AdminResetTenantToSignupResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    company_name: str
+    deleted_relationships: int
+    deleted_mapping_events: int
+    deleted_current_mappings: int
+    deleted_external_references: int
+    deleted_actor_external_identities: int
+    deleted_artifacts: int
+    deleted_actors: int
+    deleted_step3_canonical_cursors: int
+    deleted_github_projection_rows: int
+    deleted_linear_projection_rows: int
+    deleted_connector_projection_progress_rows: int
+    deleted_raw_records: int
+    deleted_ingestion_runs: int
+    deleted_sync_state_rows: int
+    deleted_tenant_connections: int
+    deleted_manager_onboarding_sessions: int
+
+
 class AdminHardDeleteTenantResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

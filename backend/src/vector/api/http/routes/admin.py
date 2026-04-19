@@ -25,6 +25,8 @@ from vector.contracts.admin import (
     AdminHardDeleteTenantResponse,
     AdminHardDeleteTenantsBulkRequest,
     AdminHardDeleteTenantsBulkResponse,
+    AdminResetTenantToSignupRequest,
+    AdminResetTenantToSignupResponse,
     AdminStep1RawResetRequest,
     AdminStep1RawResetResponse,
     AdminStep2ProjectionsResetRequest,
@@ -93,6 +95,10 @@ from vector.domains.tenancy.hard_delete_tenant import (
     HARD_DELETE_TENANT_CONFIRMATION_PHRASE,
     hard_delete_tenant,
 )
+from vector.domains.tenancy.reset_tenant_to_fresh_signup import (
+    RESET_TENANT_TO_SIGNUP_CONFIRMATION_PHRASE,
+    reset_tenant_to_fresh_signup,
+)
 from vector.infrastructure.db.models.canonical import Step3CanonicalCursor
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.repositories import canonical_debug_queries as cq
@@ -109,6 +115,32 @@ from vector.settings import Settings
 
 GITHUB_ENTITIES = frozenset({"repositories", "pull_requests", "issues", "commits", "users"})
 LINEAR_ENTITIES = frozenset({"teams", "projects", "issues", "users", "issue_comments"})
+
+
+def _admin_reset_tenant_to_signup_response(out: dict[str, Any]) -> AdminResetTenantToSignupResponse:
+    s3 = out["step3"]
+    s2 = out["step2"]
+    s1 = out["step1"]
+    return AdminResetTenantToSignupResponse(
+        tenant_id=out["tenant_id"],
+        company_name=out["company_name"],
+        deleted_relationships=s3["deleted_relationships"],
+        deleted_mapping_events=s3["deleted_mapping_events"],
+        deleted_current_mappings=s3["deleted_current_mappings"],
+        deleted_external_references=s3["deleted_external_references"],
+        deleted_actor_external_identities=s3["deleted_actor_external_identities"],
+        deleted_artifacts=s3["deleted_artifacts"],
+        deleted_actors=s3["deleted_actors"],
+        deleted_step3_canonical_cursors=s3["deleted_step3_canonical_cursors"],
+        deleted_github_projection_rows=s2["deleted_github_projection_rows"],
+        deleted_linear_projection_rows=s2["deleted_linear_projection_rows"],
+        deleted_connector_projection_progress_rows=s2["deleted_connector_projection_progress_rows"],
+        deleted_raw_records=s1["deleted_raw_records"],
+        deleted_ingestion_runs=s1["deleted_ingestion_runs"],
+        deleted_sync_state_rows=s1["deleted_sync_state_rows"],
+        deleted_tenant_connections=out["deleted_tenant_connections"],
+        deleted_manager_onboarding_sessions=out["deleted_manager_onboarding_sessions"],
+    )
 
 
 def _admin_hard_delete_tenant_response(tenant_id: uuid.UUID, out: dict[str, Any]) -> AdminHardDeleteTenantResponse:
@@ -362,6 +394,36 @@ def build_admin_router() -> APIRouter:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
         db.commit()
         return _admin_hard_delete_tenant_response(tenant_id, out)
+
+    @r.post(
+        "/tenants/{tenant_id}/reset-to-fresh-signup",
+        response_model=AdminResetTenantToSignupResponse,
+    )
+    def admin_reset_tenant_to_fresh_signup(
+        tenant_id: uuid.UUID,
+        body: AdminResetTenantToSignupRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminResetTenantToSignupResponse:
+        """Wipe tenant product data and integrations; keep tenant row and memberships (day-one signup)."""
+        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
+        if t is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        if body.confirmation != RESET_TENANT_TO_SIGNUP_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        if t.company_name.strip() != body.company_name_confirmation.strip():
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Company name does not match this tenant.",
+            ) from None
+        try:
+            out = reset_tenant_to_fresh_signup(db, tenant_id=tenant_id)
+        except ValueError as e:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        db.commit()
+        return _admin_reset_tenant_to_signup_response(out)
 
     @r.post(
         "/tenants/hard-delete-bulk",
