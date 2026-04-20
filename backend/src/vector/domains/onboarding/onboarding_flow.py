@@ -31,6 +31,7 @@ from vector.domains.onboarding.constants import (
     STEP_SCANNING,
     STEP_SLACK_STAKEHOLDERS,
     STEP_THANK_YOU,
+    STEP_UNSUPPORTED_MANDATORY_TOOLS,
     TOOL_CATEGORY_KEYS,
 )
 
@@ -126,14 +127,36 @@ def _merge_tools_categories(
 
 
 def _connect_queue_from_tools(tools: dict[str, list[str]]) -> list[str]:
-    """Onboarding OAuth queue: Slack, or Teams/Discord placeholder only (no Linear/GitHub in-flow)."""
+    """Onboarding OAuth queue: Slack only (Linear/GitHub are not queued in this flow)."""
     q: list[str] = []
     comm = tools.get("communication") or []
     if "slack" in comm:
         q.append("slack")
-    elif "ms_teams" in comm or "discord" in comm:
-        q.append("comm_placeholder")
     return q
+
+
+def _unsupported_mandatory_sections(tools: dict[str, list[str]]) -> list[str]:
+    """Categories where the user's mandatory picks are not all supported in onboarding yet."""
+    out: list[str] = []
+    comm = tools.get("communication") or []
+    if isinstance(comm, list) and len(comm) > 0 and "slack" not in comm:
+        out.append("communication")
+    pm = tools.get("pm") or []
+    if isinstance(pm, list) and len(pm) > 0 and "linear" not in pm:
+        out.append("pm")
+    eng = tools.get("engineering") or []
+    if isinstance(eng, list) and len(eng) > 0 and "github" not in eng:
+        out.append("engineering")
+    return out
+
+
+def _unsupported_mandatory_labels_for_instruction(sections: list[str]) -> str:
+    mapping = {
+        "communication": "Communication (Microsoft Teams / Discord)",
+        "pm": "Project management (outside Linear)",
+        "engineering": "Engineering (outside GitHub)",
+    }
+    return ", ".join(mapping.get(s, s) for s in sections)
 
 
 def _queue_skip_connected(queue: list[str], *, slack_connected: bool) -> list[str]:
@@ -311,6 +334,20 @@ def handle_turn(
             },
         )
 
+    if current_step == STEP_UNSUPPORTED_MANDATORY_TOOLS:
+        return OnboardingTurnResult(
+            next_step=STEP_UNSUPPORTED_MANDATORY_TOOLS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are on the unsupported mandatory tools screen after confirming picks. "
+                    "The UI already explains we will email when those tools are available and offers "
+                    "Finish or Edit tools. Reply in one short sentence if needed; do not repeat the card."
+                ),
+            },
+        )
+
     if current_step == STEP_ADMIN_ACCESS:
         return OnboardingTurnResult(
             next_step=STEP_ADMIN_ACCESS,
@@ -468,11 +505,50 @@ def handle_turn(
                         ),
                     },
                 )
+            pm_sel = merged.get("pm") or []
+            if not isinstance(pm_sel, list) or len(pm_sel) == 0:
+                return OnboardingTurnResult(
+                    next_step=STEP_CHAT_PROFILE,
+                    answers_updates={},
+                    assistant_prompt_context={
+                        **ctx_base,
+                        "profile_phase": PROFILE_PHASE_TOOLS,
+                        "instruction": (
+                            "They confirmed without picking any project management tool "
+                            "(Linear, Jira, or ClickUp). Ask them to pick at least one, then confirm again."
+                        ),
+                    },
+                )
+            eng_sel = merged.get("engineering") or []
+            if not isinstance(eng_sel, list) or len(eng_sel) == 0:
+                return OnboardingTurnResult(
+                    next_step=STEP_CHAT_PROFILE,
+                    answers_updates={},
+                    assistant_prompt_context={
+                        **ctx_base,
+                        "profile_phase": PROFILE_PHASE_TOOLS,
+                        "instruction": (
+                            "They confirmed without picking any engineering tool "
+                            "(GitHub, GitLab, or Bitbucket). Ask them to pick at least one, then confirm again."
+                        ),
+                    },
+                )
             prior = _had_prior_tool_selection(answers)
             cq = _connect_queue_from_tools(merged)
             cq = _queue_skip_connected(cq, slack_connected=slack_connected)
+            unsupported = _unsupported_mandatory_sections(merged)
             oauth_labels = _oauth_connector_labels_in_order(cq)
             instr = _tools_post_pick_instruction(prior=prior, oauth_labels=oauth_labels)
+            if unsupported:
+                labels = _unsupported_mandatory_labels_for_instruction(unsupported)
+                instr = (
+                    "They confirmed tool picks where Vector does not yet support everything they need "
+                    f"in mandatory categories ({labels}). "
+                    "Acknowledge briefly without sounding alarmed. The product shows a card explaining "
+                    "we will email when they can finish onboarding with those tools, plus Finish and "
+                    "Edit tools. Do not promise OAuth or live ingestion for unsupported picks. "
+                    "Do not read their entire tool list."
+                )
             ti = _tools_interest_flat(merged)
             updates = {
                 "tools": merged,
@@ -480,9 +556,15 @@ def handle_turn(
                 "connect_queue": cq,
                 "connect_plan": list(cq),
                 "tools_interest": ti,
+                "unsupported_mandatory_sections": unsupported,
             }
+            next_step = (
+                STEP_UNSUPPORTED_MANDATORY_TOOLS
+                if unsupported
+                else _next_step_after_tool_connect_queue(cq, merged)
+            )
             return OnboardingTurnResult(
-                next_step=_next_step_after_tool_connect_queue(cq, merged),
+                next_step=next_step,
                 answers_updates=updates,
                 assistant_prompt_context={
                     **ctx_base,
@@ -492,6 +574,7 @@ def handle_turn(
                     "tools_selection_revision": prior,
                     "connect_queue_next": cq,
                     "oauth_connector_labels_in_order": oauth_labels,
+                    "unsupported_mandatory_sections": unsupported,
                 },
             )
         return OnboardingTurnResult(
@@ -660,8 +743,9 @@ def _instruction_for_phase(phase: str, answers: dict[str, Any]) -> str:
         return (
             "The user is on the tool picker step. If they seem lost, nudge them to list the tools "
             "their organization actually uses so you can understand how to help, not to pick "
-            "products from a catalog. One communication tool is required; they can add PM, engineering, "
-            "docs, and CRM / support tools that reflect how work runs."
+            "products from a catalog. They must pick at least one communication tool, one project "
+            "management tool, and one engineering tool before confirming; video calls, calendars, "
+            "and documentation tools are optional."
         )
     if phase == PROFILE_PHASE_DONE:
         return "Profile is complete; transition messaging is handled elsewhere."

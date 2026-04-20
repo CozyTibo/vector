@@ -130,6 +130,56 @@ function unsupportedCommunicationPickLabel(answers: Record<string, unknown>): st
   return "Microsoft Teams or Discord";
 }
 
+const UNSUPPORTED_MANDATORY_SECTION_KEYS = ["communication", "pm", "engineering"] as const;
+
+function unsupportedMandatorySectionsFromAnswers(answers: Record<string, unknown>): string[] {
+  const raw = answers.unsupported_mandatory_sections;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter(
+    (x): x is string =>
+      typeof x === "string" && (UNSUPPORTED_MANDATORY_SECTION_KEYS as readonly string[]).includes(x),
+  );
+}
+
+/** Readable scope for the unsupported-mandatory card (one, two, or three areas). */
+function unsupportedMandatoryScopeDescription(sections: string[]): string {
+  const labels: Record<string, string> = {
+    communication: "communication tools such as Microsoft Teams or Discord",
+    pm: "project management tools outside Linear (for example Jira or ClickUp)",
+    engineering: "engineering tools outside GitHub (for example GitLab or Bitbucket)",
+  };
+  const parts = sections.map((s) => labels[s] ?? s);
+  if (parts.length === 1) {
+    return parts[0]!;
+  }
+  if (parts.length === 2) {
+    return `${parts[0]} and ${parts[1]}`;
+  }
+  return `${parts[0]}, ${parts[1]}, and ${parts[2]}`;
+}
+
+function nextStepAfterUnsupportedMandatoryDismissed(
+  answers: Record<string, unknown>,
+  slackConnected: boolean,
+): OnboardingStep {
+  const rawQ = answers.connect_queue;
+  const q = (Array.isArray(rawQ) ? rawQ : []).filter((x): x is string => typeof x === "string");
+  if (q[0] === "slack" && !slackConnected) {
+    return "CONNECT_COMMUNICATION";
+  }
+  if (q[0] === "comm_placeholder") {
+    return "CONNECT_COMMUNICATION";
+  }
+  const tools = answers.tools as Record<string, string[]> | undefined;
+  const comm = tools?.communication ?? [];
+  if (comm.includes("slack") && slackConnected) {
+    return "SLACK_STAKEHOLDERS";
+  }
+  return "SCANNING";
+}
+
 /** UI-only Slack handoff rows (not persisted); see ``slackHandoffSyntheticMessages``. */
 function syntheticStakeholderStepMessages(answers: Record<string, unknown>, startTs: number): ChatMessage[] {
   return slackHandoffSyntheticMessages(primaryCommunicationToolLabel(answers), startTs);
@@ -511,7 +561,7 @@ export default function OnboardingPage() {
 
   const userLabel = "You";
 
-  /** Tool picker UI: core categories only (CRM stays in state for backwards compatibility). */
+  /** Tool picker groups (mirrors ``ONBOARDING_TOOL_GROUPS`` / backend catalog). */
   const toolGroupsUi = ONBOARDING_TOOL_GROUPS;
 
   useEffect(() => {
@@ -548,6 +598,39 @@ export default function OnboardingPage() {
       setFinishOnboardingError(e instanceof Error ? e.message : "Could not finish onboarding.");
     },
   });
+
+  const [unsupportedMandatoryContinueBusy, setUnsupportedMandatoryContinueBusy] = useState(false);
+
+  const continuePastUnsupportedMandatory = useCallback(async () => {
+    if (!server) {
+      return;
+    }
+    setFinishOnboardingError(null);
+    setUnsupportedMandatoryContinueBusy(true);
+    const cleared = { ...server.answers, unsupported_mandatory_sections: [] as string[] };
+    const next = nextStepAfterUnsupportedMandatoryDismissed(cleared, server.slack_connected);
+    try {
+      if (next === "CONNECT_COMMUNICATION") {
+        await patchOnboarding(apiBase, { current_step: "CONNECT_COMMUNICATION", answers: cleared });
+      } else if (next === "SLACK_STAKEHOLDERS") {
+        await patchOnboarding(apiBase, {
+          current_step: "SLACK_STAKEHOLDERS",
+          answers: { ...cleared, connect_queue: [], connect_plan: [] },
+        });
+      } else {
+        await patchOnboarding(apiBase, { answers: cleared });
+        await completeOnboarding(apiBase);
+      }
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+      }
+      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+    } catch (e) {
+      setFinishOnboardingError(e instanceof Error ? e.message : "Could not continue.");
+    } finally {
+      setUnsupportedMandatoryContinueBusy(false);
+    }
+  }, [apiBase, qc, server, tenantId]);
 
   const restartOnboardingMut = useMutation({
     mutationFn: () => postRestartOnboarding(apiBase),
@@ -877,7 +960,11 @@ export default function OnboardingPage() {
     if (chatBusy) {
       return;
     }
-    if ((toolPick.communication ?? []).length === 0) {
+    if (
+      (toolPick.communication ?? []).length === 0 ||
+      (toolPick.pm ?? []).length === 0 ||
+      (toolPick.engineering ?? []).length === 0
+    ) {
       return;
     }
     const toolsPayload = toolPickToBackendPayload(toolPick);
@@ -1264,8 +1351,8 @@ export default function OnboardingPage() {
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <div
                 className={
-                  "flex h-[min(30vh,260px)] shrink-0 flex-col overflow-hidden border-b border-zinc-100/80 " +
-                  "sm:h-[min(34vh,300px)]"
+                  "flex h-[min(30dvh,216px)] shrink-0 flex-col overflow-hidden border-b border-zinc-100/80 " +
+                  "sm:h-[min(36dvh,276px)]"
                 }
               >
                 {chatScrollArea}
@@ -1332,6 +1419,75 @@ export default function OnboardingPage() {
           }
         >
           {chatBody}
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "UNSUPPORTED_MANDATORY_TOOLS" && server) {
+    const unsupportedSections = unsupportedMandatorySectionsFromAnswers(server.answers);
+    const scopeText =
+      unsupportedSections.length > 0 ? unsupportedMandatoryScopeDescription(unsupportedSections) : "those tools";
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <ChatMessageList messages={messages} userDisplayName={userLabel} isTyping={isTyping} />
+            <div className="shrink-0 px-4 pb-8 pt-1 sm:px-5">
+              <div className="rounded-2xl border border-[#E878BE]/20 bg-white/95 p-5 shadow-[0_16px_44px_-28px_rgba(232,120,190,0.45)] ring-1 ring-zinc-950/[0.04] sm:p-6">
+                <div className="mx-auto max-w-md text-left">
+                  <h2 className="text-center text-lg font-semibold tracking-tight text-zinc-900 sm:text-left">
+                    Thanks for telling us
+                  </h2>
+                  <div className="mt-4 space-y-3 text-pretty text-sm leading-relaxed text-zinc-600">
+                    <p>
+                      We&apos;re sorry — Vector doesn&apos;t fully support your picks yet for{" "}
+                      <span className="font-medium text-zinc-800">{scopeText}</span>. We&apos;re on it, and
+                      we&apos;ll email you as soon as you can finish onboarding when those tools are available.
+                    </p>
+                    <p>
+                      You can still explore the app. If you&apos;d like to choose different tools, use{" "}
+                      <span className="font-medium text-zinc-800">Edit tools</span> below.
+                    </p>
+                  </div>
+                  {finishOnboardingError ? (
+                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-950">
+                      {finishOnboardingError}
+                    </p>
+                  ) : null}
+                  <div className="mt-6 flex w-full flex-col gap-2 border-t border-zinc-100/90 pt-5">
+                    <button
+                      type="button"
+                      disabled={unsupportedMandatoryContinueBusy || finishOnboardingMut.isPending}
+                      className="w-full rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => void continuePastUnsupportedMandatory()}
+                    >
+                      {unsupportedMandatoryContinueBusy || finishOnboardingMut.isPending
+                        ? "Continuing…"
+                        : "Finish and continue"}
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        CONNECTOR_STEP_FOOTER_LINK_CLASS +
+                        " w-full py-1 text-center text-[13px] font-medium text-zinc-600 hover:text-zinc-800"
+                      }
+                      onClick={() =>
+                        goToStep("CHAT_PROFILE", {
+                          ...server.answers,
+                          profile_phase: "tools",
+                          unsupported_mandatory_sections: [],
+                        })
+                      }
+                    >
+                      Edit tools
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </OnboardingChatLayout>
         {restartConfirmOverlay}
       </>

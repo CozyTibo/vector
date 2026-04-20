@@ -107,11 +107,15 @@ class OnboardingAdminSnapshot(BaseModel):
     tools_engineering: list[str] = Field(default_factory=list)
     tools_pm: list[str] = Field(default_factory=list)
     tools_communication: list[str] = Field(default_factory=list)
-    tools_docs: list[str] = Field(default_factory=list)
-    tools_crm: list[str] = Field(
+    tools_calls: list[str] = Field(
         default_factory=list,
-        description="CRM / customer support tool ids from answers_json.tools.crm.",
+        description="Video call tool ids from answers_json.tools.calls.",
     )
+    tools_calendars: list[str] = Field(
+        default_factory=list,
+        description="Calendar tool ids from answers_json.tools.calendars.",
+    )
+    tools_docs: list[str] = Field(default_factory=list)
     tools_stack: dict[str, Any] | None = Field(
         default=None,
         description="Legacy wizard: tools by category from answers_json.tools_stack.",
@@ -157,8 +161,9 @@ class AdminOnboardingCollectedDataPatch(BaseModel):
     tools_engineering: list[str] | None = None
     tools_pm: list[str] | None = None
     tools_communication: list[str] | None = None
+    tools_calls: list[str] | None = None
+    tools_calendars: list[str] | None = None
     tools_docs: list[str] | None = None
-    tools_crm: list[str] | None = None
 
 
 class AdminTenantPrimaryMemberFullNamePatchRequest(BaseModel):

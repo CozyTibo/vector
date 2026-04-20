@@ -15,6 +15,7 @@ from vector.domains.onboarding.constants import (
     STEP_CONNECT_COMMUNICATION,
     STEP_SLACK_STAKEHOLDERS,
     STEP_SCANNING,
+    STEP_UNSUPPORTED_MANDATORY_TOOLS,
 )
 from vector.domains.onboarding.onboarding_flow import handle_turn
 
@@ -140,8 +141,8 @@ def test_tools_selected_without_communication_does_not_advance() -> None:
     assert r.assistant_prompt_context["profile_phase"] == PROFILE_PHASE_TOOLS
 
 
-def test_tools_selected_slack_and_github_engineering_queues_slack_only() -> None:
-    """GitHub is stored but not queued; Slack is the in-flow OAuth target."""
+def test_tools_selected_without_pm_does_not_advance() -> None:
+    """At least one PM tool is required (with communication and engineering)."""
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -157,13 +158,13 @@ def test_tools_selected_slack_and_github_engineering_queues_slack_only() -> None
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
-    assert r.next_step == STEP_CONNECT_COMMUNICATION
-    assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
-    assert "github" in r.answers_updates["tools"]["engineering"]
-    assert r.answers_updates["connect_queue"] == ["slack"]
+    assert r.next_step == STEP_CHAT_PROFILE
+    assert r.answers_updates == {}
+    assert "project management" in r.assistant_prompt_context["instruction"].lower()
 
 
-def test_tools_selected_teams_only_goes_connect_comm() -> None:
+def test_tools_selected_without_engineering_does_not_advance() -> None:
+    """At least one engineering tool is required (with communication and PM)."""
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -173,13 +174,150 @@ def test_tools_selected_teams_only_goes_connect_comm() -> None:
         "type": "tools_selected",
         "tools": {
             "engineering": [],
-            "pm": [],
-            "communication": ["ms_teams"],
+            "pm": ["linear"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.next_step == STEP_CHAT_PROFILE
+    assert r.answers_updates == {}
+    assert "engineering" in r.assistant_prompt_context["instruction"].lower()
+
+
+def test_tools_selected_slack_and_github_engineering_queues_slack_only() -> None:
+    """GitHub is stored but not queued; Slack is the in-flow OAuth target."""
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["linear"],
+            "communication": ["slack"],
             "docs": [],
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
     assert r.next_step == STEP_CONNECT_COMMUNICATION
+    assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
+    assert "github" in r.answers_updates["tools"]["engineering"]
+    assert r.answers_updates["connect_queue"] == ["slack"]
+    assert r.answers_updates.get("unsupported_mandatory_sections") == []
+
+
+def test_tools_selected_teams_only_goes_unsupported_mandatory() -> None:
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["linear"],
+            "communication": ["ms_teams"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.next_step == STEP_UNSUPPORTED_MANDATORY_TOOLS
+    assert r.answers_updates["unsupported_mandatory_sections"] == ["communication"]
+    assert r.answers_updates["connect_queue"] == []
+
+
+def test_tools_selected_slack_jira_github_goes_unsupported_mandatory_with_slack_queued() -> None:
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["jira"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.next_step == STEP_UNSUPPORTED_MANDATORY_TOOLS
+    assert r.answers_updates["unsupported_mandatory_sections"] == ["pm"]
+    assert r.answers_updates["connect_queue"] == ["slack"]
+
+
+def test_tools_selected_slack_linear_gitlab_goes_unsupported_mandatory_eng_only() -> None:
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["gitlab"],
+            "pm": ["linear"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.next_step == STEP_UNSUPPORTED_MANDATORY_TOOLS
+    assert r.answers_updates["unsupported_mandatory_sections"] == ["engineering"]
+    assert r.answers_updates["connect_queue"] == ["slack"]
+
+
+def test_tools_selected_slack_connected_jira_github_queues_pm_unsupported_only() -> None:
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["jira"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a, slack_connected=True)
+    assert r.next_step == STEP_UNSUPPORTED_MANDATORY_TOOLS
+    assert r.answers_updates["unsupported_mandatory_sections"] == ["pm"]
+    assert r.answers_updates["connect_queue"] == []
+
+
+def test_unsupported_mandatory_tools_idle_stays_put() -> None:
+    r = handle_turn(STEP_UNSUPPORTED_MANDATORY_TOOLS, "hello", None, {})
+    assert r.next_step == STEP_UNSUPPORTED_MANDATORY_TOOLS
+    assert r.answers_updates == {}
+
+
+def test_tools_selected_teams_jira_gitlab_all_three_mandatory_unsupported() -> None:
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["gitlab"],
+            "pm": ["jira"],
+            "communication": ["discord"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.next_step == STEP_UNSUPPORTED_MANDATORY_TOOLS
+    assert r.answers_updates["unsupported_mandatory_sections"] == ["communication", "pm", "engineering"]
+    assert r.answers_updates["connect_queue"] == []
 
 
 def test_tools_selected_moves_to_connect_slack_with_tools_merged() -> None:
@@ -203,6 +341,7 @@ def test_tools_selected_moves_to_connect_slack_with_tools_merged() -> None:
     assert "github" in r.answers_updates["tools"]["engineering"]
     assert "linear" in r.answers_updates["tools"]["pm"]
     assert r.answers_updates["connect_queue"] == ["slack"]
+    assert r.answers_updates.get("unsupported_mandatory_sections") == []
 
 
 def test_tools_selected_skips_already_connected_slack() -> None:

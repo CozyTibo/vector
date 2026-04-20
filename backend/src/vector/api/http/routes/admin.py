@@ -304,8 +304,9 @@ def _snapshot_from_onboarding(
         tools_engineering=_tools_category(ans, "engineering"),
         tools_pm=_tools_category(ans, "pm"),
         tools_communication=_tools_category(ans, "communication"),
+        tools_calls=_tools_category(ans, "calls"),
+        tools_calendars=_tools_category(ans, "calendars"),
         tools_docs=_tools_category(ans, "docs"),
-        tools_crm=_tools_category(ans, "crm"),
         tools_stack=_tools_stack(ans),
         slack_stakeholders=_slack_stakeholders_from_answers(ans),
         chat_messages=msgs,
@@ -370,8 +371,9 @@ def _apply_admin_onboarding_collected_patch(
         ("tools_engineering", "engineering"),
         ("tools_pm", "pm"),
         ("tools_communication", "communication"),
+        ("tools_calls", "calls"),
+        ("tools_calendars", "calendars"),
         ("tools_docs", "docs"),
-        ("tools_crm", "crm"),
     )
     if any(pk in patch for pk, _ in tool_cat_keys):
         tools = dict(out["tools"]) if isinstance(out.get("tools"), dict) else {}
@@ -408,8 +410,9 @@ def _validate_admin_onboarding_collected_patch(patch: dict[str, Any]) -> None:
         ("tools_engineering", "engineering"),
         ("tools_pm", "pm"),
         ("tools_communication", "communication"),
+        ("tools_calls", "calls"),
+        ("tools_calendars", "calendars"),
         ("tools_docs", "docs"),
-        ("tools_crm", "crm"),
     )
     for patch_key, cat in tool_patch_keys:
         if patch_key not in patch:

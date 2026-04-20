@@ -1,8 +1,8 @@
 import type { ToolGroupDef } from "./ToolSelectorBlock";
 
-/** Backend keys: engineering, pm, communication, docs, crm.
- * Keep ids in sync with ``ONBOARDING_TOOL_OPTIONS`` in
- * ``backend/src/vector/domains/onboarding/constants.py`` (admin + validation).
+/** Backend keys for ``answers_json.tools``. Keep ids in sync with
+ * ``ONBOARDING_TOOL_OPTIONS`` in ``backend/src/vector/domains/onboarding/constants.py``.
+ * Section order: Communication → PM → Engineering → Video calls → Documentation → Calendars.
  */
 export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
   {
@@ -33,6 +33,16 @@ export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
     ],
   },
   {
+    key: "calls",
+    label: "Video calls",
+    items: [
+      { id: "zoom", label: "Zoom" },
+      { id: "google_meet", label: "Google Meet" },
+      { id: "ms_teams", label: "Microsoft Teams" },
+      { id: "webex", label: "Webex" },
+    ],
+  },
+  {
     key: "docs",
     label: "Documentation",
     items: [
@@ -42,14 +52,13 @@ export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
     ],
   },
   {
-    key: "crm",
-    label: "CRM & customer support",
+    key: "calendars",
+    label: "Calendars",
     items: [
-      { id: "salesforce", label: "Salesforce" },
-      { id: "hubspot", label: "HubSpot" },
-      { id: "pipedrive", label: "Pipedrive" },
-      { id: "zendesk", label: "Zendesk" },
-      { id: "intercom", label: "Intercom" },
+      { id: "google_calendar", label: "Google Calendar" },
+      { id: "outlook_calendar", label: "Outlook / Microsoft 365" },
+      { id: "apple_calendar", label: "Apple Calendar" },
+      { id: "calendly", label: "Calendly" },
     ],
   },
 ];
@@ -62,10 +71,9 @@ export function emptyToolPick(): ToolPickState {
 
 /** Payload keys sent to backend onboarding_flow `tools_selected`. */
 export function toolPickToBackendPayload(pick: ToolPickState): Record<string, string[]> {
-  const keys = ["communication", "pm", "engineering", "docs", "crm"] as const;
   const out: Record<string, string[]> = {};
-  for (const k of keys) {
-    out[k] = [...(pick[k] ?? [])].sort();
+  for (const g of ONBOARDING_TOOL_GROUPS) {
+    out[g.key] = [...(pick[g.key] ?? [])].sort();
   }
   return out;
 }

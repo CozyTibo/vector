@@ -34,8 +34,9 @@ type OnboardingSnap = {
   tools_engineering: string[];
   tools_pm: string[];
   tools_communication: string[];
+  tools_calls?: string[];
+  tools_calendars?: string[];
   tools_docs: string[];
-  tools_crm: string[];
   tools_stack: Record<string, unknown> | null;
   slack_stakeholders: SlackStakeholdersSnap | null;
   chat_messages: ChatMsg[];
@@ -704,24 +705,6 @@ export default function AdminTenantOnboardingPage() {
                   {opts ? (
                     <>
                       <CollectedToolsMultiRow
-                        label="Engineering tools"
-                        fieldKey="tools_engineering"
-                        patchKey="tools_engineering"
-                        items={opts.tools_by_category.engineering ?? []}
-                        selectedIds={ob.tools_engineering}
-                        commitPatch={commitPatch}
-                        patchPending={patchPending}
-                      />
-                      <CollectedToolsMultiRow
-                        label="PM tools"
-                        fieldKey="tools_pm"
-                        patchKey="tools_pm"
-                        items={opts.tools_by_category.pm ?? []}
-                        selectedIds={ob.tools_pm}
-                        commitPatch={commitPatch}
-                        patchPending={patchPending}
-                      />
-                      <CollectedToolsMultiRow
                         label="Communication"
                         fieldKey="tools_communication"
                         patchKey="tools_communication"
@@ -731,7 +714,34 @@ export default function AdminTenantOnboardingPage() {
                         patchPending={patchPending}
                       />
                       <CollectedToolsMultiRow
-                        label="Docs"
+                        label="Project management"
+                        fieldKey="tools_pm"
+                        patchKey="tools_pm"
+                        items={opts.tools_by_category.pm ?? []}
+                        selectedIds={ob.tools_pm}
+                        commitPatch={commitPatch}
+                        patchPending={patchPending}
+                      />
+                      <CollectedToolsMultiRow
+                        label="Engineering"
+                        fieldKey="tools_engineering"
+                        patchKey="tools_engineering"
+                        items={opts.tools_by_category.engineering ?? []}
+                        selectedIds={ob.tools_engineering}
+                        commitPatch={commitPatch}
+                        patchPending={patchPending}
+                      />
+                      <CollectedToolsMultiRow
+                        label="Video calls"
+                        fieldKey="tools_calls"
+                        patchKey="tools_calls"
+                        items={opts.tools_by_category.calls ?? []}
+                        selectedIds={ob.tools_calls ?? []}
+                        commitPatch={commitPatch}
+                        patchPending={patchPending}
+                      />
+                      <CollectedToolsMultiRow
+                        label="Documentation"
                         fieldKey="tools_docs"
                         patchKey="tools_docs"
                         items={opts.tools_by_category.docs ?? []}
@@ -740,11 +750,11 @@ export default function AdminTenantOnboardingPage() {
                         patchPending={patchPending}
                       />
                       <CollectedToolsMultiRow
-                        label="CRM & support"
-                        fieldKey="tools_crm"
-                        patchKey="tools_crm"
-                        items={opts.tools_by_category.crm ?? []}
-                        selectedIds={ob.tools_crm}
+                        label="Calendars"
+                        fieldKey="tools_calendars"
+                        patchKey="tools_calendars"
+                        items={opts.tools_by_category.calendars ?? []}
+                        selectedIds={ob.tools_calendars ?? []}
                         commitPatch={commitPatch}
                         patchPending={patchPending}
                       />
@@ -753,7 +763,7 @@ export default function AdminTenantOnboardingPage() {
                     <>
                       <dt className="text-stone-500">Tool pickers</dt>
                       <dd className="text-stone-500">
-                        Loading catalog (engineering, PM, communication, docs, CRM)…
+                        Loading catalog (tools by category)…
                       </dd>
                     </>
                   )}

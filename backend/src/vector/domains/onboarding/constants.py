@@ -6,8 +6,12 @@ from __future__ import annotations
 STEP_CHAT_PROFILE = "CHAT_PROFILE"
 
 # Connector OAuth screens (order is driven by `connect_queue` in answers).
-# Communication phase: Slack OAuth and/or Teams+Discord placeholder share this step; branch on queue head.
+# Communication phase: Slack OAuth; legacy rows may still have ``comm_placeholder`` in ``connect_queue``.
 STEP_CONNECT_COMMUNICATION = "CONNECT_COMMUNICATION"
+
+# Mandatory tool picks include categories Vector does not connect in onboarding yet (e.g. Teams-only,
+# or PM/engineering outside Linear/GitHub). In-product apology + finish or edit tools.
+STEP_UNSUPPORTED_MANDATORY_TOOLS = "UNSUPPORTED_MANDATORY_TOOLS"
 
 # After Slack OAuth: pick managers/people with @-mention autocomplete (Slack workspace roster).
 STEP_SLACK_STAKEHOLDERS = "SLACK_STAKEHOLDERS"
@@ -22,6 +26,7 @@ ONBOARDING_STEPS: frozenset[str] = frozenset(
     {
         STEP_CHAT_PROFILE,
         STEP_CONNECT_COMMUNICATION,
+        STEP_UNSUPPORTED_MANDATORY_TOOLS,
         STEP_SLACK_STAKEHOLDERS,
         STEP_ADMIN_ACCESS,
         STEP_SCANNING,
@@ -122,11 +127,11 @@ ONBOARDING_PROFILE_ROLE_VALUES: frozenset[str] = frozenset(
 )
 
 TOOL_CATEGORY_KEYS: frozenset[str] = frozenset(
-    {"communication", "engineering", "pm", "docs", "crm"},
+    {"communication", "pm", "engineering", "calls", "docs", "calendars"},
 )
 
 # Stored in ``answers_json.tools.<category>`` as string ids. Keep in sync with
-# ``frontend/src/components/onboarding/onboardingToolGroups.ts``.
+# ``frontend/src/components/onboarding/onboardingToolGroups.ts`` (section order there).
 ONBOARDING_TOOL_OPTIONS: tuple[tuple[str, str, str], ...] = (
     ("communication", "slack", "Slack"),
     ("communication", "ms_teams", "Microsoft Teams"),
@@ -137,14 +142,17 @@ ONBOARDING_TOOL_OPTIONS: tuple[tuple[str, str, str], ...] = (
     ("engineering", "github", "GitHub"),
     ("engineering", "gitlab", "GitLab"),
     ("engineering", "bitbucket", "Bitbucket"),
+    ("calls", "zoom", "Zoom"),
+    ("calls", "google_meet", "Google Meet"),
+    ("calls", "ms_teams", "Microsoft Teams"),
+    ("calls", "webex", "Webex"),
     ("docs", "notion", "Notion"),
     ("docs", "confluence", "Confluence"),
     ("docs", "google_docs", "Google Docs"),
-    ("crm", "salesforce", "Salesforce"),
-    ("crm", "hubspot", "HubSpot"),
-    ("crm", "pipedrive", "Pipedrive"),
-    ("crm", "zendesk", "Zendesk"),
-    ("crm", "intercom", "Intercom"),
+    ("calendars", "google_calendar", "Google Calendar"),
+    ("calendars", "outlook_calendar", "Outlook / Microsoft 365"),
+    ("calendars", "apple_calendar", "Apple Calendar"),
+    ("calendars", "calendly", "Calendly"),
 )
 
 
