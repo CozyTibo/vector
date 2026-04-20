@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import uuid
 from typing import Annotated, Any, Literal
 
@@ -18,6 +19,10 @@ from vector.api.http.routes.admin_manager_onboarding import (
 from vector.api.http.serialization import orm_to_dict
 from vector.application.services import connector_sync
 from vector.contracts.admin import (
+    AdminOnboardingAnswerOptionsResponse,
+    AdminOnboardingCollectedDataPatch,
+    AdminTenantPrimaryMemberFullNamePatchRequest,
+    AdminToolOptionItem,
     AdminConnectionsResponse,
     AdminHardDeleteOrphanUserRequest,
     AdminHardDeleteOrphanUserResponse,
@@ -80,6 +85,15 @@ from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_re
 from vector.domains.ingestion.step1_reset import (
     STEP1_RAW_RESET_CONFIRMATION_PHRASE,
     wipe_step1_raw_for_tenant,
+)
+from vector.domains.onboarding.constants import (
+    ONBOARDING_ALL_TOOL_IDS,
+    ONBOARDING_PROFILE_ROLE_CANONICAL,
+    ONBOARDING_PROFILE_ROLE_VALUES,
+    ONBOARDING_TOOL_OPTIONS,
+    PROFILE_ROLE_OTHER,
+    TOOL_CATEGORY_KEYS,
+    onboarding_tool_ids_for_category,
 )
 from vector.domains.onboarding.onboarding_commands import dev_force_complete_website_onboarding_for_tenant
 from vector.domains.ingestion.step2_step3_reset import (
@@ -298,6 +312,146 @@ def _snapshot_from_onboarding(
     )
 
 
+def _coerce_str_list(v: object) -> list[str]:
+    if not isinstance(v, list):
+        return []
+    return [str(x).strip() for x in v if str(x).strip()]
+
+
+def _apply_admin_onboarding_collected_patch(
+    existing: dict[str, Any],
+    patch: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge admin edits into ``answers_json`` (profile/company/tools only; no FSM fields)."""
+    out: dict[str, Any] = copy.deepcopy(existing) if existing else {}
+
+    if "user_role" in patch:
+        val = patch["user_role"]
+        prof = dict(out["profile"]) if isinstance(out.get("profile"), dict) else {}
+        if isinstance(val, str) and val.strip():
+            prof["role"] = val.strip()
+        else:
+            prof.pop("role", None)
+        if prof:
+            out["profile"] = prof
+        else:
+            out.pop("profile", None)
+
+    if "company_website" in patch or "company_size" in patch:
+        comp = dict(out["company"]) if isinstance(out.get("company"), dict) else {}
+        if "company_website" in patch:
+            w = patch["company_website"]
+            if isinstance(w, str) and w.strip():
+                comp["website"] = w.strip()
+            else:
+                comp.pop("website", None)
+        if "company_size" in patch:
+            s = patch["company_size"]
+            if isinstance(s, str) and s.strip():
+                comp["size"] = s.strip()
+            else:
+                comp.pop("size", None)
+        if comp:
+            out["company"] = comp
+        else:
+            out.pop("company", None)
+
+    if "company_domain" in patch:
+        d = patch["company_domain"]
+        if isinstance(d, str) and d.strip():
+            out["company_domain"] = d.strip()
+        else:
+            out.pop("company_domain", None)
+
+    if "tools_interest" in patch:
+        out["tools_interest"] = _coerce_str_list(patch["tools_interest"])
+
+    tool_cat_keys = (
+        ("tools_engineering", "engineering"),
+        ("tools_pm", "pm"),
+        ("tools_communication", "communication"),
+        ("tools_docs", "docs"),
+        ("tools_crm", "crm"),
+    )
+    if any(pk in patch for pk, _ in tool_cat_keys):
+        tools = dict(out["tools"]) if isinstance(out.get("tools"), dict) else {}
+        for patch_key, cat in tool_cat_keys:
+            if patch_key in patch:
+                tools[cat] = _coerce_str_list(patch[patch_key])
+        out["tools"] = tools
+
+    return out
+
+
+def _build_admin_onboarding_answer_options() -> AdminOnboardingAnswerOptionsResponse:
+    roles = list(ONBOARDING_PROFILE_ROLE_CANONICAL) + [PROFILE_ROLE_OTHER]
+    by_cat: dict[str, list[AdminToolOptionItem]] = {c: [] for c in sorted(TOOL_CATEGORY_KEYS)}
+    for cat, tid, label in ONBOARDING_TOOL_OPTIONS:
+        by_cat.setdefault(cat, []).append(AdminToolOptionItem(id=tid, label=label))
+    return AdminOnboardingAnswerOptionsResponse(
+        profile_roles=roles,
+        tools_by_category=by_cat,
+    )
+
+
+def _validate_admin_onboarding_collected_patch(patch: dict[str, Any]) -> None:
+    if "user_role" in patch:
+        v = patch["user_role"]
+        if v is not None and (
+            not isinstance(v, str) or (v.strip() and v.strip() not in ONBOARDING_PROFILE_ROLE_VALUES)
+        ):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="user_role must be empty/null or one of the known profile roles.",
+            ) from None
+    tool_patch_keys: tuple[tuple[str, str], ...] = (
+        ("tools_engineering", "engineering"),
+        ("tools_pm", "pm"),
+        ("tools_communication", "communication"),
+        ("tools_docs", "docs"),
+        ("tools_crm", "crm"),
+    )
+    for patch_key, cat in tool_patch_keys:
+        if patch_key not in patch:
+            continue
+        ids = patch[patch_key]
+        if not isinstance(ids, list):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"{patch_key} must be a JSON array of tool ids.",
+            ) from None
+        allowed = onboarding_tool_ids_for_category(cat)
+        for i in ids:
+            if not isinstance(i, str):
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid tool id for {patch_key}: {i!r}",
+                ) from None
+            if i.strip() not in allowed:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid tool id for {patch_key}: {i!r}",
+                ) from None
+    if "tools_interest" in patch:
+        ti = patch["tools_interest"]
+        if not isinstance(ti, list):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="tools_interest must be a JSON array of tool ids.",
+            ) from None
+        for i in ti:
+            if not isinstance(i, str):
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid tools_interest id: {i!r}",
+                ) from None
+            if i.strip() not in ONBOARDING_ALL_TOOL_IDS:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid tools_interest id: {i!r}",
+                ) from None
+
+
 def _assert_tenant(session: Session, tenant_id: uuid.UUID) -> None:
     if tenancy_repo.get_tenant_by_id(session, tenant_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
@@ -311,6 +465,10 @@ def build_admin_router() -> APIRouter:
     )
     r.include_router(build_admin_manager_onboarding_router())
     r.include_router(build_admin_manager_onboarding_tenant_router())
+
+    @r.get("/meta/onboarding-answer-options", response_model=AdminOnboardingAnswerOptionsResponse)
+    def get_admin_onboarding_answer_options() -> AdminOnboardingAnswerOptionsResponse:
+        return _build_admin_onboarding_answer_options()
 
     @r.get("/tenants", response_model=TenantListResponse)
     def list_tenants(
@@ -516,6 +674,95 @@ def build_admin_router() -> APIRouter:
         t = tenancy_repo.get_tenant_by_id(db, tenant_id)
         if t is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
+        conns = dbg.list_tenant_connections_for_tenant(db, tenant_id=tenant_id)
+        member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
+        return TenantAdminDetailResponse(
+            id=t.id,
+            company_name=t.company_name,
+            created_at=t.created_at,
+            workspace_access_enabled=bool(t.workspace_access_enabled),
+            onboarding=_snapshot_from_onboarding(db, ob),
+            member_full_name=member.full_name if member else None,
+            member_email=member.email if member else None,
+            connected_connectors=[c.provider for c in conns],
+            slack_vector_paused=bool(t.slack_vector_paused),
+        )
+
+    @r.patch(
+        "/tenants/{tenant_id}/onboarding/collected-data",
+        response_model=TenantAdminDetailResponse,
+    )
+    def patch_tenant_onboarding_collected_data(
+        tenant_id: uuid.UUID,
+        body: AdminOnboardingCollectedDataPatch,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> TenantAdminDetailResponse:
+        """Update onboarding ``answers_json`` fields (user/company/tools); not status or timestamps."""
+        _assert_tenant(db, tenant_id)
+        row = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
+        if row is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail="No onboarding row for this tenant.",
+            ) from None
+        patch = body.model_dump(exclude_unset=True)
+        if not patch:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="No fields to update.",
+            ) from None
+        _validate_admin_onboarding_collected_patch(patch)
+        merged = _apply_admin_onboarding_collected_patch(dict(row.answers_json or {}), patch)
+        onboarding_repo.normalize_slack_stakeholders_in_place(merged)
+        row.answers_json = merged
+        row.version = int(row.version) + 1
+        db.commit()
+        db.refresh(row)
+        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
+        assert t is not None
+        ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
+        conns = dbg.list_tenant_connections_for_tenant(db, tenant_id=tenant_id)
+        member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
+        return TenantAdminDetailResponse(
+            id=t.id,
+            company_name=t.company_name,
+            created_at=t.created_at,
+            workspace_access_enabled=bool(t.workspace_access_enabled),
+            onboarding=_snapshot_from_onboarding(db, ob),
+            member_full_name=member.full_name if member else None,
+            member_email=member.email if member else None,
+            connected_connectors=[c.provider for c in conns],
+            slack_vector_paused=bool(t.slack_vector_paused),
+        )
+
+    @r.patch(
+        "/tenants/{tenant_id}/primary-member-full-name",
+        response_model=TenantAdminDetailResponse,
+    )
+    def patch_tenant_primary_member_full_name(
+        tenant_id: uuid.UUID,
+        body: AdminTenantPrimaryMemberFullNamePatchRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> TenantAdminDetailResponse:
+        """Update ``users.full_name`` for the primary (oldest) member of this tenant."""
+        _assert_tenant(db, tenant_id)
+        user = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
+        if user is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail="No membership user found for this tenant.",
+            ) from None
+        raw = body.member_full_name
+        if raw is None:
+            user.full_name = None
+        else:
+            s = raw.strip()
+            user.full_name = s if s else None
+        db.commit()
+        db.refresh(user)
+        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
+        assert t is not None
         ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
         conns = dbg.list_tenant_connections_for_tenant(db, tenant_id=tenant_id)
         member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)

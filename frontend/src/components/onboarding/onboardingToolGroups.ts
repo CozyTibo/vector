@@ -1,6 +1,9 @@
 import type { ToolGroupDef } from "./ToolSelectorBlock";
 
-/** Backend keys: engineering, pm, communication, docs, crm. */
+/** Backend keys: engineering, pm, communication, docs, crm.
+ * Keep ids in sync with ``ONBOARDING_TOOL_OPTIONS`` in
+ * ``backend/src/vector/domains/onboarding/constants.py`` (admin + validation).
+ */
 export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
   {
     key: "communication",

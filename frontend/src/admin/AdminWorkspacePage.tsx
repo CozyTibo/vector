@@ -248,21 +248,10 @@ export default function AdminWorkspacePage() {
               ? "Members can use the app and website onboarding."
               : "Signed-in members only see the waitlist thank-you page until you activate this workspace."}
           </p>
-          {workspaceAccessMut.isError ? (
-            <p className="mt-2 text-xs text-red-700">{(workspaceAccessMut.error as Error).message}</p>
-          ) : null}
-          <button
-            type="button"
-            className={`mt-3 w-fit ${accessBtn}`}
-            disabled={workspaceAccessMut.isPending}
-            onClick={() => workspaceAccessMut.mutate(!t.workspace_access_enabled)}
-          >
-            {workspaceAccessMut.isPending
-              ? "Updating…"
-              : t.workspace_access_enabled
-                ? "Move workspace to waitlist (deactivate)"
-                : "Activate workspace for product access"}
-          </button>
+          <p className="mt-2 text-[11px] text-stone-500">
+            Use <strong className="font-medium text-stone-700">Action</strong> below to activate, move to
+            waitlist, or run other workspace controls.
+          </p>
         </Tile>
 
         <Tile title="Company & contact">
@@ -288,33 +277,9 @@ export default function AdminWorkspacePage() {
           <p className="mt-2 line-clamp-2 text-xs text-stone-600">{websiteObLine}</p>
           <TileLink to={`/admin/tenants/${tenantId}/onboarding`}>Transcript &amp; answers →</TileLink>
           {import.meta.env.DEV ? (
-            <div className="mt-3 rounded border border-violet-200 bg-violet-50/80 p-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-violet-700">
-                Local dev only
-              </p>
-              <p className="mt-1 text-[11px] leading-snug text-violet-900/90">
-                Marks website onboarding completed so the member lands on the app dashboard (no Slack
-                handoff). Backend requires <span className="font-mono">ENV=development</span>.
-              </p>
-              {devCompleteWebsiteObMut.isError ? (
-                <p className="mt-1 text-xs text-red-700">{(devCompleteWebsiteObMut.error as Error).message}</p>
-              ) : null}
-              <button
-                type="button"
-                className="mt-2 rounded border border-violet-600 bg-violet-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
-                disabled={
-                  devCompleteWebsiteObMut.isPending ||
-                  (ob !== null && ob.status.toLowerCase() === "completed")
-                }
-                onClick={() => devCompleteWebsiteObMut.mutate()}
-              >
-                {devCompleteWebsiteObMut.isPending
-                  ? "Updating…"
-                  : ob !== null && ob.status.toLowerCase() === "completed"
-                    ? "Already on dashboard path"
-                    : "Skip website onboarding → dashboard"}
-              </button>
-            </div>
+            <p className="mt-2 text-[11px] text-stone-500">
+              Dev shortcut to mark onboarding done lives under <strong className="font-medium text-stone-700">Action</strong> below.
+            </p>
           ) : null}
         </Tile>
 
@@ -345,36 +310,79 @@ export default function AdminWorkspacePage() {
 
       </div>
 
-      <details className="rounded border border-stone-200 bg-stone-50/80 text-xs">
-        <summary className="cursor-pointer select-none px-2 py-1.5 font-medium text-stone-600">
-          Debug: IDs
-        </summary>
-        <div className="border-t border-stone-200 bg-white px-2 py-2 font-mono text-[11px] text-stone-600">
-          <p>tenant_id {t.id}</p>
-          <ul className="mt-1 space-y-0.5">
-            {connQ.data.items.map((c) => (
-              <li key={c.id}>
-                {c.provider}: {c.id}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </details>
-
       <section
         className="rounded-lg border border-stone-300/90 bg-stone-50/60 p-3 shadow-sm ring-1 ring-stone-950/[0.04]"
-        aria-labelledby="workspace-sensitive-actions-heading"
+        aria-labelledby="workspace-actions-heading"
       >
         <h2
-          id="workspace-sensitive-actions-heading"
+          id="workspace-actions-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-stone-600"
         >
-          Sensitive workspace actions
+          Action
         </h2>
         <p className="mt-1 text-xs text-stone-500">
-          Pause Slack delivery, reset product data to a day-one state, or permanently delete the company —
-          use only when you intend to change production behavior for this workspace.
+          Activate product access or return a workspace to the waitlist, reset signup state, pause or
+          resume Slack delivery, or permanently delete the company. Local-only shortcuts appear when
+          running the admin UI in development. These change live behavior — use deliberately.
         </p>
+
+        <div className="mt-3 rounded-md border border-stone-200 bg-white p-3 shadow-sm">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-stone-600">Product access</h3>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <StatusBadge tone={t.workspace_access_enabled ? "ok" : "warn"}>
+              {t.workspace_access_enabled ? "Active" : "Waitlist"}
+            </StatusBadge>
+          </div>
+          <p className="mt-2 text-xs text-stone-600">
+            {t.workspace_access_enabled
+              ? "Members can use the app and website onboarding."
+              : "Signed-in members only see the waitlist thank-you page until you activate this workspace."}
+          </p>
+          {workspaceAccessMut.isError ? (
+            <p className="mt-2 text-xs text-red-700">{(workspaceAccessMut.error as Error).message}</p>
+          ) : null}
+          <button
+            type="button"
+            className={`mt-3 w-fit ${accessBtn}`}
+            disabled={workspaceAccessMut.isPending}
+            onClick={() => workspaceAccessMut.mutate(!t.workspace_access_enabled)}
+          >
+            {workspaceAccessMut.isPending
+              ? "Updating…"
+              : t.workspace_access_enabled
+                ? "Move workspace to waitlist (deactivate)"
+                : "Activate workspace for product access"}
+          </button>
+        </div>
+
+        {import.meta.env.DEV ? (
+          <div className="mt-3 rounded-md border border-violet-200 bg-violet-50/80 p-3">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-violet-700">Local dev only</p>
+            <p className="mt-1 text-xs leading-snug text-violet-900/90">
+              Marks website onboarding completed so the member lands on the app dashboard (no Slack
+              handoff). Backend requires <span className="font-mono">ENV=development</span>.
+            </p>
+            {devCompleteWebsiteObMut.isError ? (
+              <p className="mt-2 text-xs text-red-700">{(devCompleteWebsiteObMut.error as Error).message}</p>
+            ) : null}
+            <button
+              type="button"
+              className="mt-2 rounded border border-violet-600 bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              disabled={
+                devCompleteWebsiteObMut.isPending ||
+                (ob !== null && ob.status.toLowerCase() === "completed")
+              }
+              onClick={() => devCompleteWebsiteObMut.mutate()}
+            >
+              {devCompleteWebsiteObMut.isPending
+                ? "Updating…"
+                : ob !== null && ob.status.toLowerCase() === "completed"
+                  ? "Already on dashboard path"
+                  : "Skip website onboarding → dashboard"}
+            </button>
+          </div>
+        ) : null}
+
         <div className="mt-3">
           <AdminTenantResetToSignup tenantId={tenantId} companyName={t.company_name} />
         </div>
@@ -416,6 +424,22 @@ export default function AdminWorkspacePage() {
           </div>
         </div>
       </section>
+
+      <details className="rounded border border-stone-200 bg-stone-50/80 text-xs">
+        <summary className="cursor-pointer select-none px-2 py-1.5 font-medium text-stone-600">
+          Debug: IDs
+        </summary>
+        <div className="border-t border-stone-200 bg-white px-2 py-2 font-mono text-[11px] text-stone-600">
+          <p>tenant_id {t.id}</p>
+          <ul className="mt-1 space-y-0.5">
+            {connQ.data.items.map((c) => (
+              <li key={c.id}>
+                {c.provider}: {c.id}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
     </div>
   );
 }

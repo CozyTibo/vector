@@ -124,3 +124,32 @@ ONBOARDING_PROFILE_ROLE_VALUES: frozenset[str] = frozenset(
 TOOL_CATEGORY_KEYS: frozenset[str] = frozenset(
     {"communication", "engineering", "pm", "docs", "crm"},
 )
+
+# Stored in ``answers_json.tools.<category>`` as string ids. Keep in sync with
+# ``frontend/src/components/onboarding/onboardingToolGroups.ts``.
+ONBOARDING_TOOL_OPTIONS: tuple[tuple[str, str, str], ...] = (
+    ("communication", "slack", "Slack"),
+    ("communication", "ms_teams", "Microsoft Teams"),
+    ("communication", "discord", "Discord"),
+    ("pm", "linear", "Linear"),
+    ("pm", "jira", "Jira"),
+    ("pm", "clickup", "ClickUp"),
+    ("engineering", "github", "GitHub"),
+    ("engineering", "gitlab", "GitLab"),
+    ("engineering", "bitbucket", "Bitbucket"),
+    ("docs", "notion", "Notion"),
+    ("docs", "confluence", "Confluence"),
+    ("docs", "google_docs", "Google Docs"),
+    ("crm", "salesforce", "Salesforce"),
+    ("crm", "hubspot", "HubSpot"),
+    ("crm", "pipedrive", "Pipedrive"),
+    ("crm", "zendesk", "Zendesk"),
+    ("crm", "intercom", "Intercom"),
+)
+
+
+def onboarding_tool_ids_for_category(category: str) -> frozenset[str]:
+    return frozenset(tid for cat, tid, _ in ONBOARDING_TOOL_OPTIONS if cat == category)
+
+
+ONBOARDING_ALL_TOOL_IDS: frozenset[str] = frozenset(tid for _, tid, _ in ONBOARDING_TOOL_OPTIONS)

@@ -128,6 +128,51 @@ class OnboardingAdminSnapshot(BaseModel):
     )
 
 
+class AdminToolOptionItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    label: str
+
+
+class AdminOnboardingAnswerOptionsResponse(BaseModel):
+    """Allowed values for admin edits (mirrors product onboarding catalog)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    profile_roles: list[str]
+    tools_by_category: dict[str, list[AdminToolOptionItem]]
+
+
+class AdminOnboardingCollectedDataPatch(BaseModel):
+    """PATCH onboarding ``answers_json`` only — user/company/tool fields (not status, step, or timestamps)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_role: str | None = None
+    company_website: str | None = None
+    company_size: str | None = None
+    company_domain: str | None = None
+    tools_interest: list[str] | None = None
+    tools_engineering: list[str] | None = None
+    tools_pm: list[str] | None = None
+    tools_communication: list[str] | None = None
+    tools_docs: list[str] | None = None
+    tools_crm: list[str] | None = None
+
+
+class AdminTenantPrimaryMemberFullNamePatchRequest(BaseModel):
+    """PATCH ``users.full_name`` for the oldest membership on this tenant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    member_full_name: str | None = Field(
+        ...,
+        max_length=255,
+        description="Display name; JSON null or empty string clears ``users.full_name``.",
+    )
+
+
 class TenantAdminDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
