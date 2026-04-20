@@ -8,6 +8,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -37,6 +39,8 @@ from vector.domains.manager_onboarding.engine.prompts import build_reply_channel
 from vector.domains.manager_onboarding.engine.reply_context import format_recent_messages_transcript
 from vector.domains.manager_onboarding.engine.slack_text import normalize_manager_onboarding_outbound
 from vector.domains.manager_onboarding.engine.turn import run_engine_turn
+from vector.infrastructure.db.models.manager_onboarding_session import ManagerOnboardingSession
+from vector.infrastructure.db.models.manager_onboarding_session import ManagerOnboardingSession
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.repositories import manager_onboarding as mo_repo
 from vector.infrastructure.db.repositories import onboarding as ob_repo

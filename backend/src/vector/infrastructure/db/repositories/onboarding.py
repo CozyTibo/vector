@@ -29,6 +29,11 @@ def get_onboarding_for_tenant(session: Session, tenant_id: uuid.UUID) -> Onboard
     return session.scalar(stmt)
 
 
+def get_onboarding_for_tenant_for_update(session: Session, tenant_id: uuid.UUID) -> OnboardingState | None:
+    stmt = select(OnboardingState).where(OnboardingState.tenant_id == tenant_id).with_for_update()
+    return session.scalar(stmt)
+
+
 # Historical `current_step` values that may still exist in DB rows (never valid for new PATCHes).
 _LEGACY_DB_ONBOARDING_STEPS = frozenset({"CONNECT_GITHUB", "CONNECT_LINEAR"})
 _ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder"})
@@ -62,8 +67,14 @@ def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
         row.version = int(row.version) + 1
 
 
-def get_or_create_onboarding(session: Session, tenant_id: uuid.UUID) -> OnboardingState:
-    row = get_onboarding_for_tenant(session, tenant_id)
+def get_or_create_onboarding(
+    session: Session, tenant_id: uuid.UUID, *, with_for_update: bool = False
+) -> OnboardingState:
+    row = (
+        get_onboarding_for_tenant_for_update(session, tenant_id)
+        if with_for_update
+        else get_onboarding_for_tenant(session, tenant_id)
+    )
     if row is not None:
         normalize_onboarding_row_removed_steps(row)
         return row

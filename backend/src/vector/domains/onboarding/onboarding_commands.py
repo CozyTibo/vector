@@ -42,46 +42,20 @@ from vector.infrastructure.db.repositories import linear_connection as linear_re
 from vector.infrastructure.db.repositories import onboarding as ob_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
+from vector.settings import get_settings
 
 _logger = logging.getLogger("app")
 
 
-def _manager_ob_intro_already_sent(db: Session, tenant_id: uuid.UUID, slack_user_id: str) -> bool:
-    from vector.infrastructure.db.repositories import manager_onboarding as mo_repo
-
-    sess = mo_repo.get_session_for_tenant_slack_user(
-        db,
-        tenant_id=tenant_id,
-        slack_user_id=slack_user_id,
-    )
-    if sess is None:
-        return False
-    ctx = dict(sess.context_json or {})
-    return bool(ctx.get("intro_sent"))
-
-
-def _enqueue_manager_slack_onboarding_intro_if_needed(
-    db: Session,
-    *,
-    tenant_id: uuid.UUID,
-    slack_user_id: str,
-) -> None:
-    try:
-        from vector.settings import get_settings
-
-        if not get_settings().manager_slack_onboarding_enabled:
-            return
-        if _manager_ob_intro_already_sent(db, tenant_id, slack_user_id):
-            return
-        from app.tasks.manager_onboarding import send_manager_onboarding_intro_task
-
-        send_manager_onboarding_intro_task.delay(str(tenant_id), slack_user_id)
-    except Exception as exc:
-        _logger.warning(
-            "Could not enqueue manager Slack onboarding intro tenant=%s: %s",
-            tenant_id,
-            exc,
-        )
+def _primary_slack_stakeholder_user_id(merged_answers: dict[str, Any]) -> str | None:
+    ss = merged_answers.get("slack_stakeholders")
+    if not isinstance(ss, dict):
+        return None
+    ids = ss.get("slack_user_ids")
+    if not isinstance(ids, list) or not ids:
+        return None
+    primary = str(ids[0]).strip()
+    return primary or None
 
 
 def _slack_stakeholders_user_chat_line(ss: Any) -> str | None:
@@ -156,42 +130,52 @@ def _maybe_send_slack_handoff_welcome_dm(
     *,
     tenant_id: uuid.UUID,
     merged_answers: dict[str, Any],
-) -> None:
+) -> bool:
+    """Send optional short Slack handoff DM; return True if ``answers_json`` changed.
+
+    When ``manager_slack_onboarding_enabled`` is on, skip the standalone \"Hi\" DM — the manager intro
+    already opens the conversation — but still record idempotency so we do not re-send.
+
+    Call only from ``complete_onboarding`` (not PATCH) so we never double-send when the client saves
+    stakeholders and completes in the same flow.
+
+    In-place JSON mutations on ``OnboardingState.answers_json`` are not always detected by SQLAlchemy;
+    callers should assign ``row.answers_json = merged`` after this returns True.
+    """
     sl = slack_repo.get_slack_connection_for_tenant(db, tenant_id)
     if sl is None:
-        return
+        return False
     ss = merged_answers.get("slack_stakeholders")
     if not isinstance(ss, dict):
-        return
+        return False
     ids = ss.get("slack_user_ids")
     if not isinstance(ids, list) or not ids:
-        return
+        return False
     primary = str(ids[0]).strip()
     if not primary:
-        return
+        return False
     if merged_answers.get(SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY) == primary:
-        _enqueue_manager_slack_onboarding_intro_if_needed(
-            db,
-            tenant_id=tenant_id,
-            slack_user_id=primary,
-        )
-        return
-    try:
-        send_slack_handoff_welcome_dm(sl.detail.bot_access_token, primary)
-    except Exception as e:
-        _logger.warning(
-            "Slack onboarding handoff welcome DM failed for tenant=%s slack_user=%s: %s",
+        return False
+    skip_short_wave = bool(get_settings().manager_slack_onboarding_enabled)
+    if not skip_short_wave:
+        try:
+            send_slack_handoff_welcome_dm(sl.detail.bot_access_token, primary)
+        except Exception as e:
+            _logger.warning(
+                "Slack onboarding handoff welcome DM failed for tenant=%s slack_user=%s: %s",
+                tenant_id,
+                primary,
+                e,
+            )
+            return False
+    else:
+        _logger.info(
+            "Skipping standalone Slack handoff welcome DM (manager intro covers greeting) tenant=%s slack_user=%s",
             tenant_id,
             primary,
-            e,
         )
-        return
     merged_answers[SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY] = primary
-    _enqueue_manager_slack_onboarding_intro_if_needed(
-        db,
-        tenant_id=tenant_id,
-        slack_user_id=primary,
-    )
+    return True
 
 
 def _get_response_bundle(
@@ -278,12 +262,6 @@ def patch_onboarding(
                         content=line,
                     )
 
-        _maybe_send_slack_handoff_welcome_dm(
-            db,
-            tenant_id=claims.tenant_id,
-            merged_answers=merged_snapshot,
-        )
-
     row.version = int(row.version) + 1
     db.commit()
     db.refresh(row)
@@ -316,8 +294,9 @@ def list_slack_workspace_members_for_onboarding(
 
 
 def complete_onboarding(db: Session, claims: SessionClaims) -> OnboardingCompleteResponse:
-    row = ob_repo.get_or_create_onboarding(db, claims.tenant_id)
+    row = ob_repo.get_or_create_onboarding(db, claims.tenant_id, with_for_update=True)
     now = datetime.now(UTC)
+    intro_slack_user: str | None = None
     if row.status != STATUS_COMPLETED:
         merged = dict(row.answers_json or {})
         _maybe_send_slack_handoff_welcome_dm(
@@ -326,12 +305,36 @@ def complete_onboarding(db: Session, claims: SessionClaims) -> OnboardingComplet
             merged_answers=merged,
         )
         row.answers_json = merged
+        if get_settings().manager_slack_onboarding_enabled:
+            intro_slack_user = _primary_slack_stakeholder_user_id(merged)
         row.status = STATUS_COMPLETED
         row.current_step = STEP_THANK_YOU
         row.completed_at = now
         row.version = int(row.version) + 1
         db.commit()
     db.refresh(row)
+    if intro_slack_user:
+        from vector.domains.manager_onboarding.service import run_send_intro_task
+
+        try:
+            run_send_intro_task(tenant_id=claims.tenant_id, slack_user_id=intro_slack_user)
+        except Exception as exc:
+            _logger.warning(
+                "Inline manager Slack onboarding intro failed tenant=%s slack_user=%s: %s; retrying async",
+                claims.tenant_id,
+                intro_slack_user,
+                exc,
+            )
+            try:
+                from app.tasks.manager_onboarding import send_manager_onboarding_intro_task
+
+                send_manager_onboarding_intro_task.delay(str(claims.tenant_id), intro_slack_user)
+            except Exception as exc2:
+                _logger.warning(
+                    "Could not enqueue manager Slack onboarding intro tenant=%s: %s",
+                    claims.tenant_id,
+                    exc2,
+                )
     return OnboardingCompleteResponse(
         status=row.status,
         current_step=row.current_step,

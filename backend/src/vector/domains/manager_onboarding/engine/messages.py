@@ -6,13 +6,25 @@ import re
 from typing import Any
 
 
+# Leading tokens we skip so "El Tibo" greets as "Tibo", not "El".
+_INTRO_GREETING_LEADING_TOKENS = frozenset(
+    {"el", "la", "los", "las", "le", "les", "da", "de", "del", "von", "van"},
+)
+
+
 def _sanitize_intro_greeting_name(raw: object) -> str | None:
     if not isinstance(raw, str):
         return None
     s = raw.strip()
     if not s:
         return None
-    first = s.split()[0].strip(".,!?\"'")
+    tokens = [t.strip(".,!?\"'") for t in s.split() if t.strip()]
+    if not tokens:
+        return None
+    pick = tokens[0]
+    if len(tokens) >= 2 and pick.lower() in _INTRO_GREETING_LEADING_TOKENS:
+        pick = tokens[1]
+    first = pick.strip(".,!?\"'")
     if not first or not re.match(r"^[\w'.-]+$", first, re.UNICODE):
         return None
     return first[:32]
@@ -31,7 +43,7 @@ def intro_dm_text(*, context: dict[str, Any] | None = None) -> str:
 
     Context keys (from session ``context_json``, set by ``_ensure_intro_context_from_onboarding``):
 
-    - ``intro_greeting_name``: full name from profile; first word used for "Hey {name}."
+    - ``intro_greeting_name``: display name from profile; first substantive token for "Hey {name}."
     - ``intro_company_name``: company name from onboarding
     - ``intro_role``: role string from profile (optional)
     - ``intro_web_handoff``: truthy when we have web onboarding data to reference
