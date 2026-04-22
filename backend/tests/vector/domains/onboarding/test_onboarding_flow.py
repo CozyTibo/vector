@@ -14,6 +14,8 @@ from vector.domains.onboarding.constants import (
     STEP_CHAT_PROFILE,
     STEP_CONNECT_COMMUNICATION,
     STEP_CONNECT_PROJECT_MANAGEMENT,
+    STEP_SLACK_COLLABORATORS,
+    STEP_SLACK_COLLABORATORS_CONFIRM,
     STEP_SLACK_STAKEHOLDERS,
     STEP_SCANNING,
     STEP_UNSUPPORTED_MANDATORY_TOOLS,
@@ -427,3 +429,13 @@ def test_admin_access_step_stays_put() -> None:
     r = handle_turn(STEP_ADMIN_ACCESS, "hello", None, {})
     assert r.next_step == STEP_ADMIN_ACCESS
     assert r.answers_updates == {}
+
+
+def test_slack_collaborators_step_stays_put() -> None:
+    r = handle_turn(STEP_SLACK_COLLABORATORS, "hello", None, {})
+    assert r.next_step == STEP_SLACK_COLLABORATORS
+
+
+def test_slack_collaborators_confirm_step_stays_put() -> None:
+    r = handle_turn(STEP_SLACK_COLLABORATORS_CONFIRM, "hello", None, {})
+    assert r.next_step == STEP_SLACK_COLLABORATORS_CONFIRM

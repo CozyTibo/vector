@@ -106,15 +106,12 @@ migrate: $(DOTENV) build-backend
 migrate-down: $(DOTENV) build-backend
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic downgrade -1
 
-# Resets public.alembic_version to repo HEAD when the DB references a missing migration (branch switch).
-# Uses scripts/repair-alembic-version.sh (safe if alembic_version table does not exist yet).
+# Stamps head when alembic_version references a missing revision (branch switch). Safe if table missing.
 migrate-repair: $(DOTENV) build-backend
-	@COMPOSE="$(COMPOSE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" POSTGRES_SERVICE="$(POSTGRES_SERVICE)" BACKEND_SERVICE="$(BACKEND_SERVICE)" \
-		bash scripts/repair-alembic-version.sh "$(POSTGRES_DB)"
+	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) python -m vector.scripts.repair_alembic_version
 
 migrate-repair-test: $(DOTENV) build-backend
-	@COMPOSE="$(COMPOSE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" POSTGRES_SERVICE="$(POSTGRES_SERVICE)" BACKEND_SERVICE="$(BACKEND_SERVICE)" \
-		bash scripts/repair-alembic-version.sh vector_test
+	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) python -m vector.scripts.repair_alembic_version
 
 migrate-new: $(DOTENV) build-backend
 	@test -n "$(msg)" || (echo 'Usage: make migrate-new msg="description"' && exit 1)

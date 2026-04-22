@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from typing import Union
 
 from alembic import op
+from sqlalchemy import text
 
 revision: str = "20260422_0023"
 down_revision: Union[str, None] = "20260416_0022"
@@ -20,6 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Some DBs still have tables that FK to manager_onboarding_sessions but are not in this
+    # repo's Alembic history (e.g. older local/test schemas).
+    for _legacy in ("manager_onboarding_events", "execution_onboarding_states"):
+        op.execute(text(f'DROP TABLE IF EXISTS "{_legacy}" CASCADE'))
+
     # Order matches reverse of 20260410_0019_manager_slack_onboarding: children before sessions.
     op.drop_table("manager_onboarding_slack_event_dedup")
     op.drop_index("ix_manager_ob_ch_obs_session", table_name="manager_onboarding_channel_observations")

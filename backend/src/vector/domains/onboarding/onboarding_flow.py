@@ -31,6 +31,12 @@ from vector.domains.onboarding.constants import (
     STEP_CONNECT_ENGINEERING,
     STEP_CONNECT_PROJECT_MANAGEMENT,
     STEP_SCANNING,
+    STEP_SLACK_COLLABORATORS,
+    STEP_SLACK_COLLABORATORS_CONFIRM,
+    STEP_SLACK_TEAM_MEMBERS,
+    STEP_SLACK_TEAM_MEMBERS_CONFIRM,
+    STEP_SLACK_WATCH_CHANNELS,
+    STEP_SLACK_WATCH_CHANNELS_CONFIRM,
     STEP_SLACK_STAKEHOLDERS,
     STEP_THANK_YOU,
     STEP_UNSUPPORTED_MANDATORY_TOOLS,
@@ -425,6 +431,84 @@ def handle_turn(
                 "instruction": (
                     "They are on the final onboarding screen. Tell them to use the on-screen control "
                     "to continue to the app; do not promise more chat steps."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_TEAM_MEMBERS:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_TEAM_MEMBERS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are picking Slack team members (excluding managers already chosen). "
+                    "Nudge them to use the on-screen roster and Continue."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_TEAM_MEMBERS_CONFIRM:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_TEAM_MEMBERS_CONFIRM,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are confirming their Slack team list before choosing channels to watch. "
+                    "Nudge them to use Edit or Continue in the product UI."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_WATCH_CHANNELS:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_WATCH_CHANNELS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are picking Slack channels for Vector to watch. "
+                    "Nudge them to use the channel list and Continue."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_WATCH_CHANNELS_CONFIRM:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_WATCH_CHANNELS_CONFIRM,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are confirming Slack channels to monitor. "
+                    "Nudge them to use Edit or Continue in the product UI."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_COLLABORATORS:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_COLLABORATORS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are picking Slack collaborators (other managers) in the onboarding UI. "
+                    "If they chat here by mistake, nudge them to use the on-screen search and Continue."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_COLLABORATORS_CONFIRM:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_COLLABORATORS_CONFIRM,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are reviewing their Slack collaborator list before the final screen. "
+                    "Nudge them to use Edit or Continue in the product UI."
                 ),
             },
         )

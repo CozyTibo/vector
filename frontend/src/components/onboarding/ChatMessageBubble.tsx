@@ -31,6 +31,98 @@ function structuredOnlyUserDisplayLabel(content: string): string | null {
   }
 }
 
+type SlackCollaboratorChip = {
+  slack_user_id: string;
+  username: string;
+  label: string;
+};
+
+function tryParseSlackCollaboratorsSelectedContent(content: string): SlackCollaboratorChip[] | null {
+  const t = content.trim();
+  if (!t.startsWith("{")) {
+    return null;
+  }
+  try {
+    const o = JSON.parse(t) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      return null;
+    }
+    const rec = o as Record<string, unknown>;
+    if (rec.type !== "slack_collaborators_selected" && rec.type !== "slack_team_members_selected") {
+      return null;
+    }
+    const raw = rec.members;
+    if (!Array.isArray(raw)) {
+      return null;
+    }
+    const out: SlackCollaboratorChip[] = [];
+    for (const m of raw) {
+      if (!m || typeof m !== "object" || Array.isArray(m)) {
+        continue;
+      }
+      const row = m as Record<string, unknown>;
+      const id = row.slack_user_id;
+      const un = row.username;
+      const lab = row.label;
+      if (typeof id !== "string" || !id.trim()) {
+        continue;
+      }
+      const username =
+        typeof un === "string" && un.trim() ? un.trim().replace(/^@/, "") : id.trim();
+      const label =
+        typeof lab === "string" && lab.trim() ? lab.trim() : username;
+      out.push({ slack_user_id: id.trim(), username, label });
+    }
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+type SlackWatchChannelChip = {
+  channel_id: string;
+  name: string;
+};
+
+function tryParseSlackWatchChannelsSelectedContent(content: string): SlackWatchChannelChip[] | null {
+  const t = content.trim();
+  if (!t.startsWith("{")) {
+    return null;
+  }
+  try {
+    const o = JSON.parse(t) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      return null;
+    }
+    const rec = o as Record<string, unknown>;
+    if (rec.type !== "slack_watch_channels_selected") {
+      return null;
+    }
+    const raw = rec.channels;
+    if (!Array.isArray(raw)) {
+      return null;
+    }
+    const out: SlackWatchChannelChip[] = [];
+    for (const ch of raw) {
+      if (!ch || typeof ch !== "object" || Array.isArray(ch)) {
+        continue;
+      }
+      const row = ch as Record<string, unknown>;
+      const id = row.channel_id;
+      const nm = row.name;
+      if (typeof id !== "string" || !id.trim()) {
+        continue;
+      }
+      const name =
+        typeof nm === "string" && nm.trim() ? nm.trim().replace(/^#/, "") : id.trim();
+      out.push({ channel_id: id.trim(), name });
+    }
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 function tryParseToolsSelectedContent(content: string): Record<string, string[]> | null {
   const t = content.trim();
   if (!t.startsWith("{")) {
@@ -130,10 +222,16 @@ export default function ChatMessageBubble({
 
   const isUser = message.role === "user";
   const toolsPick = isUser ? tryParseToolsSelectedContent(message.content) : null;
+  const collaboratorsPick = isUser ? tryParseSlackCollaboratorsSelectedContent(message.content) : null;
+  const watchChannelsPick = isUser ? tryParseSlackWatchChannelsSelectedContent(message.content) : null;
   const structuredOnlyLabel =
-    isUser && !toolsPick ? structuredOnlyUserDisplayLabel(message.content) : null;
+    isUser && !toolsPick && !collaboratorsPick && !watchChannelsPick
+      ? structuredOnlyUserDisplayLabel(message.content)
+      : null;
   const persistedConnectorLabel =
-    isUser && !toolsPick && !structuredOnlyLabel ? connectorConnectedDisplayLabel(message.content) : null;
+    isUser && !toolsPick && !collaboratorsPick && !watchChannelsPick && !structuredOnlyLabel
+      ? connectorConnectedDisplayLabel(message.content)
+      : null;
 
   if (isUser) {
     if (persistedConnectorLabel) {
@@ -159,7 +257,29 @@ export default function ChatMessageBubble({
               "to-[#F8D4E8] px-4 py-2.5 text-[15px] leading-relaxed text-zinc-900 shadow-[0_10px_28px_-18px_rgba(232,120,190,0.55)]"
             }
           >
-            {toolsPick ? (
+            {collaboratorsPick ? (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {collaboratorsPick.map((m) => (
+                  <span
+                    key={m.slack_user_id}
+                    className="inline-flex max-w-full items-center rounded-full border border-[#E878BE]/35 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm"
+                  >
+                    @{m.username.replace(/^@/, "")}
+                  </span>
+                ))}
+              </div>
+            ) : watchChannelsPick ? (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {watchChannelsPick.map((c) => (
+                  <span
+                    key={c.channel_id}
+                    className="inline-flex max-w-full items-center rounded-full border border-violet-300/60 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm"
+                  >
+                    #{c.name.replace(/^#/, "")}
+                  </span>
+                ))}
+              </div>
+            ) : toolsPick ? (
               <div className="flex flex-wrap justify-end gap-1.5">
                 {labelsForToolsPayload(toolsPick).map((label, i) => (
                   <span

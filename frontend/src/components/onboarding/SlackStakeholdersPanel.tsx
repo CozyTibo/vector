@@ -5,8 +5,12 @@ import ChatMessageList from "./ChatMessageList";
 import { landingAccentText } from "../landing/landingBrandPalette";
 import type { SlackWorkspaceMember } from "../../lib/onboardingApi";
 import { slackHandoffSyntheticMessagesDeduped } from "./slackHandoffCopy";
-
-const SLACKBOT_USER_ID = "USLACKBOT";
+import {
+  filterSlackMembersByQuery,
+  rosterWithoutSlackbot,
+  slackMemberPickerPrimary,
+  slackMemberPickerSecondary,
+} from "./slackMemberSearchUtils";
 
 function normalizeSignupEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -26,37 +30,6 @@ function findSlackMemberBySignupEmail(
     }
   }
   return null;
-}
-
-function filterMembers(roster: SlackWorkspaceMember[], query: string): SlackWorkspaceMember[] {
-  const q = query.trim().toLowerCase();
-  const base = q
-    ? roster.filter(
-        (m) =>
-          m.username.toLowerCase().includes(q) ||
-          m.label.toLowerCase().includes(q) ||
-          m.id.toLowerCase().includes(q),
-      )
-    : roster;
-  return base.slice(0, 12);
-}
-
-/** Display name (fallback: @login) for list rows and the selected chip. */
-function slackMemberPickerPrimary(m: SlackWorkspaceMember): string {
-  const t = m.label.trim();
-  if (t) {
-    return t;
-  }
-  return `@${m.username}`;
-}
-
-/** Slack @login when it adds context beyond the primary line. */
-function slackMemberPickerSecondary(m: SlackWorkspaceMember): string | null {
-  const t = m.label.trim();
-  if (!t || t.toLowerCase() === m.username.toLowerCase()) {
-    return null;
-  }
-  return `@${m.username}`;
 }
 
 type SlackStakeholdersPanelProps = {
@@ -102,10 +75,7 @@ export default function SlackStakeholdersPanel({
     ];
   }, [priorChatMessages, communicationToolLabel]);
 
-  const roster = useMemo(
-    () => members.filter((m) => m.id !== SLACKBOT_USER_ID),
-    [members],
-  );
+  const roster = useMemo(() => rosterWithoutSlackbot(members), [members]);
 
   const emailMatchMember = useMemo(
     () => findSlackMemberBySignupEmail(members, signupEmail),
@@ -135,7 +105,7 @@ export default function SlackStakeholdersPanel({
     return t.toLowerCase() !== emailMatchMember.username.toLowerCase();
   }, [emailMatchMember]);
 
-  const suggestions = useMemo(() => filterMembers(roster, query), [roster, query]);
+  const suggestions = useMemo(() => filterSlackMembersByQuery(roster, query), [roster, query]);
 
   useEffect(() => {
     setHighlight(0);

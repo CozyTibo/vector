@@ -87,6 +87,19 @@ class SlackMembersResponse(BaseModel):
     members: list[SlackWorkspaceMemberItem]
 
 
+class SlackChannelItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Slack channel id, e.g. C…")
+    name: str = Field(description="Channel name without leading #.")
+
+
+class SlackChannelsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channels: list[SlackChannelItem]
+
+
 class OnboardingChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

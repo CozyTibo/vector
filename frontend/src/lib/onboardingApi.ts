@@ -8,9 +8,22 @@ export type OnboardingStep =
   | "CONNECT_COMMUNICATION"
   | "UNSUPPORTED_MANDATORY_TOOLS"
   | "SLACK_STAKEHOLDERS"
+  | "SLACK_COLLABORATORS"
+  | "SLACK_COLLABORATORS_CONFIRM"
+  | "SLACK_TEAM_MEMBERS"
+  | "SLACK_TEAM_MEMBERS_CONFIRM"
+  | "SLACK_WATCH_CHANNELS"
+  | "SLACK_WATCH_CHANNELS_CONFIRM"
   | "ADMIN_ACCESS"
   | "SCANNING"
   | "THANK_YOU";
+
+/** ``answers_json.slack_collaborators.members[]`` — Slack roster row persisted for “who you work with”. */
+export type SlackCollaboratorMember = {
+  slack_user_id: string;
+  username: string;
+  label: string;
+};
 
 export type SlackWorkspaceMember = {
   id: string;
@@ -20,6 +33,12 @@ export type SlackWorkspaceMember = {
   /** Lowercase email when the Slack app has users:read.email and the user exposes it. */
   email: string | null;
   image_48: string | null;
+};
+
+/** Public workspace channel from ``GET /onboarding/slack-channels`` (name without #). */
+export type SlackWorkspaceChannel = {
+  id: string;
+  name: string;
 };
 
 export type OnboardingMessagePayload = {
@@ -115,6 +134,15 @@ export async function fetchSlackWorkspaceMembers(base: string): Promise<SlackWor
   }
   const data = (await res.json()) as { members: SlackWorkspaceMember[] };
   return data.members ?? [];
+}
+
+export async function fetchSlackWorkspaceChannels(base: string): Promise<SlackWorkspaceChannel[]> {
+  const res = await fetch(`${base}/onboarding/slack-channels`, mergeProductSessionAuth());
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  const data = (await res.json()) as { channels: SlackWorkspaceChannel[] };
+  return data.channels ?? [];
 }
 
 export async function completeOnboarding(base: string): Promise<{ status: string; current_step: string; completed_at: string }> {

@@ -12,6 +12,27 @@ import {
   ONBOARDING_PRIMARY_CTA_GRADIENT_BUTTON_CLASS,
   ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS,
 } from "../../components/onboarding/onboardingUiConstants";
+import SlackCollaboratorsConfirmPanel from "../../components/onboarding/SlackCollaboratorsConfirmPanel";
+import SlackCollaboratorsPickPanel from "../../components/onboarding/SlackCollaboratorsPickPanel";
+import SlackChannelsConfirmPanel from "../../components/onboarding/SlackChannelsConfirmPanel";
+import SlackChannelsPickPanel from "../../components/onboarding/SlackChannelsPickPanel";
+import SlackPeopleMultiConfirmPanel from "../../components/onboarding/SlackPeopleMultiConfirmPanel";
+import SlackPeopleMultiPickPanel from "../../components/onboarding/SlackPeopleMultiPickPanel";
+import {
+  seedCollaboratorsFromStakeholders,
+  slackCollaboratorsFromAnswers,
+} from "../../components/onboarding/slackCollaboratorsAnswers";
+import { collaboratorsIncludesStakeholderSelf } from "../../components/onboarding/slackOnboardingBranching";
+import {
+  slackTeamMembersConfirmIntroMessages,
+  slackTeamMembersPickIntroMessages,
+  slackWatchChannelsConfirmIntroMessages,
+  slackWatchChannelsPickIntroMessages,
+} from "../../components/onboarding/slackTeamChannelsCopy";
+import {
+  slackTeamMembersFromAnswers,
+  slackWatchChannelsFromAnswers,
+} from "../../components/onboarding/slackTeamChannelAnswers";
 import SlackStakeholdersPanel from "../../components/onboarding/SlackStakeholdersPanel";
 import {
   ONB_SLACK_HANDOFF_EVENT_ID,
@@ -32,6 +53,7 @@ import { landingAccentText } from "../../components/landing/landingBrandPalette"
 import {
   completeOnboarding,
   fetchOnboarding,
+  fetchSlackWorkspaceChannels,
   fetchSlackWorkspaceMembers,
   patchOnboarding,
   postOnboardingChat,
@@ -39,6 +61,7 @@ import {
   type OnboardingMessagePayload,
   type OnboardingStatePayload,
   type OnboardingStep,
+  type SlackCollaboratorMember,
 } from "../../lib/onboardingApi";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
@@ -335,7 +358,27 @@ export default function OnboardingPage() {
   const slackMembersForStep = useQuery({
     queryKey: ["slack-onboarding-members", apiBase, tenantId ?? ""],
     queryFn: () => fetchSlackWorkspaceMembers(apiBase),
-    enabled: Boolean(tenantId && ob.data?.current_step === "SLACK_STAKEHOLDERS"),
+    enabled: Boolean(
+      tenantId &&
+        ob.data?.current_step &&
+        [
+          "SLACK_STAKEHOLDERS",
+          "SLACK_COLLABORATORS",
+          "SLACK_COLLABORATORS_CONFIRM",
+          "SLACK_TEAM_MEMBERS",
+          "SLACK_TEAM_MEMBERS_CONFIRM",
+        ].includes(ob.data.current_step),
+    ),
+  });
+
+  const slackChannelsForStep = useQuery({
+    queryKey: ["slack-onboarding-channels", apiBase, tenantId ?? ""],
+    queryFn: () => fetchSlackWorkspaceChannels(apiBase),
+    enabled: Boolean(
+      tenantId &&
+        ob.data?.current_step &&
+        ["SLACK_WATCH_CHANNELS", "SLACK_WATCH_CHANNELS_CONFIRM"].includes(ob.data.current_step),
+    ),
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -354,6 +397,12 @@ export default function OnboardingPage() {
   const [finishOnboardingError, setFinishOnboardingError] = useState<string | null>(null);
   const [stakeholdersSubmitError, setStakeholdersSubmitError] = useState<string | null>(null);
   const [stakeholdersBusy, setStakeholdersBusy] = useState(false);
+  const [collaboratorsSubmitError, setCollaboratorsSubmitError] = useState<string | null>(null);
+  const [collaboratorsBusy, setCollaboratorsBusy] = useState(false);
+  const [slackTeamSubmitError, setSlackTeamSubmitError] = useState<string | null>(null);
+  const [slackTeamBusy, setSlackTeamBusy] = useState(false);
+  const [slackWatchChannelsSubmitError, setSlackWatchChannelsSubmitError] = useState<string | null>(null);
+  const [slackWatchChannelsBusy, setSlackWatchChannelsBusy] = useState(false);
   const [adminFarewellMessage, setAdminFarewellMessage] = useState<ChatMessage | null>(null);
   /** Shown when ?*_connected=1 is in the URL but GET /onboarding does not reflect the link yet, or PATCH fails. */
   const [oauthReturnError, setOauthReturnError] = useState<string | null>(null);
@@ -380,6 +429,9 @@ export default function OnboardingPage() {
     setConnectorsIntroChipMode("both");
     setAdminFarewellMessage(null);
     setStakeholdersSubmitError(null);
+    setCollaboratorsSubmitError(null);
+    setSlackTeamSubmitError(null);
+    setSlackWatchChannelsSubmitError(null);
     setFinishOnboardingError(null);
     oauthAdvanceLockRef.current = null;
     if (tenantId) {
@@ -445,6 +497,12 @@ export default function OnboardingPage() {
       "CONNECT_ENGINEERING",
       "CONNECT_COMMUNICATION",
       "SLACK_STAKEHOLDERS",
+      "SLACK_COLLABORATORS",
+      "SLACK_COLLABORATORS_CONFIRM",
+      "SLACK_TEAM_MEMBERS",
+      "SLACK_TEAM_MEMBERS_CONFIRM",
+      "SLACK_WATCH_CHANNELS",
+      "SLACK_WATCH_CHANNELS_CONFIRM",
       "ADMIN_ACCESS",
     ];
     if (!hydrateSteps.includes(server.current_step as OnboardingStep)) {
@@ -763,13 +821,21 @@ export default function OnboardingPage() {
       setStakeholdersSubmitError(null);
       setStakeholdersBusy(true);
       try {
+        const uid = payload.slack_user_ids[0]!;
+        const username = payload.text.trim().replace(/^@/, "") || uid;
+        const labelRaw = payload.mention_labels[0];
+        const label =
+          typeof labelRaw === "string" && labelRaw.trim() ? labelRaw.trim() : username;
         await patchOnboarding(apiBase, {
-          current_step: "ADMIN_ACCESS",
+          current_step: "SLACK_COLLABORATORS",
           answers: {
             slack_stakeholders: {
               raw_text: payload.text,
               slack_user_ids: payload.slack_user_ids,
               mention_labels: payload.mention_labels,
+            },
+            slack_collaborators: {
+              members: [{ slack_user_id: uid, username, label }],
             },
           },
         });
@@ -785,6 +851,248 @@ export default function OnboardingPage() {
     },
     [apiBase, qc, tenantId],
   );
+
+  const collaboratorsPickInitial = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    const fromAnswers = slackCollaboratorsFromAnswers(server.answers);
+    if (fromAnswers.length > 0) {
+      return fromAnswers;
+    }
+    return seedCollaboratorsFromStakeholders(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const collaboratorsConfirmList = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    return slackCollaboratorsFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const collaboratorSlackUserIdsExcludeForTeam = useMemo(() => {
+    if (!server) {
+      return [];
+    }
+    return slackCollaboratorsFromAnswers(server.answers).map((m) => m.slack_user_id);
+  }, [server?.answers, server?.version]);
+
+  const teamMembersPickInitial = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    return slackTeamMembersFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const teamMembersConfirmList = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    return slackTeamMembersFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const slackTeamPickIntroMessages = useMemo(
+    () => slackTeamMembersPickIntroMessages(Date.now()),
+    [server?.current_step, server?.version],
+  );
+  const slackTeamConfirmIntroMessages = useMemo(
+    () => slackTeamMembersConfirmIntroMessages(Date.now()),
+    [server?.current_step, server?.version],
+  );
+  const slackWatchPickIntroMessages = useMemo(
+    () => slackWatchChannelsPickIntroMessages(Date.now()),
+    [server?.current_step, server?.version],
+  );
+  const slackWatchConfirmIntroMessages = useMemo(
+    () => slackWatchChannelsConfirmIntroMessages(Date.now()),
+    [server?.current_step, server?.version],
+  );
+
+  const watchChannelsPickInitial = useMemo(() => {
+    if (!server) {
+      return [];
+    }
+    return slackWatchChannelsFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const watchChannelsConfirmList = useMemo(() => {
+    if (!server) {
+      return [];
+    }
+    return slackWatchChannelsFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const submitCollaboratorsPick = useCallback(
+    async (members: SlackCollaboratorMember[]) => {
+      setCollaboratorsSubmitError(null);
+      setCollaboratorsBusy(true);
+      try {
+        await patchOnboarding(apiBase, {
+          current_step: "SLACK_COLLABORATORS_CONFIRM",
+          answers: { slack_collaborators: { members } },
+        });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+      } catch (e) {
+        setCollaboratorsSubmitError(
+          e instanceof Error ? e.message : "Could not save your collaborator list.",
+        );
+      } finally {
+        setCollaboratorsBusy(false);
+      }
+    },
+    [apiBase, qc, tenantId],
+  );
+
+  const submitCollaboratorsConfirmEdit = useCallback(async () => {
+    setCollaboratorsSubmitError(null);
+    setCollaboratorsBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_COLLABORATORS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setCollaboratorsSubmitError(e instanceof Error ? e.message : "Could not go back to edit.");
+    } finally {
+      setCollaboratorsBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitCollaboratorsConfirmContinue = useCallback(async () => {
+    if (!server) {
+      return;
+    }
+    setCollaboratorsSubmitError(null);
+    setCollaboratorsBusy(true);
+    try {
+      const nextStep: OnboardingStep = collaboratorsIncludesStakeholderSelf(server.answers)
+        ? "SLACK_TEAM_MEMBERS"
+        : "ADMIN_ACCESS";
+      await patchOnboarding(apiBase, { current_step: nextStep });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setCollaboratorsSubmitError(e instanceof Error ? e.message : "Could not continue.");
+    } finally {
+      setCollaboratorsBusy(false);
+    }
+  }, [apiBase, qc, tenantId, server]);
+
+  const submitTeamMembersPick = useCallback(
+    async (members: SlackCollaboratorMember[]) => {
+      setSlackTeamSubmitError(null);
+      setSlackTeamBusy(true);
+      try {
+        await patchOnboarding(apiBase, {
+          current_step: "SLACK_TEAM_MEMBERS_CONFIRM",
+          answers: { slack_team_members: { members } },
+        });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+      } catch (e) {
+        setSlackTeamSubmitError(e instanceof Error ? e.message : "Could not save your team list.");
+      } finally {
+        setSlackTeamBusy(false);
+      }
+    },
+    [apiBase, qc, tenantId],
+  );
+
+  const submitTeamMembersConfirmEdit = useCallback(async () => {
+    setSlackTeamSubmitError(null);
+    setSlackTeamBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_TEAM_MEMBERS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackTeamSubmitError(e instanceof Error ? e.message : "Could not go back to edit.");
+    } finally {
+      setSlackTeamBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitTeamMembersConfirmContinue = useCallback(async () => {
+    setSlackTeamSubmitError(null);
+    setSlackTeamBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_WATCH_CHANNELS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackTeamSubmitError(e instanceof Error ? e.message : "Could not continue.");
+    } finally {
+      setSlackTeamBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitWatchChannelsPick = useCallback(
+    async (channels: { channel_id: string; name: string }[]) => {
+      setSlackWatchChannelsSubmitError(null);
+      setSlackWatchChannelsBusy(true);
+      try {
+        await patchOnboarding(apiBase, {
+          current_step: "SLACK_WATCH_CHANNELS_CONFIRM",
+          answers: { slack_watch_channels: { channels } },
+        });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+      } catch (e) {
+        setSlackWatchChannelsSubmitError(
+          e instanceof Error ? e.message : "Could not save your channel list.",
+        );
+      } finally {
+        setSlackWatchChannelsBusy(false);
+      }
+    },
+    [apiBase, qc, tenantId],
+  );
+
+  const submitWatchChannelsConfirmEdit = useCallback(async () => {
+    setSlackWatchChannelsSubmitError(null);
+    setSlackWatchChannelsBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_WATCH_CHANNELS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackWatchChannelsSubmitError(e instanceof Error ? e.message : "Could not go back to edit.");
+    } finally {
+      setSlackWatchChannelsBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitWatchChannelsConfirmContinue = useCallback(async () => {
+    setSlackWatchChannelsSubmitError(null);
+    setSlackWatchChannelsBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "ADMIN_ACCESS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackWatchChannelsSubmitError(e instanceof Error ? e.message : "Could not continue.");
+    } finally {
+      setSlackWatchChannelsBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
 
   const continuePastCommPlaceholder = useCallback(() => {
     if (!server) {
@@ -1317,6 +1625,144 @@ export default function OnboardingPage() {
             submitError={stakeholdersSubmitError}
             submitting={stakeholdersBusy}
             onSubmit={submitSlackStakeholders}
+            userDisplayName={userLabel}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_COLLABORATORS_CONFIRM" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackCollaboratorsConfirmPanel
+            priorChatMessages={messages}
+            members={collaboratorsConfirmList}
+            rosterMembers={slackMembersForStep.data ?? []}
+            submitError={collaboratorsSubmitError}
+            submitting={collaboratorsBusy}
+            onEdit={() => void submitCollaboratorsConfirmEdit()}
+            onContinue={() => void submitCollaboratorsConfirmContinue()}
+            userDisplayName={userLabel}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_WATCH_CHANNELS_CONFIRM" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackChannelsConfirmPanel
+            priorChatMessages={messages}
+            confirmIntroMessages={slackWatchConfirmIntroMessages}
+            listTitle="Channels we will watch for your team"
+            channels={watchChannelsConfirmList}
+            submitError={slackWatchChannelsSubmitError}
+            submitting={slackWatchChannelsBusy}
+            onEdit={() => void submitWatchChannelsConfirmEdit()}
+            onContinue={() => void submitWatchChannelsConfirmContinue()}
+            userDisplayName={userLabel}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_WATCH_CHANNELS" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackChannelsPickPanel
+            priorChatMessages={messages}
+            introMessages={slackWatchPickIntroMessages}
+            channels={slackChannelsForStep.data ?? []}
+            channelsLoading={slackChannelsForStep.isLoading}
+            channelsError={
+              slackChannelsForStep.error ? (slackChannelsForStep.error as Error).message : null
+            }
+            initialChannels={watchChannelsPickInitial}
+            initialChannelsKey={String(server.version)}
+            submitError={slackWatchChannelsSubmitError}
+            submitting={slackWatchChannelsBusy}
+            onContinue={(ch) => void submitWatchChannelsPick(ch)}
+            userDisplayName={userLabel}
+            emptyHint="No channels selected yet. Search below or continue with an empty list."
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_TEAM_MEMBERS_CONFIRM" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackPeopleMultiConfirmPanel
+            priorChatMessages={messages}
+            confirmIntroMessages={slackTeamConfirmIntroMessages}
+            listTitle="Team members you selected"
+            members={teamMembersConfirmList}
+            rosterMembers={slackMembersForStep.data ?? []}
+            submitError={slackTeamSubmitError}
+            submitting={slackTeamBusy}
+            onEdit={() => void submitTeamMembersConfirmEdit()}
+            onContinue={() => void submitTeamMembersConfirmContinue()}
+            userDisplayName={userLabel}
+            requireNonEmpty={false}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_TEAM_MEMBERS" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackPeopleMultiPickPanel
+            priorChatMessages={messages}
+            introMessages={slackTeamPickIntroMessages}
+            members={slackMembersForStep.data ?? []}
+            membersLoading={slackMembersForStep.isLoading}
+            membersError={slackMembersForStep.error ? (slackMembersForStep.error as Error).message : null}
+            excludeSlackUserIds={collaboratorSlackUserIdsExcludeForTeam}
+            initialMembers={teamMembersPickInitial}
+            initialMembersKey={String(server.version)}
+            submitError={slackTeamSubmitError}
+            submitting={slackTeamBusy}
+            onContinue={(m) => void submitTeamMembersPick(m)}
+            userDisplayName={userLabel}
+            requireAtLeastOne={false}
+            emptyHint="No teammates listed yet. You can add people below or continue with an empty list."
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_COLLABORATORS" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackCollaboratorsPickPanel
+            priorChatMessages={messages}
+            members={slackMembersForStep.data ?? []}
+            membersLoading={slackMembersForStep.isLoading}
+            membersError={slackMembersForStep.error ? (slackMembersForStep.error as Error).message : null}
+            initialMembers={collaboratorsPickInitial}
+            initialMembersKey={String(server.version)}
+            submitError={collaboratorsSubmitError}
+            submitting={collaboratorsBusy}
+            onContinue={(m) => void submitCollaboratorsPick(m)}
             userDisplayName={userLabel}
           />
         </OnboardingChatLayout>

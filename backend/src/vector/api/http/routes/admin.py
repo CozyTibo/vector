@@ -40,7 +40,11 @@ from vector.contracts.admin import (
     AdminUserListResponse,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
+    SlackCollaboratorMemberSnapshot,
+    SlackCollaboratorsSnapshot,
     SlackStakeholdersSnapshot,
+    SlackWatchChannelSnapshot,
+    SlackWatchChannelsSnapshot,
     RawIngestionAdminDetail,
     RawIngestionAdminDetailResponse,
     RawIngestionAdminItem,
@@ -263,6 +267,103 @@ def _slack_stakeholders_from_answers(ans: dict[str, object]) -> SlackStakeholder
     return SlackStakeholdersSnapshot(raw_text=text_out, slack_user_ids=uid_list)
 
 
+def _slack_collaborators_from_answers(ans: dict[str, object]) -> SlackCollaboratorsSnapshot | None:
+    raw = ans.get("slack_collaborators")
+    if not isinstance(raw, dict):
+        return None
+    members_raw = raw.get("members")
+    if not isinstance(members_raw, list) or not members_raw:
+        return None
+    rows: list[SlackCollaboratorMemberSnapshot] = []
+    seen: set[str] = set()
+    for m in members_raw:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) and un.strip() else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        rows.append(
+            SlackCollaboratorMemberSnapshot(
+                slack_user_id=uid,
+                username=username,
+                label=label,
+            )
+        )
+    if not rows:
+        return None
+    return SlackCollaboratorsSnapshot(members=rows)
+
+
+def _slack_team_members_from_answers(ans: dict[str, object]) -> SlackCollaboratorsSnapshot | None:
+    raw = ans.get("slack_team_members")
+    if not isinstance(raw, dict):
+        return None
+    members_raw = raw.get("members")
+    if not isinstance(members_raw, list) or not members_raw:
+        return None
+    rows: list[SlackCollaboratorMemberSnapshot] = []
+    seen: set[str] = set()
+    for m in members_raw:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) and un.strip() else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        rows.append(
+            SlackCollaboratorMemberSnapshot(
+                slack_user_id=uid,
+                username=username,
+                label=label,
+            )
+        )
+    if not rows:
+        return None
+    return SlackCollaboratorsSnapshot(members=rows)
+
+
+def _slack_watch_channels_from_answers(ans: dict[str, object]) -> SlackWatchChannelsSnapshot | None:
+    raw = ans.get("slack_watch_channels")
+    if not isinstance(raw, dict):
+        return None
+    ch_raw = raw.get("channels")
+    if not isinstance(ch_raw, list) or not ch_raw:
+        return None
+    out: list[SlackWatchChannelSnapshot] = []
+    seen: set[str] = set()
+    for ch in ch_raw:
+        if not isinstance(ch, dict):
+            continue
+        cid = ch.get("channel_id")
+        if not isinstance(cid, str) or not cid.strip():
+            continue
+        cid = cid.strip()
+        if cid in seen:
+            continue
+        seen.add(cid)
+        nm = ch.get("name")
+        name = nm.strip().lstrip("#") if isinstance(nm, str) and nm.strip() else cid
+        out.append(SlackWatchChannelSnapshot(channel_id=cid, name=name))
+    if not out:
+        return None
+    return SlackWatchChannelsSnapshot(channels=out)
+
+
 def _connect_queue_plan_snapshot(ans: dict[str, object]) -> tuple[list[str], list[str]]:
     def _coerce_str_list(key: str) -> list[str]:
         raw = ans.get(key)
@@ -318,6 +419,9 @@ def _snapshot_from_onboarding(
         tools_docs=_tools_category(ans, "docs"),
         tools_stack=_tools_stack(ans),
         slack_stakeholders=_slack_stakeholders_from_answers(ans),
+        slack_collaborators=_slack_collaborators_from_answers(ans),
+        slack_team_members=_slack_team_members_from_answers(ans),
+        slack_watch_channels=_slack_watch_channels_from_answers(ans),
         chat_messages=msgs,
     )
 
@@ -725,6 +829,9 @@ def build_admin_router() -> APIRouter:
         _validate_admin_onboarding_collected_patch(patch)
         merged = _apply_admin_onboarding_collected_patch(dict(row.answers_json or {}), patch)
         onboarding_repo.normalize_slack_stakeholders_in_place(merged)
+        onboarding_repo.normalize_slack_collaborators_in_place(merged)
+        onboarding_repo.normalize_slack_team_members_in_place(merged)
+        onboarding_repo.normalize_slack_watch_channels_in_place(merged)
         row.answers_json = merged
         row.version = int(row.version) + 1
         db.commit()

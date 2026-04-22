@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
-import { AdminOnboardingStyleThread, adminOnboardingRowsToChatMessages } from "./adminChatTranscript";
+import { AdminOnboardingStyleThread, buildAdminWebsiteOnboardingTranscript } from "./adminChatTranscript";
 import { CollapsibleDebug, OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 
 type ChatMsg = {
@@ -17,6 +17,25 @@ type ChatMsg = {
 type SlackStakeholdersSnap = {
   raw_text: string | null;
   slack_user_ids: string[];
+};
+
+type SlackCollaboratorMemberSnap = {
+  slack_user_id: string;
+  username: string;
+  label: string;
+};
+
+type SlackCollaboratorsSnap = {
+  members: SlackCollaboratorMemberSnap[];
+};
+
+type SlackWatchChannelSnap = {
+  channel_id: string;
+  name: string;
+};
+
+type SlackWatchChannelsSnap = {
+  channels: SlackWatchChannelSnap[];
 };
 
 type OnboardingSnap = {
@@ -42,6 +61,10 @@ type OnboardingSnap = {
   tools_docs: string[];
   tools_stack: Record<string, unknown> | null;
   slack_stakeholders: SlackStakeholdersSnap | null;
+  /** Present on API after collaborator onboarding shipped; older payloads may omit. */
+  slack_collaborators?: SlackCollaboratorsSnap | null;
+  slack_team_members?: SlackCollaboratorsSnap | null;
+  slack_watch_channels?: SlackWatchChannelsSnap | null;
   chat_messages: ChatMsg[];
 };
 
@@ -565,17 +588,19 @@ export default function AdminTenantOnboardingPage() {
   const t = q.data;
   const ob = t.onboarding;
   const userLabel = t.member_full_name?.trim() || "User";
-  const chatMessages = ob ? adminOnboardingRowsToChatMessages(ob.chat_messages) : [];
+  const chatMessages = ob ? buildAdminWebsiteOnboardingTranscript(ob.chat_messages, ob) : [];
   const opts = optQ.data;
   const flatTools = opts ? flattenToolOptions(opts) : [];
 
   return (
     <div className="space-y-8">
       <OperatorIntro title="Website onboarding">
-        Structured answers first, then the in-app chat transcript (same order as the product flow:
-        what we stored, then how we got there).         Role in company and tool fields use the same allowed values as the product; company size and
-        other free-text fields use click-to-edit (Enter saves, Esc or click outside cancels). Slack
-        handoff is read-only here.
+        Structured answers first, then the website onboarding chat transcript. The conversation panel
+        mirrors the product thread (including Slack manager / teammate / channel steps): we merge
+        persisted chat rows with the same Vector prompts the member saw in the Slack pick/confirm
+        panels. Role in company and tool fields use the same allowed values as the product; company
+        size and other free-text fields use click-to-edit (Enter saves, Esc or click outside cancels).
+        Slack handoff answers are read-only here.
       </OperatorIntro>
 
       {optQ.isError ? (
@@ -809,6 +834,84 @@ export default function AdminTenantOnboardingPage() {
                   <p className="mt-2 text-sm text-stone-500">—</p>
                 )}
               </div>
+
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+                  Slack collaborators
+                </h3>
+                <p className="mt-1 text-xs text-stone-500">
+                  Read-only — people Vector will work with in Slack (product onboarding, after self-identify).
+                </p>
+                {ob.slack_collaborators && (ob.slack_collaborators.members?.length ?? 0) > 0 ? (
+                  <ul className="mt-2 space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-800">
+                    {ob.slack_collaborators.members.map((m) => (
+                      <li
+                        key={m.slack_user_id}
+                        className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-200/80 pb-2 last:border-b-0 last:pb-0"
+                      >
+                        <span className="font-medium text-stone-900">{m.label}</span>
+                        <span className="font-mono text-xs text-stone-600">
+                          @{m.username} · {m.slack_user_id}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-stone-500">—</p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+                  Slack team members
+                </h3>
+                <p className="mt-1 text-xs text-stone-500">
+                  Read-only — teammates (excluding managers above) when the member included themselves as a
+                  collaborator and completed the extra team step.
+                </p>
+                {ob.slack_team_members && (ob.slack_team_members.members?.length ?? 0) > 0 ? (
+                  <ul className="mt-2 space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-800">
+                    {ob.slack_team_members.members.map((m) => (
+                      <li
+                        key={m.slack_user_id}
+                        className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-200/80 pb-2 last:border-b-0 last:pb-0"
+                      >
+                        <span className="font-medium text-stone-900">{m.label}</span>
+                        <span className="font-mono text-xs text-stone-600">
+                          @{m.username} · {m.slack_user_id}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-stone-500">—</p>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+                  Slack channels to watch
+                </h3>
+                <p className="mt-1 text-xs text-stone-500">
+                  Read-only — public channels the member asked us to watch after the team step.
+                </p>
+                {ob.slack_watch_channels && (ob.slack_watch_channels.channels?.length ?? 0) > 0 ? (
+                  <ul className="mt-2 space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-800">
+                    {ob.slack_watch_channels.channels.map((c) => (
+                      <li
+                        key={c.channel_id}
+                        className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-200/80 pb-2 last:border-b-0 last:pb-0"
+                      >
+                        <span className="font-medium text-stone-900">#{c.name.replace(/^#/, "")}</span>
+                        <span className="font-mono text-xs text-stone-600">{c.channel_id}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-stone-500">—</p>
+                )}
+              </div>
+
               {ob.tools_stack && Object.keys(ob.tools_stack).length > 0 ? (
                 <details className="rounded-lg border border-stone-200 bg-white">
                   <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-stone-700">
@@ -824,7 +927,7 @@ export default function AdminTenantOnboardingPage() {
 
           <OperatorSection
             title="Conversation"
-            description="Chronological transcript: Vector on the left, signed-in user on the right (same layout as the product)."
+            description="Chronological transcript: Vector on the left, member on the right. Same bubble layout as the product; Slack step Vector prompts are merged in so this matches what they saw."
           >
             <AdminOnboardingStyleThread
               messages={chatMessages}

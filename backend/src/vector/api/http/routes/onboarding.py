@@ -14,6 +14,7 @@ from vector.contracts.onboarding import (
     OnboardingCompleteResponse,
     OnboardingGetResponse,
     OnboardingPatchBody,
+    SlackChannelsResponse,
     SlackMembersResponse,
 )
 from vector.domains.identity_access.errors import NoMembershipError
@@ -30,6 +31,9 @@ from vector.domains.onboarding.onboarding_commands import (
 )
 from vector.domains.onboarding.onboarding_commands import (
     get_onboarding_state as ob_get_onboarding_state,
+)
+from vector.domains.onboarding.onboarding_commands import (
+    list_slack_workspace_channels_for_onboarding as ob_list_slack_workspace_channels,
 )
 from vector.domains.onboarding.onboarding_commands import (
     list_slack_workspace_members_for_onboarding as ob_list_slack_workspace_members,
@@ -114,6 +118,28 @@ def build_onboarding_router() -> APIRouter:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         try:
             return ob_list_slack_workspace_members(db, claims)
+        except SlackNotConnectedForWorkspaceError:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Slack is not connected for this workspace.",
+            ) from None
+        except SlackMembersLoadError as e:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=e.message,
+            ) from e
+
+    @r.get("/slack-channels", response_model=SlackChannelsResponse)
+    def get_slack_workspace_channels(
+        db: Annotated[Session, Depends(get_db)],
+        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+    ) -> SlackChannelsResponse:
+        try:
+            assert_membership(db, claims)
+        except NoMembershipError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        try:
+            return ob_list_slack_workspace_channels(db, claims)
         except SlackNotConnectedForWorkspaceError:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,

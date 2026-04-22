@@ -27,6 +27,41 @@ class SlackStakeholdersSnapshot(BaseModel):
     slack_user_ids: list[str] = Field(default_factory=list)
 
 
+class SlackCollaboratorMemberSnapshot(BaseModel):
+    """One row in ``answers_json.slack_collaborators.members``."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    slack_user_id: str
+    username: str
+    label: str
+
+
+class SlackCollaboratorsSnapshot(BaseModel):
+    """answers_json.slack_collaborators: managers / leads the user works with in Slack."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    members: list[SlackCollaboratorMemberSnapshot] = Field(default_factory=list)
+
+
+class SlackWatchChannelSnapshot(BaseModel):
+    """One row in ``answers_json.slack_watch_channels.channels``."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    channel_id: str
+    name: str
+
+
+class SlackWatchChannelsSnapshot(BaseModel):
+    """answers_json.slack_watch_channels: public channels to watch for the team."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    channels: list[SlackWatchChannelSnapshot] = Field(default_factory=list)
+
+
 class TenantListItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -133,6 +168,18 @@ class OnboardingAdminSnapshot(BaseModel):
         description=(
             "Slack handoff: Vector user mapped to a member (answers_json.slack_stakeholders)."
         ),
+    )
+    slack_collaborators: SlackCollaboratorsSnapshot | None = Field(
+        default=None,
+        description="Slack collaborator picks from product onboarding (answers_json.slack_collaborators).",
+    )
+    slack_team_members: SlackCollaboratorsSnapshot | None = Field(
+        default=None,
+        description="Teammates (non-managers) from answers_json.slack_team_members (same member shape).",
+    )
+    slack_watch_channels: SlackWatchChannelsSnapshot | None = Field(
+        default=None,
+        description="Slack channels to watch from answers_json.slack_watch_channels.",
     )
     chat_messages: list[OnboardingChatMessageItem] = Field(
         default_factory=list,

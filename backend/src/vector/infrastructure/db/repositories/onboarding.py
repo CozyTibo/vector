@@ -141,6 +141,100 @@ def normalize_slack_stakeholders_in_place(answers: dict[str, Any]) -> None:
         del ss["mention_labels"]
 
 
+def normalize_slack_collaborators_in_place(answers: dict[str, Any]) -> None:
+    """Keep ``slack_collaborators.members`` as deduped dict rows with string fields."""
+    raw = answers.get("slack_collaborators")
+    if not isinstance(raw, dict):
+        return
+    members = raw.get("members")
+    if not isinstance(members, list):
+        return
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for m in members:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        out.append(
+            {
+                "slack_user_id": uid,
+                "username": username,
+                "label": label,
+            }
+        )
+    raw["members"] = out
+
+
+def normalize_slack_team_members_in_place(answers: dict[str, Any]) -> None:
+    """Same shape as ``slack_collaborators.members`` under ``slack_team_members``."""
+    raw = answers.get("slack_team_members")
+    if not isinstance(raw, dict):
+        return
+    members = raw.get("members")
+    if not isinstance(members, list):
+        return
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for m in members:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        out.append(
+            {
+                "slack_user_id": uid,
+                "username": username,
+                "label": label,
+            }
+        )
+    raw["members"] = out
+
+
+def normalize_slack_watch_channels_in_place(answers: dict[str, Any]) -> None:
+    """Dedupe ``slack_watch_channels.channels`` by ``channel_id``."""
+    raw = answers.get("slack_watch_channels")
+    if not isinstance(raw, dict):
+        return
+    channels = raw.get("channels")
+    if not isinstance(channels, list):
+        return
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for ch in channels:
+        if not isinstance(ch, dict):
+            continue
+        cid = ch.get("channel_id")
+        if not isinstance(cid, str) or not cid.strip():
+            continue
+        cid = cid.strip()
+        if cid in seen:
+            continue
+        seen.add(cid)
+        nm = ch.get("name")
+        name = nm.strip().lstrip("#") if isinstance(nm, str) and nm.strip() else cid
+        out.append({"channel_id": cid, "name": name})
+    raw["channels"] = out
+
+
 def hard_reset_onboarding_progress(session: Session, *, tenant_id: uuid.UUID) -> OnboardingState:
     """Delete persisted chat rows and reset onboarding answers/step to a fresh chat-profile start.
 
