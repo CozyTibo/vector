@@ -4,7 +4,7 @@ import type { ChatMessage } from "./types";
 import ChatMessageList from "./ChatMessageList";
 import { landingAccentText } from "../landing/landingBrandPalette";
 import type { SlackWorkspaceMember } from "../../lib/onboardingApi";
-import { slackHandoffSyntheticMessages } from "./slackHandoffCopy";
+import { slackHandoffSyntheticMessagesDeduped } from "./slackHandoffCopy";
 
 const SLACKBOT_USER_ID = "USLACKBOT";
 
@@ -39,6 +39,24 @@ function filterMembers(roster: SlackWorkspaceMember[], query: string): SlackWork
       )
     : roster;
   return base.slice(0, 12);
+}
+
+/** Display name (fallback: @login) for list rows and the selected chip. */
+function slackMemberPickerPrimary(m: SlackWorkspaceMember): string {
+  const t = m.label.trim();
+  if (t) {
+    return t;
+  }
+  return `@${m.username}`;
+}
+
+/** Slack @login when it adds context beyond the primary line. */
+function slackMemberPickerSecondary(m: SlackWorkspaceMember): string | null {
+  const t = m.label.trim();
+  if (!t || t.toLowerCase() === m.username.toLowerCase()) {
+    return null;
+  }
+  return `@${m.username}`;
 }
 
 type SlackStakeholdersPanelProps = {
@@ -78,7 +96,10 @@ export default function SlackStakeholdersPanel({
 
   const listMessages = useMemo(() => {
     const t = Date.now();
-    return [...priorChatMessages, ...slackHandoffSyntheticMessages(communicationToolLabel, t)];
+    return [
+      ...priorChatMessages,
+      ...slackHandoffSyntheticMessagesDeduped(communicationToolLabel, t, priorChatMessages),
+    ];
   }, [priorChatMessages, communicationToolLabel]);
 
   const roster = useMemo(
@@ -93,6 +114,26 @@ export default function SlackStakeholdersPanel({
 
   const showEmailMatchPrompt =
     Boolean(emailMatchMember) && !emailMatchDismissed && !membersLoading && !membersError;
+
+  /** Slack display name for the email-match headline (falls back to login). */
+  const emailMatchPromptLead = useMemo(() => {
+    if (!emailMatchMember) {
+      return "";
+    }
+    const t = emailMatchMember.label.trim();
+    return t || emailMatchMember.username;
+  }, [emailMatchMember]);
+
+  const emailMatchPromptShowSlackLogin = useMemo(() => {
+    if (!emailMatchMember) {
+      return false;
+    }
+    const t = emailMatchMember.label.trim();
+    if (!t) {
+      return false;
+    }
+    return t.toLowerCase() !== emailMatchMember.username.toLowerCase();
+  }, [emailMatchMember]);
 
   const suggestions = useMemo(() => filterMembers(roster, query), [roster, query]);
 
@@ -126,6 +167,16 @@ export default function SlackStakeholdersPanel({
 
   const disabled = membersLoading || Boolean(membersError);
   const canContinue = selected !== null;
+
+  const selectedSlackDisplay = useMemo(() => {
+    if (!selected) {
+      return { primary: "", secondary: null as string | null };
+    }
+    return {
+      primary: slackMemberPickerPrimary(selected),
+      secondary: slackMemberPickerSecondary(selected),
+    };
+  }, [selected]);
 
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open && (e.key === "ArrowDown" || e.key === "Enter")) {
@@ -166,13 +217,22 @@ export default function SlackStakeholdersPanel({
           <div className="space-y-4">
             <div className="rounded-2xl border border-zinc-200/90 bg-zinc-50/80 px-4 py-4 text-center">
               <p className="text-[15px] font-medium leading-snug text-zinc-900">
-                Is{" "}
-                <span className="font-semibold text-zinc-950">@{emailMatchMember.username}</span> you
-                on Slack?
+                Is <span className="font-semibold text-zinc-950">@{emailMatchPromptLead}</span> you on
+                Slack?
               </p>
               <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-600">
-                <span className="font-medium text-zinc-800">{emailMatchMember.label}</span>
-                <span className="mt-1 block text-[12px] text-zinc-500">
+                {emailMatchPromptShowSlackLogin ? (
+                  <span className="block font-normal text-zinc-500">
+                    Slack login @{emailMatchMember.username}
+                  </span>
+                ) : null}
+                <span
+                  className={
+                    emailMatchPromptShowSlackLogin
+                      ? "mt-1 block text-[12px] text-zinc-500"
+                      : "block text-[12px] text-zinc-500"
+                  }
+                >
                   Same email as your Vector signup — confirm if this is you.
                 </span>
               </p>
@@ -204,7 +264,8 @@ export default function SlackStakeholdersPanel({
         ) : (
           <div className="space-y-3">
             <p className="text-center text-[12px] leading-relaxed text-zinc-500">
-              Tap the field, then type to filter or choose your Slack{" "}
+              Tap the field, then type to filter by the{" "}
+              <span className="font-medium text-zinc-700">name you use in Slack</span> or your{" "}
               <span className="font-medium text-zinc-700">@username</span>.
             </p>
             <div className="relative">
@@ -212,9 +273,13 @@ export default function SlackStakeholdersPanel({
                 <div className="flex min-h-[3rem] items-center justify-between gap-3 rounded-2xl border border-teal-400/50 bg-white px-3 py-2.5 shadow-[0_0_0_3px_rgba(45,212,191,0.12)]">
                   <div className="min-w-0">
                     <p className="truncate text-[15px] font-semibold text-zinc-900">
-                      @{selected.username}
+                      {selectedSlackDisplay.primary}
                     </p>
-                    <p className="truncate text-[13px] text-zinc-500">{selected.label}</p>
+                    {selectedSlackDisplay.secondary ? (
+                      <p className="truncate text-[13px] text-zinc-500">
+                        {selectedSlackDisplay.secondary}
+                      </p>
+                    ) : null}
                   </div>
                   <button
                     type="button"
@@ -262,7 +327,7 @@ export default function SlackStakeholdersPanel({
                       aria-autocomplete="list"
                       aria-expanded={open}
                       aria-controls={listboxId}
-                      placeholder="your_username"
+                      placeholder="name or username"
                       className="min-w-0 flex-1 border-0 bg-transparent py-2 text-[15px] text-zinc-900 outline-none placeholder:text-zinc-400"
                     />
                   </div>
@@ -295,12 +360,18 @@ export default function SlackStakeholdersPanel({
                               />
                             ) : (
                               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-zinc-200/80 text-[11px] font-semibold text-zinc-600">
-                                {m.label.slice(0, 2).toUpperCase()}
+                                {(m.label.trim() || m.username).slice(0, 2).toUpperCase()}
                               </span>
                             )}
-                            <span className="min-w-0 flex-1 truncate">
-                              <span className="font-semibold text-zinc-900">@{m.username}</span>
-                              <span className="ml-1.5 text-zinc-500">{m.label}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-semibold text-zinc-900">
+                                {slackMemberPickerPrimary(m)}
+                              </span>
+                              {slackMemberPickerSecondary(m) ? (
+                                <span className="block truncate text-[12px] text-zinc-500">
+                                  {slackMemberPickerSecondary(m)}
+                                </span>
+                              ) : null}
                             </span>
                           </button>
                         </li>
@@ -329,7 +400,7 @@ export default function SlackStakeholdersPanel({
             </button>
             {!canContinue && !disabled ? (
               <p className="text-center text-[12px] text-zinc-500">
-                Select your Slack @username from the list to continue.
+                Pick your Slack profile from the list to continue.
               </p>
             ) : null}
           </div>

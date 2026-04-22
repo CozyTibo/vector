@@ -90,6 +90,14 @@ class OnboardingAdminSnapshot(BaseModel):
         default=None,
         description="Chat profile sub-step from answers_json.profile_phase.",
     )
+    connect_queue: list[str] = Field(
+        default_factory=list,
+        description="Remaining connector OAuth queue from answers_json.connect_queue.",
+    )
+    connect_plan: list[str] = Field(
+        default_factory=list,
+        description="Original connector plan from answers_json.connect_plan (same ids as connect_queue when fresh).",
+    )
     tools_interest: list[str] = Field(default_factory=list)
     company_domain: str | None = Field(
         default=None,

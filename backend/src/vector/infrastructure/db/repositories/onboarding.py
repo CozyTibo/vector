@@ -15,9 +15,9 @@ from vector.domains.onboarding.constants import (
     STATUS_COMPLETED,
     STATUS_IN_PROGRESS,
     STEP_CHAT_PROFILE,
-    STEP_CONNECT_COMMUNICATION,
     STEP_SCANNING,
 )
+from vector.domains.onboarding.onboarding_flow import _first_connect_step
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 
@@ -36,11 +36,11 @@ def get_onboarding_for_tenant_for_update(session: Session, tenant_id: uuid.UUID)
 
 # Historical `current_step` values that may still exist in DB rows (never valid for new PATCHes).
 _LEGACY_DB_ONBOARDING_STEPS = frozenset({"CONNECT_GITHUB", "CONNECT_LINEAR"})
-_ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder"})
+_ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder", "linear", "github"})
 
 
 def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
-    """Persisted rows may predate removal of GitHub/Linear onboarding steps; coerce in place."""
+    """Coerce legacy connector step names and strip unknown ``connect_queue`` ids."""
     if row.status == STATUS_COMPLETED:
         return
     answers = dict(row.answers_json or {})
@@ -60,7 +60,7 @@ def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
             for x in (cq if isinstance(cq, list) else [])
             if isinstance(x, str) and x in _ALLOWED_CONNECT_QUEUE_IDS
         ]
-        row.current_step = STEP_CONNECT_COMMUNICATION if allowed else STEP_SCANNING
+        row.current_step = _first_connect_step(allowed) if allowed else STEP_SCANNING
         changed = True
     if changed:
         row.answers_json = answers

@@ -267,12 +267,23 @@ def _slack_stakeholders_from_answers(ans: dict[str, object]) -> SlackStakeholder
     return SlackStakeholdersSnapshot(raw_text=text_out, slack_user_ids=uid_list)
 
 
+def _connect_queue_plan_snapshot(ans: dict[str, object]) -> tuple[list[str], list[str]]:
+    def _coerce_str_list(key: str) -> list[str]:
+        raw = ans.get(key)
+        if not isinstance(raw, list):
+            return []
+        return [str(x) for x in raw if isinstance(x, str)]
+
+    return _coerce_str_list("connect_queue"), _coerce_str_list("connect_plan")
+
+
 def _snapshot_from_onboarding(
     session: Session, row: OnboardingState | None
 ) -> OnboardingAdminSnapshot | None:
     if row is None:
         return None
     ans = dict(row.answers_json or {})
+    cq, cp = _connect_queue_plan_snapshot(ans)
     msgs: list[OnboardingChatMessageItem] = []
     if onboarding_repo.onboarding_messages_table_exists(session):
         # Full transcript from the start, in DB order (created_at, id). Avoid "recent 200 DESC then
@@ -296,6 +307,8 @@ def _snapshot_from_onboarding(
         completed_at=row.completed_at,
         abandoned_at=row.abandoned_at,
         profile_phase=_profile_phase(ans),
+        connect_queue=cq,
+        connect_plan=cp,
         tools_interest=_tools_interest(ans),
         company_domain=_company_domain(ans),
         company_website=_company_website(ans),

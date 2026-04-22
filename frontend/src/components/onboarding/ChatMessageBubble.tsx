@@ -87,34 +87,58 @@ function safeDateTimeIso(ts: number): string | undefined {
   }
 }
 
+/** Persisted OAuth log lines use ``Linear connected``; timeline UI matches synthetic ``Connected to …`` events. */
+function connectorConnectedDisplayLabel(content: string): string | null {
+  const t = content.trim().toLowerCase();
+  if (t === "linear connected") {
+    return "Connected to Linear";
+  }
+  if (t === "github connected") {
+    return "Connected to GitHub";
+  }
+  if (t === "slack connected") {
+    return "Connected to Slack";
+  }
+  return null;
+}
+
+function OnboardingConnectorConnectedPill({ label }: { label: string }) {
+  return (
+    <div className="onboarding-message-enter flex justify-center px-3 py-3" role="status">
+      <div
+        className={
+          "inline-flex max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-emerald-200/90 " +
+          "bg-gradient-to-r from-emerald-50/95 to-teal-50/90 px-4 py-2 text-[13px] font-medium " +
+          "leading-snug text-emerald-950 shadow-[0_8px_24px_-16px_rgba(5,150,105,0.35)]"
+        }
+      >
+        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
+        <span>{label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatMessageBubble({
   message,
   userDisplayName,
   isContinuation = false,
 }: ChatMessageBubbleProps) {
   if (message.role === "event") {
-    return (
-      <div className="onboarding-message-enter flex justify-center px-3 py-3" role="status">
-        <div
-          className={
-            "inline-flex max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-emerald-200/90 " +
-            "bg-gradient-to-r from-emerald-50/95 to-teal-50/90 px-4 py-2 text-[13px] font-medium " +
-            "leading-snug text-emerald-950 shadow-[0_8px_24px_-16px_rgba(5,150,105,0.35)]"
-          }
-        >
-          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
-          <span>{message.content}</span>
-        </div>
-      </div>
-    );
+    return <OnboardingConnectorConnectedPill label={message.content} />;
   }
 
   const isUser = message.role === "user";
   const toolsPick = isUser ? tryParseToolsSelectedContent(message.content) : null;
   const structuredOnlyLabel =
     isUser && !toolsPick ? structuredOnlyUserDisplayLabel(message.content) : null;
+  const persistedConnectorLabel =
+    isUser && !toolsPick && !structuredOnlyLabel ? connectorConnectedDisplayLabel(message.content) : null;
 
   if (isUser) {
+    if (persistedConnectorLabel) {
+      return <OnboardingConnectorConnectedPill label={persistedConnectorLabel} />;
+    }
     return (
       <div
         className={`onboarding-message-enter flex justify-end px-3 ${isContinuation ? "py-0.5" : "py-1.5"}`}

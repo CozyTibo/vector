@@ -3,6 +3,8 @@ import { mergeProductSessionAuth } from "./sessionToken";
 
 export type OnboardingStep =
   | "CHAT_PROFILE"
+  | "CONNECT_PROJECT_MANAGEMENT"
+  | "CONNECT_ENGINEERING"
   | "CONNECT_COMMUNICATION"
   | "UNSUPPORTED_MANDATORY_TOOLS"
   | "SLACK_STAKEHOLDERS"

@@ -26,6 +26,9 @@ type OnboardingSnap = {
   completed_at: string | null;
   abandoned_at: string | null;
   profile_phase: string | null;
+  /** Remaining in-product OAuth queue from answers_json (Linear → GitHub → Slack). */
+  connect_queue: string[];
+  connect_plan: string[];
   tools_interest: string[];
   company_domain: string | null;
   company_website: string | null;
@@ -48,6 +51,7 @@ type TenantDetail = {
   member_full_name: string | null;
   member_email: string | null;
   onboarding: OnboardingSnap | null;
+  connected_connectors: string[];
 };
 
 type AdminToolOptionItem = { id: string; label: string };
@@ -603,6 +607,14 @@ export default function AdminTenantOnboardingPage() {
                   <dd className="text-stone-900">{ob.status}</dd>
                   <dt className="text-stone-500">Current step</dt>
                   <dd className="text-stone-900">{ob.current_step}</dd>
+                  <dt className="text-stone-500">Connector queue</dt>
+                  <dd className="font-mono text-xs text-stone-800">
+                    {(ob.connect_queue?.length ?? 0) > 0 ? (ob.connect_queue ?? []).join(" → ") : "—"}
+                  </dd>
+                  <dt className="text-stone-500">Connector plan</dt>
+                  <dd className="font-mono text-xs text-stone-800">
+                    {(ob.connect_plan?.length ?? 0) > 0 ? (ob.connect_plan ?? []).join(" → ") : "—"}
+                  </dd>
                   <dt className="text-stone-500">Profile phase</dt>
                   <dd>{ob.profile_phase ?? "—"}</dd>
                   <dt className="text-stone-500">Started</dt>
@@ -611,6 +623,10 @@ export default function AdminTenantOnboardingPage() {
                   <dd>{ob.completed_at ? new Date(ob.completed_at).toLocaleString() : "—"}</dd>
                   <dt className="text-stone-500">Abandoned</dt>
                   <dd>{ob.abandoned_at ? new Date(ob.abandoned_at).toLocaleString() : "—"}</dd>
+                  <dt className="text-stone-500">Workspace connectors linked</dt>
+                  <dd className="text-stone-900">
+                    {t.connected_connectors?.length ? t.connected_connectors.join(", ") : "—"}
+                  </dd>
                 </dl>
               </div>
 

@@ -6,6 +6,9 @@ from __future__ import annotations
 STEP_CHAT_PROFILE = "CHAT_PROFILE"
 
 # Connector OAuth screens (order is driven by `connect_queue` in answers).
+# Typical queue: Linear (PM) → GitHub (engineering) → Slack or Teams/Discord placeholder.
+STEP_CONNECT_PROJECT_MANAGEMENT = "CONNECT_PROJECT_MANAGEMENT"
+STEP_CONNECT_ENGINEERING = "CONNECT_ENGINEERING"
 # Communication phase: Slack OAuth; legacy rows may still have ``comm_placeholder`` in ``connect_queue``.
 STEP_CONNECT_COMMUNICATION = "CONNECT_COMMUNICATION"
 
@@ -25,6 +28,8 @@ STEP_THANK_YOU = "THANK_YOU"
 ONBOARDING_STEPS: frozenset[str] = frozenset(
     {
         STEP_CHAT_PROFILE,
+        STEP_CONNECT_PROJECT_MANAGEMENT,
+        STEP_CONNECT_ENGINEERING,
         STEP_CONNECT_COMMUNICATION,
         STEP_UNSUPPORTED_MANDATORY_TOOLS,
         STEP_SLACK_STAKEHOLDERS,
