@@ -181,6 +181,13 @@ class OnboardingAdminSnapshot(BaseModel):
         default=None,
         description="Slack channels to watch from answers_json.slack_watch_channels.",
     )
+    slack_introduce_managers_consent: str | None = Field(
+        default=None,
+        description=(
+            "Product wrap-up: whether Vector may introduce itself in Slack to other managers "
+            "(``yes`` | ``later`` | ``not_applicable``)."
+        ),
+    )
     chat_messages: list[OnboardingChatMessageItem] = Field(
         default_factory=list,
         description="Recent onboarding chat rows (append-only log).",

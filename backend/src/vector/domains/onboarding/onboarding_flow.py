@@ -429,8 +429,8 @@ def handle_turn(
             assistant_prompt_context={
                 **ctx_base,
                 "instruction": (
-                    "They are on the final onboarding screen. Tell them to use the on-screen control "
-                    "to continue to the app; do not promise more chat steps."
+                    "They are on the final website wrap-up: thanks + optional permission to introduce "
+                    "Vector in Slack to other managers. They use on-screen buttons only; no further chat steps."
                 ),
             },
         )

@@ -235,6 +235,33 @@ def normalize_slack_watch_channels_in_place(answers: dict[str, Any]) -> None:
     raw["channels"] = out
 
 
+_SLACK_INTRODUCE_MANAGERS_CONSENT_VALUES = frozenset({"yes", "later", "not_applicable"})
+
+
+def normalize_slack_introduce_managers_consent_in_place(answers: dict[str, Any]) -> None:
+    """Coerce ``slack_introduce_managers_consent`` to yes | later | not_applicable or drop."""
+    raw = answers.get("slack_introduce_managers_consent")
+    if raw is None:
+        return
+    if not isinstance(raw, str):
+        answers.pop("slack_introduce_managers_consent", None)
+        return
+    v = raw.strip().lower()
+    if v in ("yes", "y", "allow", "sure", "ok", "okay"):
+        answers["slack_introduce_managers_consent"] = "yes"
+        return
+    if v in ("later", "defer", "maybe_later", "not_now", "skip"):
+        answers["slack_introduce_managers_consent"] = "later"
+        return
+    if v in ("not_applicable", "na", "skipped", "none", "n/a"):
+        answers["slack_introduce_managers_consent"] = "not_applicable"
+        return
+    if v in _SLACK_INTRODUCE_MANAGERS_CONSENT_VALUES:
+        answers["slack_introduce_managers_consent"] = v
+        return
+    answers.pop("slack_introduce_managers_consent", None)
+
+
 def hard_reset_onboarding_progress(session: Session, *, tenant_id: uuid.UUID) -> OnboardingState:
     """Delete persisted chat rows and reset onboarding answers/step to a fresh chat-profile start.
 

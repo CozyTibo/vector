@@ -4,6 +4,7 @@ import type { ChatMessage } from "./types";
 import ChatMessageList from "./ChatMessageList";
 import { landingAccentText } from "../landing/landingBrandPalette";
 import type { SlackCollaboratorMember, SlackWorkspaceMember } from "../../lib/onboardingApi";
+import { slackPersonChipText } from "./slackPersonDisplay";
 import { slackCollaboratorsPickIntroMessages } from "./slackCollaboratorsCopy";
 import {
   filterSlackMembersByQuery,
@@ -18,10 +19,6 @@ function workspaceMemberToCollaborator(m: SlackWorkspaceMember): SlackCollaborat
     username: m.username.trim(),
     label: m.label.trim() || m.username.trim(),
   };
-}
-
-function slackHandleFromCollaborator(c: SlackCollaboratorMember): string {
-  return `@${c.username.trim().replace(/^@/, "")}`;
 }
 
 type SlackCollaboratorsPickPanelProps = {
@@ -147,7 +144,7 @@ export default function SlackCollaboratorsPickPanel({
             <div className="flex flex-wrap justify-center gap-2">
               {picked.map((m) => {
                 const wm = members.find((x) => x.id === m.slack_user_id);
-                const handle = slackHandleFromCollaborator(m);
+                const handle = slackPersonChipText(m);
                 const initials = (m.label.trim() || m.username).slice(0, 2).toUpperCase();
                 return (
                   <div

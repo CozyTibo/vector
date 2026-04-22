@@ -1,14 +1,32 @@
 import type { ChatMessage } from "./types";
 
-export function slackTeamMembersPickIntroMessages(startTs: number): ChatMessage[] {
+/** ``solo_manager``: only the stakeholder in the manager list; ``with_other_managers``: at least one other manager. */
+export type SlackTeamMembersPickIntroVariant = "solo_manager" | "with_other_managers";
+
+export function slackTeamMembersPickIntroMessages(
+  startTs: number,
+  variant: SlackTeamMembersPickIntroVariant = "with_other_managers",
+): ChatMessage[] {
   let t = startTs;
+  if (variant === "solo_manager") {
+    return [
+      {
+        id: "onb-team-pick-1",
+        role: "vector",
+        content:
+          "I'd like to know who's on your team so we can start tracking how work moves. " +
+          "Right now you're the only manager listed—add teammates' Slack @handles below, or tap Continue if there's no one else to add yet.",
+        timestamp: t++,
+      },
+    ];
+  }
   return [
     {
       id: "onb-team-pick-1",
       role: "vector",
       content:
         "Since you're one of the people I'll coordinate with, I'd like to know who's on your team so we can start tracking how work moves. " +
-        "Add their Slack handles below (your manager list is already set aside). Skip this if there's no one else to add yet.",
+        "Add their Slack handles below (other managers you listed are already set aside). Skip this if there's no one else to add yet.",
       timestamp: t++,
     },
   ];

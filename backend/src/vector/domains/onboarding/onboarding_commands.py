@@ -31,6 +31,7 @@ from vector.domains.onboarding.constants import (
     ONBOARDING_STEPS,
     STATUS_COMPLETED,
     STEP_ADMIN_ACCESS,
+    STEP_SLACK_COLLABORATORS_CONFIRM,
     STEP_SLACK_WATCH_CHANNELS,
     STEP_THANK_YOU,
 )
@@ -135,6 +136,18 @@ def _slack_team_members_structured_chat_content(raw: Any) -> str | None:
         return None
     return json.dumps(
         {"type": "slack_team_members_selected", "members": payload_members},
+        separators=(",", ":"),
+    )
+
+
+def _slack_manager_intro_consent_chat_content(raw: Any) -> str | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    choice = raw.strip().lower()
+    if choice not in ("yes", "later", "not_applicable"):
+        return None
+    return json.dumps(
+        {"type": "slack_manager_intro_consent", "choice": choice},
         separators=(",", ":"),
     )
 
@@ -299,6 +312,7 @@ def patch_onboarding(
         ob_repo.normalize_slack_collaborators_in_place(merged)
         ob_repo.normalize_slack_team_members_in_place(merged)
         ob_repo.normalize_slack_watch_channels_in_place(merged)
+        ob_repo.normalize_slack_introduce_managers_consent_in_place(merged)
         row.answers_json = merged
         merged_snapshot = merged
         apply_patch_answers_to_profile_and_company(
@@ -329,13 +343,39 @@ def patch_onboarding(
                     content=team_line,
                 )
 
+    if body.current_step == STEP_SLACK_COLLABORATORS_CONFIRM and ob_repo.onboarding_messages_table_exists(
+        db
+    ):
+        snap_collab: dict[str, Any] = (
+            merged_snapshot if merged_snapshot is not None else dict(row.answers_json or {})
+        )
+        collab_line = _slack_collaborators_structured_chat_content(snap_collab.get("slack_collaborators"))
+        if collab_line:
+            prior_collab = ob_repo.list_onboarding_messages_chronological(
+                db,
+                claims.tenant_id,
+                limit=200,
+            )
+            last_collab = prior_collab[-1] if prior_collab else None
+            if not (
+                last_collab is not None
+                and last_collab.role == "user"
+                and last_collab.content == collab_line
+            ):
+                ob_repo.append_onboarding_message(
+                    db,
+                    tenant_id=claims.tenant_id,
+                    user_id=claims.user_id,
+                    role="user",
+                    content=collab_line,
+                )
+
     if body.current_step == STEP_ADMIN_ACCESS and ob_repo.onboarding_messages_table_exists(db):
         snap: dict[str, Any] = (
             merged_snapshot if merged_snapshot is not None else dict(row.answers_json or {})
         )
         for line in (
             _slack_stakeholders_user_chat_line(snap.get("slack_stakeholders")),
-            _slack_collaborators_structured_chat_content(snap.get("slack_collaborators")),
             _slack_watch_channels_structured_chat_content(snap.get("slack_watch_channels")),
         ):
             if not line:
@@ -355,6 +395,30 @@ def patch_onboarding(
                 role="user",
                 content=line,
             )
+
+    if merged_snapshot is not None and ob_repo.onboarding_messages_table_exists(db):
+        consent_line = _slack_manager_intro_consent_chat_content(
+            merged_snapshot.get("slack_introduce_managers_consent"),
+        )
+        if consent_line:
+            prior_c = ob_repo.list_onboarding_messages_chronological(
+                db,
+                claims.tenant_id,
+                limit=200,
+            )
+            last_c = prior_c[-1] if prior_c else None
+            if not (
+                last_c is not None
+                and last_c.role == "user"
+                and last_c.content == consent_line
+            ):
+                ob_repo.append_onboarding_message(
+                    db,
+                    tenant_id=claims.tenant_id,
+                    user_id=claims.user_id,
+                    role="user",
+                    content=consent_line,
+                )
 
     row.version = int(row.version) + 1
     db.commit()

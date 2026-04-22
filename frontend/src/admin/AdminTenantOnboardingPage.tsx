@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { slackPersonChipText } from "../components/onboarding/slackPersonDisplay";
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { AdminOnboardingStyleThread, buildAdminWebsiteOnboardingTranscript } from "./adminChatTranscript";
@@ -65,6 +66,8 @@ type OnboardingSnap = {
   slack_collaborators?: SlackCollaboratorsSnap | null;
   slack_team_members?: SlackCollaboratorsSnap | null;
   slack_watch_channels?: SlackWatchChannelsSnap | null;
+  /** ``yes`` | ``later`` | ``not_applicable`` from final wrap-up when other managers exist. */
+  slack_introduce_managers_consent?: string | null;
   chat_messages: ChatMsg[];
 };
 
@@ -849,10 +852,8 @@ export default function AdminTenantOnboardingPage() {
                         key={m.slack_user_id}
                         className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-200/80 pb-2 last:border-b-0 last:pb-0"
                       >
-                        <span className="font-medium text-stone-900">{m.label}</span>
-                        <span className="font-mono text-xs text-stone-600">
-                          @{m.username} · {m.slack_user_id}
-                        </span>
+                        <span className="min-w-0 text-stone-900">{slackPersonChipText(m)}</span>
+                        <span className="shrink-0 font-mono text-xs text-stone-600">{m.slack_user_id}</span>
                       </li>
                     ))}
                   </ul>
@@ -876,10 +877,8 @@ export default function AdminTenantOnboardingPage() {
                         key={m.slack_user_id}
                         className="flex flex-wrap items-baseline justify-between gap-2 border-b border-stone-200/80 pb-2 last:border-b-0 last:pb-0"
                       >
-                        <span className="font-medium text-stone-900">{m.label}</span>
-                        <span className="font-mono text-xs text-stone-600">
-                          @{m.username} · {m.slack_user_id}
-                        </span>
+                        <span className="min-w-0 text-stone-900">{slackPersonChipText(m)}</span>
+                        <span className="shrink-0 font-mono text-xs text-stone-600">{m.slack_user_id}</span>
                       </li>
                     ))}
                   </ul>
@@ -910,6 +909,24 @@ export default function AdminTenantOnboardingPage() {
                 ) : (
                   <p className="mt-2 text-sm text-stone-500">—</p>
                 )}
+              </div>
+
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+                  Introduce Vector to other managers
+                </h3>
+                <p className="mt-1 text-xs text-stone-500">
+                  Read-only — answer from the final wrap-up when other managers were listed (
+                  <span className="font-mono">yes</span>, <span className="font-mono">later</span>, or{" "}
+                  <span className="font-mono">not_applicable</span>).
+                </p>
+                <p className="mt-2 text-sm text-stone-800">
+                  {ob.slack_introduce_managers_consent?.trim() ? (
+                    <span className="font-mono">{ob.slack_introduce_managers_consent}</span>
+                  ) : (
+                    <span className="text-stone-500">—</span>
+                  )}
+                </p>
               </div>
 
               {ob.tools_stack && Object.keys(ob.tools_stack).length > 0 ? (

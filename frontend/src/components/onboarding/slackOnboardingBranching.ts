@@ -1,3 +1,4 @@
+import type { SlackCollaboratorMember } from "../../lib/onboardingApi";
 import { slackCollaboratorsFromAnswers } from "./slackCollaboratorsAnswers";
 
 /** Slack user id chosen at stakeholder self-identify (``slack_stakeholders``). */
@@ -20,4 +21,16 @@ export function collaboratorsIncludesStakeholderSelf(answers: Record<string, unk
     return false;
   }
   return slackCollaboratorsFromAnswers(answers).some((m) => m.slack_user_id === self);
+}
+
+/** Collaborators excluding the stakeholder Slack user (``other managers`` for wrap-up consent). */
+export function otherSlackCollaboratorsExcludingStakeholder(
+  answers: Record<string, unknown>,
+): SlackCollaboratorMember[] {
+  const self = stakeholderSlackUserId(answers);
+  const all = slackCollaboratorsFromAnswers(answers);
+  if (!self) {
+    return all;
+  }
+  return all.filter((m) => m.slack_user_id !== self);
 }

@@ -103,8 +103,8 @@ def test_patch_admin_access_with_slack_stakeholders_appends_user_chat_line(clien
     assert "@Tibo" in user_lines
 
 
-def test_patch_admin_access_appends_slack_collaborators_structured_json(client: TestClient) -> None:
-    """Collaborator picks are logged as structured JSON (same UX pattern as tools_selected)."""
+def test_patch_slack_collaborators_confirm_appends_structured_json(client: TestClient) -> None:
+    """Collaborator picks are logged when entering confirm (same UX pattern as tools_selected)."""
     email = f"ob-collab-chat-{uuid.uuid4().hex[:12]}@example.com"
     reg = client.post(
         "/auth/register",
@@ -125,10 +125,10 @@ def test_patch_admin_access_appends_slack_collaborators_structured_json(client: 
         == 200
     )
 
-    to_admin = client.patch(
+    to_confirm = client.patch(
         "/onboarding",
         json={
-            "current_step": "ADMIN_ACCESS",
+            "current_step": "SLACK_COLLABORATORS_CONFIRM",
             "answers": {
                 "slack_stakeholders": {
                     "raw_text": "@ada",
@@ -144,8 +144,8 @@ def test_patch_admin_access_appends_slack_collaborators_structured_json(client: 
             },
         },
     )
-    assert to_admin.status_code == 200
-    msgs = to_admin.json().get("messages") or []
+    assert to_confirm.status_code == 200
+    msgs = to_confirm.json().get("messages") or []
     user_lines = [m["content"] for m in msgs if m.get("role") == "user"]
     coll_row = next(
         (c for c in user_lines if c.strip().startswith("{") and "slack_collaborators_selected" in c),

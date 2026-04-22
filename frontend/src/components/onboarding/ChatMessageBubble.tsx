@@ -2,6 +2,7 @@ import type { ChatMessage } from "./types";
 import ChatAvatar from "./ChatAvatar";
 import { landingAccentText, landingSubtleLineV } from "../landing/landingBrandPalette";
 import { labelsForToolsPayload } from "./onboardingToolGroups";
+import { slackPersonChipText } from "./slackPersonDisplay";
 
 type ChatMessageBubbleProps = {
   message: ChatMessage;
@@ -83,6 +84,40 @@ type SlackWatchChannelChip = {
   channel_id: string;
   name: string;
 };
+
+function tryParseSlackManagerIntroConsent(content: string): "yes" | "later" | "not_applicable" | null {
+  const t = content.trim();
+  if (!t.startsWith("{")) {
+    return null;
+  }
+  try {
+    const o = JSON.parse(t) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      return null;
+    }
+    const rec = o as Record<string, unknown>;
+    if (rec.type !== "slack_manager_intro_consent") {
+      return null;
+    }
+    const ch = rec.choice;
+    if (ch === "yes" || ch === "later" || ch === "not_applicable") {
+      return ch;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function slackManagerIntroConsentLabel(choice: "yes" | "later" | "not_applicable"): string {
+  if (choice === "yes") {
+    return "Yes — introduce yourself to managers";
+  }
+  if (choice === "later") {
+    return "Maybe later on manager intros";
+  }
+  return "Continue (no other managers)";
+}
 
 function tryParseSlackWatchChannelsSelectedContent(content: string): SlackWatchChannelChip[] | null {
   const t = content.trim();
@@ -224,12 +259,18 @@ export default function ChatMessageBubble({
   const toolsPick = isUser ? tryParseToolsSelectedContent(message.content) : null;
   const collaboratorsPick = isUser ? tryParseSlackCollaboratorsSelectedContent(message.content) : null;
   const watchChannelsPick = isUser ? tryParseSlackWatchChannelsSelectedContent(message.content) : null;
+  const managerIntroConsentPick = isUser ? tryParseSlackManagerIntroConsent(message.content) : null;
   const structuredOnlyLabel =
-    isUser && !toolsPick && !collaboratorsPick && !watchChannelsPick
+    isUser && !toolsPick && !collaboratorsPick && !watchChannelsPick && !managerIntroConsentPick
       ? structuredOnlyUserDisplayLabel(message.content)
       : null;
   const persistedConnectorLabel =
-    isUser && !toolsPick && !collaboratorsPick && !watchChannelsPick && !structuredOnlyLabel
+    isUser &&
+    !toolsPick &&
+    !collaboratorsPick &&
+    !watchChannelsPick &&
+    !managerIntroConsentPick &&
+    !structuredOnlyLabel
       ? connectorConnectedDisplayLabel(message.content)
       : null;
 
@@ -262,11 +303,17 @@ export default function ChatMessageBubble({
                 {collaboratorsPick.map((m) => (
                   <span
                     key={m.slack_user_id}
-                    className="inline-flex max-w-full items-center rounded-full border border-[#E878BE]/35 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm"
+                    className="inline-flex max-w-full min-w-0 max-w-[min(100%,20rem)] items-center rounded-full border border-[#E878BE]/35 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm"
                   >
-                    @{m.username.replace(/^@/, "")}
+                    <span className="truncate">{slackPersonChipText(m)}</span>
                   </span>
                 ))}
+              </div>
+            ) : managerIntroConsentPick ? (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                <span className="inline-flex max-w-full items-center rounded-full border border-teal-300/60 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm">
+                  {slackManagerIntroConsentLabel(managerIntroConsentPick)}
+                </span>
               </div>
             ) : watchChannelsPick ? (
               <div className="flex flex-wrap justify-end gap-1.5">

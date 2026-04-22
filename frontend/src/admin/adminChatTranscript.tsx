@@ -14,6 +14,17 @@ import {
   slackWatchChannelsConfirmIntroMessages,
   slackWatchChannelsPickIntroMessages,
 } from "../components/onboarding/slackTeamChannelsCopy";
+import {
+  ONBOARDING_WRAP_UP_THANKS,
+  wrapUpManagerIntroQuestion,
+} from "../components/onboarding/onboardingWrapUpCopy";
+import {
+  reorderOnboardingTranscriptForDisplay,
+  stakeholderAnswerDisplayLineFromAnswers,
+  tryParseUserStructuredJsonType,
+} from "../components/onboarding/onboardingTranscriptDisplayOrder";
+import { slackPersonChipText } from "../components/onboarding/slackPersonDisplay";
+import { otherSlackCollaboratorsExcludingStakeholder } from "../components/onboarding/slackOnboardingBranching";
 import type { ChatMessage } from "../components/onboarding/types";
 
 type AdminChatRow = {
@@ -85,51 +96,6 @@ function adminSnapToAnswers(snap: AdminOnboardingTranscriptSnapshot): Record<str
   };
 }
 
-function tryParseUserStructuredJsonType(content: string): string | null {
-  const t = content.trim();
-  if (!t.startsWith("{")) {
-    return null;
-  }
-  try {
-    const o = JSON.parse(t) as { type?: unknown };
-    return typeof o.type === "string" ? o.type : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Same display line as product PATCH stakeholder user row (``stakeholderAnswerDisplayLine``). */
-function stakeholderAnswerDisplayLineFromAnswers(answers: Record<string, unknown>): string | null {
-  const ss = answers.slack_stakeholders;
-  if (!ss || typeof ss !== "object" || Array.isArray(ss)) {
-    return null;
-  }
-  const o = ss as Record<string, unknown>;
-  const raw = o.raw_text;
-  if (typeof raw === "string" && raw.trim()) {
-    return raw.trim();
-  }
-  const labels = o.mention_labels;
-  if (Array.isArray(labels) && labels.length > 0) {
-    const parts = labels
-      .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
-      .map((l) => {
-        const s = l.trim();
-        return s.startsWith("@") ? s : `@${s}`;
-      });
-    return parts.length > 0 ? parts.join(" ") : null;
-  }
-  return null;
-}
-
-function buildStakeholderFarewellFromAnswers(answers: Record<string, unknown>): string {
-  const line = stakeholderAnswerDisplayLineFromAnswers(answers);
-  if (line) {
-    return `Perfect ${line}, I see you on Slack! Talk soon 😊`;
-  }
-  return "Perfect — I see you on Slack! Talk soon 😊";
-}
-
 function transcriptHasVectorContent(msgs: ChatMessage[], substring: string): boolean {
   return msgs.some((m) => m.role === "vector" && m.content.includes(substring));
 }
@@ -171,7 +137,16 @@ export function buildAdminWebsiteOnboardingTranscript(
     if (m.role === "user") {
       const jsonType = tryParseUserStructuredJsonType(m.content);
       if (jsonType === "slack_team_members_selected") {
-        appendUniqueVectorIntros(out, slackTeamMembersPickIntroMessages(0), m.timestamp, 0);
+        const teamPickVariant =
+          otherSlackCollaboratorsExcludingStakeholder(answers).length === 0
+            ? "solo_manager"
+            : "with_other_managers";
+        appendUniqueVectorIntros(
+          out,
+          slackTeamMembersPickIntroMessages(0, teamPickVariant),
+          m.timestamp,
+          0,
+        );
         appendUniqueVectorIntros(out, slackTeamMembersConfirmIntroMessages(0), m.timestamp, 8);
       } else if (jsonType === "slack_collaborators_selected") {
         appendUniqueVectorIntros(out, slackCollaboratorsPickIntroMessages(0), m.timestamp, 0);
@@ -201,18 +176,48 @@ export function buildAdminWebsiteOnboardingTranscript(
     out.push(m);
   }
 
-  const done = snap.status === "completed" || snap.current_step === "THANK_YOU";
-  if (done && stakeholderLine && !transcriptHasVectorContent(out, "I see you on Slack")) {
-    const lastTs = out.length > 0 ? Math.max(...out.map((x) => x.timestamp)) : Date.now();
-    out.push({
-      id: "admin-synth-stakeholder-farewell",
+  const hasSlackHandoff =
+    Boolean(snap.slack_stakeholders?.slack_user_ids && snap.slack_stakeholders.slack_user_ids.length > 0);
+  const wrapUpContext =
+    hasSlackHandoff &&
+    (snap.current_step === "ADMIN_ACCESS" ||
+      snap.current_step === "THANK_YOU" ||
+      snap.status === "completed");
+  if (wrapUpContext && !transcriptHasVectorContent(out, "We've got everything")) {
+    const consentIdx = out.findIndex(
+      (m) => m.role === "user" && tryParseUserStructuredJsonType(m.content) === "slack_manager_intro_consent",
+    );
+    const anchorTs =
+      consentIdx >= 0
+        ? out[consentIdx]!.timestamp
+        : out.length > 0
+          ? Math.max(...out.map((x) => x.timestamp))
+          : Date.now();
+    const thanksMsg: ChatMessage = {
+      id: "admin-synth-wrap-thanks",
       role: "vector",
-      content: buildStakeholderFarewellFromAnswers(answers),
-      timestamp: lastTs + 1,
-    });
+      content: ONBOARDING_WRAP_UP_THANKS,
+      timestamp: anchorTs - 2,
+    };
+    const others = otherSlackCollaboratorsExcludingStakeholder(answers);
+    const askMsg: ChatMessage | null =
+      others.length > 0 && !transcriptHasVectorContent(out, "introduce myself in Slack to the managers")
+        ? {
+            id: "admin-synth-wrap-manager-ask",
+            role: "vector",
+            content: wrapUpManagerIntroQuestion(others.map((m) => slackPersonChipText(m)).join(", ")),
+            timestamp: anchorTs - 1,
+          }
+        : null;
+    const synthWrap = askMsg ? [thanksMsg, askMsg] : [thanksMsg];
+    if (consentIdx >= 0) {
+      out.splice(consentIdx, 0, ...synthWrap);
+    } else {
+      out.push(...synthWrap.map((row, i) => ({ ...row, timestamp: anchorTs + 1 + i })));
+    }
   }
 
-  return out;
+  return reorderOnboardingTranscriptForDisplay(out, answers);
 }
 
 function parseCreatedAtMs(created_at: string | null | undefined): number {

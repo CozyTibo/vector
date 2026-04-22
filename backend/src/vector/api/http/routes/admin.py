@@ -337,6 +337,13 @@ def _slack_team_members_from_answers(ans: dict[str, object]) -> SlackCollaborato
     return SlackCollaboratorsSnapshot(members=rows)
 
 
+def _slack_introduce_managers_consent_from_answers(ans: dict[str, object]) -> str | None:
+    raw = ans.get("slack_introduce_managers_consent")
+    if isinstance(raw, str) and raw.strip() in ("yes", "later", "not_applicable"):
+        return raw.strip().lower()
+    return None
+
+
 def _slack_watch_channels_from_answers(ans: dict[str, object]) -> SlackWatchChannelsSnapshot | None:
     raw = ans.get("slack_watch_channels")
     if not isinstance(raw, dict):
@@ -422,6 +429,7 @@ def _snapshot_from_onboarding(
         slack_collaborators=_slack_collaborators_from_answers(ans),
         slack_team_members=_slack_team_members_from_answers(ans),
         slack_watch_channels=_slack_watch_channels_from_answers(ans),
+        slack_introduce_managers_consent=_slack_introduce_managers_consent_from_answers(ans),
         chat_messages=msgs,
     )
 

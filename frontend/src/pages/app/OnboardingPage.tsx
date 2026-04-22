@@ -22,7 +22,16 @@ import {
   seedCollaboratorsFromStakeholders,
   slackCollaboratorsFromAnswers,
 } from "../../components/onboarding/slackCollaboratorsAnswers";
-import { collaboratorsIncludesStakeholderSelf } from "../../components/onboarding/slackOnboardingBranching";
+import {
+  collaboratorsIncludesStakeholderSelf,
+  otherSlackCollaboratorsExcludingStakeholder,
+} from "../../components/onboarding/slackOnboardingBranching";
+import { reorderOnboardingTranscriptForDisplay } from "../../components/onboarding/onboardingTranscriptDisplayOrder";
+import {
+  ONBOARDING_WRAP_UP_THANKS,
+  wrapUpManagerIntroQuestion,
+} from "../../components/onboarding/onboardingWrapUpCopy";
+import { slackPersonChipText } from "../../components/onboarding/slackPersonDisplay";
 import {
   slackTeamMembersConfirmIntroMessages,
   slackTeamMembersPickIntroMessages,
@@ -243,33 +252,29 @@ function buildAdminAccessStakeholderBase(
     return msgs;
   }
   const stakeholderLine = stakeholderAnswerDisplayLine(answers);
-  const last = msgs[msgs.length - 1];
-  const lastIsStakeholderUser =
-    last &&
-    last.role === "user" &&
-    stakeholderLine !== null &&
-    last.content.trim() === stakeholderLine;
-
-  if (lastIsStakeholderUser) {
-    const rest = msgs.slice(0, -1);
-    const lastTs = rest.length > 0 ? Math.max(...rest.map((m) => m.timestamp)) : Date.now();
-    return [...rest, ...syntheticStakeholderStepMessages(answers, lastTs + 1, rest), last];
+  if (stakeholderLine === null) {
+    return msgs;
+  }
+  const stakeTrim = stakeholderLine.trim();
+  const idx = msgs.findIndex(
+    (m) => m.role === "user" && m.content.trim() === stakeTrim,
+  );
+  if (idx < 0) {
+    const lastTs = msgs.length > 0 ? Math.max(...msgs.map((m) => m.timestamp)) : Date.now();
+    return [...msgs, ...syntheticStakeholderStepMessages(answers, lastTs + 1, msgs)];
   }
 
-  const lastTs = msgs.length > 0 ? Math.max(...msgs.map((m) => m.timestamp)) : Date.now();
-  return [...msgs, ...syntheticStakeholderStepMessages(answers, lastTs + 1, msgs)];
-}
-
-function buildStakeholderFarewellMessage(answers: Record<string, unknown>): string {
-  const line = stakeholderAnswerDisplayLine(answers);
-  if (line) {
-    return `Perfect ${line}, I see you on Slack! Talk soon 😊`;
-  }
-  return "Perfect — I see you on Slack! Talk soon 😊";
-}
-
-function onboardingAppCtaStorageKey(tenantId: string): string {
-  return `vector_onboarding_app_cta:${tenantId}`;
+  const before = msgs.slice(0, idx);
+  const stakeMsg = msgs[idx]!;
+  const synth = syntheticStakeholderStepMessages(
+    answers,
+    stakeMsg.timestamp - 100,
+    before,
+  ).map((row, i) => ({
+    ...row,
+    timestamp: stakeMsg.timestamp - 20 + i,
+  }));
+  return [...before, ...synth, stakeMsg, ...msgs.slice(idx + 1)];
 }
 
 function effectiveConnectQueue(answers: Record<string, unknown>, currentStep: string): string[] {
@@ -403,7 +408,6 @@ export default function OnboardingPage() {
   const [slackTeamBusy, setSlackTeamBusy] = useState(false);
   const [slackWatchChannelsSubmitError, setSlackWatchChannelsSubmitError] = useState<string | null>(null);
   const [slackWatchChannelsBusy, setSlackWatchChannelsBusy] = useState(false);
-  const [adminFarewellMessage, setAdminFarewellMessage] = useState<ChatMessage | null>(null);
   /** Shown when ?*_connected=1 is in the URL but GET /onboarding does not reflect the link yet, or PATCH fails. */
   const [oauthReturnError, setOauthReturnError] = useState<string | null>(null);
   const oauthAdvanceLockRef = useRef<string | null>(null);
@@ -427,16 +431,12 @@ export default function OnboardingPage() {
     setChatBusy(false);
     chatInputHadBusyRef.current = false;
     setConnectorsIntroChipMode("both");
-    setAdminFarewellMessage(null);
     setStakeholdersSubmitError(null);
     setCollaboratorsSubmitError(null);
     setSlackTeamSubmitError(null);
     setSlackWatchChannelsSubmitError(null);
     setFinishOnboardingError(null);
     oauthAdvanceLockRef.current = null;
-    if (tenantId) {
-      sessionStorage.removeItem(onboardingAppCtaStorageKey(tenantId));
-    }
   }, [tenantId]);
 
   /** Clear local chat state when switching accounts (React Query cache is tenant-scoped; refs/state are not). */
@@ -464,7 +464,6 @@ export default function OnboardingPage() {
     setOauthReturnError(null);
     oauthAdvanceLockRef.current = null;
     setConnectorsIntroChipMode("both");
-    setAdminFarewellMessage(null);
   }, [tenantId]);
 
   /**
@@ -525,41 +524,47 @@ export default function OnboardingPage() {
     return server.current_step as OnboardingStep;
   }, [server]);
 
-  /** Leave ADMIN_ACCESS → drop UI-only farewell bubble (persisted chat stays from GET /onboarding). */
-  useEffect(() => {
-    if (displayStep !== "ADMIN_ACCESS") {
-      setAdminFarewellMessage(null);
+  const otherManagersForWrapUp = useMemo(() => {
+    if (!server) {
+      return [];
     }
-  }, [displayStep]);
+    return otherSlackCollaboratorsExcludingStakeholder(server.answers);
+  }, [server?.answers, server?.version]);
 
-  /** Refresh / return: show farewell again without replaying typing when the CTA was already reached. */
-  useEffect(() => {
-    if (displayStep !== "ADMIN_ACCESS" || !server || !tenantId) {
-      return;
+  const wrapUpTailMessages = useMemo((): ChatMessage[] => {
+    if (displayStep !== "ADMIN_ACCESS" || !server) {
+      return [];
     }
-    if (sessionStorage.getItem(onboardingAppCtaStorageKey(tenantId)) !== "1") {
-      return;
+    const lastTs = messages.length > 0 ? Math.max(...messages.map((m) => m.timestamp)) : Date.now();
+    const t0 = lastTs + 15;
+    const thanks: ChatMessage = {
+      id: "onb-wrap-up-thanks",
+      role: "vector",
+      content: ONBOARDING_WRAP_UP_THANKS,
+      timestamp: t0,
+    };
+    if (otherManagersForWrapUp.length === 0) {
+      return [thanks];
     }
-    setAdminFarewellMessage((prev) => {
-      if (prev) {
-        return prev;
-      }
-      return {
-        id: "admin-farewell-restored",
+    const handles = otherManagersForWrapUp.map((m) => slackPersonChipText(m)).join(", ");
+    return [
+      thanks,
+      {
+        id: "onb-wrap-up-manager-ask",
         role: "vector",
-        content: buildStakeholderFarewellMessage(server.answers),
-        timestamp: Date.now(),
-      };
-    });
-  }, [displayStep, server, tenantId]);
+        content: wrapUpManagerIntroQuestion(handles),
+        timestamp: t0 + 1,
+      },
+    ];
+  }, [displayStep, server, messages, otherManagersForWrapUp]);
 
   const adminAccessDisplayMessages = useMemo(() => {
     if (displayStep !== "ADMIN_ACCESS" || !server) {
       return [];
     }
     const base = buildAdminAccessStakeholderBase(messages, server.answers);
-    return adminFarewellMessage ? [...base, adminFarewellMessage] : base;
-  }, [displayStep, server, messages, adminFarewellMessage]);
+    return reorderOnboardingTranscriptForDisplay([...base, ...wrapUpTailMessages], server.answers);
+  }, [displayStep, server, messages, wrapUpTailMessages]);
 
   const thankYou = Boolean(server && (server.status === "completed" || displayStep === "THANK_YOU"));
 
@@ -573,39 +578,6 @@ export default function OnboardingPage() {
       setConnectorsIntroChipMode("both");
     }
   }, [profilePhase]);
-
-  useEffect(() => {
-    if (displayStep !== "ADMIN_ACCESS" || !server || !tenantId) {
-      return;
-    }
-    if (sessionStorage.getItem(onboardingAppCtaStorageKey(tenantId)) === "1") {
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      setIsTyping(true);
-      await minTypingDelay(400, 800);
-      if (cancelled) {
-        return;
-      }
-      const text = buildStakeholderFarewellMessage(server.answers);
-      setAdminFarewellMessage({
-        id: crypto.randomUUID(),
-        role: "vector",
-        content: text,
-        timestamp: Date.now(),
-      });
-      setIsTyping(false);
-      if (cancelled || !tenantId) {
-        return;
-      }
-      sessionStorage.setItem(onboardingAppCtaStorageKey(tenantId), "1");
-    })();
-    return () => {
-      cancelled = true;
-      setIsTyping(false);
-    };
-  }, [displayStep, server, tenantId]);
 
   /** After Vector finishes typing or the chat request completes, keep focus in the message field. */
   useEffect(() => {
@@ -666,6 +638,24 @@ export default function OnboardingPage() {
       setFinishOnboardingError(e instanceof Error ? e.message : "Could not finish onboarding.");
     },
   });
+
+  const patchConsentThenComplete = useCallback(
+    async (choice: "yes" | "later" | "not_applicable") => {
+      setFinishOnboardingError(null);
+      try {
+        await patchOnboarding(apiBase, { answers: { slack_introduce_managers_consent: choice } });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+        completeOnboardingGoAppRef.current = true;
+        await finishOnboardingMut.mutateAsync();
+      } catch (e) {
+        setFinishOnboardingError(e instanceof Error ? e.message : "Could not finish setup.");
+      }
+    },
+    [apiBase, qc, tenantId, finishOnboardingMut],
+  );
 
   const restartOnboardingMut = useMutation({
     mutationFn: () => postRestartOnboarding(apiBase),
@@ -891,9 +881,18 @@ export default function OnboardingPage() {
     return slackTeamMembersFromAnswers(server.answers);
   }, [server?.answers, server?.version]);
 
+  const slackTeamPickIntroVariant = useMemo(() => {
+    if (!server) {
+      return "with_other_managers" as const;
+    }
+    return otherSlackCollaboratorsExcludingStakeholder(server.answers).length === 0
+      ? ("solo_manager" as const)
+      : ("with_other_managers" as const);
+  }, [server?.answers, server?.version]);
+
   const slackTeamPickIntroMessages = useMemo(
-    () => slackTeamMembersPickIntroMessages(Date.now()),
-    [server?.current_step, server?.version],
+    () => slackTeamMembersPickIntroMessages(Date.now(), slackTeamPickIntroVariant),
+    [server?.current_step, server?.version, slackTeamPickIntroVariant],
   );
   const slackTeamConfirmIntroMessages = useMemo(
     () => slackTeamMembersConfirmIntroMessages(Date.now()),
@@ -1572,26 +1571,53 @@ export default function OnboardingPage() {
   }
 
   if (displayStep === "ADMIN_ACCESS" && server) {
-    const adminAccessFooter = adminFarewellMessage ? (
-      <div className="px-4 pb-4 pt-2 sm:px-5">
+    const wrapUpPrimaryButtonClass =
+      "w-full rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white " +
+      "shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03] " +
+      "disabled:cursor-not-allowed disabled:opacity-50 " +
+      landingAccentText;
+    const wrapUpSecondaryButtonClass =
+      "w-full rounded-full border border-zinc-200 bg-white px-8 py-3 text-sm font-medium text-zinc-800 " +
+      "transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[10rem]";
+
+    const adminAccessFooter = (
+      <div className="space-y-3 px-4 pb-4 pt-2 sm:px-5">
         {finishOnboardingError ? (
-          <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-950">
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-950">
             {finishOnboardingError}
           </p>
         ) : null}
-        <button
-          type="button"
-          disabled={finishOnboardingMut.isPending}
-          className="w-full rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => {
-            completeOnboardingGoAppRef.current = true;
-            finishOnboardingMut.mutate();
-          }}
-        >
-          {finishOnboardingMut.isPending ? "Opening…" : "Access your company space"}
-        </button>
+        {otherManagersForWrapUp.length > 0 ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              disabled={finishOnboardingMut.isPending}
+              className={wrapUpPrimaryButtonClass}
+              onClick={() => void patchConsentThenComplete("yes")}
+            >
+              {finishOnboardingMut.isPending ? "Saving…" : "Yes, go ahead"}
+            </button>
+            <button
+              type="button"
+              disabled={finishOnboardingMut.isPending}
+              className={wrapUpSecondaryButtonClass}
+              onClick={() => void patchConsentThenComplete("later")}
+            >
+              Maybe later
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={finishOnboardingMut.isPending}
+            className={wrapUpPrimaryButtonClass}
+            onClick={() => void patchConsentThenComplete("not_applicable")}
+          >
+            {finishOnboardingMut.isPending ? "Opening…" : "Finish the onboarding"}
+          </button>
+        )}
       </div>
-    ) : null;
+    );
 
     return (
       <>

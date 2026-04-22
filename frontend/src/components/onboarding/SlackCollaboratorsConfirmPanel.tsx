@@ -4,11 +4,8 @@ import type { ChatMessage } from "./types";
 import ChatMessageList from "./ChatMessageList";
 import { landingAccentText } from "../landing/landingBrandPalette";
 import type { SlackCollaboratorMember, SlackWorkspaceMember } from "../../lib/onboardingApi";
+import { slackPersonChipText } from "./slackPersonDisplay";
 import { slackCollaboratorsConfirmIntroMessages } from "./slackCollaboratorsCopy";
-
-function slackHandleFromCollaborator(c: SlackCollaboratorMember): string {
-  return `@${c.username.trim().replace(/^@/, "")}`;
-}
 
 type SlackCollaboratorsConfirmPanelProps = {
   priorChatMessages: ChatMessage[];
@@ -55,7 +52,7 @@ export default function SlackCollaboratorsConfirmPanel({
           <ul className="space-y-2">
             {members.map((m) => {
               const wm = rosterMembers.find((x) => x.id === m.slack_user_id);
-              const handle = slackHandleFromCollaborator(m);
+              const handle = slackPersonChipText(m);
               const initials = (m.label.trim() || m.username).slice(0, 2).toUpperCase();
               return (
                 <li
