@@ -109,11 +109,11 @@ migrate-down: $(DOTENV) build-backend
 # Resets public.alembic_version to repo HEAD when the DB references a missing migration (branch switch).
 # Uses scripts/repair-alembic-version.sh (safe if alembic_version table does not exist yet).
 migrate-repair: $(DOTENV) build-backend
-	@COMPOSE="$(COMPOSE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_SERVICE="$(POSTGRES_SERVICE)" BACKEND_SERVICE="$(BACKEND_SERVICE)" \
+	@COMPOSE="$(COMPOSE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" POSTGRES_SERVICE="$(POSTGRES_SERVICE)" BACKEND_SERVICE="$(BACKEND_SERVICE)" \
 		bash scripts/repair-alembic-version.sh "$(POSTGRES_DB)"
 
 migrate-repair-test: $(DOTENV) build-backend
-	@COMPOSE="$(COMPOSE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_SERVICE="$(POSTGRES_SERVICE)" BACKEND_SERVICE="$(BACKEND_SERVICE)" \
+	@COMPOSE="$(COMPOSE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" POSTGRES_SERVICE="$(POSTGRES_SERVICE)" BACKEND_SERVICE="$(BACKEND_SERVICE)" \
 		bash scripts/repair-alembic-version.sh vector_test
 
 migrate-new: $(DOTENV) build-backend

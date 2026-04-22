@@ -144,6 +144,7 @@ ONBOARDING_TOOL_OPTIONS: tuple[tuple[str, str, str], ...] = (
     ("pm", "linear", "Linear"),
     ("pm", "jira", "Jira"),
     ("pm", "clickup", "ClickUp"),
+    ("pm", "notion", "Notion"),
     ("engineering", "github", "GitHub"),
     ("engineering", "gitlab", "GitLab"),
     ("engineering", "bitbucket", "Bitbucket"),

@@ -629,7 +629,7 @@ def handle_turn(
                         "profile_phase": PROFILE_PHASE_TOOLS,
                         "instruction": (
                             "They confirmed without picking any project management tool "
-                            "(Linear, Jira, or ClickUp). Ask them to pick at least one, then confirm again."
+                            "(Linear, Jira, ClickUp, or Notion). Ask them to pick at least one, then confirm again."
                         ),
                     },
                 )

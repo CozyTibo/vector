@@ -205,10 +205,7 @@ class TenantAdminDetailResponse(BaseModel):
     connected_connectors: list[str] = Field(default_factory=list)
     slack_vector_paused: bool = Field(
         default=False,
-        description=(
-            "When true, Vector skips outbound Slack sends for this tenant "
-            "(including manager onboarding DMs)."
-        ),
+        description="When true, Vector skips outbound Slack sends for this tenant.",
     )
 
 
@@ -216,6 +213,12 @@ class AdminTenantWorkspaceAccessRequest(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     workspace_access_enabled: bool
+
+
+class AdminTenantSlackDeliveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slack_vector_paused: bool
 
 
 class TenantConnectionAdminItem(BaseModel):
@@ -392,7 +395,6 @@ class AdminResetTenantToSignupResponse(BaseModel):
     deleted_ingestion_runs: int
     deleted_sync_state_rows: int
     deleted_tenant_connections: int
-    deleted_manager_onboarding_sessions: int
 
 
 class AdminHardDeleteTenantResponse(BaseModel):

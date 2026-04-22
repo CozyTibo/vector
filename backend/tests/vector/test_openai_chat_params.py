@@ -1,8 +1,4 @@
-from vector.openai_chat_params import (
-    manager_onboarding_completion_cap,
-    onboarding_chat_max_completion_tokens,
-    temperature_for_chat_model,
-)
+from vector.openai_chat_params import onboarding_chat_max_completion_tokens, temperature_for_chat_model
 
 
 def test_gpt5_uses_provider_default_temperature() -> None:
@@ -12,12 +8,6 @@ def test_gpt5_uses_provider_default_temperature() -> None:
 
 def test_gpt4o_passes_requested_temperature() -> None:
     assert temperature_for_chat_model("gpt-4o-mini", 0.35) == 0.35
-
-
-def test_gpt5_higher_completion_cap() -> None:
-    assert manager_onboarding_completion_cap("gpt-5-mini", interpret=True) == 4096
-    assert manager_onboarding_completion_cap("gpt-5-mini", interpret=False) == 3072
-    assert manager_onboarding_completion_cap("gpt-4o-mini", interpret=True) == 900
 
 
 def test_onboarding_chat_gpt5_uses_high_completion_cap() -> None:

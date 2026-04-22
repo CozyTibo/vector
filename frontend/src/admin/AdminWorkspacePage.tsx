@@ -26,16 +26,6 @@ type TenantDetail = {
 
 type Conn = { id: string; provider: string; status: string; created_at: string };
 
-type MoSummary = {
-  session_count: number;
-  invitation_count?: number;
-  managers_with_sessions?: number;
-  managers_completed?: number;
-  managers_in_progress?: number;
-  managers_needs_attention?: number;
-  slack_vector_paused: boolean;
-};
-
 function Tile({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
     <div
@@ -74,12 +64,6 @@ export default function AdminWorkspacePage() {
     enabled: Boolean(tenantId),
   });
 
-  const moQ = useQuery({
-    queryKey: ["admin-mo-tenant-summary", tenantId],
-    queryFn: () => adminJson<MoSummary>(`/admin/tenants/${tenantId}/manager-onboarding/summary`),
-    enabled: Boolean(tenantId),
-  });
-
   const workspaceAccessMut = useMutation({
     mutationFn: async (workspace_access_enabled: boolean) => {
       const res = await adminFetch(`/admin/tenants/${tenantId}/workspace-access`, {
@@ -100,7 +84,7 @@ export default function AdminWorkspacePage() {
 
   const slackPauseMut = useMutation({
     mutationFn: async (slack_vector_paused: boolean) => {
-      const res = await adminFetch(`/admin/tenants/${tenantId}/manager-onboarding/slack-policy`, {
+      const res = await adminFetch(`/admin/tenants/${tenantId}/slack-delivery`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slack_vector_paused }),
@@ -112,7 +96,6 @@ export default function AdminWorkspacePage() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["admin-tenant", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["admin-mo-tenant-summary", tenantId] });
     },
   });
 
@@ -146,7 +129,6 @@ export default function AdminWorkspacePage() {
   }
 
   const t = tenantQ.data;
-  const mo = moQ.data;
   const slackBtn =
     "rounded-md border px-3 py-1.5 text-sm font-medium disabled:opacity-50 " +
     (t.slack_vector_paused
@@ -171,60 +153,6 @@ export default function AdminWorkspacePage() {
     : ob.status.toLowerCase() === "completed"
       ? "ok"
       : "warn";
-
-  const moTotal = mo ? (mo.managers_with_sessions ?? mo.session_count) : 0;
-  const moDone = mo?.managers_completed ?? 0;
-  const moActive = mo?.managers_in_progress ?? 0;
-  const moAttention = mo?.managers_needs_attention ?? 0;
-  const moInvites = mo?.invitation_count ?? 0;
-
-  const slackObTag = !moQ.isFetched
-    ? "Loading…"
-    : !mo
-      ? "—"
-      : mo.slack_vector_paused
-        ? "Paused"
-        : moTotal > 0
-          ? `${moTotal} manager${moTotal === 1 ? "" : "s"} in Slack`
-          : moInvites > 0
-            ? `${moInvites} invite${moInvites === 1 ? "" : "s"} pending`
-            : "No managers yet";
-
-  const slackObTone: "ok" | "warn" | "neutral" =
-    !moQ.isFetched || !mo
-      ? "neutral"
-      : mo.slack_vector_paused
-        ? "warn"
-        : moTotal > 0 || moInvites > 0
-          ? "ok"
-          : "neutral";
-
-  const slackObLine = !moQ.isFetched
-    ? "Loading…"
-    : !mo
-      ? "Unavailable."
-      : mo.slack_vector_paused
-        ? "Vector is not sending Slack DMs; managers may be waiting."
-        : moTotal === 0 && moInvites === 0
-            ? "No managers are in Slack onboarding yet."
-            : moTotal === 0 && moInvites > 0
-              ? `${moInvites} invitation${moInvites === 1 ? "" : "s"} sent or queued — no live Slack thread yet.`
-              : (() => {
-                  const parts: string[] = [];
-                  if (moDone > 0) {
-                    parts.push(`${moDone} finished`);
-                  }
-                  if (moActive > 0) {
-                    parts.push(`${moActive} in progress`);
-                  }
-                  if (moAttention > 0) {
-                    parts.push(`${moAttention} need review or blocked`);
-                  }
-                  if (parts.length > 0) {
-                    return parts.join(" · ");
-                  }
-                  return `${moTotal} manager DM thread${moTotal === 1 ? "" : "s"} — open details for per-manager status.`;
-                })();
 
   return (
     <div className="space-y-3">
@@ -283,14 +211,6 @@ export default function AdminWorkspacePage() {
           ) : null}
         </Tile>
 
-        <Tile title="Manager onboarding (Slack)">
-          <div className="flex flex-wrap gap-1.5">
-            <StatusBadge tone={slackObTone}>{slackObTag}</StatusBadge>
-          </div>
-          <p className="mt-2 line-clamp-2 text-xs text-stone-600">{slackObLine}</p>
-          <TileLink to={`/admin/tenants/${tenantId}/slack-onboarding`}>Details &amp; conversations →</TileLink>
-        </Tile>
-
         <Tile title="Connectors" className="xl:col-span-3">
           {t.connected_connectors.length === 0 ? (
             <p className="text-xs text-stone-600">None.</p>
@@ -322,7 +242,7 @@ export default function AdminWorkspacePage() {
         </h2>
         <p className="mt-1 text-xs text-stone-500">
           Activate product access or return a workspace to the waitlist, reset signup state, pause or
-          resume Slack delivery, or permanently delete the company. Local-only shortcuts appear when
+          resume Slack delivery for the workspace, or permanently delete the company. Local-only shortcuts appear when
           running the admin UI in development. These change live behavior — use deliberately.
         </p>
 
@@ -399,9 +319,8 @@ export default function AdminWorkspacePage() {
               Slack delivery (whole workspace)
             </h3>
             <p className="mt-2 text-xs text-stone-600">
-              When paused, Vector does not send <strong>any</strong> Slack messages for this company —
-              not just manager onboarding. This is the main switch your team should use during incidents
-              or customer requests.
+              When paused, Vector does not send <strong>any</strong> Slack messages for this company.
+              This is the main switch your team should use during incidents or customer requests.
             </p>
             {slackPauseMut.isError ? (
               <p className="mt-2 text-xs text-red-700">{(slackPauseMut.error as Error).message}</p>

@@ -46,7 +46,6 @@ export default function AdminTenantResetToSignup({ tenantId, companyName }: Prop
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["admin-tenant", tenantId] }),
         qc.invalidateQueries({ queryKey: ["admin-connections", tenantId] }),
-        qc.invalidateQueries({ queryKey: ["admin-mo-tenant-summary", tenantId] }),
         qc.invalidateQueries({ queryKey: ["admin-tenants"] }),
       ]);
       setOpen(false);
@@ -65,7 +64,7 @@ export default function AdminTenantResetToSignup({ tenantId, companyName }: Prop
       <h2 className="text-sm font-semibold text-amber-950">Reset workspace to fresh signup</h2>
       <p className="mt-1 text-[11px] leading-snug text-amber-900/90">
         Wipes <strong>all</strong> tenant-scoped product data (ingestion, canonical graph, connectors,
-        website onboarding, manager Slack onboarding) and turns off product access + Slack pause. Keeps
+        website onboarding) and turns off product access + Slack pause. Keeps
         this company id, name, and <strong>all memberships</strong> — same users, empty product state.
       </p>
       <button

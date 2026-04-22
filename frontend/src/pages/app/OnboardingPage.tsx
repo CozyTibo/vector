@@ -161,7 +161,7 @@ function unsupportedMandatorySectionsFromAnswers(answers: Record<string, unknown
 function unsupportedMandatoryScopeDescription(sections: string[]): string {
   const labels: Record<string, string> = {
     communication: "communication tools such as Microsoft Teams or Discord",
-    pm: "project management tools outside Linear (for example Jira or ClickUp)",
+    pm: "project management tools outside Linear (for example Jira, ClickUp, or Notion)",
     engineering: "engineering tools outside GitHub (for example GitLab or Bitbucket)",
   };
   const parts = sections.map((s) => labels[s] ?? s);
