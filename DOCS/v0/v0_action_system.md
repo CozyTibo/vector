@@ -24,14 +24,18 @@ V0 implements a **pure Action-based** pipeline:
 | # | Rule |
 |---|------|
 | 1 | **No ingestion or persistence of report pipeline data** — do not write report payloads, raw fetches, embeddings, or `UserReportContext` to DB tables for this flow. Existing DB use for **auth**, **tenant/membership**, and **connector tokens/config** is allowed only where the product already requires it; those reads are not “report storage.” |
-| 2 | **No Celery** (or other async job runners) **for this V0 report flow** — end-to-end work runs in the **HTTP request** handling the Slack command (or synchronous path invoked there). |
+| 2 | **No Celery** (or other async job runners) **for this V0 report flow** — work runs **in the same API process** after Slack is acknowledged (see **§3.5**). No separate job queue. |
 | 3 | **No embeddings / vector DB** for V0 report. |
 | 4 | **No long-term memory** (no conversational state machine; no RAG store for this flow). |
 | 5 | **All report-source data is fetched live** via external APIs (Slack, Linear, GitHub, Notion, peer-review source, etc.) inside **`type="data"`** Actions only. |
-| 6 | **All processing for the report** in this spec runs **synchronously** in that same request until the Slack response is returned (subject to platform timeouts — implement timeouts per connector). |
-| 7 | **LLM runs exactly once** per successful `report.user` invocation: only **`report.generate_user_summary`**. No LLM in **`data`** or **`aggregation`** handlers (call the registered **`llm`** Action via executor if needed — already the case for summary). |
+| 6 | **Slack slash commands** MUST **acknowledge immediately** (<1s) and MUST **not** block on `report.user`. The report pipeline runs **after** that acknowledgment **in-process** (e.g. FastAPI `BackgroundTasks`); the **user-visible** result is sent via Slack **`response_url`** (see **§3.5**). Connector fetches remain subject to per-source timeouts (§6.1.3). |
+| 7 | **One LLM Action** per successful `report.user` invocation: only **`report.generate_user_summary`** performs model inference. That Action **MAY** perform **at most one** additional model call for **format repair** only (§9.0). No LLM in **`data`** or **`aggregation`** handlers (call the registered **`llm`** Action via executor if needed — already the case for summary). |
 
 **Clarification:** `db: Session` may appear in handlers per global Action signature; V0 forbids **using Session to persist report artifacts**, not the presence of Session for ORM-backed identity/connector config already in the codebase.
+
+### 1.1 Normative override (time window)
+
+**V0 uses ONLY `window_days`** on `ReportUserInput` / `UserReportContext` (and related payloads). This **overrides** any conflicting illustrative examples elsewhere (including date-based `window_start` / `window_end` in [`action_system.md`](./action_system.md) §9). Implementations and tests MUST follow **`window_days`** for the shipped V0 Slack → report path.
 
 ---
 
@@ -40,14 +44,16 @@ V0 implements a **pure Action-based** pipeline:
 ```
 Slack slash request
   → verify Slack auth / signing
-  → resolve tenant_id, actor_user_id → build ActionContext (source="slack", request_id=…)
-  → parse body → { action_name, raw_inputs }
-  → execute_action(db, ctx, action_name, raw_inputs)
-       → (if report.user) child execute_action calls …
-  → format output_model → Slack message (markdown or structured post)
+  → parse body → { action_name, raw_inputs, response_url }
+  → return immediate HTTP 200 + Slack JSON acknowledgment (<1s)  ← §3.5
+  → (after response is sent, same worker process)
+        → open DB session / resolve tenant_id, actor_user_id → build ActionContext (source="slack", request_id=…)
+        → execute_action(db, ctx, action_name, raw_inputs)
+             → (if report.user) child execute_action calls …
+        → POST final payload to Slack response_url (markdown or structured post)
 ```
 
-**No business logic** in Slack routes: auth, parse, `ActionContext`, `execute_action`, format.
+**No business logic** in Slack routes: auth, parse, immediate ACK, schedule work, `ActionContext` + `execute_action` only in the post-ACK job (§3.5). Formatting stays adapter-side.
 
 ---
 
@@ -82,7 +88,22 @@ Slack slash request
 | Map Slack workspace + caller → `tenant_id`, `actor_user_id` | Direct HTTP to Linear/GitHub from route |
 | Generate `request_id`, set `source="slack"` | Skipping `execute_action` |
 | Parse `key=value` → `dict` | Natural language parsing |
-| Call **`execute_action`** | Embedding domain invariants inline |
+| Call **`execute_action`** (in the **post-ACK** job, not before Slack ACK) | Embedding domain invariants inline |
+| Schedule post-ACK execution + **`response_url`** delivery | Returning the final report in the initial slash-command HTTP body as the only path |
+
+### 3.5 Slack execution model (normative)
+
+The Slack adapter **MUST** treat platform timeouts as blocking for the **initial** HTTP response only.
+
+| Step | Requirement |
+|------|-------------|
+| **Verify** | Verify Slack signing secret / request signature on the raw body before any heavy work. |
+| **Acknowledge** | Return **HTTP 200** with a Slack-compatible JSON body **within \<1s** (e.g. ephemeral “Working on your report…”). This satisfies Slack’s slash-command interaction window. |
+| **Execute** | Run `execute_action` **after** that response is returned, **in the same API process** (e.g. FastAPI `BackgroundTasks` — **not** Celery). |
+| **Deliver** | POST the **final** user-visible payload to the `response_url` from the slash command payload. Use `response_type` appropriate for the product (often `in_channel` or `ephemeral` for errors). |
+| **Errors** | On validation errors before ACK, return an error payload in the **initial** response if appropriate; on failures **after** ACK, POST an error message to `response_url` (do not leave the user with only the ACK). |
+
+**DB session:** the post-ACK job **MAY** use a **new** DB session (e.g. `session_scope()`), independent of the request-scoped session used only for fast path / signing verification if any.
 
 ---
 
@@ -90,19 +111,20 @@ Slack slash request
 
 ### 4.1 Structure
 
-Every Action **MUST** satisfy the full **`ActionSpec`** in [`action_system.md`](./action_system.md) §2.3, including:
+Every Action **MUST** satisfy **`ActionSpec`** in [`action_system.md`](./action_system.md) §2.3, including:
 
-- `permissions`, `idempotent`, `idempotency_note`, `side_effects`, `errors`, `llm_exposed`, `cost_hint`, `latency_hint`
+- `permissions`, `idempotent`, `idempotency_note`, `side_effects`, `errors`, `llm_exposed`
 - `handler(db, ctx, payload)` signature
 - `input_model` / `output_model` as **`type[BaseModel]`** with `extra="forbid"` on inputs per global spec
 
-V0 does **not** relax any of those fields.
+**V0 omits `cost_hint` and `latency_hint` as product/runtime policy.** If the shared `ActionSpec` type in code still carries these fields for forward compatibility with the global doc, V0 registrations **SHOULD** leave them at implementation defaults; **no** V0 code path **MUST** branch on them (routing, quotas, “slow” rejection, etc.).
 
 ### 4.2 Action types (V0 semantics)
 
 #### 4.2.1 `data` — live fetch only
 
-- **May:** call external HTTP APIs via existing **connectors** / domain clients; read connector configuration from existing stores if required.
+- **May:** call external HTTP APIs via existing **connectors** / domain clients.
+- **V0 — no DB in `data.fetch_*`:** handlers for **`data.fetch_*` MUST NOT** perform **any** ORM / `Session` database access (queries, flushes, writes). Connector tokens and workspace configuration **MUST** be resolved **before** the parallel fetch phase (e.g. in `report.user` preflight or the Slack post-ACK job) using a DB session, then passed into fetches via **in-memory** connector clients, DTOs, or **request-scoped wiring** (e.g. context keyed by `ctx.request_id`) populated only by that preflight — **not** via user-visible slash-command payloads. Handlers keep the global `db` parameter but **MUST NOT** use it in V0 fetch Actions.
 - **Must not:** call LLM clients; persist report payloads; enqueue Celery for this flow.
 - **Output:** normalized **slice** models (typed) consumed only by aggregation.
 
@@ -177,6 +199,12 @@ class ReportUserInput(BaseModel):
 
 **`side_effects` on `report.user`:** MUST list `invokes <name>` for every child Action actually called (all fetches + `report.build_user_context` + `report.generate_user_summary`).
 
+### 6.0 Declared `side_effects` / `invokes` (V0)
+
+In V0, `side_effects` entries (including `invokes <action.name>`) are **informational** for humans and static review. The executor **does not** validate that runtime `execute_action` calls match the declared list.
+
+**Optional (recommended):** the executor **SHOULD** emit a structured log field (or trace attribute) listing each child `name` as `execute_action` runs, for drift detection and ops dashboards.
+
 ### 6.1 Fetch failure, parallelism, and executor (normative)
 
 #### 6.1.1 Failure of a `data.fetch_*` Action
@@ -194,6 +222,7 @@ When any **`data.fetch_*`** invocation fails (timeout, HTTP 5xx after retry poli
 
 - **`data.fetch_*` Actions SHOULD** be executed **in parallel** when they are **independent** (no shared mutable prefetch state; same read-only `ctx`).
 - The **executor** (or a thin V0 orchestration helper used **only** from `report.user`) **MAY** use **`asyncio.gather`** (async) or a **bounded thread pool** to run child `execute_action` calls concurrently, provided each child still runs: validate input → permissions → handler → validate output per [`action_system.md`](./action_system.md).
+- **DB session safety:** parallel child Actions **MUST NOT** share one `Session` for ORM work. Combined with **§4.2.1** (no DB in `data.fetch_*`), the default V0 pattern is: **preflight** connector/config reads on **one** session (sequential), then run fetches **without** DB access in parallel threads/tasks.
 - **Ordering** of results before **`report.build_user_context`** MUST be deterministic (e.g. sort by fixed source name order) so tests and logs are stable.
 
 #### 6.1.3 Per-source timeouts (fetch phase)
@@ -206,9 +235,9 @@ Each **`data.fetch_*`** call from `report.user` **MUST** enforce a **hard wall-c
 
 Each **`data.fetch_*`** handler:
 
-1. Uses **tenant-scoped** connector credentials (existing domain/connectors); never raw tokens in Action payload.
+1. Uses **tenant-scoped** connector credentials supplied **in memory** after preflight (§4.2.1); never raw tokens in the Slack-visible Action payload.
 2. Calls **external APIs** and normalizes into a **fixed Pydantic `output_model`** for that Action (slice).
-3. **Does not** INSERT/UPDATE report tables; does not enqueue background jobs for report materialization.
+3. **Does not** INSERT/UPDATE report tables; does not enqueue background jobs for report materialization; **does not** use `Session` for ORM access in V0 (§4.2.1).
 
 ### 7.1 Bounds and selection (MUST — every `data.fetch_*`)
 
@@ -352,6 +381,19 @@ class UserReportContext(BaseModel):
 
 **`side_effects`:** MUST document LLM inference API usage; **no** other side effects.
 
+### 9.0 Markdown format validation and retry (normative)
+
+Strict H2 heading validation (§10) can fail on otherwise acceptable model output. **`report.generate_user_summary` MUST** implement:
+
+1. **Generate** markdown from the model using system prompt §9.1 (first attempt).
+2. **Validate** headings per §10 (order, spelling, level-2).
+3. **If invalid:** issue **exactly one** retry call to the model with a **user** (or secondary system) instruction whose sole purpose is format repair, e.g. *“Fix Markdown structure only: keep factual content identical. Ensure all six H2 headings from §10 appear once, in order, with exact titles.”* Do **not** supply new facts or JSON beyond what the first pass already had.
+4. **If still invalid after retry:** return a **structured error** to the caller (do not POST raw broken markdown to Slack as the final `response_url` payload).
+
+This yields **at most two** LLM generations for the summary step (one primary + one format-repair). It does **not** violate §1 item 7 (“single LLM step”) — that rule refers to **one logical summarization Action**, not retry-for-format within that Action.
+
+**Implementation note:** Python may centralize steps 1–4 in `vector.domains.actions.user_report_markdown.user_summary_markdown_with_heading_retry`, passing a `format_fix` callable whose model call includes `FORMAT_FIX_RETRY_USER_MESSAGE` (same module) as the repair instruction.
+
 ### 9.1 System prompt (normative — MUST use verbatim except `{…}` injection)
 
 The implementation **MUST** send a **system** message equivalent to the following (placeholders filled with **serialized `UserReportContext` JSON** only; no extra scraped text):
@@ -436,7 +478,24 @@ The string returned by **`report.generate_user_summary`** (and echoed in `report
 | **5. Coaching Questions** | Numbered or bulleted **actionable** questions for the manager, grounded in context. |
 | **6. One Priority** | Exactly **one** primary recommendation: **what to do next** and **why it matters** (short paragraph). |
 
-**Validation:** implement a **post-condition** in `report.generate_user_summary` handler or executor wrapper: regex or cheap parser asserts all six H2 headings exist in order; on failure return structured error (do not silently send to Slack).
+**Validation:** implement a **post-condition** per **§9.0** (validate → single format-retry → structured error if still invalid). Do not silently send broken markdown to Slack.
+
+### 10.2 Partial data banner (user-facing)
+
+Let **`V0_REPORT_SOURCE_KEYS`** be the canonical five sources: `slack`, `linear`, `github`, `notion`, `peer_reviews` (stable strings, aligned with `unavailable_sources` in §8.1).
+
+When **all** of the following hold:
+
+- `UserReportContext.unavailable_sources` is **non-empty**, and
+- **at least 50%** of the five sources are unavailable (i.e. `len(unavailable_sources) >= 3` when using the full five-source set),
+
+then the markdown delivered to Slack (`report.user` final output / `response_url`) **MUST** begin with the following **verbatim prefix line** (line break after), followed by the normal report body:
+
+```text
+⚠️ Partial data: some sources unavailable (Slack, GitHub, …)
+```
+
+Replace the parenthetical with a **comma-separated** list of **human-readable** source labels derived from the unavailable keys (e.g. `slack` → `Slack`), **all** sources that are unavailable for this run, not a literal ellipsis. Keep the leading warning emoji and wording through “unavailable ” consistent for searchability in support tooling.
 
 ---
 
@@ -446,9 +505,37 @@ The string returned by **`report.generate_user_summary`** (and echoed in `report
 2. **No mega-actions** — keep `data.*` single-source; keep aggregation pure; keep one `llm` Action.
 3. **No hidden inputs** — [`action_system.md`](./action_system.md) `ActionContext` + explicit payload only.
 4. **No report persistence** — §1.
-5. **LLM only at final step** — §1 item 7.
+5. **LLM only in the summary Action** — §1 item 7 (including §9.0 format-retry cap).
 6. **Partial fetch failure** — §6.1.1: continue, `None` slice, log, no fabrication.
 7. **Bounded fetches** — §7.1: max items, window from `window_days`, prioritization, one retry, rate limits, per-source timeout.
+8. **Partial data UX** — §10.2: ≥50% sources unavailable → mandatory warning prefix.
+9. **LLM format recovery** — §9.0: one format-only retry before structured error.
+
+### 11.1 Recommended structured log (end of `report.user`)
+
+For observability (optional but **recommended**), when `report.user` completes (success or handled failure), emit **one** structured log line (JSON fields or logging `extra`) including at minimum:
+
+```json
+{
+  "action": "report.user",
+  "request_id": "...",
+  "tenant_id": "...",
+  "user_id": "...",
+  "duration_ms": 0,
+  "sources": {
+    "slack": "ok|timeout|error",
+    "github": "ok|timeout|error",
+    "linear": "ok|timeout|error",
+    "notion": "ok|timeout|error",
+    "peer_reviews": "ok|timeout|error"
+  },
+  "status": "success|partial_success|fail"
+}
+```
+
+- **`user_id`:** report subject (`ReportUserInput.user_id`), not necessarily `ctx.actor_user_id`.
+- **`sources`:** map each canonical key to the outcome of that fetch phase (including `timeout` per §6.1.3).
+- **`status`:** e.g. `partial_success` when the pipeline produced markdown but at least one source failed; `fail` when no usable output.
 
 ---
 
@@ -459,7 +546,7 @@ The string returned by **`report.generate_user_summary`** (and echoed in `report
 | `vector/domains/actions/` | Action modules, registration bootstrap, **`execute_action`**, handlers calling domain/connectors. |
 | `vector/domains/connectors/` (and related) | HTTP clients, OAuth token usage — invoked **from `data.*` handlers** (or thin domain services they call). |
 | `vector/domains/*` | Business rules for “what to fetch,” rate limits, error translation — **not** skipped. |
-| `vector/api/http/routes/` | Slack route only: verify, parse, `execute_action`, respond. |
+| `vector/api/http/routes/` | Slack route: verify, parse, **immediate ACK**, schedule post-ACK **`execute_action`**, **`response_url`** delivery (§3.5). |
 
 **Forbidden:** Actions that **bypass** domain connector rules or open arbitrary HTTP not covered by connector policy.
 
@@ -481,15 +568,16 @@ A future LLM agent:
 
 Use as **final sign-off** after completing **§15**. Each item MUST be true before calling V0 “done.”
 
-- [ ] All actions in §5 registered with full `ActionSpec` per [`action_system.md`](./action_system.md).
-- [ ] `report.user` is `type="aggregation"` with full `invokes …` `side_effects`.
+- [ ] All actions in §5 registered with full `ActionSpec` per [`action_system.md`](./action_system.md) (V0 omits runtime use of `cost_hint` / `latency_hint`; §4.1).
+- [ ] `report.user` is `type="aggregation"` with full `invokes …` `side_effects` (informational per §6.0).
 - [ ] `report.build_user_context` output matches §8.1 schema (**includes `user_id`, `window_days`, `unavailable_sources`**).
 - [ ] Fetch failures implement §6.1.1 (continue, `None`, structured log).
-- [ ] Each `data.fetch_*` implements §7.1 + §6.1.3 (caps, window, ordering, retry, rate limit, timeout).
-- [ ] Parallel fetch orchestration per §6.1.2 where independent.
-- [ ] `report.generate_user_summary` uses system prompt **§9.1** and output validated against §10 headings.
+- [ ] Each `data.fetch_*` implements §7.1 + §6.1.3 (caps, window, ordering, retry, rate limit, timeout) and **no DB** in handler (§4.2.1).
+- [ ] Parallel fetch orchestration per §6.1.2 where independent; **no shared `Session`** across parallel children (§6.1.2).
+- [ ] `report.generate_user_summary` uses system prompt **§9.1**, output validated against §10 headings, **§9.0** retry path covered in tests.
 - [ ] Post-generation check enforces §9.2 (no invented lists beyond JSON support — spot-check in tests).
-- [ ] Slack adapter has zero domain branching beyond parse + map identity.
+- [ ] Slack adapter: **§3.5** immediate ACK + post-ACK `execute_action` + **`response_url`** delivery; zero domain branching beyond parse + map identity.
+- [ ] §10.2 partial-data banner when ≥50% sources unavailable.
 - [ ] No Celery enqueue on `report.user` path; no report tables written.
 
 ---
@@ -653,14 +741,15 @@ Same pattern for peer-review connector (Google Docs or chosen backend).
 
 **Tasks**
 
-- Parse `/do` per §3; build `ActionContext` (`source="slack"`, `request_id`); call `execute_action` for `report.user` only (or generic `action_name` if already supported).
-- Format Slack response from `output_model` (markdown).
+- Parse `/do` per §3; verify signing secret; return **immediate ACK** JSON \<1s (**§3.5**).
+- In a post-ACK in-process task: open DB session as needed; build `ActionContext` (`source="slack"`, `request_id`); call `execute_action` for the parsed `action_name` (including `report.user` when registered).
+- POST final markdown (or error text) to **`response_url`**; do not rely on the initial HTTP response for the full report.
 
 **Deliverable:** Manual run from Slack staging workspace.
 
 **Exit criteria**
 
-- §3.4: zero business logic in route.
+- §3.4 + §3.5 satisfied; zero business logic in the route beyond parse / identity map / scheduling.
 - §14 checklist fully satisfied for V0.
 
 ---
@@ -679,6 +768,92 @@ Phase 1 (skeleton)
 ```
 
 **Optional split:** If Phase 4 is still large, split into **4a** (`report.user` + stubs only) and **4b** (parallelism + failure injection tests only).
+
+---
+
+## 16. Strategic Direction — RAG + Tool Orchestration (Post-V0)
+
+### 16.1 Positioning
+
+V0 is **not** a RAG system. V0 is a **deterministic Action-based execution layer**: live `data.*` fetches, deterministic `aggregation` (including `report.build_user_context`), and a **single logical LLM Action** for final narrative generation. There is **no retrieval** over a historical corpus, **no long-term conversational memory**, **no embeddings**, and **no vector database** on the V0 report path.
+
+> V0 is intentionally designed so that RAG and LLM tool orchestration can be added later without refactoring the Action system.
+
+### 16.2 Target architecture (V1 → V2)
+
+Future stages extend the same primitives:
+
+- **Tool orchestration:** an LLM runtime (or agent) **selects and chains** registered Actions via `execute_action`, using stable `name` values and Pydantic `input_model` / `output_model` as tool contracts.
+- **RAG:** a **retrieval layer** supplies historical or indexed context as **structured inputs** to aggregation and, ultimately, to the `llm` Action—still through typed models and the executor, not ad hoc prompts.
+
+**Target flow (conceptual):**
+
+```text
+LLM (orchestrator)
+  → selects / chains Actions (tool calls → execute_action)
+  → optionally invokes retrieval-backed data Actions
+  → aggregation builds structured context (e.g. UserReportContext or successor models)
+  → llm Action generates output from that context only
+```
+
+### 16.3 What V0 already establishes (foundation)
+
+V0 is not an end state; it **locks in** the pieces required for both tools and RAG later:
+
+1. **Action system (tools):** stable global `name`, typed I/O, registry, `execute_action`, permissions, logging, and composability rules per [`action_system.md`](./action_system.md).
+2. **Structured context (`UserReportContext`):** deterministic, bounded, explicit fields suitable as the **only** payload shape for the summary LLM in V0—this pattern generalizes to richer context objects when retrieval exists.
+3. **Strict separation of kinds:** `data` = IO, `aggregation` = deterministic merge/orchestration, `llm` = generation only—preserved so that new IO (including retrieval) remains in `data`, not in prompts.
+
+These are **required primitives** for safe tool orchestration and for RAG that respects the same boundary discipline.
+
+### 16.4 What is intentionally excluded from V0
+
+The following are **out of scope** for the V0 Slack → report slice (see §1):
+
+- embeddings
+- vector DB
+- semantic retrieval over a managed historical index
+- long-term memory stores for this flow
+- historical indexing / materialization of report pipeline data for retrieval
+
+> These are deferred to avoid premature complexity and maintain deterministic behavior in V0.
+
+### 16.5 RAG introduction path (future)
+
+RAG becomes appropriate when the product needs **historical analysis**, **trend detection**, **multi-period reasoning**, or other capabilities that cannot be satisfied by live connector slices alone.
+
+**Intended pattern:**
+
+- Add retrieval as **new `data.*` Actions** (e.g. `data.retrieve_user_history` or domain-specific fetchers) that return **typed slice models**, not prose blobs.
+- Feed retrieval outputs into **`report.build_user_context`** (or a successor aggregation Action) so merged context remains **structured and validated**.
+- The **`llm`** Action continues to consume **only** structured context (Pydantic-validated), not raw index hits.
+
+### 16.6 Critical invariant (must not be broken)
+
+The LLM must **NEVER** receive raw unstructured retrieval output (full chunks, dump JSON from a search engine, unbounded hit lists, etc.).
+
+**Always:**
+
+```text
+retrieval → structured context (validated models) → llm Action
+```
+
+**Never:**
+
+```text
+retrieval → raw dump → LLM
+```
+
+Violations break auditability, safety gates tied to `ActionContext`, and the single-source-of-truth schema model.
+
+### 16.7 Migration path
+
+| Stage | Description |
+| ----- | ----------- |
+| V0 | Deterministic Action pipeline for Slack → report; live external `data.*`; single summary `llm` Action; constraints in §1. |
+| V1 | LLM tool runtime **selects and chains** Actions via the same executor and contracts; composition depth and policies expand; V0 Actions remain valid tools. |
+| V2 | **RAG:** retrieval enters as additional **`data.*`** sources feeding aggregation; structured context only into `llm`. |
+| V3 | Full **execution intelligence** platform: broader tool surface, retrieval, evaluation, and ops—still anchored on the Action system and typed context invariants above. |
 
 ---
 

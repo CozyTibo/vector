@@ -4,6 +4,8 @@
 **Audience:** backend engineers.  
 **Stack:** Python, FastAPI — must fit `vector/api/http/routes`, `vector/contracts`, `vector/domains`, `vector/application/services`, `vector/infrastructure`, Celery.
 
+**V0 companion:** [`v0_action_system.md`](./v0_action_system.md) is normative for the **Slack → `report.user`** slice (e.g. **`window_days` only**, Slack **`response_url`** execution model, parallel-fetch DB rules). If **§9** below uses date-based windows for illustration, **V0 implementations MUST follow the companion** (companion §1.1).
+
 ---
 
 ## 1. What is an Action
@@ -278,6 +280,7 @@ The executor is the **only** supported path from `{name, raw dict}` to handler e
 2. **Input validation:** `payload = spec.input_model.model_validate(raw)` — strict; reject unknown keys per Pydantic config.
 3. **Permission enforcement:** `enforce_permissions(ctx, spec.permissions)` — deny → consistent error (e.g. `PermissionDenied`).
 4. **Logging:** structured log line with `name`, `type`, `ctx.tenant_id`, `ctx.actor_user_id`, `ctx.request_id`, `ctx.source`, redacted `raw`, `cost_hint`, `latency_hint`.
+   - **Optional (V0+ops):** also record each nested `execute_action` `name` (e.g. in `extra` or tracing) so runtime behavior can be compared to declared `invokes` strings — see [`v0_action_system.md`](./v0_action_system.md) §6.0 (`side_effects` remain informational in V0).
 5. **Execute:** `result = spec.handler(db, ctx, payload)` (await if coroutine).
 6. **Output validation:** `return spec.output_model.model_validate(result)` — ensures handler contract; catches accidental wrong shapes.
 7. **Errors:** map domain exceptions to stable codes/messages for adapters; never leak raw SQL.
@@ -401,6 +404,8 @@ Examples:
 ---
 
 ## 9. Full example: `report.user`
+
+**Illustrative inputs:** this example uses **`window_start` / `window_end`** on `ReportUserInput` to show date handling in composition. The **shipped V0** Slack path uses **`window_days` only** — see [`v0_action_system.md`](./v0_action_system.md) §1.1; adjust models accordingly for V0 contracts.
 
 ### Contracts (`vector/contracts/actions/report_user.py`)
 
