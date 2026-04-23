@@ -15,9 +15,9 @@ from vector.domains.onboarding.constants import (
     STATUS_COMPLETED,
     STATUS_IN_PROGRESS,
     STEP_CHAT_PROFILE,
-    STEP_CONNECT_COMMUNICATION,
     STEP_SCANNING,
 )
+from vector.domains.onboarding.onboarding_flow import _first_connect_step
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 
@@ -36,11 +36,11 @@ def get_onboarding_for_tenant_for_update(session: Session, tenant_id: uuid.UUID)
 
 # Historical `current_step` values that may still exist in DB rows (never valid for new PATCHes).
 _LEGACY_DB_ONBOARDING_STEPS = frozenset({"CONNECT_GITHUB", "CONNECT_LINEAR"})
-_ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder"})
+_ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder", "linear", "github"})
 
 
 def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
-    """Persisted rows may predate removal of GitHub/Linear onboarding steps; coerce in place."""
+    """Coerce legacy connector step names and strip unknown ``connect_queue`` ids."""
     if row.status == STATUS_COMPLETED:
         return
     answers = dict(row.answers_json or {})
@@ -60,7 +60,7 @@ def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
             for x in (cq if isinstance(cq, list) else [])
             if isinstance(x, str) and x in _ALLOWED_CONNECT_QUEUE_IDS
         ]
-        row.current_step = STEP_CONNECT_COMMUNICATION if allowed else STEP_SCANNING
+        row.current_step = _first_connect_step(allowed) if allowed else STEP_SCANNING
         changed = True
     if changed:
         row.answers_json = answers
@@ -139,6 +139,127 @@ def normalize_slack_stakeholders_in_place(answers: dict[str, Any]) -> None:
         ss["mention_labels"] = out_labels
     elif "mention_labels" in ss:
         del ss["mention_labels"]
+
+
+def normalize_slack_collaborators_in_place(answers: dict[str, Any]) -> None:
+    """Keep ``slack_collaborators.members`` as deduped dict rows with string fields."""
+    raw = answers.get("slack_collaborators")
+    if not isinstance(raw, dict):
+        return
+    members = raw.get("members")
+    if not isinstance(members, list):
+        return
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for m in members:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        out.append(
+            {
+                "slack_user_id": uid,
+                "username": username,
+                "label": label,
+            }
+        )
+    raw["members"] = out
+
+
+def normalize_slack_team_members_in_place(answers: dict[str, Any]) -> None:
+    """Same shape as ``slack_collaborators.members`` under ``slack_team_members``."""
+    raw = answers.get("slack_team_members")
+    if not isinstance(raw, dict):
+        return
+    members = raw.get("members")
+    if not isinstance(members, list):
+        return
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for m in members:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        out.append(
+            {
+                "slack_user_id": uid,
+                "username": username,
+                "label": label,
+            }
+        )
+    raw["members"] = out
+
+
+def normalize_slack_watch_channels_in_place(answers: dict[str, Any]) -> None:
+    """Dedupe ``slack_watch_channels.channels`` by ``channel_id``."""
+    raw = answers.get("slack_watch_channels")
+    if not isinstance(raw, dict):
+        return
+    channels = raw.get("channels")
+    if not isinstance(channels, list):
+        return
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for ch in channels:
+        if not isinstance(ch, dict):
+            continue
+        cid = ch.get("channel_id")
+        if not isinstance(cid, str) or not cid.strip():
+            continue
+        cid = cid.strip()
+        if cid in seen:
+            continue
+        seen.add(cid)
+        nm = ch.get("name")
+        name = nm.strip().lstrip("#") if isinstance(nm, str) and nm.strip() else cid
+        out.append({"channel_id": cid, "name": name})
+    raw["channels"] = out
+
+
+_SLACK_INTRODUCE_MANAGERS_CONSENT_VALUES = frozenset({"yes", "later", "not_applicable"})
+
+
+def normalize_slack_introduce_managers_consent_in_place(answers: dict[str, Any]) -> None:
+    """Coerce ``slack_introduce_managers_consent`` to yes | later | not_applicable or drop."""
+    raw = answers.get("slack_introduce_managers_consent")
+    if raw is None:
+        return
+    if not isinstance(raw, str):
+        answers.pop("slack_introduce_managers_consent", None)
+        return
+    v = raw.strip().lower()
+    if v in ("yes", "y", "allow", "sure", "ok", "okay"):
+        answers["slack_introduce_managers_consent"] = "yes"
+        return
+    if v in ("later", "defer", "maybe_later", "not_now", "skip"):
+        answers["slack_introduce_managers_consent"] = "later"
+        return
+    if v in ("not_applicable", "na", "skipped", "none", "n/a"):
+        answers["slack_introduce_managers_consent"] = "not_applicable"
+        return
+    if v in _SLACK_INTRODUCE_MANAGERS_CONSENT_VALUES:
+        answers["slack_introduce_managers_consent"] = v
+        return
+    answers.pop("slack_introduce_managers_consent", None)
 
 
 def hard_reset_onboarding_progress(session: Session, *, tenant_id: uuid.UUID) -> OnboardingState:

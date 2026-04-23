@@ -6,6 +6,9 @@ from __future__ import annotations
 STEP_CHAT_PROFILE = "CHAT_PROFILE"
 
 # Connector OAuth screens (order is driven by `connect_queue` in answers).
+# Typical queue: Linear (PM) → GitHub (engineering) → Slack or Teams/Discord placeholder.
+STEP_CONNECT_PROJECT_MANAGEMENT = "CONNECT_PROJECT_MANAGEMENT"
+STEP_CONNECT_ENGINEERING = "CONNECT_ENGINEERING"
 # Communication phase: Slack OAuth; legacy rows may still have ``comm_placeholder`` in ``connect_queue``.
 STEP_CONNECT_COMMUNICATION = "CONNECT_COMMUNICATION"
 
@@ -16,7 +19,19 @@ STEP_UNSUPPORTED_MANDATORY_TOOLS = "UNSUPPORTED_MANDATORY_TOOLS"
 # After Slack OAuth: pick managers/people with @-mention autocomplete (Slack workspace roster).
 STEP_SLACK_STAKEHOLDERS = "SLACK_STAKEHOLDERS"
 
-# After stakeholders are saved: product UI shows a short in-chat farewell then app CTA.
+# Who else they work with in Slack (multi-pick); self is pre-seeded from ``slack_stakeholders``.
+STEP_SLACK_COLLABORATORS = "SLACK_COLLABORATORS"
+# Review list before final admin screen.
+STEP_SLACK_COLLABORATORS_CONFIRM = "SLACK_COLLABORATORS_CONFIRM"
+
+# When the onboardee included themselves among collaborators: pick team (excluding managers), then confirm.
+STEP_SLACK_TEAM_MEMBERS = "SLACK_TEAM_MEMBERS"
+STEP_SLACK_TEAM_MEMBERS_CONFIRM = "SLACK_TEAM_MEMBERS_CONFIRM"
+# Then pick Slack channels to watch, then confirm.
+STEP_SLACK_WATCH_CHANNELS = "SLACK_WATCH_CHANNELS"
+STEP_SLACK_WATCH_CHANNELS_CONFIRM = "SLACK_WATCH_CHANNELS_CONFIRM"
+
+# After optional team/channel steps (or collaborators confirm): farewell + app CTA.
 STEP_ADMIN_ACCESS = "ADMIN_ACCESS"
 
 STEP_SCANNING = "SCANNING"
@@ -25,9 +40,17 @@ STEP_THANK_YOU = "THANK_YOU"
 ONBOARDING_STEPS: frozenset[str] = frozenset(
     {
         STEP_CHAT_PROFILE,
+        STEP_CONNECT_PROJECT_MANAGEMENT,
+        STEP_CONNECT_ENGINEERING,
         STEP_CONNECT_COMMUNICATION,
         STEP_UNSUPPORTED_MANDATORY_TOOLS,
         STEP_SLACK_STAKEHOLDERS,
+        STEP_SLACK_COLLABORATORS,
+        STEP_SLACK_COLLABORATORS_CONFIRM,
+        STEP_SLACK_TEAM_MEMBERS,
+        STEP_SLACK_TEAM_MEMBERS_CONFIRM,
+        STEP_SLACK_WATCH_CHANNELS,
+        STEP_SLACK_WATCH_CHANNELS_CONFIRM,
         STEP_ADMIN_ACCESS,
         STEP_SCANNING,
         STEP_THANK_YOU,
@@ -139,6 +162,7 @@ ONBOARDING_TOOL_OPTIONS: tuple[tuple[str, str, str], ...] = (
     ("pm", "linear", "Linear"),
     ("pm", "jira", "Jira"),
     ("pm", "clickup", "ClickUp"),
+    ("pm", "notion", "Notion"),
     ("engineering", "github", "GitHub"),
     ("engineering", "gitlab", "GitLab"),
     ("engineering", "bitbucket", "Bitbucket"),

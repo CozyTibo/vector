@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any
 
-from openai import OpenAI
+from openai import APIError, OpenAI
 
 from vector.domains.onboarding.connectors_intro_qa_context import (
     CONNECTORS_INTRO_QA_PRODUCT_GUIDE,
@@ -402,7 +402,19 @@ Readable summary:
     t = temperature_for_chat_model(cfg.openai_model, temp)
     if t is not None:
         kwargs["temperature"] = t
-    resp = client.chat.completions.create(**kwargs)
+    try:
+        resp = client.chat.completions.create(**kwargs)
+    except APIError as exc:
+        logger.warning(
+            "onboarding_llm: OpenAI chat.completions failed (%s): %s; using deterministic fallback",
+            type(exc).__name__,
+            exc,
+        )
+        if intro_kind == "after_size":
+            return _finalize_assistant_segments(_fallback_connectors_intro_after_size_bubbles())
+        return _finalize_assistant_segments(
+            [_fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)]
+        )
     choice = resp.choices[0].message.content
     text = (choice or "").strip()
     if not text:

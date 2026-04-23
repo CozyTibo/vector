@@ -2,6 +2,7 @@ import type { ChatMessage } from "./types";
 import ChatAvatar from "./ChatAvatar";
 import { landingAccentText, landingSubtleLineV } from "../landing/landingBrandPalette";
 import { labelsForToolsPayload } from "./onboardingToolGroups";
+import { slackPersonChipText } from "./slackPersonDisplay";
 
 type ChatMessageBubbleProps = {
   message: ChatMessage;
@@ -26,6 +27,132 @@ function structuredOnlyUserDisplayLabel(content: string): string | null {
       return "I'm ready to choose tools";
     }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+type SlackCollaboratorChip = {
+  slack_user_id: string;
+  username: string;
+  label: string;
+};
+
+function tryParseSlackCollaboratorsSelectedContent(content: string): SlackCollaboratorChip[] | null {
+  const t = content.trim();
+  if (!t.startsWith("{")) {
+    return null;
+  }
+  try {
+    const o = JSON.parse(t) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      return null;
+    }
+    const rec = o as Record<string, unknown>;
+    if (rec.type !== "slack_collaborators_selected" && rec.type !== "slack_team_members_selected") {
+      return null;
+    }
+    const raw = rec.members;
+    if (!Array.isArray(raw)) {
+      return null;
+    }
+    const out: SlackCollaboratorChip[] = [];
+    for (const m of raw) {
+      if (!m || typeof m !== "object" || Array.isArray(m)) {
+        continue;
+      }
+      const row = m as Record<string, unknown>;
+      const id = row.slack_user_id;
+      const un = row.username;
+      const lab = row.label;
+      if (typeof id !== "string" || !id.trim()) {
+        continue;
+      }
+      const username =
+        typeof un === "string" && un.trim() ? un.trim().replace(/^@/, "") : id.trim();
+      const label =
+        typeof lab === "string" && lab.trim() ? lab.trim() : username;
+      out.push({ slack_user_id: id.trim(), username, label });
+    }
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+type SlackWatchChannelChip = {
+  channel_id: string;
+  name: string;
+};
+
+function tryParseSlackManagerIntroConsent(content: string): "yes" | "later" | "not_applicable" | null {
+  const t = content.trim();
+  if (!t.startsWith("{")) {
+    return null;
+  }
+  try {
+    const o = JSON.parse(t) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      return null;
+    }
+    const rec = o as Record<string, unknown>;
+    if (rec.type !== "slack_manager_intro_consent") {
+      return null;
+    }
+    const ch = rec.choice;
+    if (ch === "yes" || ch === "later" || ch === "not_applicable") {
+      return ch;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function slackManagerIntroConsentLabel(choice: "yes" | "later" | "not_applicable"): string {
+  if (choice === "yes") {
+    return "Yes — introduce yourself to managers";
+  }
+  if (choice === "later") {
+    return "Maybe later on manager intros";
+  }
+  return "Continue (no other managers)";
+}
+
+function tryParseSlackWatchChannelsSelectedContent(content: string): SlackWatchChannelChip[] | null {
+  const t = content.trim();
+  if (!t.startsWith("{")) {
+    return null;
+  }
+  try {
+    const o = JSON.parse(t) as unknown;
+    if (!o || typeof o !== "object" || Array.isArray(o)) {
+      return null;
+    }
+    const rec = o as Record<string, unknown>;
+    if (rec.type !== "slack_watch_channels_selected") {
+      return null;
+    }
+    const raw = rec.channels;
+    if (!Array.isArray(raw)) {
+      return null;
+    }
+    const out: SlackWatchChannelChip[] = [];
+    for (const ch of raw) {
+      if (!ch || typeof ch !== "object" || Array.isArray(ch)) {
+        continue;
+      }
+      const row = ch as Record<string, unknown>;
+      const id = row.channel_id;
+      const nm = row.name;
+      if (typeof id !== "string" || !id.trim()) {
+        continue;
+      }
+      const name =
+        typeof nm === "string" && nm.trim() ? nm.trim().replace(/^#/, "") : id.trim();
+      out.push({ channel_id: id.trim(), name });
+    }
+    return out.length > 0 ? out : null;
   } catch {
     return null;
   }
@@ -87,34 +214,70 @@ function safeDateTimeIso(ts: number): string | undefined {
   }
 }
 
+/** Persisted OAuth log lines use ``Linear connected``; timeline UI matches synthetic ``Connected to …`` events. */
+function connectorConnectedDisplayLabel(content: string): string | null {
+  const t = content.trim().toLowerCase();
+  if (t === "linear connected") {
+    return "Connected to Linear";
+  }
+  if (t === "github connected") {
+    return "Connected to GitHub";
+  }
+  if (t === "slack connected") {
+    return "Connected to Slack";
+  }
+  return null;
+}
+
+function OnboardingConnectorConnectedPill({ label }: { label: string }) {
+  return (
+    <div className="onboarding-message-enter flex justify-center px-3 py-3" role="status">
+      <div
+        className={
+          "inline-flex max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-emerald-200/90 " +
+          "bg-gradient-to-r from-emerald-50/95 to-teal-50/90 px-4 py-2 text-[13px] font-medium " +
+          "leading-snug text-emerald-950 shadow-[0_8px_24px_-16px_rgba(5,150,105,0.35)]"
+        }
+      >
+        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
+        <span>{label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatMessageBubble({
   message,
   userDisplayName,
   isContinuation = false,
 }: ChatMessageBubbleProps) {
   if (message.role === "event") {
-    return (
-      <div className="onboarding-message-enter flex justify-center px-3 py-3" role="status">
-        <div
-          className={
-            "inline-flex max-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-emerald-200/90 " +
-            "bg-gradient-to-r from-emerald-50/95 to-teal-50/90 px-4 py-2 text-[13px] font-medium " +
-            "leading-snug text-emerald-950 shadow-[0_8px_24px_-16px_rgba(5,150,105,0.35)]"
-          }
-        >
-          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]" />
-          <span>{message.content}</span>
-        </div>
-      </div>
-    );
+    return <OnboardingConnectorConnectedPill label={message.content} />;
   }
 
   const isUser = message.role === "user";
   const toolsPick = isUser ? tryParseToolsSelectedContent(message.content) : null;
+  const collaboratorsPick = isUser ? tryParseSlackCollaboratorsSelectedContent(message.content) : null;
+  const watchChannelsPick = isUser ? tryParseSlackWatchChannelsSelectedContent(message.content) : null;
+  const managerIntroConsentPick = isUser ? tryParseSlackManagerIntroConsent(message.content) : null;
   const structuredOnlyLabel =
-    isUser && !toolsPick ? structuredOnlyUserDisplayLabel(message.content) : null;
+    isUser && !toolsPick && !collaboratorsPick && !watchChannelsPick && !managerIntroConsentPick
+      ? structuredOnlyUserDisplayLabel(message.content)
+      : null;
+  const persistedConnectorLabel =
+    isUser &&
+    !toolsPick &&
+    !collaboratorsPick &&
+    !watchChannelsPick &&
+    !managerIntroConsentPick &&
+    !structuredOnlyLabel
+      ? connectorConnectedDisplayLabel(message.content)
+      : null;
 
   if (isUser) {
+    if (persistedConnectorLabel) {
+      return <OnboardingConnectorConnectedPill label={persistedConnectorLabel} />;
+    }
     return (
       <div
         className={`onboarding-message-enter flex justify-end px-3 ${isContinuation ? "py-0.5" : "py-1.5"}`}
@@ -135,7 +298,35 @@ export default function ChatMessageBubble({
               "to-[#F8D4E8] px-4 py-2.5 text-[15px] leading-relaxed text-zinc-900 shadow-[0_10px_28px_-18px_rgba(232,120,190,0.55)]"
             }
           >
-            {toolsPick ? (
+            {collaboratorsPick ? (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {collaboratorsPick.map((m) => (
+                  <span
+                    key={m.slack_user_id}
+                    className="inline-flex max-w-full min-w-0 max-w-[min(100%,20rem)] items-center rounded-full border border-[#E878BE]/35 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm"
+                  >
+                    <span className="truncate">{slackPersonChipText(m)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : managerIntroConsentPick ? (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                <span className="inline-flex max-w-full items-center rounded-full border border-teal-300/60 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm">
+                  {slackManagerIntroConsentLabel(managerIntroConsentPick)}
+                </span>
+              </div>
+            ) : watchChannelsPick ? (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {watchChannelsPick.map((c) => (
+                  <span
+                    key={c.channel_id}
+                    className="inline-flex max-w-full items-center rounded-full border border-violet-300/60 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-800 shadow-sm"
+                  >
+                    #{c.name.replace(/^#/, "")}
+                  </span>
+                ))}
+              </div>
+            ) : toolsPick ? (
               <div className="flex flex-wrap justify-end gap-1.5">
                 {labelsForToolsPayload(toolsPick).map((label, i) => (
                   <span

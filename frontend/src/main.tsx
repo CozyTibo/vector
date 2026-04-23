@@ -12,7 +12,6 @@ import AdminTenantDebugPage from "./admin/AdminTenantDebugPage.tsx";
 import AdminTenantHubPage from "./admin/AdminTenantHubPage.tsx";
 import AdminTenantLayout from "./admin/AdminTenantLayout.tsx";
 import AdminTenantDataSectionLayout from "./admin/AdminTenantDataSectionLayout.tsx";
-import AdminTenantManagerOnboarding from "./admin/AdminTenantManagerOnboarding.tsx";
 import AdminTenantStep3 from "./admin/AdminTenantStep3.tsx";
 import AdminWorkspacePage from "./admin/AdminWorkspacePage.tsx";
 import AdminUsersPage from "./admin/AdminUsersPage.tsx";
@@ -20,13 +19,11 @@ import AdminWorkspacesPage from "./admin/AdminWorkspacesPage.tsx";
 import {
   LegacyExecutionGraphRedirect,
   LegacyTenantDebugRedirect,
-  RedirectManagerOnboardingSessionToTenant,
   RedirectStep1ToDataPipeline,
   RedirectStep2ToDataPipeline,
   RedirectStep3Actor,
   RedirectStep3Artifact,
   RedirectTenantToIntegrations,
-  RedirectTenantToSlackOnboarding,
   RedirectTenantToWorkspace,
 } from "./admin/adminRedirects.tsx";
 import RequireAuth from "./layouts/RequireAuth.tsx";
@@ -77,10 +74,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="workspaces" element={<Navigate to="/admin" replace />} />
             <Route path="manager-onboarding" element={<Navigate to="/admin" replace />} />
             <Route path="slack-onboarding" element={<Navigate to="/admin" replace />} />
-            <Route
-              path="manager-onboarding/sessions/:sessionId"
-              element={<RedirectManagerOnboardingSessionToTenant />}
-            />
+            <Route path="manager-onboarding/sessions/:sessionId" element={<Navigate to="/admin" replace />} />
             <Route
               path="execution-graph"
               element={
@@ -118,8 +112,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="overview" element={<RedirectTenantToWorkspace />} />
               <Route path="integrations" element={<AdminIntegrationsPage />} />
               <Route path="connections" element={<RedirectTenantToIntegrations />} />
-              <Route path="slack-onboarding" element={<AdminTenantManagerOnboarding />} />
-              <Route path="manager-onboarding" element={<RedirectTenantToSlackOnboarding />} />
+              <Route path="slack-onboarding" element={<RedirectTenantToWorkspace />} />
+              <Route path="manager-onboarding" element={<RedirectTenantToWorkspace />} />
               <Route path="data-pipeline" element={<AdminTenantDataSectionLayout />}>
                 <Route index element={<AdminDataPipelinePage />} />
                 <Route path="execution-graph">

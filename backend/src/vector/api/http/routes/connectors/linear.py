@@ -32,6 +32,7 @@ from vector.domains.connectors.linear.oauth_flow import (
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
+from vector.domains.onboarding.connector_connected_chat_log import append_connector_connected_user_line
 from vector.domains.ingestion.http_fetch import FetchFatalError
 from vector.domains.ingestion.mock_preflight import preflight_mock_connectors_reachable
 from vector.infrastructure.db.repositories import ingestion_queries as ing_queries
@@ -113,6 +114,13 @@ def build_linear_connector_router() -> APIRouter:
                     "post-connect Linear enqueue failed (POST /connectors/linear/sync): %s",
                     exc,
                 )
+        append_connector_connected_user_line(
+            db,
+            tenant_id=_link.tenant_id,
+            user_id=_link.connection.connected_by_user_id,
+            return_to=return_to,
+            tool_label="Linear",
+        )
         ok = (
             f"{front}{return_to}?linear_connected=1"
             if return_to

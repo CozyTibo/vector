@@ -135,15 +135,8 @@ class Settings(BaseSettings):
         validation_alias="SLACK_BOT_SCOPES",
         description=(
             "Comma-separated bot scopes for oauth.v2.authorize (must match Slack app). "
-            "channels:join for joining public channels in onboarding; im:history for message.im; "
-            "usergroups:read for expanding @usergroup mentions in manager onboarding."
+            "channels:join for joining public channels in onboarding; im:history for message.im."
         ),
-    )
-    manager_slack_onboarding_enabled: bool = Field(
-        default=False,
-        validation_alias="MANAGER_SLACK_ONBOARDING_ENABLED",
-        description="When true, enqueue Slack manager onboarding intro after website handoff DM; "
-        "Slack Events + Interactivity must be configured.",
     )
     admin_password: str = Field(
         default="",

@@ -12,10 +12,40 @@ import {
   ONBOARDING_PRIMARY_CTA_GRADIENT_BUTTON_CLASS,
   ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS,
 } from "../../components/onboarding/onboardingUiConstants";
+import SlackCollaboratorsConfirmPanel from "../../components/onboarding/SlackCollaboratorsConfirmPanel";
+import SlackCollaboratorsPickPanel from "../../components/onboarding/SlackCollaboratorsPickPanel";
+import SlackChannelsConfirmPanel from "../../components/onboarding/SlackChannelsConfirmPanel";
+import SlackChannelsPickPanel from "../../components/onboarding/SlackChannelsPickPanel";
+import SlackPeopleMultiConfirmPanel from "../../components/onboarding/SlackPeopleMultiConfirmPanel";
+import SlackPeopleMultiPickPanel from "../../components/onboarding/SlackPeopleMultiPickPanel";
+import {
+  seedCollaboratorsFromStakeholders,
+  slackCollaboratorsFromAnswers,
+} from "../../components/onboarding/slackCollaboratorsAnswers";
+import {
+  collaboratorsIncludesStakeholderSelf,
+  otherSlackCollaboratorsExcludingStakeholder,
+} from "../../components/onboarding/slackOnboardingBranching";
+import { reorderOnboardingTranscriptForDisplay } from "../../components/onboarding/onboardingTranscriptDisplayOrder";
+import {
+  ONBOARDING_WRAP_UP_THANKS,
+  wrapUpManagerIntroQuestion,
+} from "../../components/onboarding/onboardingWrapUpCopy";
+import { slackPersonChipText } from "../../components/onboarding/slackPersonDisplay";
+import {
+  slackTeamMembersConfirmIntroMessages,
+  slackTeamMembersPickIntroMessages,
+  slackWatchChannelsConfirmIntroMessages,
+  slackWatchChannelsPickIntroMessages,
+} from "../../components/onboarding/slackTeamChannelsCopy";
+import {
+  slackTeamMembersFromAnswers,
+  slackWatchChannelsFromAnswers,
+} from "../../components/onboarding/slackTeamChannelAnswers";
 import SlackStakeholdersPanel from "../../components/onboarding/SlackStakeholdersPanel";
 import {
   ONB_SLACK_HANDOFF_EVENT_ID,
-  slackHandoffSyntheticMessages,
+  slackHandoffSyntheticMessagesDeduped,
 } from "../../components/onboarding/slackHandoffCopy";
 import ToolSelectorBlock from "../../components/onboarding/ToolSelectorBlock";
 import {
@@ -32,6 +62,7 @@ import { landingAccentText } from "../../components/landing/landingBrandPalette"
 import {
   completeOnboarding,
   fetchOnboarding,
+  fetchSlackWorkspaceChannels,
   fetchSlackWorkspaceMembers,
   patchOnboarding,
   postOnboardingChat,
@@ -39,6 +70,7 @@ import {
   type OnboardingMessagePayload,
   type OnboardingStatePayload,
   type OnboardingStep,
+  type SlackCollaboratorMember,
 } from "../../lib/onboardingApi";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
@@ -74,20 +106,34 @@ type LiveConnectorId = "github" | "linear" | "slack";
 type ConnectorQueueId = LiveConnectorId | "comm_placeholder";
 
 function NextConnectStep(next: ConnectorQueueId): OnboardingStep {
+  if (next === "linear") {
+    return "CONNECT_PROJECT_MANAGEMENT";
+  }
+  if (next === "github") {
+    return "CONNECT_ENGINEERING";
+  }
   if (next === "slack" || next === "comm_placeholder") {
     return "CONNECT_COMMUNICATION";
   }
   return "SCANNING";
 }
 
-/** Order matches backend `onboarding_flow._connect_queue_from_tools` (Slack / Teams-Discord placeholder only). */
-function connectorOrderFromTools(answers: Record<string, unknown>): ConnectorQueueId[] {
+/** Order matches backend `onboarding_flow._connect_queue_full_from_tools`. */
+function connectQueueFromTools(answers: Record<string, unknown>): ConnectorQueueId[] {
   const t = answers.tools as Record<string, string[]> | undefined;
   if (!t) {
     return [];
   }
-  const comm = t.communication ?? [];
   const order: ConnectorQueueId[] = [];
+  const pm = t.pm ?? [];
+  if (pm.includes("linear")) {
+    order.push("linear");
+  }
+  const eng = t.engineering ?? [];
+  if (eng.includes("github")) {
+    order.push("github");
+  }
+  const comm = t.communication ?? [];
   if (comm.includes("slack")) {
     order.push("slack");
   } else if (comm.includes("ms_teams") || comm.includes("discord")) {
@@ -147,7 +193,7 @@ function unsupportedMandatorySectionsFromAnswers(answers: Record<string, unknown
 function unsupportedMandatoryScopeDescription(sections: string[]): string {
   const labels: Record<string, string> = {
     communication: "communication tools such as Microsoft Teams or Discord",
-    pm: "project management tools outside Linear (for example Jira or ClickUp)",
+    pm: "project management tools outside Linear (for example Jira, ClickUp, or Notion)",
     engineering: "engineering tools outside GitHub (for example GitLab or Bitbucket)",
   };
   const parts = sections.map((s) => labels[s] ?? s);
@@ -160,29 +206,17 @@ function unsupportedMandatoryScopeDescription(sections: string[]): string {
   return `${parts[0]}, ${parts[1]}, and ${parts[2]}`;
 }
 
-function nextStepAfterUnsupportedMandatoryDismissed(
+/** UI-only Slack handoff rows (not persisted); see ``slackHandoffSyntheticMessagesDeduped``. */
+function syntheticStakeholderStepMessages(
   answers: Record<string, unknown>,
-  slackConnected: boolean,
-): OnboardingStep {
-  const rawQ = answers.connect_queue;
-  const q = (Array.isArray(rawQ) ? rawQ : []).filter((x): x is string => typeof x === "string");
-  if (q[0] === "slack" && !slackConnected) {
-    return "CONNECT_COMMUNICATION";
-  }
-  if (q[0] === "comm_placeholder") {
-    return "CONNECT_COMMUNICATION";
-  }
-  const tools = answers.tools as Record<string, string[]> | undefined;
-  const comm = tools?.communication ?? [];
-  if (comm.includes("slack") && slackConnected) {
-    return "SLACK_STAKEHOLDERS";
-  }
-  return "SCANNING";
-}
-
-/** UI-only Slack handoff rows (not persisted); see ``slackHandoffSyntheticMessages``. */
-function syntheticStakeholderStepMessages(answers: Record<string, unknown>, startTs: number): ChatMessage[] {
-  return slackHandoffSyntheticMessages(primaryCommunicationToolLabel(answers), startTs);
+  startTs: number,
+  priorForDedup: ChatMessage[],
+): ChatMessage[] {
+  return slackHandoffSyntheticMessagesDeduped(
+    primaryCommunicationToolLabel(answers),
+    startTs,
+    priorForDedup,
+  );
 }
 
 /** Matches persisted PATCH stakeholder user line (raw_text preferred; else @labels). */
@@ -218,33 +252,29 @@ function buildAdminAccessStakeholderBase(
     return msgs;
   }
   const stakeholderLine = stakeholderAnswerDisplayLine(answers);
-  const last = msgs[msgs.length - 1];
-  const lastIsStakeholderUser =
-    last &&
-    last.role === "user" &&
-    stakeholderLine !== null &&
-    last.content.trim() === stakeholderLine;
-
-  if (lastIsStakeholderUser) {
-    const rest = msgs.slice(0, -1);
-    const lastTs = rest.length > 0 ? Math.max(...rest.map((m) => m.timestamp)) : Date.now();
-    return [...rest, ...syntheticStakeholderStepMessages(answers, lastTs + 1), last];
+  if (stakeholderLine === null) {
+    return msgs;
+  }
+  const stakeTrim = stakeholderLine.trim();
+  const idx = msgs.findIndex(
+    (m) => m.role === "user" && m.content.trim() === stakeTrim,
+  );
+  if (idx < 0) {
+    const lastTs = msgs.length > 0 ? Math.max(...msgs.map((m) => m.timestamp)) : Date.now();
+    return [...msgs, ...syntheticStakeholderStepMessages(answers, lastTs + 1, msgs)];
   }
 
-  const lastTs = msgs.length > 0 ? Math.max(...msgs.map((m) => m.timestamp)) : Date.now();
-  return [...msgs, ...syntheticStakeholderStepMessages(answers, lastTs + 1)];
-}
-
-function buildStakeholderFarewellMessage(answers: Record<string, unknown>): string {
-  const line = stakeholderAnswerDisplayLine(answers);
-  if (line) {
-    return `Perfect ${line}, I see you on Slack! Talk soon 😊`;
-  }
-  return "Perfect — I see you on Slack! Talk soon 😊";
-}
-
-function onboardingAppCtaStorageKey(tenantId: string): string {
-  return `vector_onboarding_app_cta:${tenantId}`;
+  const before = msgs.slice(0, idx);
+  const stakeMsg = msgs[idx]!;
+  const synth = syntheticStakeholderStepMessages(
+    answers,
+    stakeMsg.timestamp - 100,
+    before,
+  ).map((row, i) => ({
+    ...row,
+    timestamp: stakeMsg.timestamp - 20 + i,
+  }));
+  return [...before, ...synth, stakeMsg, ...msgs.slice(idx + 1)];
 }
 
 function effectiveConnectQueue(answers: Record<string, unknown>, currentStep: string): string[] {
@@ -252,8 +282,12 @@ function effectiveConnectQueue(answers: Record<string, unknown>, currentStep: st
   if (Array.isArray(q) && q.length > 0) {
     return [...(q as string[])];
   }
-  if (currentStep === "CONNECT_COMMUNICATION") {
-    const order = connectorOrderFromTools(answers);
+  if (
+    currentStep === "CONNECT_COMMUNICATION" ||
+    currentStep === "CONNECT_PROJECT_MANAGEMENT" ||
+    currentStep === "CONNECT_ENGINEERING"
+  ) {
+    const order = connectQueueFromTools(answers);
     return order.length ? [order[0]!] : [];
   }
   return [];
@@ -269,8 +303,14 @@ function normalizeQueueAfterOAuth(
   if (Array.isArray(q) && q.length > 0) {
     queue = [...(q as string[])];
   }
-  if (queue.length === 0 && currentStep === "CONNECT_COMMUNICATION" && provider === "slack") {
-    queue = ["slack"];
+  if (
+    queue.length === 0 &&
+    (currentStep === "CONNECT_COMMUNICATION" ||
+      currentStep === "CONNECT_PROJECT_MANAGEMENT" ||
+      currentStep === "CONNECT_ENGINEERING") &&
+    (provider === "slack" || provider === "linear" || provider === "github")
+  ) {
+    queue = [provider];
   }
   if (queue[0] === provider) {
     return queue.slice(1);
@@ -323,7 +363,27 @@ export default function OnboardingPage() {
   const slackMembersForStep = useQuery({
     queryKey: ["slack-onboarding-members", apiBase, tenantId ?? ""],
     queryFn: () => fetchSlackWorkspaceMembers(apiBase),
-    enabled: Boolean(tenantId && ob.data?.current_step === "SLACK_STAKEHOLDERS"),
+    enabled: Boolean(
+      tenantId &&
+        ob.data?.current_step &&
+        [
+          "SLACK_STAKEHOLDERS",
+          "SLACK_COLLABORATORS",
+          "SLACK_COLLABORATORS_CONFIRM",
+          "SLACK_TEAM_MEMBERS",
+          "SLACK_TEAM_MEMBERS_CONFIRM",
+        ].includes(ob.data.current_step),
+    ),
+  });
+
+  const slackChannelsForStep = useQuery({
+    queryKey: ["slack-onboarding-channels", apiBase, tenantId ?? ""],
+    queryFn: () => fetchSlackWorkspaceChannels(apiBase),
+    enabled: Boolean(
+      tenantId &&
+        ob.data?.current_step &&
+        ["SLACK_WATCH_CHANNELS", "SLACK_WATCH_CHANNELS_CONFIRM"].includes(ob.data.current_step),
+    ),
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -342,7 +402,12 @@ export default function OnboardingPage() {
   const [finishOnboardingError, setFinishOnboardingError] = useState<string | null>(null);
   const [stakeholdersSubmitError, setStakeholdersSubmitError] = useState<string | null>(null);
   const [stakeholdersBusy, setStakeholdersBusy] = useState(false);
-  const [adminFarewellMessage, setAdminFarewellMessage] = useState<ChatMessage | null>(null);
+  const [collaboratorsSubmitError, setCollaboratorsSubmitError] = useState<string | null>(null);
+  const [collaboratorsBusy, setCollaboratorsBusy] = useState(false);
+  const [slackTeamSubmitError, setSlackTeamSubmitError] = useState<string | null>(null);
+  const [slackTeamBusy, setSlackTeamBusy] = useState(false);
+  const [slackWatchChannelsSubmitError, setSlackWatchChannelsSubmitError] = useState<string | null>(null);
+  const [slackWatchChannelsBusy, setSlackWatchChannelsBusy] = useState(false);
   /** Shown when ?*_connected=1 is in the URL but GET /onboarding does not reflect the link yet, or PATCH fails. */
   const [oauthReturnError, setOauthReturnError] = useState<string | null>(null);
   const oauthAdvanceLockRef = useRef<string | null>(null);
@@ -366,13 +431,12 @@ export default function OnboardingPage() {
     setChatBusy(false);
     chatInputHadBusyRef.current = false;
     setConnectorsIntroChipMode("both");
-    setAdminFarewellMessage(null);
     setStakeholdersSubmitError(null);
+    setCollaboratorsSubmitError(null);
+    setSlackTeamSubmitError(null);
+    setSlackWatchChannelsSubmitError(null);
     setFinishOnboardingError(null);
     oauthAdvanceLockRef.current = null;
-    if (tenantId) {
-      sessionStorage.removeItem(onboardingAppCtaStorageKey(tenantId));
-    }
   }, [tenantId]);
 
   /** Clear local chat state when switching accounts (React Query cache is tenant-scoped; refs/state are not). */
@@ -400,7 +464,6 @@ export default function OnboardingPage() {
     setOauthReturnError(null);
     oauthAdvanceLockRef.current = null;
     setConnectorsIntroChipMode("both");
-    setAdminFarewellMessage(null);
   }, [tenantId]);
 
   /**
@@ -423,21 +486,25 @@ export default function OnboardingPage() {
     bootstrapCompletedForServerIdRef.current = server.id;
   }, [server]);
 
-  /** Stakeholders step continues the same chat; hydrate from API so OAuth return / refresh keeps full history. */
+  /** Connector OAuth, Slack stakeholders, and admin CTA: hydrate chat from API (e.g. persisted \"… connected\" lines). */
   useEffect(() => {
-    if (!server || server.current_step !== "SLACK_STAKEHOLDERS") {
+    if (!server) {
       return;
     }
-    const apiMsgs = server.messages;
-    if (!apiMsgs?.length) {
-      return;
-    }
-    setMessages(apiMsgs.map(mapServerMessageToChatMessage));
-  }, [server?.current_step, server?.id, server?.version]);
-
-  /** Post-stakeholders step: same persisted history as the rest of onboarding. */
-  useEffect(() => {
-    if (!server || server.current_step !== "ADMIN_ACCESS") {
+    const hydrateSteps: OnboardingStep[] = [
+      "CONNECT_PROJECT_MANAGEMENT",
+      "CONNECT_ENGINEERING",
+      "CONNECT_COMMUNICATION",
+      "SLACK_STAKEHOLDERS",
+      "SLACK_COLLABORATORS",
+      "SLACK_COLLABORATORS_CONFIRM",
+      "SLACK_TEAM_MEMBERS",
+      "SLACK_TEAM_MEMBERS_CONFIRM",
+      "SLACK_WATCH_CHANNELS",
+      "SLACK_WATCH_CHANNELS_CONFIRM",
+      "ADMIN_ACCESS",
+    ];
+    if (!hydrateSteps.includes(server.current_step as OnboardingStep)) {
       return;
     }
     const apiMsgs = server.messages;
@@ -457,41 +524,47 @@ export default function OnboardingPage() {
     return server.current_step as OnboardingStep;
   }, [server]);
 
-  /** Leave ADMIN_ACCESS → drop UI-only farewell bubble (persisted chat stays from GET /onboarding). */
-  useEffect(() => {
-    if (displayStep !== "ADMIN_ACCESS") {
-      setAdminFarewellMessage(null);
+  const otherManagersForWrapUp = useMemo(() => {
+    if (!server) {
+      return [];
     }
-  }, [displayStep]);
+    return otherSlackCollaboratorsExcludingStakeholder(server.answers);
+  }, [server?.answers, server?.version]);
 
-  /** Refresh / return: show farewell again without replaying typing when the CTA was already reached. */
-  useEffect(() => {
-    if (displayStep !== "ADMIN_ACCESS" || !server || !tenantId) {
-      return;
+  const wrapUpTailMessages = useMemo((): ChatMessage[] => {
+    if (displayStep !== "ADMIN_ACCESS" || !server) {
+      return [];
     }
-    if (sessionStorage.getItem(onboardingAppCtaStorageKey(tenantId)) !== "1") {
-      return;
+    const lastTs = messages.length > 0 ? Math.max(...messages.map((m) => m.timestamp)) : Date.now();
+    const t0 = lastTs + 15;
+    const thanks: ChatMessage = {
+      id: "onb-wrap-up-thanks",
+      role: "vector",
+      content: ONBOARDING_WRAP_UP_THANKS,
+      timestamp: t0,
+    };
+    if (otherManagersForWrapUp.length === 0) {
+      return [thanks];
     }
-    setAdminFarewellMessage((prev) => {
-      if (prev) {
-        return prev;
-      }
-      return {
-        id: "admin-farewell-restored",
+    const handles = otherManagersForWrapUp.map((m) => slackPersonChipText(m)).join(", ");
+    return [
+      thanks,
+      {
+        id: "onb-wrap-up-manager-ask",
         role: "vector",
-        content: buildStakeholderFarewellMessage(server.answers),
-        timestamp: Date.now(),
-      };
-    });
-  }, [displayStep, server, tenantId]);
+        content: wrapUpManagerIntroQuestion(handles),
+        timestamp: t0 + 1,
+      },
+    ];
+  }, [displayStep, server, messages, otherManagersForWrapUp]);
 
   const adminAccessDisplayMessages = useMemo(() => {
     if (displayStep !== "ADMIN_ACCESS" || !server) {
       return [];
     }
     const base = buildAdminAccessStakeholderBase(messages, server.answers);
-    return adminFarewellMessage ? [...base, adminFarewellMessage] : base;
-  }, [displayStep, server, messages, adminFarewellMessage]);
+    return reorderOnboardingTranscriptForDisplay([...base, ...wrapUpTailMessages], server.answers);
+  }, [displayStep, server, messages, wrapUpTailMessages]);
 
   const thankYou = Boolean(server && (server.status === "completed" || displayStep === "THANK_YOU"));
 
@@ -505,39 +578,6 @@ export default function OnboardingPage() {
       setConnectorsIntroChipMode("both");
     }
   }, [profilePhase]);
-
-  useEffect(() => {
-    if (displayStep !== "ADMIN_ACCESS" || !server || !tenantId) {
-      return;
-    }
-    if (sessionStorage.getItem(onboardingAppCtaStorageKey(tenantId)) === "1") {
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      setIsTyping(true);
-      await minTypingDelay(400, 800);
-      if (cancelled) {
-        return;
-      }
-      const text = buildStakeholderFarewellMessage(server.answers);
-      setAdminFarewellMessage({
-        id: crypto.randomUUID(),
-        role: "vector",
-        content: text,
-        timestamp: Date.now(),
-      });
-      setIsTyping(false);
-      if (cancelled || !tenantId) {
-        return;
-      }
-      sessionStorage.setItem(onboardingAppCtaStorageKey(tenantId), "1");
-    })();
-    return () => {
-      cancelled = true;
-      setIsTyping(false);
-    };
-  }, [displayStep, server, tenantId]);
 
   /** After Vector finishes typing or the chat request completes, keep focus in the message field. */
   useEffect(() => {
@@ -599,38 +639,23 @@ export default function OnboardingPage() {
     },
   });
 
-  const [unsupportedMandatoryContinueBusy, setUnsupportedMandatoryContinueBusy] = useState(false);
-
-  const continuePastUnsupportedMandatory = useCallback(async () => {
-    if (!server) {
-      return;
-    }
-    setFinishOnboardingError(null);
-    setUnsupportedMandatoryContinueBusy(true);
-    const cleared = { ...server.answers, unsupported_mandatory_sections: [] as string[] };
-    const next = nextStepAfterUnsupportedMandatoryDismissed(cleared, server.slack_connected);
-    try {
-      if (next === "CONNECT_COMMUNICATION") {
-        await patchOnboarding(apiBase, { current_step: "CONNECT_COMMUNICATION", answers: cleared });
-      } else if (next === "SLACK_STAKEHOLDERS") {
-        await patchOnboarding(apiBase, {
-          current_step: "SLACK_STAKEHOLDERS",
-          answers: { ...cleared, connect_queue: [], connect_plan: [] },
-        });
-      } else {
-        await patchOnboarding(apiBase, { answers: cleared });
-        await completeOnboarding(apiBase);
+  const patchConsentThenComplete = useCallback(
+    async (choice: "yes" | "later" | "not_applicable") => {
+      setFinishOnboardingError(null);
+      try {
+        await patchOnboarding(apiBase, { answers: { slack_introduce_managers_consent: choice } });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+        completeOnboardingGoAppRef.current = true;
+        await finishOnboardingMut.mutateAsync();
+      } catch (e) {
+        setFinishOnboardingError(e instanceof Error ? e.message : "Could not finish setup.");
       }
-      if (tenantId) {
-        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
-      }
-      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
-    } catch (e) {
-      setFinishOnboardingError(e instanceof Error ? e.message : "Could not continue.");
-    } finally {
-      setUnsupportedMandatoryContinueBusy(false);
-    }
-  }, [apiBase, qc, server, tenantId]);
+    },
+    [apiBase, qc, tenantId, finishOnboardingMut],
+  );
 
   const restartOnboardingMut = useMutation({
     mutationFn: () => postRestartOnboarding(apiBase),
@@ -740,7 +765,9 @@ export default function OnboardingPage() {
           queue = queue.filter((p) => p !== provider);
         }
         if (queue.length === 0) {
-          if (provider === "slack") {
+          const tools = server.answers.tools as Record<string, string[]> | undefined;
+          const comm = tools?.communication ?? [];
+          if (comm.includes("slack") && server.slack_connected) {
             patchMut.mutate({
               current_step: "SLACK_STAKEHOLDERS",
               answers: { ...server.answers, connect_queue: [], connect_plan: [] },
@@ -750,7 +777,11 @@ export default function OnboardingPage() {
           }
         } else {
           const next = queue[0] as ConnectorQueueId;
-          goToStep(NextConnectStep(next), { ...server.answers, connect_queue: queue });
+          goToStep(NextConnectStep(next), {
+            ...server.answers,
+            connect_queue: queue,
+            connect_plan: queue,
+          });
         }
         return;
       }
@@ -762,7 +793,11 @@ export default function OnboardingPage() {
         finishOnboardingMut.mutate();
       } else {
         const next = rest[0] as ConnectorQueueId;
-        goToStep(NextConnectStep(next), { ...server.answers, connect_queue: rest });
+        goToStep(NextConnectStep(next), {
+          ...server.answers,
+          connect_queue: rest,
+          connect_plan: rest,
+        });
       }
     },
     [server, goToStep, finishOnboardingMut, patchMut],
@@ -776,13 +811,21 @@ export default function OnboardingPage() {
       setStakeholdersSubmitError(null);
       setStakeholdersBusy(true);
       try {
+        const uid = payload.slack_user_ids[0]!;
+        const username = payload.text.trim().replace(/^@/, "") || uid;
+        const labelRaw = payload.mention_labels[0];
+        const label =
+          typeof labelRaw === "string" && labelRaw.trim() ? labelRaw.trim() : username;
         await patchOnboarding(apiBase, {
-          current_step: "ADMIN_ACCESS",
+          current_step: "SLACK_COLLABORATORS",
           answers: {
             slack_stakeholders: {
               raw_text: payload.text,
               slack_user_ids: payload.slack_user_ids,
               mention_labels: payload.mention_labels,
+            },
+            slack_collaborators: {
+              members: [{ slack_user_id: uid, username, label }],
             },
           },
         });
@@ -799,6 +842,257 @@ export default function OnboardingPage() {
     [apiBase, qc, tenantId],
   );
 
+  const collaboratorsPickInitial = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    const fromAnswers = slackCollaboratorsFromAnswers(server.answers);
+    if (fromAnswers.length > 0) {
+      return fromAnswers;
+    }
+    return seedCollaboratorsFromStakeholders(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const collaboratorsConfirmList = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    return slackCollaboratorsFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const collaboratorSlackUserIdsExcludeForTeam = useMemo(() => {
+    if (!server) {
+      return [];
+    }
+    return slackCollaboratorsFromAnswers(server.answers).map((m) => m.slack_user_id);
+  }, [server?.answers, server?.version]);
+
+  const teamMembersPickInitial = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    return slackTeamMembersFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const teamMembersConfirmList = useMemo((): SlackCollaboratorMember[] => {
+    if (!server) {
+      return [];
+    }
+    return slackTeamMembersFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const slackTeamPickIntroVariant = useMemo(() => {
+    if (!server) {
+      return "with_other_managers" as const;
+    }
+    return otherSlackCollaboratorsExcludingStakeholder(server.answers).length === 0
+      ? ("solo_manager" as const)
+      : ("with_other_managers" as const);
+  }, [server?.answers, server?.version]);
+
+  const slackTeamPickIntroMessages = useMemo(
+    () => slackTeamMembersPickIntroMessages(Date.now(), slackTeamPickIntroVariant),
+    [server?.current_step, server?.version, slackTeamPickIntroVariant],
+  );
+  const slackTeamConfirmIntroMessages = useMemo(
+    () => slackTeamMembersConfirmIntroMessages(Date.now()),
+    [server?.current_step, server?.version],
+  );
+  const slackWatchPickIntroMessages = useMemo(
+    () => slackWatchChannelsPickIntroMessages(Date.now()),
+    [server?.current_step, server?.version],
+  );
+  const slackWatchConfirmIntroMessages = useMemo(
+    () => slackWatchChannelsConfirmIntroMessages(Date.now()),
+    [server?.current_step, server?.version],
+  );
+
+  const watchChannelsPickInitial = useMemo(() => {
+    if (!server) {
+      return [];
+    }
+    return slackWatchChannelsFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const watchChannelsConfirmList = useMemo(() => {
+    if (!server) {
+      return [];
+    }
+    return slackWatchChannelsFromAnswers(server.answers);
+  }, [server?.answers, server?.version]);
+
+  const submitCollaboratorsPick = useCallback(
+    async (members: SlackCollaboratorMember[]) => {
+      setCollaboratorsSubmitError(null);
+      setCollaboratorsBusy(true);
+      try {
+        await patchOnboarding(apiBase, {
+          current_step: "SLACK_COLLABORATORS_CONFIRM",
+          answers: { slack_collaborators: { members } },
+        });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+      } catch (e) {
+        setCollaboratorsSubmitError(
+          e instanceof Error ? e.message : "Could not save your collaborator list.",
+        );
+      } finally {
+        setCollaboratorsBusy(false);
+      }
+    },
+    [apiBase, qc, tenantId],
+  );
+
+  const submitCollaboratorsConfirmEdit = useCallback(async () => {
+    setCollaboratorsSubmitError(null);
+    setCollaboratorsBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_COLLABORATORS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setCollaboratorsSubmitError(e instanceof Error ? e.message : "Could not go back to edit.");
+    } finally {
+      setCollaboratorsBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitCollaboratorsConfirmContinue = useCallback(async () => {
+    if (!server) {
+      return;
+    }
+    setCollaboratorsSubmitError(null);
+    setCollaboratorsBusy(true);
+    try {
+      const nextStep: OnboardingStep = collaboratorsIncludesStakeholderSelf(server.answers)
+        ? "SLACK_TEAM_MEMBERS"
+        : "ADMIN_ACCESS";
+      await patchOnboarding(apiBase, { current_step: nextStep });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setCollaboratorsSubmitError(e instanceof Error ? e.message : "Could not continue.");
+    } finally {
+      setCollaboratorsBusy(false);
+    }
+  }, [apiBase, qc, tenantId, server]);
+
+  const submitTeamMembersPick = useCallback(
+    async (members: SlackCollaboratorMember[]) => {
+      setSlackTeamSubmitError(null);
+      setSlackTeamBusy(true);
+      try {
+        await patchOnboarding(apiBase, {
+          current_step: "SLACK_TEAM_MEMBERS_CONFIRM",
+          answers: { slack_team_members: { members } },
+        });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+      } catch (e) {
+        setSlackTeamSubmitError(e instanceof Error ? e.message : "Could not save your team list.");
+      } finally {
+        setSlackTeamBusy(false);
+      }
+    },
+    [apiBase, qc, tenantId],
+  );
+
+  const submitTeamMembersConfirmEdit = useCallback(async () => {
+    setSlackTeamSubmitError(null);
+    setSlackTeamBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_TEAM_MEMBERS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackTeamSubmitError(e instanceof Error ? e.message : "Could not go back to edit.");
+    } finally {
+      setSlackTeamBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitTeamMembersConfirmContinue = useCallback(async () => {
+    setSlackTeamSubmitError(null);
+    setSlackTeamBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_WATCH_CHANNELS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackTeamSubmitError(e instanceof Error ? e.message : "Could not continue.");
+    } finally {
+      setSlackTeamBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitWatchChannelsPick = useCallback(
+    async (channels: { channel_id: string; name: string }[]) => {
+      setSlackWatchChannelsSubmitError(null);
+      setSlackWatchChannelsBusy(true);
+      try {
+        await patchOnboarding(apiBase, {
+          current_step: "SLACK_WATCH_CHANNELS_CONFIRM",
+          answers: { slack_watch_channels: { channels } },
+        });
+        if (tenantId) {
+          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+          await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+        }
+      } catch (e) {
+        setSlackWatchChannelsSubmitError(
+          e instanceof Error ? e.message : "Could not save your channel list.",
+        );
+      } finally {
+        setSlackWatchChannelsBusy(false);
+      }
+    },
+    [apiBase, qc, tenantId],
+  );
+
+  const submitWatchChannelsConfirmEdit = useCallback(async () => {
+    setSlackWatchChannelsSubmitError(null);
+    setSlackWatchChannelsBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "SLACK_WATCH_CHANNELS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackWatchChannelsSubmitError(e instanceof Error ? e.message : "Could not go back to edit.");
+    } finally {
+      setSlackWatchChannelsBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
+  const submitWatchChannelsConfirmContinue = useCallback(async () => {
+    setSlackWatchChannelsSubmitError(null);
+    setSlackWatchChannelsBusy(true);
+    try {
+      await patchOnboarding(apiBase, { current_step: "ADMIN_ACCESS" });
+      if (tenantId) {
+        await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+      }
+    } catch (e) {
+      setSlackWatchChannelsSubmitError(e instanceof Error ? e.message : "Could not continue.");
+    } finally {
+      setSlackWatchChannelsBusy(false);
+    }
+  }, [apiBase, qc, tenantId]);
+
   const continuePastCommPlaceholder = useCallback(() => {
     if (!server) {
       return;
@@ -812,7 +1106,11 @@ export default function OnboardingPage() {
       finishOnboardingMut.mutate();
     } else {
       const next = rest[0] as ConnectorQueueId;
-      goToStep(NextConnectStep(next), { ...server.answers, connect_queue: rest });
+      goToStep(NextConnectStep(next), {
+        ...server.answers,
+        connect_queue: rest,
+        connect_plan: rest,
+      });
     }
   }, [server, goToStep, finishOnboardingMut]);
 
@@ -1023,7 +1321,7 @@ export default function OnboardingPage() {
     });
   }, []);
 
-  /** Advance Slack OAuth return; GitHub/Linear query flags only refresh state (not part of in-flow onboarding). */
+  /** Advance OAuth return for Linear, GitHub, or Slack during onboarding. */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gh = params.get("github_connected");
@@ -1049,38 +1347,78 @@ export default function OnboardingPage() {
     void (async () => {
       try {
         setOauthReturnError(null);
-        if (gh === "1" || lin === "1") {
-          await fetchOnboarding(apiBase);
-          await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
-          stripOauthParams();
-          return;
-        }
         const fresh = await fetchOnboarding(apiBase);
-        if (!fresh.slack_connected) {
-          const msg =
-            "Slack authorization may have finished in the browser, but this workspace is not linked yet. " +
-            "Common causes: token exchange failed (redirect URL in Slack app must exactly match SLACK_CALLBACK_URL), " +
-            "or session cookie not sent to the API (use the same host for the app and VITE_API_BASE_URL, e.g. only localhost or only 127.0.0.1).";
-          setOauthReturnError(msg);
-          console.error("[onboarding] OAuth return: slack_connected=1 in URL but GET /onboarding.slack_connected is false");
+        const provider: LiveConnectorId | null =
+          gh === "1" ? "github" : lin === "1" ? "linear" : sl === "1" ? "slack" : null;
+        if (!provider) {
           stripOauthParams();
           return;
         }
-        const nextQueue = normalizeQueueAfterOAuth(fresh.answers, fresh.current_step, "slack");
+        if (!liveProviderConnected(provider, fresh)) {
+          const label = provider === "slack" ? "Slack" : provider === "github" ? "GitHub" : "Linear";
+          const msg =
+            `${label} authorization may have finished in the browser, but this workspace is not linked yet. ` +
+            (provider === "slack"
+              ? "Common causes: token exchange failed (redirect URL in Slack app must exactly match SLACK_CALLBACK_URL), " +
+                "or session cookie not sent to the API (use the same host for the app and VITE_API_BASE_URL, e.g. only localhost or only 127.0.0.1)."
+              : "Check redirect URLs and that you are signed in on the same API host as the app.");
+          setOauthReturnError(msg);
+          console.error(`[onboarding] OAuth return: ${provider}_connected=1 in URL but GET /onboarding is false`);
+          stripOauthParams();
+          return;
+        }
+
+        const nextQueue = normalizeQueueAfterOAuth(fresh.answers, fresh.current_step, provider);
+        const tools = fresh.answers.tools as Record<string, string[]> | undefined;
+        const comm = tools?.communication ?? [];
+
         if (nextQueue.length === 0) {
-          await patchOnboarding(apiBase, {
-            current_step: "SLACK_STAKEHOLDERS",
-            answers: {
-              ...fresh.answers,
-              connect_queue: [],
-              connect_plan: [],
-            },
-          });
+          if (comm.includes("slack") && fresh.slack_connected) {
+            await patchOnboarding(apiBase, {
+              current_step: "SLACK_STAKEHOLDERS",
+              answers: {
+                ...fresh.answers,
+                connect_queue: [],
+                connect_plan: [],
+              },
+            });
+          } else if (comm.includes("slack")) {
+            await patchOnboarding(apiBase, {
+              current_step: "CONNECT_COMMUNICATION",
+              answers: {
+                ...fresh.answers,
+                connect_queue: ["slack"],
+                connect_plan: ["slack"],
+              },
+            });
+          } else if (comm.includes("ms_teams") || comm.includes("discord")) {
+            await patchOnboarding(apiBase, {
+              current_step: "CONNECT_COMMUNICATION",
+              answers: {
+                ...fresh.answers,
+                connect_queue: ["comm_placeholder"],
+                connect_plan: ["comm_placeholder"],
+              },
+            });
+          } else {
+            await patchOnboarding(apiBase, {
+              current_step: "SCANNING",
+              answers: {
+                ...fresh.answers,
+                connect_queue: [],
+                connect_plan: [],
+              },
+            });
+          }
         } else {
           const next = nextQueue[0] as ConnectorQueueId;
           await patchOnboarding(apiBase, {
             current_step: NextConnectStep(next),
-            answers: { connect_queue: nextQueue },
+            answers: {
+              ...fresh.answers,
+              connect_queue: nextQueue,
+              connect_plan: nextQueue,
+            },
           });
         }
         await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
@@ -1233,26 +1571,53 @@ export default function OnboardingPage() {
   }
 
   if (displayStep === "ADMIN_ACCESS" && server) {
-    const adminAccessFooter = adminFarewellMessage ? (
-      <div className="px-4 pb-4 pt-2 sm:px-5">
+    const wrapUpPrimaryButtonClass =
+      "w-full rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white " +
+      "shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03] " +
+      "disabled:cursor-not-allowed disabled:opacity-50 " +
+      landingAccentText;
+    const wrapUpSecondaryButtonClass =
+      "w-full rounded-full border border-zinc-200 bg-white px-8 py-3 text-sm font-medium text-zinc-800 " +
+      "transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[10rem]";
+
+    const adminAccessFooter = (
+      <div className="space-y-3 px-4 pb-4 pt-2 sm:px-5">
         {finishOnboardingError ? (
-          <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-950">
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-950">
             {finishOnboardingError}
           </p>
         ) : null}
-        <button
-          type="button"
-          disabled={finishOnboardingMut.isPending}
-          className="w-full rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={() => {
-            completeOnboardingGoAppRef.current = true;
-            finishOnboardingMut.mutate();
-          }}
-        >
-          {finishOnboardingMut.isPending ? "Opening…" : "Access your company space"}
-        </button>
+        {otherManagersForWrapUp.length > 0 ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              disabled={finishOnboardingMut.isPending}
+              className={wrapUpPrimaryButtonClass}
+              onClick={() => void patchConsentThenComplete("yes")}
+            >
+              {finishOnboardingMut.isPending ? "Saving…" : "Yes, go ahead"}
+            </button>
+            <button
+              type="button"
+              disabled={finishOnboardingMut.isPending}
+              className={wrapUpSecondaryButtonClass}
+              onClick={() => void patchConsentThenComplete("later")}
+            >
+              Maybe later
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={finishOnboardingMut.isPending}
+            className={wrapUpPrimaryButtonClass}
+            onClick={() => void patchConsentThenComplete("not_applicable")}
+          >
+            {finishOnboardingMut.isPending ? "Opening…" : "Finish the onboarding"}
+          </button>
+        )}
       </div>
-    ) : null;
+    );
 
     return (
       <>
@@ -1286,6 +1651,144 @@ export default function OnboardingPage() {
             submitError={stakeholdersSubmitError}
             submitting={stakeholdersBusy}
             onSubmit={submitSlackStakeholders}
+            userDisplayName={userLabel}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_COLLABORATORS_CONFIRM" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackCollaboratorsConfirmPanel
+            priorChatMessages={messages}
+            members={collaboratorsConfirmList}
+            rosterMembers={slackMembersForStep.data ?? []}
+            submitError={collaboratorsSubmitError}
+            submitting={collaboratorsBusy}
+            onEdit={() => void submitCollaboratorsConfirmEdit()}
+            onContinue={() => void submitCollaboratorsConfirmContinue()}
+            userDisplayName={userLabel}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_WATCH_CHANNELS_CONFIRM" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackChannelsConfirmPanel
+            priorChatMessages={messages}
+            confirmIntroMessages={slackWatchConfirmIntroMessages}
+            listTitle="Channels we will watch for your team"
+            channels={watchChannelsConfirmList}
+            submitError={slackWatchChannelsSubmitError}
+            submitting={slackWatchChannelsBusy}
+            onEdit={() => void submitWatchChannelsConfirmEdit()}
+            onContinue={() => void submitWatchChannelsConfirmContinue()}
+            userDisplayName={userLabel}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_WATCH_CHANNELS" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackChannelsPickPanel
+            priorChatMessages={messages}
+            introMessages={slackWatchPickIntroMessages}
+            channels={slackChannelsForStep.data ?? []}
+            channelsLoading={slackChannelsForStep.isLoading}
+            channelsError={
+              slackChannelsForStep.error ? (slackChannelsForStep.error as Error).message : null
+            }
+            initialChannels={watchChannelsPickInitial}
+            initialChannelsKey={String(server.version)}
+            submitError={slackWatchChannelsSubmitError}
+            submitting={slackWatchChannelsBusy}
+            onContinue={(ch) => void submitWatchChannelsPick(ch)}
+            userDisplayName={userLabel}
+            emptyHint="No channels selected yet. Search below or continue with an empty list."
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_TEAM_MEMBERS_CONFIRM" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackPeopleMultiConfirmPanel
+            priorChatMessages={messages}
+            confirmIntroMessages={slackTeamConfirmIntroMessages}
+            listTitle="Team members you selected"
+            members={teamMembersConfirmList}
+            rosterMembers={slackMembersForStep.data ?? []}
+            submitError={slackTeamSubmitError}
+            submitting={slackTeamBusy}
+            onEdit={() => void submitTeamMembersConfirmEdit()}
+            onContinue={() => void submitTeamMembersConfirmContinue()}
+            userDisplayName={userLabel}
+            requireNonEmpty={false}
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_TEAM_MEMBERS" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackPeopleMultiPickPanel
+            priorChatMessages={messages}
+            introMessages={slackTeamPickIntroMessages}
+            members={slackMembersForStep.data ?? []}
+            membersLoading={slackMembersForStep.isLoading}
+            membersError={slackMembersForStep.error ? (slackMembersForStep.error as Error).message : null}
+            excludeSlackUserIds={collaboratorSlackUserIdsExcludeForTeam}
+            initialMembers={teamMembersPickInitial}
+            initialMembersKey={String(server.version)}
+            submitError={slackTeamSubmitError}
+            submitting={slackTeamBusy}
+            onContinue={(m) => void submitTeamMembersPick(m)}
+            userDisplayName={userLabel}
+            requireAtLeastOne={false}
+            emptyHint="No teammates listed yet. You can add people below or continue with an empty list."
+          />
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "SLACK_COLLABORATORS" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <SlackCollaboratorsPickPanel
+            priorChatMessages={messages}
+            members={slackMembersForStep.data ?? []}
+            membersLoading={slackMembersForStep.isLoading}
+            membersError={slackMembersForStep.error ? (slackMembersForStep.error as Error).message : null}
+            initialMembers={collaboratorsPickInitial}
+            initialMembersKey={String(server.version)}
+            submitError={collaboratorsSubmitError}
+            submitting={collaboratorsBusy}
+            onContinue={(m) => void submitCollaboratorsPick(m)}
             userDisplayName={userLabel}
           />
         </OnboardingChatLayout>
@@ -1447,31 +1950,16 @@ export default function OnboardingPage() {
                       we&apos;ll email you as soon as you can finish onboarding when those tools are available.
                     </p>
                     <p>
-                      You can still explore the app. If you&apos;d like to choose different tools, use{" "}
+                      You can still explore the app from the top nav. To change your tool picks, use{" "}
                       <span className="font-medium text-zinc-800">Edit tools</span> below.
                     </p>
                   </div>
-                  {finishOnboardingError ? (
-                    <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-950">
-                      {finishOnboardingError}
-                    </p>
-                  ) : null}
-                  <div className="mt-6 flex w-full flex-col gap-2 border-t border-zinc-100/90 pt-5">
-                    <button
-                      type="button"
-                      disabled={unsupportedMandatoryContinueBusy || finishOnboardingMut.isPending}
-                      className="w-full rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50"
-                      onClick={() => void continuePastUnsupportedMandatory()}
-                    >
-                      {unsupportedMandatoryContinueBusy || finishOnboardingMut.isPending
-                        ? "Continuing…"
-                        : "Finish and continue"}
-                    </button>
+                  <div className="mt-6 flex w-full flex-col border-t border-zinc-100/90 pt-5">
                     <button
                       type="button"
                       className={
                         CONNECTOR_STEP_FOOTER_LINK_CLASS +
-                        " w-full py-1 text-center text-[13px] font-medium text-zinc-600 hover:text-zinc-800"
+                        " w-full py-2 text-center text-[13px] font-medium text-zinc-600 hover:text-zinc-800"
                       }
                       onClick={() =>
                         goToStep("CHAT_PROFILE", {
@@ -1494,9 +1982,148 @@ export default function OnboardingPage() {
     );
   }
 
+  if (displayStep === "CONNECT_PROJECT_MANAGEMENT" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <ChatMessageList messages={messages} userDisplayName={userLabel} isTyping={isTyping} />
+            <div className="shrink-0 px-4 pb-8 pt-1 sm:px-5">
+              <div className={ONBOARDING_CONNECTOR_PROMPT_CARD_CLASS}>
+                {oauthReturnError ? (
+                  <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-950">
+                    {oauthReturnError}
+                  </p>
+                ) : null}
+                {finishOnboardingError ? (
+                  <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-left text-sm text-red-950">
+                    {finishOnboardingError}
+                  </p>
+                ) : null}
+                <h2 className="text-lg font-semibold text-zinc-900">Connect Linear</h2>
+                {!server.linear_connected ? (
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                    Link your Linear workspace so Vector can read lightweight project activity.
+                  </p>
+                ) : null}
+                {server.linear_connected ? (
+                  <div className="mt-3 space-y-1">
+                    <p className="text-sm font-medium text-emerald-700">Linear is connected to this workspace.</p>
+                    <p className="text-sm text-zinc-600">
+                      When you&apos;re ready, continue—we&apos;ll connect your engineering tool next (or Slack if
+                      you&apos;re done with Linear and GitHub).
+                    </p>
+                  </div>
+                ) : null}
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  {!server.linear_connected ? (
+                    <a
+                      className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
+                      href={`${apiBase}/connectors/linear/install?return_to=${encodeURIComponent("/app/onboarding")}`}
+                    >
+                      Connect Linear
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={finishOnboardingMut.isPending}
+                      className={`${ONBOARDING_PRIMARY_CTA_GRADIENT_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
+                      onClick={() => continueAfterManualConnect("linear")}
+                    >
+                      {finishOnboardingMut.isPending ? "Finishing…" : "Continue"}
+                    </button>
+                  )}
+                  <div className="mt-2 flex justify-center">
+                    <button
+                      type="button"
+                      className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                      onClick={() => goToStep("CHAT_PROFILE", { ...server.answers, profile_phase: "tools" })}
+                    >
+                      Edit tools
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
+  if (displayStep === "CONNECT_ENGINEERING" && server) {
+    return (
+      <>
+        <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <ChatMessageList messages={messages} userDisplayName={userLabel} isTyping={isTyping} />
+            <div className="shrink-0 px-4 pb-8 pt-1 sm:px-5">
+              <div className={ONBOARDING_CONNECTOR_PROMPT_CARD_CLASS}>
+                {oauthReturnError ? (
+                  <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-950">
+                    {oauthReturnError}
+                  </p>
+                ) : null}
+                {finishOnboardingError ? (
+                  <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-left text-sm text-red-950">
+                    {finishOnboardingError}
+                  </p>
+                ) : null}
+                <h2 className="text-lg font-semibold text-zinc-900">Connect GitHub</h2>
+                {!server.github_connected ? (
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                    Authorize Vector on GitHub so we can pick up lightweight engineering signals.
+                  </p>
+                ) : null}
+                {server.github_connected ? (
+                  <div className="mt-3 space-y-1">
+                    <p className="text-sm font-medium text-emerald-700">GitHub is connected to this workspace.</p>
+                    <p className="text-sm text-zinc-600">
+                      When you&apos;re ready, continue to connect Slack (or finish if you&apos;re all set).
+                    </p>
+                  </div>
+                ) : null}
+                <div className="mt-6 flex flex-col items-center gap-3">
+                  {!server.github_connected ? (
+                    <a
+                      className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
+                      href={`${apiBase}/connectors/github/install?return_to=${encodeURIComponent("/app/onboarding")}`}
+                    >
+                      Connect GitHub
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={finishOnboardingMut.isPending}
+                      className={`${ONBOARDING_PRIMARY_CTA_GRADIENT_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
+                      onClick={() => continueAfterManualConnect("github")}
+                    >
+                      {finishOnboardingMut.isPending ? "Finishing…" : "Continue"}
+                    </button>
+                  )}
+                  <div className="mt-2 flex justify-center">
+                    <button
+                      type="button"
+                      className={CONNECTOR_STEP_FOOTER_LINK_CLASS}
+                      onClick={() => goToStep("CHAT_PROFILE", { ...server.answers, profile_phase: "tools" })}
+                    >
+                      Edit tools
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </OnboardingChatLayout>
+        {restartConfirmOverlay}
+      </>
+    );
+  }
+
   if (displayStep === "CONNECT_COMMUNICATION") {
     const commHead = (effectiveConnectQueue(server.answers, "CONNECT_COMMUNICATION")[0] ??
-      connectorOrderFromTools(server.answers)[0]) as ConnectorQueueId | undefined;
+      connectQueueFromTools(server.answers)[0]) as ConnectorQueueId | undefined;
 
     if (commHead === "comm_placeholder") {
       const commLabel = unsupportedCommunicationPickLabel(server.answers);

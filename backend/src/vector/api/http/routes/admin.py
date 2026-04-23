@@ -12,10 +12,6 @@ from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
 from vector.api.http.deps import get_db, settings_dep
-from vector.api.http.routes.admin_manager_onboarding import (
-    build_admin_manager_onboarding_router,
-    build_admin_manager_onboarding_tenant_router,
-)
 from vector.api.http.serialization import orm_to_dict
 from vector.application.services import connector_sync
 from vector.contracts.admin import (
@@ -38,16 +34,21 @@ from vector.contracts.admin import (
     AdminStep2ProjectionsResetResponse,
     AdminStep3CanonicalResetRequest,
     AdminStep3CanonicalResetResponse,
+    AdminTenantSlackDeliveryRequest,
     AdminTenantWorkspaceAccessRequest,
     AdminUserListItem,
     AdminUserListResponse,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
+    SlackCollaboratorMemberSnapshot,
+    SlackCollaboratorsSnapshot,
+    SlackStakeholdersSnapshot,
+    SlackWatchChannelSnapshot,
+    SlackWatchChannelsSnapshot,
     RawIngestionAdminDetail,
     RawIngestionAdminDetailResponse,
     RawIngestionAdminItem,
     RawIngestionAdminPage,
-    SlackStakeholdersSnapshot,
     TenantAdminDetailResponse,
     TenantConnectionAdminItem,
     TenantListItem,
@@ -155,7 +156,6 @@ def _admin_reset_tenant_to_signup_response(out: dict[str, Any]) -> AdminResetTen
         deleted_ingestion_runs=s1["deleted_ingestion_runs"],
         deleted_sync_state_rows=s1["deleted_sync_state_rows"],
         deleted_tenant_connections=out["deleted_tenant_connections"],
-        deleted_manager_onboarding_sessions=out["deleted_manager_onboarding_sessions"],
     )
 
 
@@ -267,12 +267,127 @@ def _slack_stakeholders_from_answers(ans: dict[str, object]) -> SlackStakeholder
     return SlackStakeholdersSnapshot(raw_text=text_out, slack_user_ids=uid_list)
 
 
+def _slack_collaborators_from_answers(ans: dict[str, object]) -> SlackCollaboratorsSnapshot | None:
+    raw = ans.get("slack_collaborators")
+    if not isinstance(raw, dict):
+        return None
+    members_raw = raw.get("members")
+    if not isinstance(members_raw, list) or not members_raw:
+        return None
+    rows: list[SlackCollaboratorMemberSnapshot] = []
+    seen: set[str] = set()
+    for m in members_raw:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) and un.strip() else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        rows.append(
+            SlackCollaboratorMemberSnapshot(
+                slack_user_id=uid,
+                username=username,
+                label=label,
+            )
+        )
+    if not rows:
+        return None
+    return SlackCollaboratorsSnapshot(members=rows)
+
+
+def _slack_team_members_from_answers(ans: dict[str, object]) -> SlackCollaboratorsSnapshot | None:
+    raw = ans.get("slack_team_members")
+    if not isinstance(raw, dict):
+        return None
+    members_raw = raw.get("members")
+    if not isinstance(members_raw, list) or not members_raw:
+        return None
+    rows: list[SlackCollaboratorMemberSnapshot] = []
+    seen: set[str] = set()
+    for m in members_raw:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) and un.strip() else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        rows.append(
+            SlackCollaboratorMemberSnapshot(
+                slack_user_id=uid,
+                username=username,
+                label=label,
+            )
+        )
+    if not rows:
+        return None
+    return SlackCollaboratorsSnapshot(members=rows)
+
+
+def _slack_introduce_managers_consent_from_answers(ans: dict[str, object]) -> str | None:
+    raw = ans.get("slack_introduce_managers_consent")
+    if isinstance(raw, str) and raw.strip() in ("yes", "later", "not_applicable"):
+        return raw.strip().lower()
+    return None
+
+
+def _slack_watch_channels_from_answers(ans: dict[str, object]) -> SlackWatchChannelsSnapshot | None:
+    raw = ans.get("slack_watch_channels")
+    if not isinstance(raw, dict):
+        return None
+    ch_raw = raw.get("channels")
+    if not isinstance(ch_raw, list) or not ch_raw:
+        return None
+    out: list[SlackWatchChannelSnapshot] = []
+    seen: set[str] = set()
+    for ch in ch_raw:
+        if not isinstance(ch, dict):
+            continue
+        cid = ch.get("channel_id")
+        if not isinstance(cid, str) or not cid.strip():
+            continue
+        cid = cid.strip()
+        if cid in seen:
+            continue
+        seen.add(cid)
+        nm = ch.get("name")
+        name = nm.strip().lstrip("#") if isinstance(nm, str) and nm.strip() else cid
+        out.append(SlackWatchChannelSnapshot(channel_id=cid, name=name))
+    if not out:
+        return None
+    return SlackWatchChannelsSnapshot(channels=out)
+
+
+def _connect_queue_plan_snapshot(ans: dict[str, object]) -> tuple[list[str], list[str]]:
+    def _coerce_str_list(key: str) -> list[str]:
+        raw = ans.get(key)
+        if not isinstance(raw, list):
+            return []
+        return [str(x) for x in raw if isinstance(x, str)]
+
+    return _coerce_str_list("connect_queue"), _coerce_str_list("connect_plan")
+
+
 def _snapshot_from_onboarding(
     session: Session, row: OnboardingState | None
 ) -> OnboardingAdminSnapshot | None:
     if row is None:
         return None
     ans = dict(row.answers_json or {})
+    cq, cp = _connect_queue_plan_snapshot(ans)
     msgs: list[OnboardingChatMessageItem] = []
     if onboarding_repo.onboarding_messages_table_exists(session):
         # Full transcript from the start, in DB order (created_at, id). Avoid "recent 200 DESC then
@@ -296,6 +411,8 @@ def _snapshot_from_onboarding(
         completed_at=row.completed_at,
         abandoned_at=row.abandoned_at,
         profile_phase=_profile_phase(ans),
+        connect_queue=cq,
+        connect_plan=cp,
         tools_interest=_tools_interest(ans),
         company_domain=_company_domain(ans),
         company_website=_company_website(ans),
@@ -309,6 +426,10 @@ def _snapshot_from_onboarding(
         tools_docs=_tools_category(ans, "docs"),
         tools_stack=_tools_stack(ans),
         slack_stakeholders=_slack_stakeholders_from_answers(ans),
+        slack_collaborators=_slack_collaborators_from_answers(ans),
+        slack_team_members=_slack_team_members_from_answers(ans),
+        slack_watch_channels=_slack_watch_channels_from_answers(ans),
+        slack_introduce_managers_consent=_slack_introduce_managers_consent_from_answers(ans),
         chat_messages=msgs,
     )
 
@@ -466,8 +587,6 @@ def build_admin_router() -> APIRouter:
         tags=["admin"],
         dependencies=[Depends(require_admin_basic)],
     )
-    r.include_router(build_admin_manager_onboarding_router())
-    r.include_router(build_admin_manager_onboarding_tenant_router())
 
     @r.get("/meta/onboarding-answer-options", response_model=AdminOnboardingAnswerOptionsResponse)
     def get_admin_onboarding_answer_options() -> AdminOnboardingAnswerOptionsResponse:
@@ -718,6 +837,9 @@ def build_admin_router() -> APIRouter:
         _validate_admin_onboarding_collected_patch(patch)
         merged = _apply_admin_onboarding_collected_patch(dict(row.answers_json or {}), patch)
         onboarding_repo.normalize_slack_stakeholders_in_place(merged)
+        onboarding_repo.normalize_slack_collaborators_in_place(merged)
+        onboarding_repo.normalize_slack_team_members_in_place(merged)
+        onboarding_repo.normalize_slack_watch_channels_in_place(merged)
         row.answers_json = merged
         row.version = int(row.version) + 1
         db.commit()
@@ -794,6 +916,36 @@ def build_admin_router() -> APIRouter:
         if t is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
         t.workspace_access_enabled = body.workspace_access_enabled
+        db.commit()
+        db.refresh(t)
+        ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
+        conns = dbg.list_tenant_connections_for_tenant(db, tenant_id=tenant_id)
+        member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
+        return TenantAdminDetailResponse(
+            id=t.id,
+            company_name=t.company_name,
+            created_at=t.created_at,
+            workspace_access_enabled=bool(t.workspace_access_enabled),
+            onboarding=_snapshot_from_onboarding(db, ob),
+            member_full_name=member.full_name if member else None,
+            member_email=member.email if member else None,
+            connected_connectors=[c.provider for c in conns],
+            slack_vector_paused=bool(t.slack_vector_paused),
+        )
+
+    @r.patch(
+        "/tenants/{tenant_id}/slack-delivery",
+        response_model=TenantAdminDetailResponse,
+    )
+    def set_tenant_slack_delivery(
+        tenant_id: uuid.UUID,
+        body: AdminTenantSlackDeliveryRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> TenantAdminDetailResponse:
+        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
+        if t is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        t.slack_vector_paused = body.slack_vector_paused
         db.commit()
         db.refresh(t)
         ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)

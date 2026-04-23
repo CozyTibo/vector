@@ -21,6 +21,7 @@ export const ONBOARDING_TOOL_GROUPS: ToolGroupDef[] = [
       { id: "linear", label: "Linear" },
       { id: "jira", label: "Jira" },
       { id: "clickup", label: "ClickUp" },
+      { id: "notion", label: "Notion" },
     ],
   },
   {

@@ -15,7 +15,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build build-backend up down logs logs-frontend restart install reinstall migrate migrate-down migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-restart celery-inspect redis-monitor celery-logs
+.PHONY: help setup build build-backend up down logs logs-frontend restart install life reinstall migrate migrate-down migrate-repair migrate-repair-test migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test db-drop shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-restart celery-inspect redis-monitor celery-logs
 
 mock-help:
 	@$(MAKE) -f Makefile.mock help-mock
@@ -26,10 +26,13 @@ help:
 	@echo "  make setup / build   Build images"
 	@echo "  make build-backend   Build only the API image (picks up requirements.txt changes)"
 	@echo "  make install         Create .env if needed, build, up, migrate (dev DB)"
+	@echo "  make life            install, migrate, up, test (full local sanity lane)"
 	@echo "  make up / down       Start or stop stack"
 	@echo "  make frontend-build  docker compose build frontend (after package.json / lock changes)"
-	@echo "  make migrate         alembic upgrade head (dev DB)"
+	@echo "  make migrate         repair alembic_version if needed, then alembic upgrade head (dev DB)"
 	@echo "  make migrate-down    alembic downgrade -1"
+	@echo "  make migrate-repair  reset alembic_version to repo HEAD (dev DB; also run before migrate)"
+	@echo "  make migrate-repair-test  same for vector_test (also run before migrate-test)"
 	@echo "  make migrate-new     make migrate-new msg=\"description\""
 	@echo "  make migrate-test    alembic upgrade on vector_test"
 	@echo "  make seed-basic-tenant  Dev DB: create tenant from SEED_* if slug missing"
@@ -37,6 +40,7 @@ help:
 	@echo "  make routes          list HTTP routes (grouped by tag)"
 	@echo "  make db-psql         psql on dev DB"
 	@echo "  make db-psql-test    psql on test DB"
+	@echo "  make db-drop         DROP + recreate empty dev DB $(POSTGRES_DB), then run make migrate"
 	@echo "  make test            rebuild backend image if needed, migrate-test, pytest"
 	@echo "  make test-unit       rebuild backend image if needed, pytest (no integration)"
 	@echo "  make mypy / lint / fmt   (mypy checks src/vector + tests per pyproject)"
@@ -81,6 +85,12 @@ install: $(DOTENV) build up migrate
 	@echo "OK — API http://localhost:$${BACKEND_PORT:-8000}/health"
 	@echo "    UI  http://localhost:$${FRONTEND_PORT:-5173}/"
 
+life: $(DOTENV)
+	$(MAKE) install
+	$(MAKE) migrate
+	$(MAKE) up
+	$(MAKE) test
+
 reinstall: down
 	$(COMPOSE) build --no-cache
 	$(COMPOSE) up -d
@@ -90,16 +100,25 @@ frontend-build: $(DOTENV)
 	$(COMPOSE) build frontend
 
 migrate: $(DOTENV) build-backend
+	@$(MAKE) migrate-repair
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic upgrade head
 
 migrate-down: $(DOTENV) build-backend
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic downgrade -1
+
+# Stamps head when alembic_version references a missing revision (branch switch). Safe if table missing.
+migrate-repair: $(DOTENV) build-backend
+	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) python -m vector.scripts.repair_alembic_version
+
+migrate-repair-test: $(DOTENV) build-backend
+	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) python -m vector.scripts.repair_alembic_version
 
 migrate-new: $(DOTENV) build-backend
 	@test -n "$(msg)" || (echo 'Usage: make migrate-new msg="description"' && exit 1)
 	$(COMPOSE) run --rm -e DATABASE_URL=$(DEV_DB_URL) $(BACKEND_SERVICE) alembic revision --autogenerate -m "$(msg)"
 
 migrate-test: $(DOTENV) build-backend
+	@$(MAKE) migrate-repair-test
 	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) alembic upgrade head
 
 # Creates tenant SEED_TENANT_SLUG + password user if slug not in DB (see .env.example).
@@ -122,6 +141,18 @@ db-psql: $(DOTENV)
 
 db-psql-test: $(DOTENV)
 	$(COMPOSE) exec $(POSTGRES_SERVICE) psql -U "$(POSTGRES_USER)" -d vector_test
+
+# Terminates backends, DROP DATABASE (one psql each: DROP cannot run in a transaction),
+# then CREATE DATABASE so ``make migrate`` can connect immediately.
+db-drop: $(DOTENV)
+	@echo "Resetting database $(POSTGRES_DB) (requires postgres service: make up)…"
+	@$(COMPOSE) exec -T $(POSTGRES_SERVICE) psql -U "$(POSTGRES_USER)" -d postgres -v ON_ERROR_STOP=1 -c \
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$(POSTGRES_DB)' AND pid <> pg_backend_pid();"
+	@$(COMPOSE) exec -T $(POSTGRES_SERVICE) psql -U "$(POSTGRES_USER)" -d postgres -v ON_ERROR_STOP=1 -c \
+		"DROP DATABASE IF EXISTS $(POSTGRES_DB);"
+	@$(COMPOSE) exec -T $(POSTGRES_SERVICE) psql -U "$(POSTGRES_USER)" -d postgres -v ON_ERROR_STOP=1 -c \
+		"CREATE DATABASE $(POSTGRES_DB) OWNER $(POSTGRES_USER);"
+	@echo "OK — empty $(POSTGRES_DB) ready. Run: make migrate"
 
 shell: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) bash

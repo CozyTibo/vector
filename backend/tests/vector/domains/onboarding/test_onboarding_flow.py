@@ -13,6 +13,9 @@ from vector.domains.onboarding.constants import (
     STEP_ADMIN_ACCESS,
     STEP_CHAT_PROFILE,
     STEP_CONNECT_COMMUNICATION,
+    STEP_CONNECT_PROJECT_MANAGEMENT,
+    STEP_SLACK_COLLABORATORS,
+    STEP_SLACK_COLLABORATORS_CONFIRM,
     STEP_SLACK_STAKEHOLDERS,
     STEP_SCANNING,
     STEP_UNSUPPORTED_MANDATORY_TOOLS,
@@ -185,8 +188,8 @@ def test_tools_selected_without_engineering_does_not_advance() -> None:
     assert "engineering" in r.assistant_prompt_context["instruction"].lower()
 
 
-def test_tools_selected_slack_and_github_engineering_queues_slack_only() -> None:
-    """GitHub is stored but not queued; Slack is the in-flow OAuth target."""
+def test_tools_selected_slack_linear_github_queues_pm_then_eng_then_slack() -> None:
+    """Linear, GitHub, then Slack are queued for in-product OAuth."""
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -202,10 +205,10 @@ def test_tools_selected_slack_and_github_engineering_queues_slack_only() -> None
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
-    assert r.next_step == STEP_CONNECT_COMMUNICATION
+    assert r.next_step == STEP_CONNECT_PROJECT_MANAGEMENT
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
     assert "github" in r.answers_updates["tools"]["engineering"]
-    assert r.answers_updates["connect_queue"] == ["slack"]
+    assert r.answers_updates["connect_queue"] == ["linear", "github", "slack"]
     assert r.answers_updates.get("unsupported_mandatory_sections") == []
 
 
@@ -320,7 +323,7 @@ def test_tools_selected_teams_jira_gitlab_all_three_mandatory_unsupported() -> N
     assert r.answers_updates["connect_queue"] == []
 
 
-def test_tools_selected_moves_to_connect_slack_with_tools_merged() -> None:
+def test_tools_selected_moves_to_connect_pm_with_tools_merged() -> None:
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -336,16 +339,16 @@ def test_tools_selected_moves_to_connect_slack_with_tools_merged() -> None:
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
-    assert r.next_step == STEP_CONNECT_COMMUNICATION
+    assert r.next_step == STEP_CONNECT_PROJECT_MANAGEMENT
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
     assert "github" in r.answers_updates["tools"]["engineering"]
     assert "linear" in r.answers_updates["tools"]["pm"]
-    assert r.answers_updates["connect_queue"] == ["slack"]
+    assert r.answers_updates["connect_queue"] == ["linear", "github", "slack"]
     assert r.answers_updates.get("unsupported_mandatory_sections") == []
 
 
 def test_tools_selected_skips_already_connected_slack() -> None:
-    """Slack already linked: empty queue and SCANNING. GitHub/Linear are never queued in onboarding."""
+    """Slack already linked: queue drops Slack; Linear and GitHub OAuth remain."""
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -361,6 +364,35 @@ def test_tools_selected_skips_already_connected_slack() -> None:
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a, slack_connected=True)
+    assert r.next_step == STEP_CONNECT_PROJECT_MANAGEMENT
+    assert r.answers_updates["connect_queue"] == ["linear", "github"]
+
+
+def test_tools_selected_all_three_connectors_linked_goes_slack_stakeholders() -> None:
+    """Slack, Linear, and GitHub already linked: nothing left to OAuth in onboarding."""
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["linear"],
+            "communication": ["slack"],
+            "docs": ["notion"],
+        },
+    }
+    r = handle_turn(
+        STEP_CHAT_PROFILE,
+        None,
+        action,
+        a,
+        slack_connected=True,
+        linear_connected=True,
+        github_connected=True,
+    )
     assert r.next_step == STEP_SLACK_STAKEHOLDERS
     assert r.answers_updates["connect_queue"] == []
 
@@ -397,3 +429,13 @@ def test_admin_access_step_stays_put() -> None:
     r = handle_turn(STEP_ADMIN_ACCESS, "hello", None, {})
     assert r.next_step == STEP_ADMIN_ACCESS
     assert r.answers_updates == {}
+
+
+def test_slack_collaborators_step_stays_put() -> None:
+    r = handle_turn(STEP_SLACK_COLLABORATORS, "hello", None, {})
+    assert r.next_step == STEP_SLACK_COLLABORATORS
+
+
+def test_slack_collaborators_confirm_step_stays_put() -> None:
+    r = handle_turn(STEP_SLACK_COLLABORATORS_CONFIRM, "hello", None, {})
+    assert r.next_step == STEP_SLACK_COLLABORATORS_CONFIRM

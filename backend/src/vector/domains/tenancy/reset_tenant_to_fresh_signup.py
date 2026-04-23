@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from vector.domains.ingestion.step1_reset import wipe_step1_raw_for_tenant
@@ -13,7 +13,6 @@ from vector.domains.ingestion.step2_step3_reset import (
     wipe_step2_projections_for_tenant,
     wipe_step3_canonical_for_tenant,
 )
-from vector.infrastructure.db.models.manager_onboarding_session import ManagerOnboardingSession
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.tenant import Tenant
@@ -31,7 +30,7 @@ def reset_tenant_to_fresh_signup(session: Session, *, tenant_id: uuid.UUID) -> d
     - Step 3 → 1 ingestion/canonical data (same wipes as hard delete, without removing the tenant).
     - All ``tenant_connections`` (OAuth tokens / connector links).
     - Website onboarding state + chat transcript rows.
-    - Manager Slack onboarding sessions (and dependent rows via FK / CASCADE).
+    - Legacy manager-onboarding session rows when those tables still exist (no-op after they are dropped).
     - Tenant flags: ``workspace_access_enabled=False``, ``slack_vector_paused=False``, ``status=active``.
     - Seeds a fresh ``onboarding_state`` row (day-one chat profile step).
 
@@ -48,14 +47,6 @@ def reset_tenant_to_fresh_signup(session: Session, *, tenant_id: uuid.UUID) -> d
         )
         or 0,
     )
-    n_mo = int(
-        session.scalar(
-            select(func.count())
-            .select_from(ManagerOnboardingSession)
-            .where(ManagerOnboardingSession.tenant_id == tenant_id),
-        )
-        or 0,
-    )
 
     step3 = wipe_step3_canonical_for_tenant(session, tenant_id=tenant_id)
     step2 = wipe_step2_projections_for_tenant(session, tenant_id=tenant_id)
@@ -65,12 +56,19 @@ def reset_tenant_to_fresh_signup(session: Session, *, tenant_id: uuid.UUID) -> d
     session.execute(delete(OnboardingMessage).where(OnboardingMessage.tenant_id == tenant_id))
     session.execute(delete(OnboardingState).where(OnboardingState.tenant_id == tenant_id))
 
-    session.execute(
-        update(ManagerOnboardingSession)
-        .where(ManagerOnboardingSession.tenant_id == tenant_id)
-        .values(parent_session_id=None),
-    )
-    session.execute(delete(ManagerOnboardingSession).where(ManagerOnboardingSession.tenant_id == tenant_id))
+    bind = session.get_bind()
+    if bind is not None and inspect(bind).has_table("manager_onboarding_sessions"):
+        session.execute(
+            text(
+                "UPDATE manager_onboarding_sessions SET parent_session_id = NULL "
+                "WHERE tenant_id = CAST(:tid AS uuid)",
+            ).bindparams(tid=str(tenant_id)),
+        )
+        session.execute(
+            text(
+                "DELETE FROM manager_onboarding_sessions WHERE tenant_id = CAST(:tid AS uuid)",
+            ).bindparams(tid=str(tenant_id)),
+        )
 
     tenant.workspace_access_enabled = False
     tenant.slack_vector_paused = False
@@ -85,5 +83,4 @@ def reset_tenant_to_fresh_signup(session: Session, *, tenant_id: uuid.UUID) -> d
         "step2": step2,
         "step1": step1,
         "deleted_tenant_connections": n_conn,
-        "deleted_manager_onboarding_sessions": n_mo,
     }

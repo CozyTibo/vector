@@ -27,6 +27,41 @@ class SlackStakeholdersSnapshot(BaseModel):
     slack_user_ids: list[str] = Field(default_factory=list)
 
 
+class SlackCollaboratorMemberSnapshot(BaseModel):
+    """One row in ``answers_json.slack_collaborators.members``."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    slack_user_id: str
+    username: str
+    label: str
+
+
+class SlackCollaboratorsSnapshot(BaseModel):
+    """answers_json.slack_collaborators: managers / leads the user works with in Slack."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    members: list[SlackCollaboratorMemberSnapshot] = Field(default_factory=list)
+
+
+class SlackWatchChannelSnapshot(BaseModel):
+    """One row in ``answers_json.slack_watch_channels.channels``."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    channel_id: str
+    name: str
+
+
+class SlackWatchChannelsSnapshot(BaseModel):
+    """answers_json.slack_watch_channels: public channels to watch for the team."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    channels: list[SlackWatchChannelSnapshot] = Field(default_factory=list)
+
+
 class TenantListItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -90,6 +125,14 @@ class OnboardingAdminSnapshot(BaseModel):
         default=None,
         description="Chat profile sub-step from answers_json.profile_phase.",
     )
+    connect_queue: list[str] = Field(
+        default_factory=list,
+        description="Remaining connector OAuth queue from answers_json.connect_queue.",
+    )
+    connect_plan: list[str] = Field(
+        default_factory=list,
+        description="Original connector plan from answers_json.connect_plan (same ids as connect_queue when fresh).",
+    )
     tools_interest: list[str] = Field(default_factory=list)
     company_domain: str | None = Field(
         default=None,
@@ -124,6 +167,25 @@ class OnboardingAdminSnapshot(BaseModel):
         default=None,
         description=(
             "Slack handoff: Vector user mapped to a member (answers_json.slack_stakeholders)."
+        ),
+    )
+    slack_collaborators: SlackCollaboratorsSnapshot | None = Field(
+        default=None,
+        description="Slack collaborator picks from product onboarding (answers_json.slack_collaborators).",
+    )
+    slack_team_members: SlackCollaboratorsSnapshot | None = Field(
+        default=None,
+        description="Teammates (non-managers) from answers_json.slack_team_members (same member shape).",
+    )
+    slack_watch_channels: SlackWatchChannelsSnapshot | None = Field(
+        default=None,
+        description="Slack channels to watch from answers_json.slack_watch_channels.",
+    )
+    slack_introduce_managers_consent: str | None = Field(
+        default=None,
+        description=(
+            "Product wrap-up: whether Vector may introduce itself in Slack to other managers "
+            "(``yes`` | ``later`` | ``not_applicable``)."
         ),
     )
     chat_messages: list[OnboardingChatMessageItem] = Field(
@@ -197,10 +259,7 @@ class TenantAdminDetailResponse(BaseModel):
     connected_connectors: list[str] = Field(default_factory=list)
     slack_vector_paused: bool = Field(
         default=False,
-        description=(
-            "When true, Vector skips outbound Slack sends for this tenant "
-            "(including manager onboarding DMs)."
-        ),
+        description="When true, Vector skips outbound Slack sends for this tenant.",
     )
 
 
@@ -208,6 +267,12 @@ class AdminTenantWorkspaceAccessRequest(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     workspace_access_enabled: bool
+
+
+class AdminTenantSlackDeliveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    slack_vector_paused: bool
 
 
 class TenantConnectionAdminItem(BaseModel):
@@ -384,7 +449,6 @@ class AdminResetTenantToSignupResponse(BaseModel):
     deleted_ingestion_runs: int
     deleted_sync_state_rows: int
     deleted_tenant_connections: int
-    deleted_manager_onboarding_sessions: int
 
 
 class AdminHardDeleteTenantResponse(BaseModel):

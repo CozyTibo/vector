@@ -28,7 +28,15 @@ from vector.domains.onboarding.constants import (
     STEP_ADMIN_ACCESS,
     STEP_CHAT_PROFILE,
     STEP_CONNECT_COMMUNICATION,
+    STEP_CONNECT_ENGINEERING,
+    STEP_CONNECT_PROJECT_MANAGEMENT,
     STEP_SCANNING,
+    STEP_SLACK_COLLABORATORS,
+    STEP_SLACK_COLLABORATORS_CONFIRM,
+    STEP_SLACK_TEAM_MEMBERS,
+    STEP_SLACK_TEAM_MEMBERS_CONFIRM,
+    STEP_SLACK_WATCH_CHANNELS,
+    STEP_SLACK_WATCH_CHANNELS_CONFIRM,
     STEP_SLACK_STAKEHOLDERS,
     STEP_THANK_YOU,
     STEP_UNSUPPORTED_MANDATORY_TOOLS,
@@ -126,12 +134,28 @@ def _merge_tools_categories(
     return out
 
 
-def _connect_queue_from_tools(tools: dict[str, list[str]]) -> list[str]:
-    """Onboarding OAuth queue: Slack only (Linear/GitHub are not queued in this flow)."""
+def _connect_queue_communication_only(tools: dict[str, list[str]]) -> list[str]:
+    """When picks include unsupported mandatory categories, only Slack OAuth may remain (if selected)."""
+    comm = tools.get("communication") or []
+    if isinstance(comm, list) and "slack" in comm:
+        return ["slack"]
+    return []
+
+
+def _connect_queue_full_from_tools(tools: dict[str, list[str]]) -> list[str]:
+    """Onboarding OAuth queue: PM (Linear) → engineering (GitHub) → communication."""
     q: list[str] = []
+    pm = tools.get("pm") or []
+    if "linear" in pm:
+        q.append("linear")
+    eng = tools.get("engineering") or []
+    if "github" in eng:
+        q.append("github")
     comm = tools.get("communication") or []
     if "slack" in comm:
         q.append("slack")
+    elif isinstance(comm, list) and ("ms_teams" in comm or "discord" in comm):
+        q.append("comm_placeholder")
     return q
 
 
@@ -159,11 +183,21 @@ def _unsupported_mandatory_labels_for_instruction(sections: list[str]) -> str:
     return ", ".join(mapping.get(s, s) for s in sections)
 
 
-def _queue_skip_connected(queue: list[str], *, slack_connected: bool) -> list[str]:
-    """Drop Slack from the queue when already linked (e.g. after edit tools)."""
+def _queue_skip_connected(
+    queue: list[str],
+    *,
+    slack_connected: bool,
+    linear_connected: bool,
+    github_connected: bool,
+) -> list[str]:
+    """Drop connectors from the queue when already linked (e.g. after edit tools)."""
     out: list[str] = []
     for item in queue:
         if item == "slack" and slack_connected:
+            continue
+        if item == "linear" and linear_connected:
+            continue
+        if item == "github" and github_connected:
             continue
         out.append(item)
     return out
@@ -173,6 +207,10 @@ def _first_connect_step(connect_queue: list[str]) -> str:
     if not connect_queue:
         return STEP_SCANNING
     head = connect_queue[0]
+    if head == "linear":
+        return STEP_CONNECT_PROJECT_MANAGEMENT
+    if head == "github":
+        return STEP_CONNECT_ENGINEERING
     if head in ("slack", "comm_placeholder"):
         return STEP_CONNECT_COMMUNICATION
     return STEP_SCANNING
@@ -193,6 +231,8 @@ def _next_step_after_tool_connect_queue(
 
 def _oauth_connector_labels_in_order(connect_queue: list[str]) -> list[str]:
     mapping = {
+        "linear": "Linear",
+        "github": "GitHub",
         "slack": "Slack",
         "comm_placeholder": "Microsoft Teams or Discord",
     }
@@ -202,9 +242,9 @@ def _oauth_connector_labels_in_order(connect_queue: list[str]) -> list[str]:
 def _tools_post_pick_instruction(*, prior: bool, oauth_labels: list[str]) -> str:
     """LLM instructions grounded in actual OAuth queue."""
     slack_line = (
-        "During onboarding we only connect communication tools in the product: Slack when selected, "
-        "or a short step for Microsoft Teams / Discord (in-product connect coming later). "
-        "Linear, GitHub, and other picks are saved as context; they can connect those from Settings later."
+        "During onboarding we connect tools in the product in this order when they are selected: "
+        "Linear (project management), then GitHub (engineering), then Slack for communication. "
+        "Microsoft Teams or Discord as communication uses a short in-product placeholder until OAuth is available."
     )
     if oauth_labels:
         only_oauth = (
@@ -215,7 +255,7 @@ def _tools_post_pick_instruction(*, prior: bool, oauth_labels: list[str]) -> str
     else:
         only_oauth = (
             "Ground truth: no OAuth connectors are queued from their picks "
-            "(or only tools we do not connect yet). Do not promise GitHub, Linear, or Slack OAuth."
+            "(or only tools we do not connect yet). Do not promise OAuth for tools outside that list."
         )
     if prior:
         return (
@@ -232,35 +272,67 @@ def _tools_post_pick_instruction(*, prior: bool, oauth_labels: list[str]) -> str
     )
 
 
-def _communication_transition_result(answers: dict[str, Any]) -> OnboardingTurnResult:
-    """Skip past communication step or jump to the next queued connector (legacy Confirm)."""
+_ALLOWED_CONNECT_QUEUE_ITEM = frozenset({"linear", "github", "slack", "comm_placeholder"})
+
+
+def _coalesce_connect_queue(answers: dict[str, Any], tools: dict[str, list[str]]) -> list[str]:
+    """Prefer persisted ``connect_queue`` (product PATCH / OAuth advances); else rebuild from tools."""
+    raw = answers.get("connect_queue")
+    if isinstance(raw, list) and raw:
+        out = [str(x) for x in raw if isinstance(x, str) and x in _ALLOWED_CONNECT_QUEUE_ITEM]
+        if out:
+            return out
+    return _connect_queue_full_from_tools(tools)
+
+
+def _terminal_step_after_last_connector(head: str, tools: dict[str, list[str]]) -> str:
+    """Next step after popping the final item from ``connect_queue``."""
+    if head == "slack":
+        comm = tools.get("communication") or []
+        return STEP_SLACK_STAKEHOLDERS if isinstance(comm, list) and "slack" in comm else STEP_SCANNING
+    if head == "comm_placeholder":
+        return STEP_SCANNING
+    comm = tools.get("communication") or []
+    if isinstance(comm, list) and "slack" in comm:
+        return STEP_CONNECT_COMMUNICATION
+    if isinstance(comm, list) and ("ms_teams" in comm or "discord" in comm):
+        return STEP_CONNECT_COMMUNICATION
+    return STEP_SCANNING
+
+
+def _user_ack_pop_connect_queue(
+    answers: dict[str, Any],
+    *,
+    current_step_for_ctx: str,
+) -> OnboardingTurnResult:
+    """User sent chat on a connector step: pop the head of the persisted queue and advance."""
     tools = _merge_tools_categories(answers, {})
-    cq = _connect_queue_from_tools(tools)
     ti = _tools_interest_flat(tools)
-    base_updates: dict[str, Any] = {
-        "connect_queue": cq,
-        "connect_plan": list(cq),
-        "tools_interest": ti,
-    }
-    ctx_base: dict[str, Any] = {"step": STEP_CONNECT_COMMUNICATION}
+    cq = _coalesce_connect_queue(answers, tools)
+    base_updates: dict[str, Any] = {"tools_interest": ti}
+    ctx_base: dict[str, Any] = {"step": current_step_for_ctx}
     if not cq:
+        next_step = _next_step_after_tool_connect_queue([], tools)
         return OnboardingTurnResult(
-            next_step=STEP_SCANNING,
+            next_step=next_step,
             answers_updates=base_updates,
             assistant_prompt_context={
                 **ctx_base,
                 "instruction": (
-                    "No in-onboarding communication connector matched (e.g. they use tools we do not "
-                    "OAuth during setup). They can add Slack or other integrations from settings; "
-                    "offer to finish setup."
+                    "Connector queue is empty. They may have finished linking; nudge them to use "
+                    "the on-screen controls or finish setup."
                 ),
             },
         )
     head = cq[0]
     rest = cq[1:]
-    updates = {**base_updates, "connect_queue": rest, "connect_plan": list(rest)}
+    updates = {
+        **base_updates,
+        "connect_queue": rest,
+        "connect_plan": list(rest),
+    }
     if not rest:
-        next_step = STEP_SLACK_STAKEHOLDERS if head == "slack" else STEP_SCANNING
+        next_step = _terminal_step_after_last_connector(head, tools)
     else:
         next_step = _first_connect_step(rest)
     rest_labs = _oauth_connector_labels_in_order(rest)
@@ -270,11 +342,11 @@ def _communication_transition_result(answers: dict[str, Any]) -> OnboardingTurnR
         assistant_prompt_context={
             **ctx_base,
             "instruction": (
-                "They continued past the first communication step. "
+                "They sent chat while on a connector step (continue / acknowledgement). "
                 + (
-                    f"Still to connect: {' → '.join(rest_labs)}."
+                    f"Still to connect in product, in order: {' → '.join(rest_labs)}."
                     if rest_labs
-                    else "Nothing further in the queue for OAuth."
+                    else "Nothing further is queued for OAuth in onboarding."
                 )
             ),
             "connect_queue": rest,
@@ -313,6 +385,8 @@ def handle_turn(
     answers_json: dict[str, Any],
     *,
     slack_connected: bool = False,
+    linear_connected: bool = False,
+    github_connected: bool = False,
 ) -> OnboardingTurnResult:
     """Pure deterministic transition for one chat turn."""
     msg = _norm_str(user_message or "")
@@ -342,8 +416,8 @@ def handle_turn(
                 **ctx_base,
                 "instruction": (
                     "They are on the unsupported mandatory tools screen after confirming picks. "
-                    "The UI already explains we will email when those tools are available and offers "
-                    "Finish or Edit tools. Reply in one short sentence if needed; do not repeat the card."
+                    "The UI explains we will email when those tools are available and offers only "
+                    "Edit tools. Reply in one short sentence if needed; do not repeat the card."
                 ),
             },
         )
@@ -355,8 +429,86 @@ def handle_turn(
             assistant_prompt_context={
                 **ctx_base,
                 "instruction": (
-                    "They are on the final onboarding screen. Tell them to use the on-screen control "
-                    "to continue to the app; do not promise more chat steps."
+                    "They are on the final website wrap-up: thanks + optional permission to introduce "
+                    "Vector in Slack to other managers. They use on-screen buttons only; no further chat steps."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_TEAM_MEMBERS:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_TEAM_MEMBERS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are picking Slack team members (excluding managers already chosen). "
+                    "Nudge them to use the on-screen roster and Continue."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_TEAM_MEMBERS_CONFIRM:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_TEAM_MEMBERS_CONFIRM,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are confirming their Slack team list before choosing channels to watch. "
+                    "Nudge them to use Edit or Continue in the product UI."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_WATCH_CHANNELS:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_WATCH_CHANNELS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are picking Slack channels for Vector to watch. "
+                    "Nudge them to use the channel list and Continue."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_WATCH_CHANNELS_CONFIRM:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_WATCH_CHANNELS_CONFIRM,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are confirming Slack channels to monitor. "
+                    "Nudge them to use Edit or Continue in the product UI."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_COLLABORATORS:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_COLLABORATORS,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are picking Slack collaborators (other managers) in the onboarding UI. "
+                    "If they chat here by mistake, nudge them to use the on-screen search and Continue."
+                ),
+            },
+        )
+
+    if current_step == STEP_SLACK_COLLABORATORS_CONFIRM:
+        return OnboardingTurnResult(
+            next_step=STEP_SLACK_COLLABORATORS_CONFIRM,
+            answers_updates={},
+            assistant_prompt_context={
+                **ctx_base,
+                "instruction": (
+                    "They are reviewing their Slack collaborator list before the final screen. "
+                    "Nudge them to use Edit or Continue in the product UI."
                 ),
             },
         )
@@ -387,10 +539,56 @@ def handle_turn(
             },
         )
 
+    if current_step == STEP_CONNECT_PROJECT_MANAGEMENT:
+        if not msg and action is None:
+            tools_m = _merge_tools_categories(answers, {})
+            cq_idle = _coalesce_connect_queue(answers, tools_m)
+            head_idle = cq_idle[0] if cq_idle else None
+            ctx_pm: dict[str, Any] = {**ctx_base}
+            if head_idle == "linear":
+                ctx_pm["instruction"] = (
+                    "Ask them to connect Linear using the in-app OAuth button, then continue once "
+                    "the workspace is linked."
+                )
+                ctx_pm["connector"] = "linear"
+            else:
+                ctx_pm["instruction"] = (
+                    "Guide them through the project management connector step using the in-app UI."
+                )
+            return OnboardingTurnResult(
+                next_step=STEP_CONNECT_PROJECT_MANAGEMENT,
+                answers_updates={},
+                assistant_prompt_context=ctx_pm,
+            )
+        return _user_ack_pop_connect_queue(answers, current_step_for_ctx=STEP_CONNECT_PROJECT_MANAGEMENT)
+
+    if current_step == STEP_CONNECT_ENGINEERING:
+        if not msg and action is None:
+            tools_m = _merge_tools_categories(answers, {})
+            cq_idle = _coalesce_connect_queue(answers, tools_m)
+            head_idle = cq_idle[0] if cq_idle else None
+            ctx_gh: dict[str, Any] = {**ctx_base}
+            if head_idle == "github":
+                ctx_gh["instruction"] = (
+                    "Ask them to connect GitHub using the in-app OAuth button, then continue once "
+                    "the workspace is linked."
+                )
+                ctx_gh["connector"] = "github"
+            else:
+                ctx_gh["instruction"] = (
+                    "Guide them through the engineering connector step using the in-app UI."
+                )
+            return OnboardingTurnResult(
+                next_step=STEP_CONNECT_ENGINEERING,
+                answers_updates={},
+                assistant_prompt_context=ctx_gh,
+            )
+        return _user_ack_pop_connect_queue(answers, current_step_for_ctx=STEP_CONNECT_ENGINEERING)
+
     if current_step == STEP_CONNECT_COMMUNICATION:
         if not msg and action is None:
             tools_m = _merge_tools_categories(answers, {})
-            cq_idle = _connect_queue_from_tools(tools_m)
+            cq_idle = _coalesce_connect_queue(answers, tools_m)
             head_idle = cq_idle[0] if cq_idle else None
             ctx_comm: dict[str, Any] = {**ctx_base}
             if head_idle == "comm_placeholder":
@@ -413,7 +611,7 @@ def handle_turn(
                 answers_updates={},
                 assistant_prompt_context=ctx_comm,
             )
-        return _communication_transition_result(answers)
+        return _user_ack_pop_connect_queue(answers, current_step_for_ctx=STEP_CONNECT_COMMUNICATION)
 
     if current_step != STEP_CHAT_PROFILE:
         return OnboardingTurnResult(
@@ -428,7 +626,7 @@ def handle_turn(
     phase = _default_profile_phase(answers)
 
     if phase == PROFILE_PHASE_DONE:
-        return _communication_transition_result(answers)
+        return _user_ack_pop_connect_queue(answers, current_step_for_ctx=STEP_CHAT_PROFILE)
 
     if phase == PROFILE_PHASE_CONNECTORS_INTRO:
         if action and action.get("type") == "connectors_intro_ready":
@@ -515,7 +713,7 @@ def handle_turn(
                         "profile_phase": PROFILE_PHASE_TOOLS,
                         "instruction": (
                             "They confirmed without picking any project management tool "
-                            "(Linear, Jira, or ClickUp). Ask them to pick at least one, then confirm again."
+                            "(Linear, Jira, ClickUp, or Notion). Ask them to pick at least one, then confirm again."
                         ),
                     },
                 )
@@ -534,9 +732,17 @@ def handle_turn(
                     },
                 )
             prior = _had_prior_tool_selection(answers)
-            cq = _connect_queue_from_tools(merged)
-            cq = _queue_skip_connected(cq, slack_connected=slack_connected)
             unsupported = _unsupported_mandatory_sections(merged)
+            if unsupported:
+                cq = _connect_queue_communication_only(merged)
+            else:
+                cq = _connect_queue_full_from_tools(merged)
+            cq = _queue_skip_connected(
+                cq,
+                slack_connected=slack_connected,
+                linear_connected=linear_connected,
+                github_connected=github_connected,
+            )
             oauth_labels = _oauth_connector_labels_in_order(cq)
             instr = _tools_post_pick_instruction(prior=prior, oauth_labels=oauth_labels)
             if unsupported:
@@ -545,8 +751,8 @@ def handle_turn(
                     "They confirmed tool picks where Vector does not yet support everything they need "
                     f"in mandatory categories ({labels}). "
                     "Acknowledge briefly without sounding alarmed. The product shows a card explaining "
-                    "we will email when they can finish onboarding with those tools, plus Finish and "
-                    "Edit tools. Do not promise OAuth or live ingestion for unsupported picks. "
+                    "we will email when they can finish onboarding with those tools, with Edit tools only "
+                    "to revise picks. Do not promise OAuth or live ingestion for unsupported picks. "
                     "Do not read their entire tool list."
                 )
             ti = _tools_interest_flat(merged)

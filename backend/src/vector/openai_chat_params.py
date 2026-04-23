@@ -38,17 +38,3 @@ def onboarding_chat_max_completion_tokens(
     if has_connectors_privacy_kb:
         return 280
     return 220
-
-
-def manager_onboarding_completion_cap(model: str, *, interpret: bool) -> int:
-    """
-    ``max_completion_tokens`` for manager-onboarding JSON calls.
-
-    ``gpt-5*`` models spend completion budget on hidden reasoning tokens; too low a cap
-    yields empty content and parse failures.
-    """
-    m = (model or "").strip().lower()
-    if m.startswith("gpt-5"):
-        # Reply step benefits from a higher cap (reasoning models burn hidden tokens).
-        return 4096 if interpret else 3072
-    return 900 if interpret else 900

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from openai import APIConnectionError
+
 from vector.domains.onboarding.constants import (
     PROFILE_PHASE_CONNECTORS_INTRO,
     PROFILE_PHASE_NAME,
@@ -90,4 +92,27 @@ def test_connectors_intro_after_size_fallback_is_two_bubbles_without_openai() ->
     assert "scale of the org" in out[0].lower()
     assert "signal" in out[1].lower()
     assert "okay" in out[1].lower() or "quick" in out[1].lower()
+
+
+def test_generate_onboarding_reply_falls_back_when_openai_request_fails() -> None:
+    """Network / API failures must not bubble; product returns deterministic copy."""
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.side_effect = APIConnectionError(request=MagicMock())
+    cfg = MagicMock()
+    cfg.openai_api_key = "sk-test"
+    cfg.openai_model = "gpt-4o-mini"
+    with patch("vector.domains.onboarding.onboarding_llm.OpenAI", return_value=mock_client):
+        out = generate_onboarding_reply(
+            step=STEP_CHAT_PROFILE,
+            answers_json={"profile_phase": PROFILE_PHASE_NAME},
+            last_user_message="Ada",
+            assistant_prompt_context={
+                "profile_phase": PROFILE_PHASE_NAME,
+                "instruction": "Acknowledge the name in one short line.",
+            },
+            settings=cfg,
+        )
+    assert isinstance(out, list)
+    assert len(out) == 1
+    assert len(out[0].strip()) > 0
 

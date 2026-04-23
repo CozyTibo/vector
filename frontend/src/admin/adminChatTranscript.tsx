@@ -1,4 +1,30 @@
 import ChatMessageList from "../components/onboarding/ChatMessageList";
+import { primaryCommunicationToolLabel } from "../components/onboarding/onboardingToolGroups";
+import {
+  slackCollaboratorsConfirmIntroMessages,
+  slackCollaboratorsPickIntroMessages,
+} from "../components/onboarding/slackCollaboratorsCopy";
+import {
+  ONB_SLACK_HANDOFF_EVENT_ID,
+  slackHandoffSyntheticMessagesDeduped,
+} from "../components/onboarding/slackHandoffCopy";
+import {
+  slackTeamMembersConfirmIntroMessages,
+  slackTeamMembersPickIntroMessages,
+  slackWatchChannelsConfirmIntroMessages,
+  slackWatchChannelsPickIntroMessages,
+} from "../components/onboarding/slackTeamChannelsCopy";
+import {
+  ONBOARDING_WRAP_UP_THANKS,
+  wrapUpManagerIntroQuestion,
+} from "../components/onboarding/onboardingWrapUpCopy";
+import {
+  reorderOnboardingTranscriptForDisplay,
+  stakeholderAnswerDisplayLineFromAnswers,
+  tryParseUserStructuredJsonType,
+} from "../components/onboarding/onboardingTranscriptDisplayOrder";
+import { slackPersonChipText } from "../components/onboarding/slackPersonDisplay";
+import { otherSlackCollaboratorsExcludingStakeholder } from "../components/onboarding/slackOnboardingBranching";
 import type { ChatMessage } from "../components/onboarding/types";
 
 type AdminChatRow = {
@@ -35,6 +61,163 @@ export function adminOnboardingRowsToChatMessages(rows: AdminChatRow[]): ChatMes
     content: r.content,
     timestamp: Date.parse(r.created_at) || 0,
   }));
+}
+
+/** Minimal onboarding snapshot fields needed to mirror product-only chat rows in the admin transcript. */
+export type AdminOnboardingTranscriptSnapshot = {
+  status: string;
+  current_step: string;
+  tools_engineering: string[];
+  tools_pm: string[];
+  tools_communication: string[];
+  tools_calls?: string[];
+  tools_calendars?: string[];
+  tools_docs: string[];
+  slack_stakeholders: { raw_text: string | null; slack_user_ids: string[] } | null;
+  slack_collaborators?: { members: { slack_user_id: string; username: string; label: string }[] } | null;
+  slack_team_members?: { members: { slack_user_id: string; username: string; label: string }[] } | null;
+  slack_watch_channels?: { channels: { channel_id: string; name: string }[] } | null;
+};
+
+function adminSnapToAnswers(snap: AdminOnboardingTranscriptSnapshot): Record<string, unknown> {
+  return {
+    tools: {
+      engineering: snap.tools_engineering,
+      pm: snap.tools_pm,
+      communication: snap.tools_communication,
+      calls: snap.tools_calls ?? [],
+      calendars: snap.tools_calendars ?? [],
+      docs: snap.tools_docs,
+    },
+    slack_stakeholders: snap.slack_stakeholders,
+    slack_collaborators: snap.slack_collaborators,
+    slack_team_members: snap.slack_team_members,
+    slack_watch_channels: snap.slack_watch_channels,
+  };
+}
+
+function transcriptHasVectorContent(msgs: ChatMessage[], substring: string): boolean {
+  return msgs.some((m) => m.role === "vector" && m.content.includes(substring));
+}
+
+function appendUniqueVectorIntros(
+  out: ChatMessage[],
+  intros: ChatMessage[],
+  anchorTs: number,
+  baseOffset: number,
+): void {
+  let i = 0;
+  for (const row of intros) {
+    if (out.some((x) => x.role === "vector" && x.content === row.content)) {
+      continue;
+    }
+    out.push({
+      ...row,
+      timestamp: anchorTs - 120 + baseOffset + i,
+    });
+    i += 1;
+  }
+}
+
+/**
+ * Merge persisted onboarding_message rows with the same UI-only Vector copy the product shows
+ * around Slack pick/confirm panels, so the admin transcript matches the member-facing thread.
+ */
+export function buildAdminWebsiteOnboardingTranscript(
+  rows: AdminChatRow[],
+  snap: AdminOnboardingTranscriptSnapshot,
+): ChatMessage[] {
+  const base = adminOnboardingRowsToChatMessages(rows);
+  const answers = adminSnapToAnswers(snap);
+  const stakeholderLine = stakeholderAnswerDisplayLineFromAnswers(answers);
+  const handoffAlreadyInDb = base.some((m) => m.id === ONB_SLACK_HANDOFF_EVENT_ID);
+
+  const out: ChatMessage[] = [];
+  for (const m of base) {
+    if (m.role === "user") {
+      const jsonType = tryParseUserStructuredJsonType(m.content);
+      if (jsonType === "slack_team_members_selected") {
+        const teamPickVariant =
+          otherSlackCollaboratorsExcludingStakeholder(answers).length === 0
+            ? "solo_manager"
+            : "with_other_managers";
+        appendUniqueVectorIntros(
+          out,
+          slackTeamMembersPickIntroMessages(0, teamPickVariant),
+          m.timestamp,
+          0,
+        );
+        appendUniqueVectorIntros(out, slackTeamMembersConfirmIntroMessages(0), m.timestamp, 8);
+      } else if (jsonType === "slack_collaborators_selected") {
+        appendUniqueVectorIntros(out, slackCollaboratorsPickIntroMessages(0), m.timestamp, 0);
+        appendUniqueVectorIntros(out, slackCollaboratorsConfirmIntroMessages(0), m.timestamp, 8);
+      } else if (jsonType === "slack_watch_channels_selected") {
+        appendUniqueVectorIntros(out, slackWatchChannelsPickIntroMessages(0), m.timestamp, 0);
+        appendUniqueVectorIntros(out, slackWatchChannelsConfirmIntroMessages(0), m.timestamp, 8);
+      } else if (
+        jsonType === null &&
+        stakeholderLine !== null &&
+        m.content.trim() === stakeholderLine &&
+        !handoffAlreadyInDb
+      ) {
+        const synth = slackHandoffSyntheticMessagesDeduped(
+          primaryCommunicationToolLabel(answers),
+          m.timestamp - 120,
+          [...out],
+        );
+        synth.forEach((s, i) => {
+          if (out.some((x) => x.id === s.id)) {
+            return;
+          }
+          out.push({ ...s, timestamp: m.timestamp - 100 + i });
+        });
+      }
+    }
+    out.push(m);
+  }
+
+  const hasSlackHandoff =
+    Boolean(snap.slack_stakeholders?.slack_user_ids && snap.slack_stakeholders.slack_user_ids.length > 0);
+  const wrapUpContext =
+    hasSlackHandoff &&
+    (snap.current_step === "ADMIN_ACCESS" ||
+      snap.current_step === "THANK_YOU" ||
+      snap.status === "completed");
+  if (wrapUpContext && !transcriptHasVectorContent(out, "We've got everything")) {
+    const consentIdx = out.findIndex(
+      (m) => m.role === "user" && tryParseUserStructuredJsonType(m.content) === "slack_manager_intro_consent",
+    );
+    const anchorTs =
+      consentIdx >= 0
+        ? out[consentIdx]!.timestamp
+        : out.length > 0
+          ? Math.max(...out.map((x) => x.timestamp))
+          : Date.now();
+    const thanksMsg: ChatMessage = {
+      id: "admin-synth-wrap-thanks",
+      role: "vector",
+      content: ONBOARDING_WRAP_UP_THANKS,
+      timestamp: anchorTs - 2,
+    };
+    const others = otherSlackCollaboratorsExcludingStakeholder(answers);
+    const askMsg: ChatMessage | null =
+      others.length > 0 && !transcriptHasVectorContent(out, "introduce myself in Slack to the managers")
+        ? {
+            id: "admin-synth-wrap-manager-ask",
+            role: "vector",
+            content: wrapUpManagerIntroQuestion(others.map((m) => slackPersonChipText(m)).join(", ")),
+            timestamp: anchorTs - 1,
+          }
+        : null;
+    const synthWrap = askMsg ? [thanksMsg, askMsg] : [thanksMsg];
+    if (consentIdx >= 0) {
+      out.splice(consentIdx, 0, ...synthWrap);
+    } else {
+      out.push(...synthWrap.map((row, i) => ({ ...row, timestamp: anchorTs + 1 + i })));
+    }
+  }
+
+  return reorderOnboardingTranscriptForDisplay(out, answers);
 }
 
 function parseCreatedAtMs(created_at: string | null | undefined): number {

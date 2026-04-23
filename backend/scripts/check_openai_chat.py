@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Verify OpenAI Chat Completions for the same options manager onboarding uses.
+Verify OpenAI Chat Completions with the same token caps as website onboarding chat.
 
 Reads OPENAI_API_KEY and OPENAI_MODEL from the repo-root ``.env`` (does not load full
 ``Settings``, so local GitHub PEM path issues do not block this check).
@@ -41,10 +41,7 @@ def main() -> int:
     sys.path.insert(0, str(_BACKEND / "src"))
     from openai import OpenAI
 
-    from vector.openai_chat_params import (
-        manager_onboarding_completion_cap,
-        temperature_for_chat_model,
-    )
+    from vector.openai_chat_params import onboarding_chat_max_completion_tokens, temperature_for_chat_model
 
     key, model = _load_openai_from_dotenv(_ROOT_ENV)
     print("Env file:", _ROOT_ENV)
@@ -56,7 +53,11 @@ def main() -> int:
         model = "gpt-4o-mini"
 
     client = OpenAI(api_key=key)
-    cap = manager_onboarding_completion_cap(model, interpret=True)
+    cap = onboarding_chat_max_completion_tokens(
+        model,
+        intro_kind=None,
+        has_connectors_privacy_kb=False,
+    )
     kwargs: dict = {
         "model": model,
         "messages": [

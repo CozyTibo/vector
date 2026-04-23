@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -100,3 +101,57 @@ def test_patch_admin_access_with_slack_stakeholders_appends_user_chat_line(clien
     msgs = to_admin.json().get("messages") or []
     user_lines = [m["content"] for m in msgs if m.get("role") == "user"]
     assert "@Tibo" in user_lines
+
+
+def test_patch_slack_collaborators_confirm_appends_structured_json(client: TestClient) -> None:
+    """Collaborator picks are logged when entering confirm (same UX pattern as tools_selected)."""
+    email = f"ob-collab-chat-{uuid.uuid4().hex[:12]}@example.com"
+    reg = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "secure-pass-1",
+            "full_name": "Collab User",
+            "company_name": "Collab Co",
+        },
+    )
+    assert reg.status_code == 200
+
+    assert (
+        client.patch(
+            "/onboarding",
+            json={"current_step": "SLACK_STAKEHOLDERS", "answers": {"profile_phase": "done"}},
+        ).status_code
+        == 200
+    )
+
+    to_confirm = client.patch(
+        "/onboarding",
+        json={
+            "current_step": "SLACK_COLLABORATORS_CONFIRM",
+            "answers": {
+                "slack_stakeholders": {
+                    "raw_text": "@ada",
+                    "slack_user_ids": ["UADA"],
+                    "mention_labels": ["Ada"],
+                },
+                "slack_collaborators": {
+                    "members": [
+                        {"slack_user_id": "UADA", "username": "ada", "label": "Ada"},
+                        {"slack_user_id": "UBOB", "username": "bob", "label": "Bob"},
+                    ]
+                },
+            },
+        },
+    )
+    assert to_confirm.status_code == 200
+    msgs = to_confirm.json().get("messages") or []
+    user_lines = [m["content"] for m in msgs if m.get("role") == "user"]
+    coll_row = next(
+        (c for c in user_lines if c.strip().startswith("{") and "slack_collaborators_selected" in c),
+        None,
+    )
+    assert coll_row is not None
+    data = json.loads(coll_row)
+    assert data["type"] == "slack_collaborators_selected"
+    assert [m["username"] for m in data["members"]] == ["ada", "bob"]

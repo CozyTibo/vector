@@ -38,18 +38,6 @@ from vector.infrastructure.db.models.linear_projection import (
     LinearTeam,
     LinearUser,
 )
-from vector.infrastructure.db.models.manager_onboarding_channel_observation import (
-    ManagerOnboardingChannelObservation,
-)
-from vector.infrastructure.db.models.manager_onboarding_invitation import ManagerOnboardingInvitation
-from vector.infrastructure.db.models.manager_onboarding_message import ManagerOnboardingMessage
-from vector.infrastructure.db.models.manager_onboarding_parse_artifact import (
-    ManagerOnboardingParseArtifact,
-)
-from vector.infrastructure.db.models.manager_onboarding_session import ManagerOnboardingSession
-from vector.infrastructure.db.models.manager_onboarding_slack_event_dedup import (
-    ManagerOnboardingSlackEventDedup,
-)
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
@@ -91,12 +79,6 @@ __all__ = [
     "LinearProject",
     "LinearTeam",
     "LinearUser",
-    "ManagerOnboardingChannelObservation",
-    "ManagerOnboardingInvitation",
-    "ManagerOnboardingMessage",
-    "ManagerOnboardingParseArtifact",
-    "ManagerOnboardingSession",
-    "ManagerOnboardingSlackEventDedup",
     "SlackConnectionDetail",
     "RawIngestionRecord",
     "Tenant",
