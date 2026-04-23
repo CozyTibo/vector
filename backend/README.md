@@ -8,6 +8,7 @@ Compose includes **redis** and **celery-worker**. Set **`REDIS_URL`** (e.g. `red
 
 - Worker: `celery -A app.worker worker --loglevel=info`
 - **`POST /connectors/github/sync`** and **admin** `POST /admin/.../ingestion/github-sync` enqueue Step 1–3 on the worker and return **HTTP 202** (poll ingestion runs for completion).
+- OAuth callbacks do **not** enqueue ingestion by default (`VECTOR_POST_CONNECT_INGESTION` defaults to false); set `true` only if you want the old auto-sync-on-connect behavior.
 
 **Host shell (not Docker):** install backend deps into your venv so `celery` is importable, e.g. from `backend/`: `pip install -e .` Then run snippets with `PYTHONPATH=src` from the **`backend`** directory (or `PYTHONPATH=backend/src` from the repo root). If you see `ModuleNotFoundError: No module named 'celery'`, the active Python does not have the backend environment.
 

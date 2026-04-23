@@ -63,9 +63,12 @@ class Settings(BaseSettings):
     database_url: str = Field(validation_alias="DATABASE_URL")
     redis_url: str = Field(default="", validation_alias="REDIS_URL")
     post_connect_enqueue_ingestion: bool = Field(
-        default=True,
+        default=False,
         validation_alias="VECTOR_POST_CONNECT_INGESTION",
-        description="Enqueue full sync after GitHub/Linear OAuth (disable for manual-only sync).",
+        description=(
+            "If true, enqueue GitHub/Linear Step 1 ingestion immediately after OAuth callback. "
+            "Default false: use admin Integrations CTAs or POST …/ingestion/*-sync / POST …/connectors/*/sync."
+        ),
     )
     ingestion_sweep_interval_seconds: int = Field(
         default=900,
