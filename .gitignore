@@ -10,7 +10,6 @@ backend/.mock_connectors.pid
 /secrets/
 *.pem
 *.key
-DOCS/*
 
 # --- Python ---
 __pycache__/
