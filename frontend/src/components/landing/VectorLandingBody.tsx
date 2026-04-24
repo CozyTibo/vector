@@ -11,68 +11,247 @@ const DEMO_CAL_URL = "https://calendar.app.google/GcS9iPFBuL9XFzhc8";
 const HERO_CHAT_DELAYS_MS = [420, 580, 560, 1350, 920] as const;
 const HERO_CHAT_STEP_COUNT = 6;
 
-type EmpowerKey = "visibility" | "drift" | "handling" | "escalation";
+const EMPOWER_ORDER = [
+  "managerInsights",
+  "reportingAutomation",
+  "peerReview",
+  "staleThreadsEscalation",
+  "driftDetection",
+] as const;
+
+type EmpowerKey = (typeof EMPOWER_ORDER)[number];
 
 const EMPOWER_META: Record<
   EmpowerKey,
   { tabId: string; title: string; sub: string; bubbles: string[]; ariaLabel: string; time: string }
 > = {
-  visibility: {
-    tabId: "empower-tab-visibility",
-    title: "Execution visibility",
-    sub: "Instantly know what matters",
-    ariaLabel: "Execution visibility example in Slack",
-    time: "8:02 AM",
+  managerInsights: {
+    tabId: "empower-tab-manager-insights",
+    title: "Manager insights",
+    sub: "Delivery signal and how your people work together",
+    ariaLabel: "Manager insights: pulse, signals, collaboration, insights, one priority",
+    time: "",
+    bubbles: [],
+  },
+  reportingAutomation: {
+    tabId: "empower-tab-reporting-automation",
+    title: "Reporting automation",
+    sub: "Rollups on your rhythm—weekly, daily, or on milestones",
+    ariaLabel: "Automated reporting example in Slack",
+    time: "7:01 AM",
     bubbles: [
-      "Morning Alex, quick overview ✨",
-      "<strong>Checkout:</strong><br />• PR waiting on review since yesterday<br />• Auth migration is unblocked and moving",
-      "I nudged for a reviewer and aligned ownership.",
-      "Everything else is on track.",
+      "Your weekly rollup is ready—same sections as last time.",
+      "Shipped / slipped / next commitments, pulled from Linear + Slack with links back to source.",
+      "Cadence is Mondays 7:00 your time. Want a second digest on Thursdays? I can add it.",
     ],
   },
-  drift: {
-    tabId: "empower-tab-drift",
-    title: "Drift detection",
-    sub: "Catch issues before they slow you down",
-    ariaLabel: "Drift detection example in Slack",
-    time: "3:14 PM",
-    bubbles: [
-      "Heads up: small drift detected.",
-      "The auth service PR has been inactive for ~1 day and no reviewer is clearly assigned.",
-      "I'm resolving it now before it blocks anything.",
-    ],
-  },
-  handling: {
-    tabId: "empower-tab-handling",
-    title: "Execution handling",
-    sub: "Vector moves work forward for you",
-    ariaLabel: "Execution handling example in Slack",
+  peerReview: {
+    tabId: "empower-tab-peer-review",
+    title: "Peer review",
+    sub: "Reviews and approvals routed before work stalls",
+    ariaLabel: "Peer review routing example in Slack",
     time: "11:08 AM",
     bubbles: [
-      "I handled this in <strong>#eng-shipping</strong> so you don't have to.",
-      "→ Assigned Sam as reviewer<br />→ Clarified ownership in Linear<br />→ Scheduled a follow-up if no activity",
-      "I'll keep things moving and update you if needed.",
+      "Peer review nudge for the API gateway change.",
+      "Two approvals still out—Francesco and Jordan. I sent each the diff + the two questions reviewers usually ask here.",
+      "If neither lands by EOD, I’ll escalate to the EM with a one-line risk note.",
     ],
   },
-  escalation: {
-    tabId: "empower-tab-escalation",
-    title: "Smart escalation",
-    sub: "Vector only involves you when a decision is needed",
-    ariaLabel: "Smart escalation example in Slack",
-    time: "4:47 PM",
-    bubbles: [
-      "One item needs your input.",
-      "Checkout launch scope and timeline don't align.",
-      "Options:<br />• Move the release date<br />• Reduce scope for this cycle",
-      "Tell me what you prefer, and I'll handle the rest.",
-    ],
+  staleThreadsEscalation: {
+    tabId: "empower-tab-stale-threads",
+    title: "Stale threads & escalation",
+    sub: "Quiet Slack, stuck threads—summarized, then acted on",
+    ariaLabel: "Stale thread in Slack: Vector summarizes #eng-checkout and offers to assign and clarify the date",
+    time: "2:26 PM",
+    bubbles: [],
+  },
+  driftDetection: {
+    tabId: "empower-tab-drift-detection",
+    title: "Drift detection",
+    sub: "Scope and ownership shifts before they hit the date",
+    ariaLabel: "Drift detection: Vector nudges manager on a stale checkout ticket",
+    time: "2:14 PM",
+    bubbles: [],
   },
 };
 
+function StaleThreadsEscalationChatShowcase() {
+  const meta = EMPOWER_META.staleThreadsEscalation;
+  return (
+    <div className="chat-card chat-card--compact" role="region" aria-label={meta.ariaLabel}>
+      <div className="chat-shell">
+        <div className="chat-head">
+          <strong>#eng-checkout</strong>
+          <span className="muted">·</span>
+          <span className="muted">Stale thread</span>
+        </div>
+        <div className="chat-thread">
+          <div className="chat-block chat-row is-visible">
+            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
+            <div className="flex-1">
+              <div className="bubble-meta">
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
+                <span style={{ fontSize: 13, color: "#a1a1aa" }}>{meta.time}</span>
+              </div>
+              <div className="bubble bubble--escalation-brief">
+                <p className="bubble--escalation-brief__lead">
+                  Sam, quick heads up - thread in <strong>#eng-checkout</strong> has been open 26 hours, no owner
+                  assigned.
+                </p>
+                <div className="bubble--escalation-brief__section">
+                  <p className="bubble--escalation-brief__kicker">What’s happening:</p>
+                  <p className="bubble--escalation-brief__support">
+                    payment webhook failing in staging, 500 errors confirmed by 2 engineers.
+                  </p>
+                </div>
+                <div className="bubble--escalation-brief__section">
+                  <p className="bubble--escalation-brief__kicker">What’s unclear:</p>
+                  <ol className="bubble--escalation-brief__ol">
+                    <li>ownership (Alex raised it, Sam pushed back, no one else claimed it)</li>
+                    <li>release date (Linear says Monday, team thinks Friday)</li>
+                  </ol>
+                </div>
+                <div className="bubble--escalation-brief__section">
+                  <p className="bubble--escalation-brief__kicker">Risk:</p>
+                  <p className="bubble--escalation-brief__support">
+                    if it’s the Stripe webhook and release is actually Friday, checkout ships broken.
+                  </p>
+                </div>
+                <p className="bubble--escalation-brief__cta">
+                  Want me to assign and clarify the date ? 🙏🏻
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DriftDetectionChatShowcase() {
+  return (
+    <div
+      className="chat-card chat-card--compact"
+      role="region"
+      aria-label={EMPOWER_META.driftDetection.ariaLabel}
+    >
+      <div className="chat-shell">
+        <div className="chat-head">
+          <strong>Checkout</strong>
+          <span className="muted">·</span>
+          <span className="muted">Stale ticket</span>
+        </div>
+        <div className="chat-thread">
+          <div className="chat-block chat-row is-visible">
+            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
+            <div className="flex-1">
+              <div className="bubble-meta">
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
+                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:14 PM</span>
+              </div>
+              <div className="bubble">
+                Hey Sam, noticed that ticket on check-out has been sitting in &quot;in progress&quot; for 7 days now.
+                Should we assign to someone else?
+              </div>
+            </div>
+          </div>
+          <div className="chat-block chat-row--alex is-visible">
+            <div className="bubble-meta bubble-meta--alex">
+              <img className="avatar" src={heroOrgMichelleUrl} alt="" />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Sam</span>
+              <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:15 PM</span>
+            </div>
+            <div className="bubble bubble--alex">yes, who&apos;s on call?</div>
+          </div>
+          <div className="chat-block chat-row is-visible">
+            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
+            <div className="flex-1">
+              <div className="bubble-meta">
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
+                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:15 PM</span>
+              </div>
+              <div className="bubble">Alex is, want me to hand over?</div>
+            </div>
+          </div>
+          <div className="chat-block chat-row--alex is-visible">
+            <div className="bubble-meta bubble-meta--alex">
+              <img className="avatar" src={heroOrgMichelleUrl} alt="" />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Sam</span>
+              <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:16 PM</span>
+            </div>
+            <div className="bubble bubble--alex">👍🏻</div>
+          </div>
+          <div className="chat-block chat-row is-visible">
+            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
+            <div className="flex-1">
+              <div className="bubble-meta">
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
+                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:16 PM</span>
+              </div>
+              <div className="bubble">
+                Done, pinged Alex with context. I&apos;ll follow up if it stalls!
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManagerInsightsShowcase() {
+  return (
+    <div
+      className="mis-showcase"
+      role="region"
+      aria-label={EMPOWER_META.managerInsights.ariaLabel}
+    >
+      <div className="mis-showcase__top">
+        <p className="mis-showcase__eyebrow">Manager insights</p>
+        <h3 className="mis-showcase__title">What the report gives you</h3>
+      </div>
+      <div className="mis-stack">
+        <div className="mis-section">
+          <p className="mis-section__label">Pulse</p>
+          <p className="mis-section__body">What shipped, what’s stuck, what’s heating up.</p>
+        </div>
+        <div className="mis-section">
+          <p className="mis-section__label">Signals</p>
+          <p className="mis-section__body">Drift, repeats, blind spots—early, not after the fact.</p>
+        </div>
+        <div className="mis-section">
+          <p className="mis-section__label">Collaboration</p>
+          <p className="mis-section__body">
+            Who’s asking for help, where struggles show up, and coaching angles—not only throughput.
+          </p>
+        </div>
+        <div className="mis-section">
+          <p className="mis-section__label">Insights</p>
+          <p className="mis-section__body">Evidence-led takes + coaching questions—not slogans.</p>
+        </div>
+        <div className="mis-section">
+          <p className="mis-section__label">Close</p>
+          <p className="mis-section__body">Wins, open threads, one priority.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmpowerPanel({ feature }: { feature: EmpowerKey }) {
+  if (feature === "managerInsights") {
+    return <ManagerInsightsShowcase />;
+  }
+  if (feature === "driftDetection") {
+    return <DriftDetectionChatShowcase />;
+  }
+  if (feature === "staleThreadsEscalation") {
+    return <StaleThreadsEscalationChatShowcase />;
+  }
   const meta = EMPOWER_META[feature];
   return (
-    <div className="chat-card" role="region" aria-label={meta.ariaLabel}>
+    <div className="chat-card chat-card--compact" role="region" aria-label={meta.ariaLabel}>
       <div className="chat-shell">
         <div className="chat-thread">
           <div className="chat-block chat-row">
@@ -155,7 +334,7 @@ type VectorLandingBodyProps = {
 export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyProps) {
   const visibleSteps = useHeroChatReveal();
   const problemBannerRef = useProblemBannerInView();
-  const [empower, setEmpower] = useState<EmpowerKey>("visibility");
+  const [empower, setEmpower] = useState<EmpowerKey>("managerInsights");
 
   const stepClass = (n: number) => (visibleSteps.has(n) ? "is-visible" : "");
 
@@ -286,7 +465,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 </h2>
                 <p className="sub meet-vector__sub">Your AI Junior manager</p>
                 <p className="sub meet-vector__support">
-                  Vector integrates directly into your tools and workflows to give you a clear, real-time understanding of
+                  Vector integrates directly into your tools and workflows to give you a real-time understanding of
                   your team’s execution and the insights to improve it.
                 </p>
               </div>
@@ -326,7 +505,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
             </header>
             <div className="empowers-split">
               <div className="empowers-nav" role="tablist" aria-label="Vector capabilities">
-                {(Object.keys(EMPOWER_META) as EmpowerKey[]).map((key) => {
+                {EMPOWER_ORDER.map((key) => {
                   const m = EMPOWER_META[key];
                   const selected = empower === key;
                   return (
@@ -403,7 +582,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 </li>
                 <li>
                   <span className="cta-num">3</span>
-                  <span className="cta-step-copy">Vector is ready to work</span>
+                  <span className="cta-step-copy">Vector gives you instant insights</span>
                 </li>
               </ol>
               <div className="cta-actions">

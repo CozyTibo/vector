@@ -1039,26 +1039,59 @@
   }
 }
 
+/* “How Vector shows up” — match hero / Meet Vector width (~1200px) so scroll rhythm stays even */
+#vector-landing #core-features .section-inner > header {
+  max-width: min(75rem, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Empowers - tabbed split: nav left, detail right */
 #vector-landing .empowers-split {
   display: grid;
   gap: 1.5rem;
   margin-top: 3rem;
-  max-width: 64rem;
+  max-width: min(75rem, 100%);
   margin-left: auto;
   margin-right: auto;
-  align-items: start;
+  align-items: stretch;
+  /* Row height = max(left, right); both columns stretch to this same height */
+  min-height: clamp(17.5rem, 42vh, 26rem);
 }
 @media (min-width: 768px) {
   #vector-landing .empowers-split {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-    gap: 2rem;
+    /* Slightly favor the illustration column as the block widens */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.28fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: clamp(1.75rem, 2.8vw, 2.75rem);
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empowers-split {
+    /* Cap feature list width so long subs stay readable; chat uses the extra horizontal space */
+    grid-template-columns: minmax(18.5rem, 24rem) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  #vector-landing .empowers-split {
+    min-height: 0;
   }
 }
 #vector-landing .empowers-nav {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  align-self: stretch;
+}
+@media (max-width: 767px) {
+  #vector-landing .empowers-nav {
+    height: auto;
+    min-height: 0;
+  }
 }
 #vector-landing .empower-nav-item {
   display: block;
@@ -1108,6 +1141,16 @@
 }
 #vector-landing .empowers-panel-wrap {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  align-self: stretch;
+}
+@media (max-width: 767px) {
+  #vector-landing .empowers-panel-wrap {
+    height: auto;
+  }
 }
 #vector-landing .empower-detail {
   border-radius: 1rem;
@@ -1115,6 +1158,13 @@
   background: #fff;
   padding: 1.5rem;
   box-shadow: 0 18px 46px -32px rgba(15, 23, 42, 0.35);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#vector-landing .empower-detail:has(> .mis-showcase) {
+  padding: 1.15rem 1.25rem;
 }
 /* Daily brief: real chat-card UI (same as hero / #stack); avoid double frame */
 #vector-landing .empower-detail:has(> .chat-card) {
@@ -1126,7 +1176,187 @@
 #vector-landing .empower-detail > .chat-card {
   max-width: 100%;
   margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
+#vector-landing .empower-detail > .chat-card .chat-shell {
+  flex: 1;
+}
+
+/* “How Vector shows up” — denser chat mocks so the panel height stays closer to the tab column */
+#vector-landing .empower-detail > .chat-card--compact .chat-shell {
+  padding: 1rem 1.1rem;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .chat-card--compact .chat-shell {
+    padding: 1.1rem 1.25rem;
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empower-detail > .chat-card--compact .chat-shell {
+    padding: 1.15rem 1.35rem;
+  }
+}
+#vector-landing .empower-detail > .chat-card--compact .chat-head {
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+#vector-landing .empower-detail > .chat-card--compact .chat-thread {
+  gap: 0.5rem;
+}
+#vector-landing .empower-detail > .chat-card--compact .chat-row {
+  gap: 0.5rem;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble-meta {
+  margin-bottom: 0.25rem;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.42;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .chat-card--compact .bubble {
+    font-size: 0.9375rem;
+    line-height: 1.48;
+  }
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble + .bubble {
+  margin-top: 0.35rem;
+}
+#vector-landing .empower-detail > .chat-card--compact .avatar {
+  width: 2rem;
+  height: 2rem;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .chat-card--compact .avatar {
+    width: 2.125rem;
+    height: 2.125rem;
+  }
+}
+
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.65rem 0.85rem;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief {
+    padding: 0.75rem 1rem;
+  }
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__lead {
+  margin: 0;
+  line-height: 1.52;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__section {
+  margin-top: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(228, 228, 231, 0.9);
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__kicker {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+  color: #27272a;
+  line-height: 1.35;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__support {
+  margin: 0;
+  line-height: 1.52;
+  color: #3f3f46;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__ol {
+  margin: 0.15rem 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.5;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__ol li {
+  margin-bottom: 0.45rem;
+  padding-left: 0.2rem;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__ol li:last-child {
+  margin-bottom: 0;
+}
+#vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__cta {
+  margin: 0.75rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(228, 228, 231, 0.9);
+  line-height: 1.52;
+}
+
+/* Manager insights — fills right column so it matches stretched row height */
+#vector-landing .mis-showcase {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  text-align: left;
+  gap: 0.65rem;
+}
+#vector-landing .mis-showcase__top {
+  flex-shrink: 0;
+}
+#vector-landing .mis-showcase__eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(232, 120, 190, 0.95);
+}
+/* Override generic .empower-detail h3 (was capping headline size) */
+#vector-landing .empower-detail h3.mis-showcase__title {
+  margin: 0;
+  font-size: clamp(1.2rem, 1.1vw + 0.95rem, 1.55rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+#vector-landing .mis-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0;
+  justify-content: flex-start;
+}
+#vector-landing .mis-section {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.2rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid rgba(228, 228, 231, 0.88);
+}
+#vector-landing .mis-stack .mis-section:first-of-type {
+  border-top: 0;
+  padding-top: 0.1rem;
+}
+#vector-landing .mis-section__label {
+  margin: 0;
+  font-size: clamp(1rem, 0.55vw + 0.88rem, 1.2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+}
+#vector-landing .mis-section__body {
+  margin: 0;
+  font-size: clamp(0.9375rem, 0.35vw + 0.86rem, 1.0625rem);
+  line-height: 1.38;
+  font-weight: 500;
+  color: rgba(15, 15, 18, 0.78);
+  max-width: 38rem;
+}
+
 #vector-landing .empower-detail .chat-block {
   opacity: 1;
   transform: none;
