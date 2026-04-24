@@ -71,7 +71,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <MarketingLayout bareBackground accentJoinListCta hideHeaderEmail>
+    <MarketingLayout bareBackground hideHeaderEmail joinNavCtaLabel="join">
       <VectorLandingBody />
     </MarketingLayout>
   );

@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 
-import vectorHeroAvatarUrl from "../../assets/vector-hero-avatar.png";
-import vectorLogoUrl from "../../assets/vector-logo.png";
+import vectorPortraitUrl from "../../assets/vector-white-bg.png";
 
 /** Signed-in marketing pages: logo + session actions (no Sign in / Join the list). */
 export type MarketingLayoutSignedSession =
@@ -15,8 +14,8 @@ type Props = {
   showChrome?: boolean;
   /** When true, skip the fixed marketing grid (e.g. home uses vector-landing’s own backdrop). */
   bareBackground?: boolean;
-  /** Landing only: pink “Join the list” header CTA to match in-page CTAs. */
-  accentJoinListCta?: boolean;
+  /** Label for the anonymous `/signup` nav pill (default matches login/signup chrome). */
+  joinNavCtaLabel?: string;
   /**
    * When set, replaces marketing nav with session UI (email + Sign out).
    * Omit for default Sign in + Join the list.
@@ -38,7 +37,7 @@ export default function MarketingLayout({
   children,
   showChrome = true,
   bareBackground = false,
-  accentJoinListCta = false,
+  joinNavCtaLabel = "Join the list",
   signedSession,
   workspaceNavCta,
   hideHeaderEmail = false,
@@ -69,27 +68,13 @@ export default function MarketingLayout({
             className="group flex items-center gap-2.5 no-underline outline-none transition-opacity hover:opacity-90"
             aria-label="Vector home"
           >
-            {accentJoinListCta ? (
-              <>
-                <img
-                  src={vectorHeroAvatarUrl}
-                  alt=""
-                  className="h-9 w-9 shrink-0 rounded-full border-2 border-white object-cover shadow-[0_1px_3px_rgba(0,0,0,0.08)] outline outline-1 outline-offset-0 outline-zinc-200/80 transition-transform duration-300 group-hover:scale-105 sm:h-10 sm:w-10"
-                  decoding="async"
-                />
-                <span className="text-lg font-semibold tracking-[-0.02em] text-[#0F0F12] sm:text-xl">Vector</span>
-              </>
-            ) : (
-              <>
-                <img
-                  src={vectorLogoUrl}
-                  alt=""
-                  className="h-9 w-auto shrink-0 transition-transform duration-300 group-hover:scale-105 sm:h-10"
-                  decoding="async"
-                />
-                <span className="text-lg font-semibold tracking-[-0.02em] text-[#0F0F12] sm:text-xl">Vector</span>
-              </>
-            )}
+            <img
+              src={vectorPortraitUrl}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-full border-2 border-white object-cover shadow-[0_1px_3px_rgba(0,0,0,0.08)] outline outline-1 outline-offset-0 outline-zinc-200/80 transition-transform duration-300 group-hover:scale-105 sm:h-10 sm:w-10"
+              decoding="async"
+            />
+            <span className="text-lg font-semibold tracking-[-0.02em] text-[#0F0F12] sm:text-xl">Vector</span>
           </Link>
           {signedSession ? (
             <nav className="flex min-w-0 max-w-[min(100%,36rem)] flex-wrap items-center justify-end gap-2 sm:gap-3">
@@ -132,7 +117,7 @@ export default function MarketingLayout({
                 Sign in
               </Link>
               <Link to="/signup" className={joinListNavCta}>
-                Join the list
+                {joinNavCtaLabel}
               </Link>
             </nav>
           )}

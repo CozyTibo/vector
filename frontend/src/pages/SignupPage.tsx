@@ -74,7 +74,7 @@ export default function SignupPage() {
   }
 
   return (
-    <MarketingLayout accentJoinListCta>
+    <MarketingLayout>
       <main className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-lg flex-col justify-center px-5 py-12 sm:px-8">
         <div className={marketingCard}>
           <p className={marketingKicker}>Early access waitlist</p>

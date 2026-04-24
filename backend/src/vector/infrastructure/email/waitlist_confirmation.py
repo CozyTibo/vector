@@ -13,7 +13,7 @@ from vector.settings import Settings, get_settings
 _logger = logging.getLogger("app.email")
 
 _DIR = Path(__file__).resolve().parent
-_AVATAR_PATH = _DIR / "assets" / "vector-hero-avatar.png"
+_AVATAR_PATH = _DIR / "assets" / "vector-white-bg.png"
 _AVATAR_CID = "vector_avatar"
 
 _PERSONAL_NOTE = (

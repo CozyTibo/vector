@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import vectorHeroAvatarUrl from "../assets/vector-hero-avatar.png";
+import vectorHeroAvatarUrl from "../assets/vector-white-bg.png";
 import { marketingAccentLink, marketingMutedLink } from "./marketing/marketingStyles";
 
 type Props = {

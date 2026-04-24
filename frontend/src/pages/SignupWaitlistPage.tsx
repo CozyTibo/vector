@@ -75,7 +75,7 @@ export default function SignupWaitlistPage() {
 
   if (meStillResolving) {
     return (
-      <MarketingLayout accentJoinListCta signedSession="pending">
+      <MarketingLayout signedSession="pending">
         <main className="mx-auto flex min-h-[calc(100dvh-5.5rem)] max-w-4xl flex-col justify-center px-5 py-12 sm:px-8">
           <p className={`${marketingBody} text-center text-lg`}>Loading…</p>
         </main>
@@ -93,7 +93,6 @@ export default function SignupWaitlistPage() {
 
   return (
     <MarketingLayout
-      accentJoinListCta
       signedSession={{
         email: me.data.email,
         onSignOut: () => lo.mutate(),

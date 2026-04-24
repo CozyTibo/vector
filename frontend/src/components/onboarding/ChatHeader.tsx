@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import vectorHeroAvatarUrl from "../../assets/vector-hero-avatar.png";
+import vectorHeroAvatarUrl from "../../assets/vector-white-bg.png";
 import { landingAccentText } from "../landing/landingBrandPalette";
 
 type ChatHeaderProps = {
