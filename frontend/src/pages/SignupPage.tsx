@@ -13,7 +13,6 @@ import {
   marketingLabel,
   marketingLabelTight,
   marketingMutedLink,
-  marketingSectionTitle,
 } from "../components/marketing/marketingStyles";
 import { SHOW_GOOGLE_OAUTH } from "../lib/authUi";
 import { readErrorDetail } from "../lib/canonicalApi";
@@ -77,13 +76,7 @@ export default function SignupPage() {
     <MarketingLayout>
       <main className="mx-auto flex min-h-[calc(100vh-5.5rem)] max-w-lg flex-col justify-center px-5 py-12 sm:px-8">
         <div className={marketingCard}>
-          <p className={marketingKicker}>Early access waitlist</p>
-          <h1 className={`${marketingSectionTitle} mt-3`}>Join the list</h1>
-          <p className={`${marketingBody} mt-3`}>
-            Sign up for an early-stage access to Vector.
-            <br />
-            We currently onboard companies in batches as we finalize the product roll out.
-          </p>
+          <p className={marketingKicker}>Early access sign up</p>
           <p className={`${marketingBody} mt-4`}>
             Already have one?{" "}
             <Link to="/login" className={marketingAccentLink}>
