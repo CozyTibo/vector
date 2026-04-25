@@ -268,26 +268,22 @@ function PeerReviewShowcase() {
     {
       reviewer: "Sam",
       reviewee: "Rebecca",
-      signal: "Handoffs often miss acceptance criteria, so reviewers spend extra cycles clarifying scope.",
-      tone: "watch",
+      signal: "Most common thread: handoffs to Rebecca keep missing a clear done bar, seen in 4 of 5 recent reviews of her work.",
     },
     {
       reviewer: "Alex",
       reviewee: "Sam",
-      signal: "PR context and release notes are consistently clear, helping the team align without extra syncs.",
-      tone: "good",
+      signal: "Strongest positive signal: Sam’s diffs ship with context, test plan, and rollout in one place, fewer review round trips.",
     },
     {
       reviewer: "Rebecca",
       reviewee: "Tereza",
-      signal: "After plan changes, she now posts concise async updates that reduce duplicate implementation.",
-      tone: "good",
+      signal: "Pattern in answers: after a plan change, Tereza posts a same day update in writing, and duplicate work shows up less in follow on reviews.",
     },
     {
       reviewer: "Tereza",
       reviewee: "Alex",
-      signal: "Design rationale is clear, but QA scenarios are usually absent from the PR checklist.",
-      tone: "watch",
+      signal: "Top risk called out: reviews keep asking for edge case QA, not just happy path, on Alex’s core path changes.",
     },
   ] as const;
 
@@ -307,11 +303,25 @@ function PeerReviewShowcase() {
               </span>
               <span className="pr-row__name">{row.reviewee}</span>
             </p>
-            <p className={`pr-row__signal${row.tone === "good" ? " is-good" : " is-watch"}`}>{row.signal}</p>
+            <PeerReviewSignalLine text={row.signal} />
           </article>
         ))}
       </div>
     </div>
+  );
+}
+
+function PeerReviewSignalLine({ text }: { text: string }) {
+  const i = text.indexOf(":");
+  if (i === -1) {
+    return <p className="pr-row__signal">{text}</p>;
+  }
+  const lead = text.slice(0, i + 1).trimEnd();
+  const body = text.slice(i + 1).trimStart();
+  return (
+    <p className="pr-row__signal">
+      <strong className="pr-row__signal-lead">{lead}</strong> {body}
+    </p>
   );
 }
 
@@ -441,6 +451,33 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
   const visibleSteps = useHeroChatReveal();
   const problemBannerRef = useProblemBannerInView();
   const [empower, setEmpower] = useState<EmpowerKey>("managerInsights");
+
+  const timelineSlots = [
+    {
+      time: "9:00",
+      without:
+        "You prep your team's weekly call, gathering data from tickets, PRs, messages, hoping nothing important is missing.",
+      with: "Vector briefs the call: shipped, stuck, risks. → You lead, not chase for updates.",
+    },
+    {
+      time: "10:15",
+      without:
+        "Rebecca's PR is not merged for days, you ping her and discover it's stuck in an endless review loop.",
+      with: "2h of strategic work. No interruptions.",
+    },
+    {
+      time: "2:30",
+      without:
+        "You just discovered an insane thread with 78 exchanges, it'll take a while to catch up and sort this out.",
+      with: "Escalation with context + next action. Issue unblocked fast.",
+    },
+    {
+      time: "4:40",
+      without:
+        "Your boss is asking for more visibility on your team and projects so you start writing a detailed report.",
+      with: "Report ready. You review, not write.",
+    },
+  ] as const;
 
   const stepClass = (n: number) => (visibleSteps.has(n) ? "is-visible" : "");
 
@@ -583,7 +620,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
         <section className="join-strip" id="join-strip" aria-labelledby="join-strip-heading">
           <div className="join-strip__inner">
             <h2 id="join-strip-heading" className="join-strip__heading">
-              Onboard Vector instantly and <span className="accent">improve your execution.</span>
+              Onboard Vector and <span className="accent">improve your execution.</span>
             </h2>
             <div className="join-strip__cta">
               {signedInWorkspaceCta ? (
@@ -667,6 +704,41 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                   Project radar, blind spots surface before they cost you.
                 </p>
               </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="timeline-contrast" aria-labelledby="timeline-contrast-heading">
+          <div className="timeline-contrast__inner">
+            <header className="timeline-contrast__header">
+              <h2 id="timeline-contrast-heading">One timeline. Two realities.</h2>
+            </header>
+            <div className="timeline-contrast__sync" aria-label="Execution timeline comparison">
+              <div className="timeline-contrast__labels">
+                <p className="timeline-contrast__label timeline-contrast__label--without">Without Vector</p>
+                <p className="timeline-contrast__label timeline-contrast__label--with">With Vector</p>
+              </div>
+
+              <div className="timeline-contrast__rows" role="list">
+                {timelineSlots.map((slot) => (
+                  <div key={slot.time} className="timeline-contrast__slot" role="listitem">
+                    <div className="timeline-contrast__side timeline-contrast__side--without">
+                      <span className="timeline-contrast__track" aria-hidden="true" />
+                      <span className="timeline-contrast__dot" aria-hidden="true" />
+                      <p className="timeline-contrast__text">
+                        {slot.time}. {slot.without}
+                      </p>
+                    </div>
+                    <div className="timeline-contrast__side timeline-contrast__side--with">
+                      <span className="timeline-contrast__track" aria-hidden="true" />
+                      <span className="timeline-contrast__dot" aria-hidden="true" />
+                      <p className="timeline-contrast__text">
+                        <span className="timeline-contrast__stamp">{slot.time}.</span> {slot.with}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
