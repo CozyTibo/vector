@@ -36,11 +36,11 @@ const EMPOWER_META: Record<
   reportingAutomation: {
     tabId: "empower-tab-reporting-automation",
     title: "Reporting automation",
-    sub: "Rollups on your rhythm—weekly, daily, or on milestones",
+    sub: "Rollups on your rhythm, weekly, daily, or on milestones",
     ariaLabel: "Automated Notion weekly report with delivery, KPI, project, and drift updates",
     time: "7:01 AM",
     bubbles: [
-      "Your weekly rollup is ready—same sections as last time.",
+      "Your weekly rollup is ready, with the same sections as last time.",
       "Shipped / slipped / next commitments, pulled from Linear + Slack with links back to source.",
       "Cadence is Mondays 7:00 your time. Want a second digest on Thursdays? I can add it.",
     ],
@@ -53,14 +53,14 @@ const EMPOWER_META: Record<
     time: "11:08 AM",
     bubbles: [
       "Peer review nudge for the API gateway change.",
-      "Two approvals still out—Francesco and Jordan. I sent each the diff + the two questions reviewers usually ask here.",
+      "Two approvals still out: Francesco and Jordan. I sent each the diff + the two questions reviewers usually ask here.",
       "If neither lands by EOD, I’ll escalate to the EM with a one-line risk note.",
     ],
   },
   staleThreadsEscalation: {
     tabId: "empower-tab-stale-threads",
     title: "Stale threads & escalation",
-    sub: "Quiet Slack, stuck threads—summarized, then acted on",
+    sub: "Quiet Slack, stuck threads summarized, then acted on",
     ariaLabel: "Stale thread in Slack: Vector summarizes #eng-checkout and offers to assign and clarify the date",
     time: "2:26 PM",
     bubbles: [],
@@ -676,7 +676,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               <article className="impact-strip__col">
                 <p className="impact-strip__stat impact-strip__stat--accent">30%</p>
                 <p className="impact-strip__copy">
-                  Of your week back—spent leading, not chasing status.
+                  Of your week back, spent leading, not chasing updates.
                 </p>
               </article>
               <article className="impact-strip__col">
@@ -688,7 +688,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               <article className="impact-strip__col">
                 <p className="impact-strip__stat impact-strip__stat--accent">Always-on</p>
                 <p className="impact-strip__copy">
-                  Project radar—blind spots surface before they cost you.
+                  Project radar, blind spots surface before they cost you.
                 </p>
               </article>
             </div>

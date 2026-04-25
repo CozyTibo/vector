@@ -1,4 +1,4 @@
-/* Vector landing — scoped copy of `vector-landing/assets/style.css` (every selector prefixed with `#vector-landing`). */
+/* Vector landing - scoped copy of `vector-landing/assets/style.css` (every selector prefixed with `#vector-landing`). */
 #vector-landing {
   --ink: #0f0f12;
   --text: var(--ink);
@@ -556,7 +556,7 @@
   }
 }
 
-/* Problem banner — editorial beat between hero and Meet Vector */
+/* Problem banner - editorial beat between hero and Meet Vector */
 #vector-landing .problem-banner {
   width: 100%;
   margin: 0;
@@ -601,7 +601,7 @@
   margin-left: auto;
   margin-right: auto;
 }
-/* Section-break statement — between body pull-quote and full h2 scale */
+/* Section-break statement - between body pull-quote and full h2 scale */
 #vector-landing .problem-banner__block--focus .problem-banner__text {
   font-size: clamp(1.2rem, 1.05vw + 1.02rem, 1.95rem);
   font-weight: 700;
@@ -614,7 +614,7 @@
   margin-top: 0.28em;
 }
 
-/* Join strip — same vertical rhythm as problem banner, compact pitch + join CTA */
+/* Join strip - same vertical rhythm as problem banner, compact pitch + join CTA */
 #vector-landing .join-strip {
   width: 100%;
   margin: 0;
@@ -659,7 +659,7 @@
   text-align: center;
 }
 
-/* Impact strip — same shell as problem banner + join strip; stats larger than supporting copy */
+/* Impact strip - same shell as problem banner + join strip; stats larger than supporting copy */
 #vector-landing .impact-strip {
   width: 100%;
   margin: 0;
@@ -1039,7 +1039,7 @@
   }
 }
 
-/* “How Vector shows up” — match hero / Meet Vector width (~1200px) so scroll rhythm stays even */
+/* “How Vector shows up” - match hero / Meet Vector width (~1200px) so scroll rhythm stays even */
 #vector-landing #core-features .section-inner > header {
   max-width: min(75rem, 100%);
   margin-left: auto;
@@ -1188,7 +1188,7 @@
   flex: 1;
 }
 
-/* “How Vector shows up” — denser chat mocks so the panel height stays closer to the tab column */
+/* “How Vector shows up” - denser chat mocks so the panel height stays closer to the tab column */
 #vector-landing .empower-detail > .chat-card--compact .chat-shell {
   padding: 1rem 1.1rem;
 }
@@ -1474,7 +1474,7 @@
   }
 }
 
-/* Manager insights — fills right column so it matches stretched row height */
+/* Manager insights - fills right column so it matches stretched row height */
 #vector-landing .mis-showcase {
   flex: 1;
   display: flex;
