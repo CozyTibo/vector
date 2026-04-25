@@ -289,37 +289,13 @@ function PeerReviewShowcase() {
       signal: "Design rationale is clear, but QA scenarios are usually absent from the PR checklist.",
       tone: "watch",
     },
-    {
-      reviewer: "Jordan",
-      reviewee: "Francesco",
-      signal: "Code quality is solid, but edge-case QA evidence is missing in review comments.",
-      tone: "watch",
-    },
-    {
-      reviewer: "Francesco",
-      reviewee: "Jordan",
-      signal: "Smaller commit batches improved review turnaround and reduced back-and-forth.",
-      tone: "good",
-    },
-    {
-      reviewer: "Nina",
-      reviewee: "Rebecca",
-      signal: "Fixes ship quickly, but root-cause notes are missing, so regressions keep returning.",
-      tone: "watch",
-    },
-    {
-      reviewer: "Leo",
-      reviewee: "Nina",
-      signal: "Early blocker pings and clear owner callouts in threads are improving cross-team coordination.",
-      tone: "good",
-    },
   ] as const;
 
   return (
     <div className="pr-showcase" role="region" aria-label={EMPOWER_META.peerReview.ariaLabel}>
       <header className="pr-head">
         <p className="pr-head__eyebrow">Peer review map</p>
-        <h3 className="pr-head__title">This month&apos;s peer reviews (8 teammates)</h3>
+        <h3 className="pr-head__title">This month&apos;s peer reviews (4 teammates)</h3>
       </header>
       <div className="pr-grid">
         {reviews.map((row) => (
