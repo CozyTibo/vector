@@ -78,7 +78,7 @@ const EMPOWER_META: Record<
 function StaleThreadsEscalationChatShowcase() {
   const meta = EMPOWER_META.staleThreadsEscalation;
   return (
-    <div className="chat-card chat-card--compact" role="region" aria-label={meta.ariaLabel}>
+    <div className="chat-card chat-card--compact chat-card--escalation" role="region" aria-label={meta.ariaLabel}>
       <div className="chat-shell">
         <div className="chat-head">
           <strong>#eng-checkout</strong>

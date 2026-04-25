@@ -1245,11 +1245,24 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 0.65rem 0.85rem;
+  width: 100%;
+  padding: 0.82rem 1rem;
+  font-size: clamp(0.92rem, 0.25vw + 0.86rem, 1.02rem);
+  line-height: 1.56;
 }
 @media (min-width: 640px) {
   #vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief {
-    padding: 0.75rem 1rem;
+    padding: 0.92rem 1.08rem;
+  }
+}
+#vector-landing .empower-detail > .chat-card--escalation .chat-row > .avatar {
+  width: 2.3rem;
+  height: 2.3rem;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .chat-card--escalation .chat-row > .avatar {
+    width: 2.55rem;
+    height: 2.55rem;
   }
 }
 #vector-landing .empower-detail > .chat-card--compact .bubble--escalation-brief__lead {
