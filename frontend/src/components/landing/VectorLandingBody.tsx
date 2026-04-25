@@ -37,7 +37,7 @@ const EMPOWER_META: Record<
     tabId: "empower-tab-reporting-automation",
     title: "Reporting automation",
     sub: "Rollups on your rhythm—weekly, daily, or on milestones",
-    ariaLabel: "Automated reporting example in Slack",
+    ariaLabel: "Automated Notion weekly report with delivery, KPI, project, and drift updates",
     time: "7:01 AM",
     bubbles: [
       "Your weekly rollup is ready—same sections as last time.",
@@ -49,7 +49,7 @@ const EMPOWER_META: Record<
     tabId: "empower-tab-peer-review",
     title: "Peer review",
     sub: "Reviews and approvals routed before work stalls",
-    ariaLabel: "Peer review routing example in Slack",
+    ariaLabel: "Peer review overview with strongest extracted signal per teammate pair",
     time: "11:08 AM",
     bubbles: [
       "Peer review nudge for the API gateway change.",
@@ -200,7 +200,169 @@ function DriftDetectionChatShowcase() {
   );
 }
 
+function ReportingAutomationShowcase() {
+  return (
+    <div className="ra-showcase" role="region" aria-label={EMPOWER_META.reportingAutomation.ariaLabel}>
+      <div className="ra-page">
+        <header className="ra-head">
+          <p className="ra-head__eyebrow">Notion weekly report</p>
+          <h3 className="ra-head__title">Core Product delivery digest - last 7 days</h3>
+          <p className="ra-head__meta">Teams: Checkout + Core Platform + Auth | Manager: Sam</p>
+        </header>
+
+        <div className="ra-kpi-row" aria-label="Weekly KPI summary">
+          <div className="ra-kpi">
+            <p className="ra-kpi__label">Delivery</p>
+            <p className="ra-kpi__value">9 shipped / 2 at risk</p>
+          </div>
+          <div className="ra-kpi">
+            <p className="ra-kpi__label">PR quality</p>
+            <p className="ra-kpi__value">31% need rework</p>
+          </div>
+          <div className="ra-kpi">
+            <p className="ra-kpi__label">Escalations</p>
+            <p className="ra-kpi__value">3 stale threads flagged</p>
+          </div>
+        </div>
+
+        <div className="ra-grid">
+          <article className="ra-card">
+            <p className="ra-card__label">Projects</p>
+            <p className="ra-card__text">
+              <strong>Payments architecture</strong> design docs approved, implementation starts Monday.
+            </p>
+            <p className="ra-card__text">
+              <strong>Auth migration</strong> still unowned after Alex shifted to payments design.
+            </p>
+          </article>
+
+          <article className="ra-card">
+            <p className="ra-card__label">Delivery and risk</p>
+            <p className="ra-card__text">
+              Checkout and Core are queueing on Sam for fixes and deployment coordination.
+            </p>
+            <p className="ra-card__text">If this dependency holds, Friday release confidence drops from 82% to 61%.</p>
+          </article>
+
+          <article className="ra-card">
+            <p className="ra-card__label">Drift signals</p>
+            <p className="ra-card__text">
+              Rebecca&apos;s PRs regularly require multiple reworks before merge, slowing review throughput.
+            </p>
+            <p className="ra-card__text">Vector detected repeat spec gaps across 3 PRs in checkout webhook logic.</p>
+          </article>
+
+          <article className="ra-card">
+            <p className="ra-card__label">Recommended manager actions</p>
+            <p className="ra-card__text">Assign auth migration owner this week and rebalance deploy handoffs from Sam.</p>
+            <p className="ra-card__text">Schedule a 20-min design-review checkpoint with Rebecca before implementation.</p>
+          </article>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PeerReviewShowcase() {
+  const reviews = [
+    {
+      reviewer: "Sam",
+      reviewee: "Rebecca",
+      signal: "Handoffs often miss acceptance criteria, so reviewers spend extra cycles clarifying scope.",
+      tone: "watch",
+    },
+    {
+      reviewer: "Alex",
+      reviewee: "Sam",
+      signal: "PR context and release notes are consistently clear, helping the team align without extra syncs.",
+      tone: "good",
+    },
+    {
+      reviewer: "Rebecca",
+      reviewee: "Tereza",
+      signal: "After plan changes, she now posts concise async updates that reduce duplicate implementation.",
+      tone: "good",
+    },
+    {
+      reviewer: "Tereza",
+      reviewee: "Alex",
+      signal: "Design rationale is clear, but QA scenarios are usually absent from the PR checklist.",
+      tone: "watch",
+    },
+    {
+      reviewer: "Jordan",
+      reviewee: "Francesco",
+      signal: "Code quality is solid, but edge-case QA evidence is missing in review comments.",
+      tone: "watch",
+    },
+    {
+      reviewer: "Francesco",
+      reviewee: "Jordan",
+      signal: "Smaller commit batches improved review turnaround and reduced back-and-forth.",
+      tone: "good",
+    },
+    {
+      reviewer: "Nina",
+      reviewee: "Rebecca",
+      signal: "Fixes ship quickly, but root-cause notes are missing, so regressions keep returning.",
+      tone: "watch",
+    },
+    {
+      reviewer: "Leo",
+      reviewee: "Nina",
+      signal: "Early blocker pings and clear owner callouts in threads are improving cross-team coordination.",
+      tone: "good",
+    },
+  ] as const;
+
+  return (
+    <div className="pr-showcase" role="region" aria-label={EMPOWER_META.peerReview.ariaLabel}>
+      <header className="pr-head">
+        <p className="pr-head__eyebrow">Peer review map</p>
+        <h3 className="pr-head__title">This month&apos;s peer reviews (8 teammates)</h3>
+      </header>
+      <div className="pr-grid">
+        {reviews.map((row) => (
+          <article key={`${row.reviewer}-${row.reviewee}`} className="pr-row">
+            <p className="pr-row__pair">
+              <span className="pr-row__name">{row.reviewer}</span>
+              <span className="pr-row__arrow" aria-hidden="true">
+                →
+              </span>
+              <span className="pr-row__name">{row.reviewee}</span>
+            </p>
+            <p className={`pr-row__signal${row.tone === "good" ? " is-good" : " is-watch"}`}>{row.signal}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ManagerInsightsShowcase() {
+  const sections = [
+    {
+      label: "Pulse",
+      body: "9 PRs shipped, 2 stuck on review.",
+    },
+    {
+      label: "Signal",
+      body: "Rebecca’s PRs often require multiple reworks before getting merged.",
+    },
+    {
+      label: "Collaboration",
+      body: "Checkout and Core are waiting on Sam for fixes and deployments. Work is queueing up.",
+    },
+    {
+      label: "Insight",
+      body: "Alex is focusing on system design for the new payments architecture, leaving the auth migration without a clear owner.",
+    },
+    {
+      label: "Close",
+      body: "One priority needs your call this week: auth migration ownership.",
+    },
+  ] as const;
+
   return (
     <div
       className="mis-showcase"
@@ -209,67 +371,35 @@ function ManagerInsightsShowcase() {
     >
       <div className="mis-showcase__top">
         <p className="mis-showcase__eyebrow">Manager insights</p>
-        <h3 className="mis-showcase__title">What the report gives you</h3>
+        <h3 className="mis-showcase__title">This week, Vector surfaced...</h3>
       </div>
       <div className="mis-stack">
-        <div className="mis-section">
-          <p className="mis-section__label">Pulse</p>
-          <p className="mis-section__body">What shipped, what’s stuck, what’s heating up.</p>
-        </div>
-        <div className="mis-section">
-          <p className="mis-section__label">Signals</p>
-          <p className="mis-section__body">Drift, repeats, blind spots—early, not after the fact.</p>
-        </div>
-        <div className="mis-section">
-          <p className="mis-section__label">Collaboration</p>
-          <p className="mis-section__body">
-            Who’s asking for help, where struggles show up, and coaching angles—not only throughput.
-          </p>
-        </div>
-        <div className="mis-section">
-          <p className="mis-section__label">Insights</p>
-          <p className="mis-section__body">Evidence-led takes + coaching questions—not slogans.</p>
-        </div>
-        <div className="mis-section">
-          <p className="mis-section__label">Close</p>
-          <p className="mis-section__body">Wins, open threads, one priority.</p>
-        </div>
+        {sections.map((section) => (
+          <article key={section.label} className="mis-section">
+            <p className="mis-section__label">{section.label}</p>
+            <p className="mis-section__body">{section.body}</p>
+          </article>
+        ))}
       </div>
     </div>
   );
 }
 
 function EmpowerPanel({ feature }: { feature: EmpowerKey }) {
-  if (feature === "managerInsights") {
-    return <ManagerInsightsShowcase />;
+  switch (feature) {
+    case "managerInsights":
+      return <ManagerInsightsShowcase />;
+    case "reportingAutomation":
+      return <ReportingAutomationShowcase />;
+    case "peerReview":
+      return <PeerReviewShowcase />;
+    case "staleThreadsEscalation":
+      return <StaleThreadsEscalationChatShowcase />;
+    case "driftDetection":
+      return <DriftDetectionChatShowcase />;
+    default:
+      return null;
   }
-  if (feature === "driftDetection") {
-    return <DriftDetectionChatShowcase />;
-  }
-  if (feature === "staleThreadsEscalation") {
-    return <StaleThreadsEscalationChatShowcase />;
-  }
-  const meta = EMPOWER_META[feature];
-  return (
-    <div className="chat-card chat-card--compact" role="region" aria-label={meta.ariaLabel}>
-      <div className="chat-shell">
-        <div className="chat-thread">
-          <div className="chat-block chat-row">
-            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-            <div className="flex-1">
-              <div className="bubble-meta">
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>{meta.time}</span>
-              </div>
-              {meta.bubbles.map((html, i) => (
-                <div key={i} className="bubble" dangerouslySetInnerHTML={{ __html: html }} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function useHeroChatReveal() {
@@ -359,7 +489,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               </div>
               <div className="hero-sub-row">
                 <p className="sub hero-sub">
-                  <strong>Vector handles execution behind the scenes, so you don’t have to.</strong>
+                  <strong>Vector lives in your tools, rebuilds execution visibility, and reveals key insights.</strong>
                 </p>
                 <div className="hero-cta-row">
                   <a className="btn-light" href={DEMO_CAL_URL} target="_blank" rel="noopener noreferrer">
