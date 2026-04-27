@@ -19,6 +19,7 @@ from vector.infrastructure.db.models.canonical import (
 from vector.infrastructure.db.models.connector_projection_progress import (
     ConnectorProjectionProgress,
 )
+from vector.infrastructure.db.models.calls_connection_detail import CallsConnectionDetail
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.github_connection_detail import GithubConnectionDetail
 from vector.infrastructure.db.models.github_projection import (
@@ -39,6 +40,7 @@ from vector.infrastructure.db.models.linear_projection import (
     LinearUser,
 )
 from vector.infrastructure.db.models.membership import TenantMembership
+from vector.infrastructure.db.models.notion_connection_detail import NotionConnectionDetail
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.password_reset_token import PasswordResetToken
@@ -58,9 +60,11 @@ __all__ = [
     "ArtifactRevision",
     "ArtifactTrackableUnit",
     "ConnectorProjectionProgress",
+    "CallsConnectionDetail",
     "CurrentMapping",
     "ExternalReference",
     "MappingEvent",
+    "NotionConnectionDetail",
     "OnboardingMessage",
     "OnboardingState",
     "PasswordResetToken",

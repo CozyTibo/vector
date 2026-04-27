@@ -59,6 +59,9 @@ export default function AdminTenantLayout() {
         <NavLink to={`/admin/tenants/${tenantId}/data-pipeline`} className={tabCls}>
           Data pipeline
         </NavLink>
+        <NavLink to={`/admin/tenants/${tenantId}/manager-insight`} className={tabCls}>
+          Manager insight
+        </NavLink>
       </nav>
       <Outlet />
     </div>

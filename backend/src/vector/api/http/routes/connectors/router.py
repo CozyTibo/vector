@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
 from vector.api.http.routes.connectors import github as github_connect
 from vector.api.http.routes.connectors import linear as linear_connect
+from vector.api.http.routes.connectors import notion as notion_connect
 from vector.api.http.routes.connectors import slack as slack_connect
+from vector.api.http.routes.connectors import calls as calls_connect
 from vector.contracts.connectors import ConnectorsListResponse
 from vector.domains.connectors.runtime import all_runtimes_ordered, runtime_by_id
 from vector.domains.identity_access.errors import NoMembershipError
@@ -60,5 +62,7 @@ def build_connectors_router() -> APIRouter:
 
     root.include_router(github_connect.build_github_connector_router(), prefix="/github")
     root.include_router(linear_connect.build_linear_connector_router(), prefix="/linear")
+    root.include_router(notion_connect.build_notion_connector_router(), prefix="/notion")
+    root.include_router(calls_connect.build_calls_connector_router(), prefix="/calls")
     root.include_router(slack_connect.build_slack_connector_router(), prefix="/slack")
     return root

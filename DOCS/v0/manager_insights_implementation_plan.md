@@ -37,6 +37,29 @@ This pipeline has two types of steps:
 14. Step 10 — Slack Delivery
 15. Step 11 — Assembly / Orchestration
 
+Each runtime step **extends** the tenant **Admin → Manager insight** tab and persisted run snapshots per the [milestone checklist](#admin-per-step-milestones-required-checklist).
+
+---
+
+## Implementation status (living)
+
+Update this table only when a step is truly complete against its own checklist and acceptance criteria.
+
+| Step | Status | Completion gate |
+| --- | --- | --- |
+| Step 0 — Contracts | `in_progress` | All required models in Step 0 present, wired, and used by downstream steps without ad-hoc fields. |
+| Step 1 — FetchActivity | `completed` | All target connectors implemented to the agreed V0 scope, metadata present, tests passing, and Admin tab checklist row fully satisfied. |
+| Step 0.5 — Data reliability | `completed` | Deterministic tiers + reason codes + overall confidence aligned with defaults/config, tests passing, and Admin tab checklist row fully satisfied. |
+| Step 2+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
+
+**Current note (2026-04-27):**
+
+- Step 1 + Step 0.5 are wired in backend + admin surfaces, including tenant OAuth connect links for all five connectors (Slack, GitHub, Linear, Notion, Calls/Gemini).
+- Step 1 now performs bounded-window activity probes per connector (Slack channel history samples, GitHub repo/PR/issue samples, Linear issues/projects window query, Notion edited-page search + users/me probe, Calls calendar + events samples) and emits `fetched_at`, window bounds, caps, errors, coverage stats, completeness stats, and payload summaries.
+- Step 0.5 now consumes explicit per-connector coverage/completeness counters and applies deterministic threshold policy: coverage (>=80 / >=50 / <50), freshness (<24h / <72h / stale), critical-source gating, completeness downgrades, and exact overall confidence rule (critical-low override, >50% low override, >=80% high for overall-high).
+- Step 1 + Step 0.5 tests are passing in `backend/tests/vector/domains/manager_insights/test_fetch_activity.py` and `backend/tests/vector/domains/manager_insights/test_data_reliability.py`.
+- Remaining work for these two steps: **none in scope** (runtime prerequisites still apply: valid OAuth credentials/scopes and connector API access in each tenant environment).
+
 ---
 
 ## Responsibility Split
@@ -56,6 +79,55 @@ This pipeline has two types of steps:
   * Returns final structured result to Step 10
 
 👉 This removes ambiguity completely.
+
+---
+
+## Admin: Manager insight tab (per tenant)
+
+**Goal:** From **Step 1 onward**, every implementation step ships **visible, tenant-scoped admin UI** so operators can **see intermediate artifacts**, **confirm the step behaves**, and **debug** before moving on. This is intentionally **parallel to Slack**: Slack is the manager surface; **admin is the operator/debug surface**. (Product label: **“Manager insight”** on the tab.)
+
+### Where it lives (frontend)
+
+- Add a new tenant tab **“Manager insight”** in the admin tenant nav (alongside Workspace, Integrations, Data pipeline, etc.). Today that nav lives in **`frontend/src/admin/AdminTenantLayout.tsx`** — add a `NavLink` to e.g. **`/admin/tenants/:tenantId/manager-insight`**.
+- Implement the page in a dedicated component (suggested): **`frontend/src/admin/AdminTenantManagerInsightPage.tsx`** (route wired next to other tenant admin routes).
+
+### What the backend must support
+
+- **Tenant-scoped, admin-authenticated JSON APIs** (read-first; optional **“Run dry pipeline”** later) that return the **latest successful snapshot per step** for a tenant (and optionally a chosen **pipeline `run_id`**).
+- **Persist pipeline runs** for debugging: at minimum `run_id`, `tenant_id`, **subject user**, **window**, timestamps, **per-step status** (`pending | ok | failed | skipped`), **duration**, and **bounded JSON** (or object-store pointer) for each step’s output (`fetch_bundle`, `data_reliability`, `work_items`, …). Apply **size caps** + redaction rules for secrets; never store raw OAuth tokens in these blobs.
+- **Correlation:** reuse the same **`job_id` / `run_id`** string you log in Step 10/11 so Slack failures and admin views line up.
+
+### Operator workflow (how you “gate” steps)
+
+1. Implement backend step **N** + persist its snapshot.
+2. Extend **Manager insight** tab with a section for step **N** (collapsible JSON viewer + human summary counts + copy/download).
+3. **Manually verify** on a real or fixture-driven run before starting step **N+1**.
+
+The **canonical checklist** of what each step must surface in the tab is in **[Admin: Per-step milestones](#admin-per-step-milestones-required-checklist)** below.
+
+### Guardrails
+
+- **RBAC:** admin-only; never expose this data on public or tenant-user routes.
+- **PII / content:** default to **truncated previews** in UI; full JSON behind “expand” / download with audit logging if required by policy.
+- **Deterministic steps:** admin should show **the same inputs** you would feed golden tests (or link to `run_id` used in CI).
+
+### Tenant-identical command runs (admin)
+
+**Product goal:** At the end of the flow (and once the pipeline is wired), an operator can **trigger the same Manager Insights command** they would use in Slack **from the tenant Admin → Manager insight tab**, and see **exactly what that tenant’s manager would see** if they ran it in Slack—the **same markdown body** (post–Step 9, post–compression/lint), the **same partial-data banners**, and the **same structured context** (for the debug panels above).
+
+**Technical rules (non-negotiable for parity):**
+
+1. **Single pipeline entrypoint** — Admin actions **must not** fork a second “admin-only” report implementation. They call the **same Step 11 orchestration** (runtime order **1 → 0.5 → … → 9**) with the **same arguments** Slack would resolve: `tenant_id`, **subject user** (Slack user id / internal user key—define one canonical id in Step 0), **`window`**, caps, feature flags.
+2. **Explicit `invocation_source`** — `slack | admin` (or `delivery_channel`) is allowed **only** for outer I/O: Slack path still does **3s ACK + chat.postMessage/chat.update**; admin path does **HTTP response / SSE or poll** + renders in-page. **Downstream of Step 1, both paths must execute identical code** (same functions, same renderer output string).
+3. **Same output artifact** — Persist and return the **exact `final_markdown`** string that Step 10 would post to Slack (byte-identical for the same inputs and config). Admin UI shows it in a **Slack-flavored markdown preview** (or the same renderer component the product uses for previews) so formatting matches what Slack displays.
+4. **Audit** — Log `admin_user_id`, tenant, subject, `run_id`, and `invocation_source=admin` for every admin-triggered run.
+5. **No secret side doors** — Admin runs use **live tenant connectors** by default (same as Slack). Optional **fixture-only** runs stay restricted to **non-prod** (already suggested for Step 11).
+
+**UI sketch (Manager insight tab, bottom “Run” region):**
+
+- Fields mirroring the slash command: e.g. **subject** (`@user` picker mapped to Slack member / internal id), **window** (preset days), optional overrides only if product-approved.
+- Buttons: **“Run report (same as Slack)”** → starts job → poll until complete → show **Final report** tab with markdown identical to tenant view.
+- Show **`run_id`**, per-step timeline (reuse Step 11 data), and link “open this run’s step debug” above.
 
 ---
 
@@ -95,6 +167,8 @@ Below, **“Output”** names are **logical**; map them to `vector/contracts/…
 4. **Deterministic before LLM**: metrics, work items shape, gaps, and signals must be **replayable** from the same inputs.
 5. **LLM is narrow**: interpretations and insights are **functions** `(UserReportContext | slice, schema) → validated JSON`, not free chat.
 6. **Orchestration is not the model**: multi-step flows, retries, and tool calls live in **application code** (future: explicit tool registry with permissions).
+7. **Admin Manager insight tab ships with every step from Step 1:** each step’s PR **extends** the tenant **Manager insight** tab and the **persisted run snapshot** so the team can **validate and debug** that step before the next step merges (see [Admin: Manager insight tab](#admin-manager-insight-tab-per-tenant) and the [milestone checklist](#admin-per-step-milestones-required-checklist)).
+8. **Slack vs admin parity:** the **final user-visible report string** is produced **once** by the shared pipeline; Slack posting and admin preview are **thin adapters** over that result (see [Tenant-identical command runs](#tenant-identical-command-runs-admin)).
 
 ---
 
@@ -549,11 +623,13 @@ arbitration:
 
 **Business goal:** **Slack-native** entry and exit: a manager runs a command, gets an immediate acknowledgement, and receives a **single updated** final message with the rendered report—reliable under timeouts, partial data, and transient Slack/API failures.
 
+**Admin parity (same step, different adapter):** **Step 10** is the **Slack I/O adapter** only. **Admin “run same as Slack”** does **not** duplicate the pipeline: it calls **Step 11** with `invocation_source=admin` and displays the **same `final_markdown`** returned by the shared orchestration (see [Tenant-identical command runs](#tenant-identical-command-runs-admin)).
+
 **Technical goal:** Application-level orchestration (not LLM):
 
 1. **Slash command handler** — e.g. `/vector report @user` (exact command string product-defined); parse args, resolve `tenant`, `subject_user`, `window`, idempotency key.
 2. **Immediate ACK response** — ephemeral or channel message: **“Working on it…”** (or product copy) within Slack’s **3-second** interaction window; include a `job_id` / link if product provides status UI.
-3. **Async job execution** — enqueue Celery (or equivalent) job that invokes **Step 11 (Pipeline Orchestration)** to run the full runtime chain **1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6 → 7 → 8 → 6.5 → 9** with tracing; **never** block the ACK path on LLM or connectors.
+3. **Async job execution** — enqueue Celery (or equivalent) job that invokes **Step 11 (Pipeline Orchestration)** to run the full runtime chain **1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6 → 7 → 8 → 6.5 → 9** with tracing and `invocation_source=slack`; **never** block the ACK path on LLM or connectors.
 4. **Final message update** — post or **update** the Slack message (same `ts` if using chat.update pattern) with Step 9 markdown; respect Slack markdown limits (split deterministically into thread replies if over limit—document behavior).
 
 **Retry logic:**
@@ -594,12 +670,15 @@ Slack Flow:
 
 **Responsibility (see Execution Order → Responsibility Split):** Step 11 is the **worker-side pipeline**: it runs the **runtime items 1–13** in strict order, assembles `UserReportContext`, and returns the structured result + rendered markdown to **Step 10** for Slack delivery. Step 10 **does not** re-implement fetch/signal/LLM logic—it **triggers** this layer and **displays** the outcome.
 
+**Same entrypoint for admin:** **Step 11** is also invoked by the **Admin → Manager insight** “Run report (same as Slack)” action with `invocation_source=admin`. Return payload **must** include the same `final_markdown` (and structured `UserReportContext` / `run_id`) that Slack delivery would use so the admin UI can prove **tenant-identical** output ([Tenant-identical command runs](#tenant-identical-command-runs-admin)).
+
 The original 0–9 list implied a linear file chain; in production you also need:
 
 1. **`build_user_report_context`** — merges metrics, work items, links, evidence, gaps, **key achievements (5.5)**, **raw highlights (5.6)**, **data reliability (0.5)**, signals, interpretations, insights, **arbitration (6.5)** into the final `UserReportContext` object (spec: “what the LLM receives”) in a **documented field order** so Steps 7–9 see a stable shape.
-2. **Worker entrypoint** — invoked by **Step 10** after ACK: run pipeline stages in strict order with tracing, idempotency key per `(tenant, subject_user, window)`.
+2. **Worker entrypoint** — invoked by **Step 10** after ACK **or** by **admin run** (HTTP → job): run pipeline stages in strict order with tracing, idempotency key per `(tenant, subject_user, window, invocation_source)`.
 3. **Configuration** — `window_days`, caps, feature flags per connector; thresholds for Step 0.5 tiers (see appendix) and Step 6.5 scoring (see appendix) versioned in config with tests.
 4. **Observability** — per-stage latency, token usage, validation failures; correlate Slack `job_id` across spans.
+5. **Admin snapshots** — after **each** runtime step completes, **persist** the step output (or bounded pointer) on the **`ManagerInsightPipelineRun`** record so the tenant [Manager insight](#admin-manager-insight-tab-per-tenant) tab can render the [milestone checklist](#admin-per-step-milestones-required-checklist) without re-running the pipeline.
 
 This aligns with **deterministic control plane**: orchestration stays in Python services; LLM calls are **boxed** in Steps 7–8; **Step 6.5 and Step 9 compression** remain deterministic code paths.
 
@@ -674,6 +753,7 @@ flowchart LR
 
 ## Acceptance criteria (V0 “done enough”)
 
+- **Admin Manager insight tab:** for each merged step **≥ Step 1**, the tenant tab exposes the artifacts listed in the [milestone checklist](#admin-per-step-milestones-required-checklist); **CI or reviewer checklist** blocks the next step if the tab/snapshots lag.
 - Golden fixture: raw fetch snapshots → deterministic `WorkItem` + `Gap` + `SignalsV0` (byte-stable or field-stable).
 - **Data reliability:** golden fetch with simulated partial outage → `data_reliability` tiers + `overall_confidence` match expected; Slack banner appears when low.
 - **Key achievements:** only closed/merged items; each has `linked_items` + evidence; no LLM in builder tests.
@@ -683,6 +763,7 @@ flowchart LR
 - LLM stages: JSON schema validation + “no new quotes” check (quotes must appear in input corpora).
 - Renderer: snapshot tests enforce **compression rules** (≤3 arbitrated insights, ≤5 dev signals, ≤4 coaching questions, exactly one One Priority, **≤500 chars per major section** per V0 appendix defaults).
 - **Slack path:** interaction ACK within timeout; job completes; final message contains report; forced failure exercises retries / partial banner; end-to-end dry run with mocked connectors in CI.
+- **Admin / Slack parity:** for the same `(tenant, subject_user, window, config)`, an **admin-triggered** run and a **Slack-triggered** run produce the **same `final_markdown`** (golden test or pairwise CI check); admin-only **fixture** runs exempted when flagged `fixture=true`.
 
 ---
 
@@ -695,6 +776,34 @@ flowchart LR
 5. **Skipping Key achievements / Raw highlights** — report will feel empty; **Step 5.5** owns achievements; **Step 5.6** owns raw highlights; keep both aligned with [manager_insights_vo.md](./manager_insights_vo.md).
 6. **Step 0.5 runtime order** — document explicitly: reliability is computed **from fetch outputs** (recommended **S1 → S0.5 → S2** in code even though the section sits after Step 0 for contract reasons).
 7. **Step 6.5 runtime order** — must run **after Step 8**, never between 6 and 7.
+
+---
+
+## Admin: Per-step milestones (required checklist)
+
+Each row is **acceptance for the admin “Manager insight” tab** for that step: the tab **must** show the listed data for the **latest run** (or selected `run_id`) before the team treats the step as “done” and starts the next.
+
+| Step | Admin tab must show (minimum) | Debug helpers (minimum) |
+| ---- | ------------------------------- | ------------------------- |
+| **Step 0** — Contracts | Schema / contract **version** string; list of registered Pydantic model names (or OpenAPI link if exported). | “Contracts OK” badge from a health endpoint that imports models. |
+| **Step 1** — FetchActivity | **New tab appears** here. Per connector: **status**, `fetched_at`, window, **`caps_applied`**, **`errors`**, row/sample **counts**; expandable **truncated** raw JSON per connector. | `run_id`, **Copy JSON** (per connector + full bundle), **Download run** (bounded zip/json). |
+| **Step 0.5** — Data reliability | `DataReliabilityReport` tiers + **`overall_confidence`**; **reason codes** / downgrade trail per connector. | Filter “show only low tiers”; copy full report JSON. |
+| **Step 2** — WorkItems | `WorkItem` count by `source`/`type`; table preview (id, title, status, timestamps); validation errors if any. | Copy full `work_items[]` JSON (size-capped server-side if huge). |
+| **Step 3** — Evidence | Counts of `ActionItem` / `Blocker` / `Decision` kept vs discarded; list kept items with **evidence preview** + source id. | Highlight **failed substring-verification** rejects in a separate sub-panel. |
+| **Step 4** — Links | Link count by `confidence`; sample edges (`from` → `to`) with evidence snippets. | Copy `links[]` JSON. |
+| **Step 5** — Gaps | `Gap` list with `type`, short description, **evidence pointers** resolved to links (click → highlight work item / evidence). | Copy `gaps[]` JSON. |
+| **Step 5.5** — Key achievements | `KeyAchievementsBundle` list with linked `WorkItem` ids + evidence refs. | Empty-state copy when none (deterministic). |
+| **Step 5.6** — Raw highlights | `RawHighlightsBundle` entries + `sources[]`. | Copy bundle JSON. |
+| **Step 6** — Signals | Full **`SignalsV0`** as structured fields + “why” tooltips populated from **deterministic explain strings** you attach in code (recommended). | Copy signals JSON. |
+| **Step 7** — Interpretations | `InterpretationV0[]` with types, confidences, **signal ids referenced**, evidence quotes (preview). | Token/latency metadata for the call (if applicable). |
+| **Step 8** — Insights | `InsightsV0[]` cards (priority, confidence, evidence preview). | Copy insights JSON. |
+| **Step 6.5** — Arbitration | `InsightArbitrationResult`: **primary** + **supporting** + **`dropped_insights`** with reasons. | Side-by-side “before/after counts” vs Step 8. |
+| **Step 9** — Rendering | Final **markdown preview** (same string as would go to Slack) + **lint/compression** pass result (`ok` / `failed` + reasons). | Copy markdown; download `.md`. |
+| **Step 10** — Slack | Recent **`job_id`s**, ACK timestamp, final post/update **status**, Slack API errors. | Deep link to Slack message if `ts`/channel available. |
+| **Step 10b** — Admin run (parity) | **“Run report (same as Slack)”** UI: form fields match slash command; on success show **`final_markdown`** preview **identical** to what Slack would receive; show `run_id` + link to step panels. | Side-by-side optional: **open same `run_id` in Slack** if a Slack run was used (N/A for admin-only runs—label clearly). |
+| **Step 11** — Orchestration | End-to-end **timeline** (waterfall): per-step duration, status, **retry count**; link to raw logs; show **`invocation_source`** (`slack` / `admin`) per run. | Buttons: **“Run with fixture”** (optional, **non-prod** only) **and** **“Run report (same as Slack)”** (prod-allowed when RBAC + audit OK) — both call **this same** orchestration entrypoint. |
+
+**Definition of done (process):** merging step **N+1** without the admin tab section for step **N** complete is a **process FAIL** (CI policy or reviewer checklist), not just a missing nice-to-have.
 
 ---
 
@@ -756,6 +865,10 @@ The **ordered list** in Step 6.5 (expectation gap beats repeated topic, etc.) re
 
 **Target (example — extend as files land):**
 
+- `frontend/src/admin/AdminTenantLayout.tsx` — add **Manager insight** tab link
+- `frontend/src/admin/AdminTenantManagerInsightPage.tsx` — tab UI (per-step panels + JSON viewers)
+- `frontend/src/admin/adminRedirects.tsx` (or router module used elsewhere) — register `manager-insight` route
+- `backend/.../api/` + `vector/contracts/` — admin JSON routes for pipeline runs / step snapshots **and** `POST …/manager-insight/run` (or equivalent) that enqueues the **same Step 11 job** as Slack with `invocation_source=admin` (exact path follows repo API layout)
 - `vector/domains/manager_insights/`
   - `fetch_activity.py`
   - `data_reliability.py`

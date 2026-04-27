@@ -237,8 +237,85 @@ class SlackConnectorStatusItem(BaseModel):
     )
 
 
+class NotionConnectorDetails(BaseModel):
+    """Notion-specific payload when the Notion connector is connected."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection_id: uuid.UUID | None = Field(
+        default=None,
+        description="tenant_connections.id for this Notion link.",
+    )
+    workspace_id: str | None = None
+    workspace_name: str | None = None
+    last_sync_at: datetime | None = Field(
+        default=None,
+        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+    )
+
+
+class NotionConnectorStatusItem(BaseModel):
+    """Status row for the Notion integration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["notion"] = Field(
+        default="notion",
+        description="Stable id; matches URL segment DELETE /connectors/{provider}.",
+    )
+    display_name: str = Field(description="Human-readable label for UI.")
+    connector_configured: bool = Field(
+        description="Server has required credentials/env for this provider.",
+    )
+    connected: bool = Field(description="Tenant has completed connect for this provider.")
+    details: NotionConnectorDetails | None = Field(
+        default=None,
+        description="Provider-specific data when connected; null otherwise.",
+    )
+
+
+class CallsConnectorDetails(BaseModel):
+    """Calls-specific payload when the Calls connector is connected."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection_id: uuid.UUID | None = Field(
+        default=None,
+        description="tenant_connections.id for this Calls link.",
+    )
+    provider_email: str | None = None
+    last_sync_at: datetime | None = Field(
+        default=None,
+        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+    )
+
+
+class CallsConnectorStatusItem(BaseModel):
+    """Status row for the Calls integration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["calls"] = Field(
+        default="calls",
+        description="Stable id; matches URL segment DELETE /connectors/{provider}.",
+    )
+    display_name: str = Field(description="Human-readable label for UI.")
+    connector_configured: bool = Field(
+        description="Server has required credentials/env for this provider.",
+    )
+    connected: bool = Field(description="Tenant has completed connect for this provider.")
+    details: CallsConnectorDetails | None = Field(
+        default=None,
+        description="Provider-specific data when connected; null otherwise.",
+    )
+
+
 ConnectorStatusItem: TypeAlias = (
-    GithubConnectorStatusItem | LinearConnectorStatusItem | SlackConnectorStatusItem
+    GithubConnectorStatusItem
+    | LinearConnectorStatusItem
+    | SlackConnectorStatusItem
+    | NotionConnectorStatusItem
+    | CallsConnectorStatusItem
 )
 
 
@@ -247,7 +324,11 @@ class ConnectorsListResponse(BaseModel):
 
     items: list[
         Annotated[
-            GithubConnectorStatusItem | LinearConnectorStatusItem | SlackConnectorStatusItem,
+            GithubConnectorStatusItem
+            | LinearConnectorStatusItem
+            | SlackConnectorStatusItem
+            | NotionConnectorStatusItem
+            | CallsConnectorStatusItem,
             Field(discriminator="provider"),
         ]
     ] = Field(description="One entry per registered runtime provider.")

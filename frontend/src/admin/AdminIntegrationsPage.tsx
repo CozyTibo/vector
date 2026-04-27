@@ -6,16 +6,27 @@ import { readErrorDetail } from "../lib/canonicalApi";
 import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 import { StatusBadge } from "./ui/StatusBadge";
 
+type StatusTone = "ok" | "warn" | "neutral" | "bad";
 type Conn = { id: string; provider: string; status: string; created_at: string };
+type AdminConnectorConnectLinkResponse = {
+  provider: "slack" | "github" | "linear" | "notion" | "calls";
+  connect_url: string;
+  tenant_id: string;
+  user_id: string;
+};
 
 type IngestEnqueueBody = { run_id: string; status: string; error_summary?: string | null };
 
-const CARD_ORDER = ["slack", "github", "linear"] as const;
+const CARD_ORDER = ["slack", "github", "linear", "notion", "calls"] as const;
 
 type IngestProvider = "github" | "linear";
+type OAuthProvider = "slack" | "github" | "linear" | "notion" | "calls";
+const OAUTH_PROVIDERS: readonly OAuthProvider[] = ["slack", "github", "linear", "notion", "calls"];
 
 function titleCaseProvider(p: string) {
   if (p === "github") return "GitHub";
+  if (p === "notion") return "Notion";
+  if (p === "calls") return "Gemini";
   if (p === "linear") return "Linear";
   return p.charAt(0).toUpperCase() + p.slice(1);
 }
@@ -28,7 +39,6 @@ export default function AdminIntegrationsPage() {
     queryFn: () => adminJson<{ items: Conn[] }>(`/admin/tenants/${tenantId}/connections`),
     enabled: Boolean(tenantId),
   });
-
   const ingestEnqueueMut = useMutation({
     mutationFn: async (provider: IngestProvider) => {
       const path =
@@ -62,6 +72,12 @@ export default function AdminIntegrationsPage() {
       void qc.invalidateQueries({ queryKey: ["admin-tenant", tenantId] });
     },
   });
+  const connectLinkMut = useMutation({
+    mutationFn: async (provider: OAuthProvider) =>
+      adminJson<AdminConnectorConnectLinkResponse>(
+        `/admin/tenants/${tenantId}/connections/${provider}/connect-link`,
+      ),
+  });
 
   if (!tenantId) {
     return <p className="text-sm text-red-700">Missing tenant.</p>;
@@ -78,7 +94,7 @@ export default function AdminIntegrationsPage() {
   return (
     <div className="space-y-8">
       <OperatorIntro title="Integrations">
-        OAuth links let Vector read Slack, GitHub, or Linear on behalf of this workspace. Connecting a tool
+        OAuth links let Vector read Slack, GitHub, Linear, Notion, or Calls on behalf of this workspace. Connecting a tool
         does <strong>not</strong> start ingestion automatically. For GitHub and Linear, use{" "}
         <strong>Queue ingestion sync</strong> on each connected card (or the product{" "}
         <code className="rounded bg-stone-100 px-1 text-xs">POST /connectors/…/sync</code> endpoints). Track
@@ -99,9 +115,16 @@ export default function AdminIntegrationsPage() {
         {ingestEnqueueMut.isError ? (
           <p className="mb-4 text-sm text-red-700">{(ingestEnqueueMut.error as Error).message}</p>
         ) : null}
+        {connectLinkMut.isError ? (
+          <p className="mb-4 text-sm text-red-700">{(connectLinkMut.error as Error).message}</p>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CARD_ORDER.map((provider) => {
             const c = byProvider.get(provider);
+            const badge: { tone: StatusTone; label: string } = (() => {
+              if (c) return { tone: c.status === "active" ? "ok" : "warn", label: c.status };
+              return { tone: "neutral", label: "Not connected" };
+            })();
             return (
               <div
                 key={provider}
@@ -109,16 +132,14 @@ export default function AdminIntegrationsPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-lg font-semibold text-stone-900">{titleCaseProvider(provider)}</h3>
-                  {c ? (
-                    <StatusBadge tone={c.status === "active" ? "ok" : "warn"}>{c.status}</StatusBadge>
-                  ) : (
-                    <StatusBadge tone="neutral">Not connected</StatusBadge>
-                  )}
+                  <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
                 </div>
                 <dl className="mt-4 space-y-2 text-sm">
                   <div>
                     <dt className="text-stone-500">Connected account</dt>
-                    <dd className="text-stone-800">OAuth (workspace-scoped)</dd>
+                    <dd className="text-stone-800">
+                      OAuth (workspace-scoped)
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-stone-500">Connected since</dt>
@@ -130,6 +151,34 @@ export default function AdminIntegrationsPage() {
                 <div className="mt-4 space-y-2 border-t border-stone-200 pt-4">
                   {c ? (
                     <>
+                      {OAUTH_PROVIDERS.includes(provider as OAuthProvider) && (
+                        <>
+                          <button
+                            type="button"
+                            className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                            disabled={connectLinkMut.isPending}
+                            onClick={async () => {
+                              const out = await connectLinkMut.mutateAsync(provider);
+                              await navigator.clipboard.writeText(out.connect_url);
+                            }}
+                          >
+                            {connectLinkMut.isPending && connectLinkMut.variables === provider
+                              ? "Generating…"
+                              : "Copy connect link"}
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                            disabled={connectLinkMut.isPending}
+                            onClick={async () => {
+                              const out = await connectLinkMut.mutateAsync(provider);
+                              window.open(out.connect_url, "_blank", "noopener,noreferrer");
+                            }}
+                          >
+                            Open connect flow
+                          </button>
+                        </>
+                      )}
                       {(provider === "github" || provider === "linear") && (
                         <button
                           type="button"
@@ -165,12 +214,51 @@ export default function AdminIntegrationsPage() {
                       >
                         Disconnect
                       </button>
+                      {connectLinkMut.isSuccess && connectLinkMut.data.provider === provider ? (
+                        <p className="text-xs text-stone-600">
+                          Connect link generated for user{" "}
+                          <span className="font-mono">{connectLinkMut.data.user_id}</span>.
+                        </p>
+                      ) : null}
                     </>
-                  ) : (
-                    <p className="text-xs text-stone-500">
-                      Ask the customer to connect from the product connectors screen.
-                    </p>
-                  )}
+                  ) : OAUTH_PROVIDERS.includes(provider as OAuthProvider) ? (
+                    <>
+                      <button
+                        type="button"
+                        className="w-full rounded-lg border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-50"
+                        disabled={connectLinkMut.isPending}
+                        onClick={async () => {
+                          const out = await connectLinkMut.mutateAsync(provider);
+                          await navigator.clipboard.writeText(out.connect_url);
+                        }}
+                      >
+                        {connectLinkMut.isPending && connectLinkMut.variables === provider
+                          ? "Generating…"
+                          : "Copy connect link"}
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
+                        disabled={connectLinkMut.isPending}
+                        onClick={async () => {
+                          const out = await connectLinkMut.mutateAsync(provider);
+                          window.open(out.connect_url, "_blank", "noopener,noreferrer");
+                        }}
+                      >
+                        Open connect flow
+                      </button>
+                      {connectLinkMut.isSuccess && connectLinkMut.data.provider === provider ? (
+                        <p className="text-xs text-stone-600">
+                          Link generated for tenant user{" "}
+                          <span className="font-mono">{connectLinkMut.data.user_id}</span>.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-stone-500">
+                          Generate a tenant-scoped OAuth link and share it with the customer.
+                        </p>
+                      )}
+                    </>
+                  ) : null}
                 </div>
               </div>
             );

@@ -119,6 +119,11 @@ class Settings(BaseSettings):
     linear_client_id: str = Field(default="", validation_alias="LINEAR_CLIENT_ID")
     linear_client_secret: str = Field(default="", validation_alias="LINEAR_CLIENT_SECRET")
     linear_redirect_uri: str = Field(default="", validation_alias="LINEAR_REDIRECT_URI")
+    notion_client_id: str = Field(default="", validation_alias="NOTION_CLIENT_ID")
+    notion_client_secret: str = Field(default="", validation_alias="NOTION_CLIENT_SECRET")
+    notion_redirect_uri: str = Field(default="", validation_alias="NOTION_REDIRECT_URI")
+    notion_version: str = Field(default="2022-06-28", validation_alias="NOTION_VERSION")
+    calls_redirect_uri: str = Field(default="", validation_alias="CALLS_REDIRECT_URI")
     slack_client_id: str = Field(default="", validation_alias="SLACK_CLIENT_ID")
     slack_client_secret: str = Field(default="", validation_alias="SLACK_CLIENT_SECRET")
     slack_signing_secret: str = Field(
@@ -284,6 +289,21 @@ class Settings(BaseSettings):
     def linear_oauth_token_url(self) -> str:
         """Always real Linear — OAuth codes are issued by linear.app, not the mock."""
         return "https://api.linear.app/oauth/token"
+
+    def notion_oauth_authorize_url(self) -> str:
+        return "https://api.notion.com/v1/oauth/authorize"
+
+    def notion_oauth_token_url(self) -> str:
+        return "https://api.notion.com/v1/oauth/token"
+
+    def notion_api_base_url(self) -> str:
+        return "https://api.notion.com/v1"
+
+    def calls_google_oauth_authorize_url(self) -> str:
+        return "https://accounts.google.com/o/oauth2/v2/auth"
+
+    def calls_google_oauth_token_url(self) -> str:
+        return "https://oauth2.googleapis.com/token"
 
     @property
     def email_is_configured(self) -> bool:

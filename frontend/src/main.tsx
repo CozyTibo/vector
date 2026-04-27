@@ -12,6 +12,7 @@ import AdminTenantDebugPage from "./admin/AdminTenantDebugPage.tsx";
 import AdminTenantHubPage from "./admin/AdminTenantHubPage.tsx";
 import AdminTenantLayout from "./admin/AdminTenantLayout.tsx";
 import AdminTenantDataSectionLayout from "./admin/AdminTenantDataSectionLayout.tsx";
+import AdminTenantManagerInsightPage from "./admin/AdminTenantManagerInsightPage.tsx";
 import AdminTenantStep3 from "./admin/AdminTenantStep3.tsx";
 import AdminWorkspacePage from "./admin/AdminWorkspacePage.tsx";
 import AdminUsersPage from "./admin/AdminUsersPage.tsx";
@@ -118,6 +119,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="onboarding" element={<AdminTenantOnboardingPage />} />
               <Route path="overview" element={<RedirectTenantToWorkspace />} />
               <Route path="integrations" element={<AdminIntegrationsPage />} />
+              <Route path="manager-insight" element={<AdminTenantManagerInsightPage />} />
               <Route path="connections" element={<RedirectTenantToIntegrations />} />
               <Route path="slack-onboarding" element={<RedirectTenantToWorkspace />} />
               <Route path="manager-onboarding" element={<RedirectTenantToWorkspace />} />

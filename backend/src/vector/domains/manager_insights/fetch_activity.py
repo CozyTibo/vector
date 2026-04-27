@@ -1,0 +1,889 @@
+"""Step 1 — FetchActivity: live, bounded raw reads per connector (no merging, no LLM)."""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from datetime import datetime
+from typing import Any
+
+import httpx
+from sqlalchemy.orm import Session
+
+from vector.contracts.manager_insights_activity import (
+    ConnectorCompletenessStats,
+    ConnectorCoverageStats,
+    ConnectorFetchResult,
+    FetchActivityBundle,
+    ManagerInsightConnector,
+)
+from vector.domains.connectors.github.http_client import (
+    GitHubApiError,
+    create_github_installation_access_token,
+)
+from vector.domains.connectors.github.install_flow import github_connector_configured
+from vector.domains.connectors.notion.oauth_flow import notion_connector_configured
+from vector.domains.connectors.calls.oauth_flow import calls_connector_configured
+from vector.domains.manager_insights.data_reliability import default_window, utc_now
+from vector.infrastructure.db.repositories import calls_connection as calls_repo
+from vector.infrastructure.db.repositories import github_connection as gh_repo
+from vector.infrastructure.db.repositories import linear_connection as linear_repo
+from vector.infrastructure.db.repositories import notion_connection as notion_repo
+from vector.infrastructure.db.repositories import slack_connection as slack_repo
+from vector.settings import Settings
+
+_logger = logging.getLogger(__name__)
+
+_SLACK_API = "https://slack.com/api"
+_GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
+
+
+def _base_result(
+    connector: ManagerInsightConnector,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    status: str,
+    fetched_at: datetime | None = None,
+    errors: list[str] | None = None,
+    caps_applied: list[str] | None = None,
+    coverage: ConnectorCoverageStats | None = None,
+    completeness: ConnectorCompletenessStats | None = None,
+    payload: dict[str, Any] | None = None,
+) -> ConnectorFetchResult:
+    return ConnectorFetchResult(
+        connector=connector,
+        status=status,  # type: ignore[arg-type]
+        fetched_at=fetched_at,
+        window_start=window_start,
+        window_end=window_end,
+        caps_applied=caps_applied or [],
+        errors=errors or [],
+        coverage=coverage or ConnectorCoverageStats(),
+        completeness=completeness or ConnectorCompletenessStats(),
+        payload=payload or {},
+    )
+
+
+def _iso(dt: datetime) -> str:
+    return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _fetch_slack(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    link = slack_repo.get_slack_connection_for_tenant(session, tenant_id)
+    if link is None:
+        return _base_result(
+            "slack",
+            window_start=window_start,
+            window_end=window_end,
+            status="not_configured",
+            errors=["tenant_not_connected"],
+        )
+    token = link.detail.bot_access_token
+    now = utc_now()
+    caps: list[str] = []
+    errors: list[str] = []
+    payload: dict[str, Any] = {"window_start": _iso(window_start), "window_end": _iso(window_end)}
+
+    try:
+        r = httpx.post(
+            f"{_SLACK_API}/auth.test",
+            data={"token": token},
+            timeout=30.0,
+        )
+    except httpx.RequestError as e:
+        _logger.warning("slack auth.test transport error: %s", e)
+        return _base_result(
+            "slack",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"transport:{e}"],
+        )
+    try:
+        body = r.json()
+    except ValueError:
+        return _base_result(
+            "slack",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"slack_auth_test_non_json_http_{r.status_code}"],
+        )
+    if not body.get("ok"):
+        return _base_result(
+            "slack",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[str(body.get("error", "slack_auth_test_failed"))],
+            payload={"auth_test": body},
+        )
+    payload["auth_test"] = {k: v for k, v in body.items() if k not in ("url", "bot_id")}
+    coverage_configured = 1
+    coverage_successful = 1
+    critical_configured = 1
+    critical_successful = 1
+
+    channels: list[dict[str, Any]] = []
+    try:
+        r2 = httpx.post(
+            f"{_SLACK_API}/conversations.list",
+            data={"token": token, "limit": "100", "types": "public_channel,private_channel"},
+            timeout=30.0,
+        )
+        body2 = r2.json()
+        if body2.get("ok"):
+            chans = body2.get("channels")
+            if isinstance(chans, list):
+                channels = [c for c in chans if isinstance(c, dict)]
+                payload["public_and_private_channel_count"] = len(channels)
+                if body2.get("response_metadata", {}).get("next_cursor"):
+                    caps.append("slack_conversations_list_has_more")
+            payload["conversations_list_ok"] = True
+        else:
+            errors.append(f"conversations.list:{body2.get('error')}")
+            payload["conversations_list_ok"] = False
+    except (httpx.RequestError, ValueError) as e:
+        errors.append(f"conversations.list:{e}")
+        payload["conversations_list_ok"] = False
+
+    sampled = channels[:5]
+    sampled_rows: list[dict[str, Any]] = []
+    history_success = 0
+    history_capped = 0
+    history_non_empty = 0
+    for idx, ch in enumerate(sampled):
+        ch_id = ch.get("id")
+        if not isinstance(ch_id, str) or not ch_id:
+            continue
+        coverage_configured += 1
+        if idx == 0:
+            critical_configured += 1
+        try:
+            r3 = httpx.post(
+                f"{_SLACK_API}/conversations.history",
+                data={
+                    "token": token,
+                    "channel": ch_id,
+                    "oldest": str(window_start.timestamp()),
+                    "latest": str(window_end.timestamp()),
+                    "inclusive": "true",
+                    "limit": "50",
+                },
+                timeout=30.0,
+            )
+            body3 = r3.json()
+        except (httpx.RequestError, ValueError) as e:
+            errors.append(f"conversations.history:{ch_id}:{e}")
+            continue
+        if not body3.get("ok"):
+            errors.append(f"conversations.history:{ch_id}:{body3.get('error')}")
+            continue
+        coverage_successful += 1
+        history_success += 1
+        if idx == 0:
+            critical_successful += 1
+        msgs = body3.get("messages")
+        msg_count = len(msgs) if isinstance(msgs, list) else 0
+        if msg_count > 0:
+            history_non_empty += 1
+        has_more = bool(body3.get("has_more"))
+        if has_more:
+            history_capped += 1
+            caps.append(f"slack_history_capped:{ch_id}")
+        sampled_rows.append({"channel_id": ch_id, "message_count": msg_count, "has_more": has_more})
+    payload["sampled_channel_activity"] = sampled_rows
+
+    return _base_result(
+        "slack",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        errors=errors,
+        caps_applied=caps,
+        coverage=ConnectorCoverageStats(
+            configured_sources=coverage_configured,
+            successful_sources=coverage_successful,
+            critical_configured_sources=critical_configured,
+            critical_successful_sources=critical_successful,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=history_success,
+            capped_sources=history_capped,
+            expected_non_empty_sources=len(sampled_rows),
+            observed_non_empty_sources=history_non_empty,
+        ),
+        payload=payload,
+    )
+
+
+def _fetch_github(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    if not github_connector_configured(settings):
+        return _base_result(
+            "github",
+            window_start=window_start,
+            window_end=window_end,
+            status="global_disabled",
+            errors=["github_app_credentials_missing_in_environment"],
+        )
+    link = gh_repo.get_github_connection_for_tenant(session, tenant_id)
+    if link is None:
+        return _base_result(
+            "github",
+            window_start=window_start,
+            window_end=window_end,
+            status="not_configured",
+            errors=["tenant_not_connected"],
+        )
+    now = utc_now()
+    caps: list[str] = []
+    errors: list[str] = []
+    try:
+        inst_token = create_github_installation_access_token(settings, link.installation_id)
+    except GitHubApiError as e:
+        return _base_result(
+            "github",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[str(e)],
+        )
+    base = settings.github_rest_api_base_url().rstrip("/")
+    url = f"{base}/installation/repositories"
+    try:
+        resp = httpx.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {inst_token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"per_page": 30},
+            timeout=30.0,
+        )
+    except httpx.RequestError as e:
+        return _base_result(
+            "github",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"transport:{e}"],
+        )
+    if resp.is_error:
+        return _base_result(
+            "github",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"github_http_{resp.status_code}"],
+        )
+    try:
+        data = resp.json()
+    except ValueError:
+        return _base_result(
+            "github",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=["github_non_json"],
+        )
+    repos = data.get("repositories") if isinstance(data, dict) else None
+    nrepos = len(repos) if isinstance(repos, list) else 0
+    total = data.get("total_count") if isinstance(data, dict) else None
+    if isinstance(total, int) and total > nrepos:
+        caps.append("github_installation_repositories_capped_at_per_page")
+    sampled_repos = []
+    if isinstance(repos, list):
+        for repo in repos[:3]:
+            if isinstance(repo, dict) and isinstance(repo.get("full_name"), str):
+                sampled_repos.append(repo["full_name"])
+    repo_activity: list[dict[str, Any]] = []
+    source_configured = 1
+    source_successful = 1
+    critical_configured = 1
+    critical_successful = 1
+    non_empty = 0
+    capped_sources = 0
+    expected_non_empty = 0
+    for idx, full_name in enumerate(sampled_repos):
+        expected_non_empty += 1
+        for kind in ("pulls", "issues"):
+            source_configured += 1
+            if idx == 0:
+                critical_configured += 1
+            params: dict[str, Any] = {
+                "state": "all",
+                "per_page": 20,
+                "sort": "updated",
+                "direction": "desc",
+                "since": _iso(window_start),
+            }
+            endpoint = f"{base}/repos/{full_name}/{kind}"
+            try:
+                rr = httpx.get(
+                    endpoint,
+                    headers={
+                        "Authorization": f"Bearer {inst_token}",
+                        "Accept": "application/vnd.github+json",
+                        "X-GitHub-Api-Version": "2022-11-28",
+                    },
+                    params=params,
+                    timeout=30.0,
+                )
+            except httpx.RequestError as e:
+                errors.append(f"{kind}:{full_name}:transport:{e}")
+                continue
+            if rr.status_code >= 400:
+                errors.append(f"{kind}:{full_name}:http_{rr.status_code}")
+                continue
+            try:
+                items = rr.json()
+            except ValueError:
+                errors.append(f"{kind}:{full_name}:non_json")
+                continue
+            if not isinstance(items, list):
+                errors.append(f"{kind}:{full_name}:unexpected_shape")
+                continue
+            source_successful += 1
+            if idx == 0:
+                critical_successful += 1
+            item_count = len(items)
+            if item_count > 0:
+                non_empty += 1
+            if item_count >= 20:
+                capped_sources += 1
+                caps.append(f"github_{kind}_capped:{full_name}")
+            repo_activity.append({"repo": full_name, "kind": kind, "count": item_count})
+
+    payload = {
+        "repository_page_count": nrepos,
+        "total_count": total if isinstance(total, int) else None,
+        "sampled_repo_activity": repo_activity,
+    }
+    return _base_result(
+        "github",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        errors=errors,
+        caps_applied=caps,
+        coverage=ConnectorCoverageStats(
+            configured_sources=source_configured,
+            successful_sources=source_successful,
+            critical_configured_sources=critical_configured,
+            critical_successful_sources=critical_successful,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=max(0, source_successful - 1),
+            capped_sources=capped_sources,
+            expected_non_empty_sources=expected_non_empty,
+            observed_non_empty_sources=non_empty,
+        ),
+        payload=payload,
+    )
+
+
+def _fetch_linear(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    link = linear_repo.get_linear_connection_for_tenant(session, tenant_id)
+    if link is None:
+        return _base_result(
+            "linear",
+            window_start=window_start,
+            window_end=window_end,
+            status="not_configured",
+            errors=["tenant_not_connected"],
+        )
+    now = utc_now()
+    query = """
+    query ManagerInsightsProbe {
+      viewer {
+        id
+        name
+        issues(
+          first: 50,
+          orderBy: updatedAt,
+          filter: { updatedAt: { gte: "%(window_start)s" } }
+        ) {
+          nodes { id identifier title }
+          pageInfo { hasNextPage }
+        }
+        projects(first: 20) {
+          nodes { id name }
+          pageInfo { hasNextPage }
+        }
+      }
+    }
+    """
+    query = query % {"window_start": _iso(window_start)}
+    try:
+        r = httpx.post(
+            settings.linear_graphql_url(),
+            json={"query": query},
+            headers={
+                "Authorization": f"Bearer {link.detail.access_token}",
+                "Content-Type": "application/json",
+            },
+            timeout=30.0,
+        )
+    except httpx.RequestError as e:
+        return _base_result(
+            "linear",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"transport:{e}"],
+        )
+    if r.status_code >= 400:
+        return _base_result(
+            "linear",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"linear_http_{r.status_code}"],
+        )
+    try:
+        body = r.json()
+    except ValueError:
+        return _base_result(
+            "linear",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=["linear_non_json"],
+        )
+    errs = body.get("errors") if isinstance(body, dict) else None
+    if errs:
+        return _base_result(
+            "linear",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"linear_graphql_errors:{errs!s}"],
+        )
+    data = body.get("data") if isinstance(body, dict) else None
+    viewer = data.get("viewer") if isinstance(data, dict) else None
+    issues: dict[str, Any] = {}
+    if isinstance(viewer, dict):
+        raw_issues = viewer.get("issues")
+        issues = raw_issues if isinstance(raw_issues, dict) else {}
+    nodes = issues.get("nodes") if isinstance(issues, dict) else None
+    n = len(nodes) if isinstance(nodes, list) else 0
+    page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
+    has_next = bool(isinstance(page_info, dict) and page_info.get("hasNextPage"))
+    projects: dict[str, Any] = {}
+    if isinstance(viewer, dict):
+        raw_projects = viewer.get("projects")
+        projects = raw_projects if isinstance(raw_projects, dict) else {}
+    project_nodes = projects.get("nodes") if isinstance(projects, dict) else None
+    n_projects = len(project_nodes) if isinstance(project_nodes, list) else 0
+    projects_page = projects.get("pageInfo") if isinstance(projects, dict) else None
+    projects_has_next = bool(isinstance(projects_page, dict) and projects_page.get("hasNextPage"))
+    caps: list[str] = []
+    if has_next:
+        caps.append("linear_issues_probe_capped_at_50")
+    if projects_has_next:
+        caps.append("linear_projects_probe_capped_at_20")
+    payload = {
+        "issues_probe_count": n,
+        "has_more_issues": has_next,
+        "projects_probe_count": n_projects,
+        "has_more_projects": projects_has_next,
+    }
+    return _base_result(
+        "linear",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        caps_applied=caps,
+        coverage=ConnectorCoverageStats(
+            configured_sources=2,
+            successful_sources=2,
+            critical_configured_sources=1,
+            critical_successful_sources=1,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=2,
+            capped_sources=(1 if has_next else 0) + (1 if projects_has_next else 0),
+            expected_non_empty_sources=1,
+            observed_non_empty_sources=1 if n > 0 else 0,
+        ),
+        payload=payload,
+    )
+
+
+def _fetch_notion(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    if not notion_connector_configured(settings):
+        return _base_result(
+            "notion",
+            window_start=window_start,
+            window_end=window_end,
+            status="global_disabled",
+            errors=["notion_oauth_credentials_missing_in_environment"],
+        )
+    link = notion_repo.get_notion_connection_for_tenant(session, tenant_id)
+    if link is None:
+        return _base_result(
+            "notion",
+            window_start=window_start,
+            window_end=window_end,
+            status="not_configured",
+            errors=["tenant_not_connected"],
+        )
+    now = utc_now()
+    errors: list[str] = []
+    headers = {
+        "Authorization": f"Bearer {link.detail.access_token}",
+        "Notion-Version": settings.notion_version,
+        "Content-Type": "application/json",
+    }
+    try:
+        r = httpx.post(
+            f"{settings.notion_api_base_url().rstrip('/')}/search",
+            headers=headers,
+            json={
+                "page_size": 20,
+                "sort": {"direction": "descending", "timestamp": "last_edited_time"},
+            },
+            timeout=30.0,
+        )
+    except httpx.RequestError as e:
+        return _base_result(
+            "notion",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"transport:{e}"],
+        )
+    if r.status_code >= 400:
+        err_snippet = ""
+        try:
+            err_body = r.json()
+            if isinstance(err_body, dict):
+                msg = err_body.get("message")
+                if isinstance(msg, str):
+                    err_snippet = msg[:200]
+        except ValueError:
+            err_snippet = r.text[:200]
+        return _base_result(
+            "notion",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"notion_http_{r.status_code}" + (f":{err_snippet}" if err_snippet else "")],
+        )
+    try:
+        body = r.json()
+    except ValueError:
+        return _base_result(
+            "notion",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=["notion_non_json"],
+        )
+    results = body.get("results") if isinstance(body, dict) else None
+    rows = results if isinstance(results, list) else []
+    # Keep strict window semantics in-code: count only items edited inside the window.
+    in_window = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        edited = row.get("last_edited_time")
+        if not isinstance(edited, str):
+            continue
+        try:
+            edited_dt = datetime.fromisoformat(edited.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if window_start <= edited_dt <= window_end:
+            in_window += 1
+    n_results = in_window
+    has_more = bool(body.get("has_more")) if isinstance(body, dict) else False
+    caps: list[str] = []
+    if has_more:
+        caps.append("notion_search_probe_capped_at_20")
+    me_ok = False
+    try:
+        r2 = httpx.get(
+            f"{settings.notion_api_base_url().rstrip('/')}/users/me",
+            headers=headers,
+            timeout=30.0,
+        )
+        if r2.status_code < 400:
+            me_ok = True
+        else:
+            errors.append(f"notion_users_me_http_{r2.status_code}")
+    except httpx.RequestError as e:
+        errors.append(f"notion_users_me_transport:{e}")
+    return _base_result(
+        "notion",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        errors=errors,
+        caps_applied=caps,
+        coverage=ConnectorCoverageStats(
+            configured_sources=2,
+            successful_sources=1 + (1 if me_ok else 0),
+            critical_configured_sources=1,
+            critical_successful_sources=1,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=1,
+            capped_sources=1 if has_more else 0,
+            expected_non_empty_sources=1,
+            observed_non_empty_sources=1 if n_results > 0 else 0,
+        ),
+        payload={"search_result_count": n_results, "has_more": has_more, "users_me_ok": me_ok},
+    )
+
+
+def _fetch_calls(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    if not calls_connector_configured(settings):
+        return _base_result(
+            "calls",
+            window_start=window_start,
+            window_end=window_end,
+            status="global_disabled",
+            errors=["google_oauth_credentials_missing_in_environment"],
+        )
+    link = calls_repo.get_calls_connection_for_tenant(session, tenant_id)
+    if link is None:
+        return _base_result(
+            "calls",
+            window_start=window_start,
+            window_end=window_end,
+            status="not_configured",
+            errors=["tenant_not_connected"],
+        )
+    now = utc_now()
+    headers = {"Authorization": f"Bearer {link.detail.access_token}"}
+    try:
+        r = httpx.get(
+            "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+            headers=headers,
+            params={"maxResults": 20},
+            timeout=30.0,
+        )
+    except httpx.RequestError as e:
+        return _base_result(
+            "calls",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"transport:{e}"],
+        )
+    if r.status_code >= 400:
+        return _base_result(
+            "calls",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=[f"calls_calendar_http_{r.status_code}"],
+        )
+    try:
+        body = r.json()
+    except ValueError:
+        return _base_result(
+            "calls",
+            window_start=window_start,
+            window_end=window_end,
+            status="error",
+            fetched_at=now,
+            errors=["calls_calendar_non_json"],
+        )
+    items = body.get("items") if isinstance(body, dict) else None
+    calendars = items if isinstance(items, list) else []
+    n_items = len(calendars)
+    next_page = body.get("nextPageToken") if isinstance(body, dict) else None
+    caps: list[str] = []
+    if isinstance(next_page, str) and next_page:
+        caps.append("calls_calendar_list_capped_at_20")
+    sampled = []
+    events_success = 0
+    events_non_empty = 0
+    events_capped = 0
+    errors: list[str] = []
+    configured_sources = 1
+    successful_sources = 1
+    critical_configured = 1
+    critical_successful = 1
+    for cal in calendars[:3]:
+        if not isinstance(cal, dict):
+            continue
+        cal_id = cal.get("id")
+        if not isinstance(cal_id, str) or not cal_id:
+            continue
+        configured_sources += 1
+        try:
+            r2 = httpx.get(
+                f"{_GOOGLE_CALENDAR_API}/calendars/{cal_id}/events",
+                headers=headers,
+                params={
+                    "timeMin": _iso(window_start),
+                    "timeMax": _iso(window_end),
+                    "singleEvents": "true",
+                    "orderBy": "startTime",
+                    "maxResults": 50,
+                },
+                timeout=30.0,
+            )
+        except httpx.RequestError as e:
+            errors.append(f"events:{cal_id}:transport:{e}")
+            continue
+        if r2.status_code >= 400:
+            errors.append(f"events:{cal_id}:http_{r2.status_code}")
+            continue
+        try:
+            body2 = r2.json()
+        except ValueError:
+            errors.append(f"events:{cal_id}:non_json")
+            continue
+        successful_sources += 1
+        events_success += 1
+        evs = body2.get("items")
+        count = len(evs) if isinstance(evs, list) else 0
+        if count > 0:
+            events_non_empty += 1
+        has_more = bool(body2.get("nextPageToken"))
+        if has_more:
+            events_capped += 1
+            caps.append(f"calls_events_capped:{cal_id}")
+        sampled.append({"calendar_id": cal_id, "event_count": count, "has_more": has_more})
+    return _base_result(
+        "calls",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        errors=errors,
+        caps_applied=caps,
+        coverage=ConnectorCoverageStats(
+            configured_sources=configured_sources,
+            successful_sources=successful_sources,
+            critical_configured_sources=critical_configured,
+            critical_successful_sources=critical_successful,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=events_success,
+            capped_sources=events_capped,
+            expected_non_empty_sources=len(sampled),
+            observed_non_empty_sources=events_non_empty,
+        ),
+        payload={
+            "calendar_count": n_items,
+            "has_more": bool(next_page),
+            "sampled_calendar_events": sampled,
+        },
+    )
+
+
+def run_fetch_activity_bundle(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    window_days: int = 30,
+    as_of: datetime | None = None,
+) -> FetchActivityBundle:
+    """Execute Step 1 for one tenant (tenant-level connector model only)."""
+
+    window_start, window_end = default_window(window_days=window_days, as_of=as_of)
+    connectors: dict[str, ConnectorFetchResult] = {
+        "slack": _fetch_slack(
+            session,
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+        ),
+        "github": _fetch_github(
+            session,
+            settings,
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+        ),
+        "linear": _fetch_linear(
+            session,
+            settings,
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+        ),
+        "notion": _fetch_notion(
+            session,
+            settings,
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+        ),
+        "calls": _fetch_calls(
+            session,
+            settings,
+            tenant_id=tenant_id,
+            window_start=window_start,
+            window_end=window_end,
+        ),
+    }
+
+    return FetchActivityBundle(
+        run_id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        window_days=window_days,
+        connectors=connectors,
+    )

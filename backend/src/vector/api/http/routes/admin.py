@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import uuid
 from typing import Annotated, Any, Literal
 
@@ -19,7 +20,9 @@ from vector.infrastructure.email.onboarding_activation import (
 )
 from vector.settings import get_settings
 from vector.application.services import connector_sync
+from vector.domains.manager_insights import run_manager_insights_fetch_debug
 from vector.contracts.admin import (
+    AdminConnectorConnectLinkResponse,
     AdminOnboardingAnswerOptionsResponse,
     AdminOnboardingCollectedDataPatch,
     AdminTenantPrimaryMemberFullNamePatchRequest,
@@ -59,6 +62,7 @@ from vector.contracts.admin import (
     TenantListItem,
     TenantListResponse,
 )
+from vector.contracts.manager_insights_activity import ManagerInsightFetchDebugResponse
 from vector.contracts.onboarding import OnboardingCompleteResponse
 from vector.contracts.connectors import (
     GithubIngestionRunListItem,
@@ -81,6 +85,16 @@ from vector.domains.canonical.worker import (
     drain_linear_canonical,
 )
 from vector.domains.connectors.runtime import runtime_by_id
+from vector.domains.connectors.github.errors import GitHubConnectorNotConfiguredError
+from vector.domains.connectors.github.install_flow import start_github_install_url
+from vector.domains.connectors.linear.errors import LinearConnectorNotConfiguredError
+from vector.domains.connectors.linear.oauth_flow import start_linear_oauth_url
+from vector.domains.connectors.notion.errors import NotionConnectorNotConfiguredError
+from vector.domains.connectors.notion.oauth_flow import start_notion_oauth_url
+from vector.domains.connectors.slack.errors import SlackConnectorNotConfiguredError
+from vector.domains.connectors.slack.oauth_flow import start_slack_oauth_url
+from vector.domains.connectors.calls.errors import CallsConnectorNotConfiguredError
+from vector.domains.connectors.calls.oauth_flow import start_calls_oauth_url
 from vector.domains.debug.github_pipeline_wipe import (
     rebuild_derived_from_step1_github,
     reset_github_pipeline_state,
@@ -134,6 +148,8 @@ from vector.infrastructure.db.repositories.ingestion import (
     RUN_STATUS_SUCCEEDED,
 )
 from vector.settings import Settings
+
+_logger = logging.getLogger("app")
 
 GITHUB_ENTITIES = frozenset({"repositories", "pull_requests", "issues", "commits", "users"})
 LINEAR_ENTITIES = frozenset({"teams", "projects", "issues", "users", "issue_comments"})
@@ -1040,6 +1056,85 @@ def build_admin_router() -> APIRouter:
         runtime.disconnect_tenant(db, tenant_id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+    @r.get(
+        "/tenants/{tenant_id}/connections/{provider}/connect-link",
+        response_model=AdminConnectorConnectLinkResponse,
+    )
+    def admin_connector_connect_link(
+        tenant_id: uuid.UUID,
+        provider: Literal["slack", "github", "linear", "notion", "calls"],
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminConnectorConnectLinkResponse:
+        """Generate a tenant-scoped OAuth install URL for admin-assisted setup."""
+        _assert_tenant(db, tenant_id)
+        member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
+        if member is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Tenant has no member to anchor OAuth state.",
+            ) from None
+        return_to = f"/admin/tenants/{tenant_id}/integrations"
+        try:
+            if provider == "slack":
+                connect_url = start_slack_oauth_url(
+                    settings,
+                    tenant_id=tenant_id,
+                    user_id=member.id,
+                    return_to=return_to,
+                )
+            elif provider == "github":
+                connect_url = start_github_install_url(
+                    settings,
+                    tenant_id=tenant_id,
+                    user_id=member.id,
+                    return_to=return_to,
+                )
+            elif provider == "linear":
+                connect_url = start_linear_oauth_url(
+                    settings,
+                    tenant_id=tenant_id,
+                    user_id=member.id,
+                    return_to=return_to,
+                )
+            elif provider == "notion":
+                connect_url = start_notion_oauth_url(
+                    settings,
+                    tenant_id=tenant_id,
+                    user_id=member.id,
+                    return_to=return_to,
+                )
+            else:
+                connect_url = start_calls_oauth_url(
+                    settings,
+                    tenant_id=tenant_id,
+                    user_id=member.id,
+                    return_to=return_to,
+                )
+        except (
+            SlackConnectorNotConfiguredError,
+            GitHubConnectorNotConfiguredError,
+            LinearConnectorNotConfiguredError,
+            NotionConnectorNotConfiguredError,
+            CallsConnectorNotConfiguredError,
+        ) as e:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
+        except Exception as e:
+            _logger.exception(
+                "admin connect-link generation failed",
+                extra={"tenant_id": str(tenant_id), "provider": provider},
+            )
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"connect-link generation failed for provider={provider}: {e}",
+            ) from e
+        return AdminConnectorConnectLinkResponse(
+            provider=provider,
+            connect_url=connect_url,
+            tenant_id=tenant_id,
+            user_id=member.id,
+        )
+
     @r.get("/tenants/{tenant_id}/raw-ingestion", response_model=RawIngestionAdminPage)
     def list_raw_ingestion(
         tenant_id: uuid.UUID,
@@ -1781,5 +1876,24 @@ def build_admin_router() -> APIRouter:
             "projection_rows_processed": p.raw_rows_processed,
             "canonical_rows_processed": c.raw_rows_processed,
         }
+
+    @r.get(
+        "/tenants/{tenant_id}/manager-insight/fetch-debug",
+        response_model=ManagerInsightFetchDebugResponse,
+    )
+    def manager_insight_fetch_debug(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        window_days: Annotated[int, Query(ge=1, le=366)] = 30,
+    ) -> ManagerInsightFetchDebugResponse:
+        """Run Manager insights Step 1 (FetchActivity) + Step 0.5 (data reliability) for debugging."""
+        _assert_tenant(db, tenant_id)
+        return run_manager_insights_fetch_debug(
+            db,
+            settings,
+            tenant_id=tenant_id,
+            window_days=window_days,
+        )
 
     return r

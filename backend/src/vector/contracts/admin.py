@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -288,6 +288,17 @@ class AdminConnectionsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     items: list[TenantConnectionAdminItem]
+
+
+class AdminConnectorConnectLinkResponse(BaseModel):
+    """Admin-generated URL to run a tenant-scoped OAuth connect flow."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    provider: Literal["slack", "github", "linear", "notion", "calls"]
+    connect_url: str
+    tenant_id: uuid.UUID
+    user_id: uuid.UUID
 
 
 class RawIngestionAdminItem(BaseModel):
