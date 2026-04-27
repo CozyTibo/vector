@@ -1887,7 +1887,7 @@ def build_admin_router() -> APIRouter:
         settings: Annotated[Settings, Depends(settings_dep)],
         window_days: Annotated[int, Query(ge=1, le=366)] = 30,
     ) -> ManagerInsightFetchDebugResponse:
-        """Run Manager insights Step 1 + 0.5 + 2 + 3 + 4 + 5 for debugging."""
+        """Run Manager insights Step 1 + 0.5 + 2 + 3 + 4 + 5 + 5.5 + 5.6 for debugging."""
         _assert_tenant(db, tenant_id)
         return run_manager_insights_fetch_debug(
             db,

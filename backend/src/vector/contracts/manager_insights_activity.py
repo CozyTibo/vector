@@ -221,8 +221,56 @@ class GapBundle(BaseModel):
     gaps: list[GapItem] = Field(default_factory=list)
 
 
+class KeyAchievementItem(BaseModel):
+    """Step 5.5: one closed/merged, attributable win (deterministic, no LLM)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    title: str
+    linked_items: list[str] = Field(default_factory=list, min_length=1)
+    evidence: list[str] = Field(
+        default_factory=list,
+        min_length=1,
+        description="Citable strings: work_item id, optional link/reinforcement refs",
+    )
+    sort_at: datetime | None = None
+
+
+class KeyAchievementsBundleDebug(BaseModel):
+    """Step 5.5 bundle aligned with admin debug and UserReportContext.key_achievements."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    items: list[KeyAchievementItem] = Field(default_factory=list)
+
+
+class RawHighlightItem(BaseModel):
+    """Step 5.6: factual line + sources (work_item ids, gap ids, etc.)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    text: str
+    sources: list[str] = Field(default_factory=list, min_length=1)
+
+
+class RawHighlightsBundleDebug(BaseModel):
+    """Step 5.6 bundle for admin debug and UserReportContext.raw_highlights."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    items: list[RawHighlightItem] = Field(default_factory=list)
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload: Step 1 + 0.5 + 2 + 3 + 4 + 5."""
+    """Admin (and internal) debug payload through Step 5.6 (Key achievements + Raw highlights)."""
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -232,3 +280,5 @@ class ManagerInsightFetchDebugResponse(BaseModel):
     evidence: EvidenceBundle
     links: LinkBundle
     gaps: GapBundle
+    key_achievements: KeyAchievementsBundleDebug
+    raw_highlights: RawHighlightsBundleDebug

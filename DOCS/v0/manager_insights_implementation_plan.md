@@ -54,6 +54,8 @@ Update this table only when a step is truly complete against its own checklist a
 | Step 3 — Evidence extraction | `completed` | Deterministic extraction of `action_items` / `blockers` / `decisions` with strict non-empty evidence quotes, source references, and explicit discard tracking; Step 3 artifacts visible in Manager insight tab for QA. |
 | Step 4 — Links | `completed` | Deterministic token-Jaccard (+ cross-source nudge + shared issue keys + optional Step-3 text hits) work-item `Link` edges with `confidence` + `evidence`; `high` only at/above published thresholds; tests; Manager insight tab shows Step 4. |
 | Step 5 — Gaps | `completed` | Deterministic `Gap` computation from Step 2/3/4 artifacts (`expected_not_executed`, `discussed_not_linked_to_work`, `blocker_not_tracked`, `doc_not_connected_to_execution`) with evidence pointers; tests; Manager insight tab shows Step 5 artifacts. |
+| Step 5.5 — Key achievements | `completed` | Deterministic closed/merged execution wins from `WorkItem` + optional doc/call reinforcement via medium+ `Link`s; `KeyAchievementItem` / `KeyAchievementsBundleDebug`; tests; admin tab section. |
+| Step 5.6 — Raw highlights | `completed` | Deterministic factual highlight lines (repeated call/Slack terms, closed PRs, gap-backed lines) with `sources[]`; `RawHighlightItem` / `RawHighlightsBundleDebug`; tests; admin tab section. |
 | Step 6+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
 
 **Current note (2026-04-28):**
@@ -76,7 +78,11 @@ Update this table only when a step is truly complete against its own checklist a
   - `doc_not_connected_to_execution` (document work item without medium/high issue/PR links).
   Each gap carries evidence pointers resolvable to Step 2–4 ids. Admin debug `GET /admin/tenants/…/manager-insight/fetch-debug` and Manager insight tab now run and render **Step 1 → 0.5 → 2 → 3 → 4 → 5** including a dedicated **Gaps (Step 5)** section.
 - Step 5 tests: `backend/tests/vector/domains/manager_insights/test_compute_gaps.py`.
-- Remaining work after Step 5: pipeline feature work continues at **Step 5.5 (Key achievements)**. Runtime prerequisites unchanged (tenant OAuth, connector access).
+- **Step 5.5 (key achievements)** is implemented in `vector/domains/manager_insights/build_key_achievements.py`: includes **closed Linear issues** and **merged/closed GitHub PRs** (by `closed_at` and/or terminal `status`) only; sorted by close time; evidence lists `work_item:…` plus optional `reinforced_by_link:…` when a **medium/high** `WorkItemLink` connects the achievement to a `document` / `call` / `message_thread`. Response field `key_achievements` on admin fetch-debug; UI **Key achievements (Step 5.5)**.
+- Step 5.5 tests: `backend/tests/vector/domains/manager_insights/test_build_key_achievements.py`.
+- **Step 5.6 (raw highlights)** is implemented in `vector/domains/manager_insights/build_raw_highlights.py`: (1) repeated **4+ char tokens** across distinct **calls/Slack** work items, (2) one line per **closed** pull request (notable list, capped), (3) one line per **gap** with sources from `evidence_pointers`; light banned-token sanitizer. Response field `raw_highlights`; UI **Raw highlights (Step 5.6)**. Admin run label **1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6**.
+- Step 5.6 tests: `backend/tests/vector/domains/manager_insights/test_build_raw_highlights.py`.
+- Remaining work after Step 5.6: **Step 6 (Signals)**. Runtime prerequisites unchanged (tenant OAuth, connector access).
 
 ---
 

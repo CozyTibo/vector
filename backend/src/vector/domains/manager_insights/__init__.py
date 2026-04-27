@@ -1,4 +1,4 @@
-"""Manager insights domain: fetch through gaps (Steps 1–5) and future pipeline stages."""
+"""Manager insights domain: debug pipeline through Steps 1–5.6; future: signals and LLM stages."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from vector.contracts.manager_insights_activity import ManagerInsightFetchDebugResponse
+from vector.domains.manager_insights.build_key_achievements import build_key_achievements
+from vector.domains.manager_insights.build_raw_highlights import build_raw_highlights
 from vector.domains.manager_insights.build_work_items import build_work_items
 from vector.domains.manager_insights.compute_gaps import compute_gaps
 from vector.domains.manager_insights.data_reliability import compute_data_reliability
@@ -25,7 +27,7 @@ def run_manager_insights_fetch_debug(
     window_days: int = 30,
     as_of: datetime | None = None,
 ) -> ManagerInsightFetchDebugResponse:
-    """Run Step 1 -> 0.5 -> 2 -> 3 -> 4 -> 5 (same entrypoint used by admin debug API)."""
+    """Run Step 1 -> 0.5 -> 2 -> 3 -> 4 -> 5 -> 5.5 -> 5.6 (admin debug API)."""
 
     bundle = run_fetch_activity_bundle(
         session,
@@ -39,6 +41,8 @@ def run_manager_insights_fetch_debug(
     evidence = extract_evidence(work_items)
     links = link_work_items(work_items, evidence=evidence)
     gaps = compute_gaps(work_items, evidence, links)
+    key_achievements = build_key_achievements(work_items, links)
+    raw_highlights = build_raw_highlights(work_items, evidence, links, gaps)
     return ManagerInsightFetchDebugResponse(
         fetch=bundle,
         data_reliability=reliability,
@@ -46,11 +50,15 @@ def run_manager_insights_fetch_debug(
         evidence=evidence,
         links=links,
         gaps=gaps,
+        key_achievements=key_achievements,
+        raw_highlights=raw_highlights,
     )
 
 
 __all__ = [
     "compute_data_reliability",
+    "build_key_achievements",
+    "build_raw_highlights",
     "build_work_items",
     "compute_gaps",
     "extract_evidence",

@@ -123,6 +123,28 @@ type ManagerInsightFetchDebugResponse = {
       evidence_pointers: Record<string, string[]>;
     }>;
   };
+  key_achievements: {
+    run_id: string;
+    tenant_id: string;
+    window_days: number;
+    items: Array<{
+      id: string;
+      title: string;
+      linked_items: string[];
+      evidence: string[];
+      sort_at: string | null;
+    }>;
+  };
+  raw_highlights: {
+    run_id: string;
+    tenant_id: string;
+    window_days: number;
+    items: Array<{
+      id: string;
+      text: string;
+      sources: string[];
+    }>;
+  };
 };
 
 function tierBadge(tier: ReliabilityTier) {
@@ -160,9 +182,8 @@ export default function AdminTenantManagerInsightPage() {
       <div>
         <h1 className="text-lg font-semibold text-stone-900">Manager insight</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Step 1 (FetchActivity) + Step 0.5 (data reliability) + Step 2 (WorkItem normalization) +
-          Step 3 (Evidence) + Step 4 (Links) + Step 5 (Gaps). Click run to fetch and inspect each
-          stage.
+          Step 1 (Fetch) + 0.5 (reliability) + 2 (WorkItems) + 3 (Evidence) + 4 (Links) + 5 (Gaps) +
+          5.5 (Key achievements) + 5.6 (Raw highlights). Click run to fetch and inspect each stage.
         </p>
         <div className="mt-3">
           <button
@@ -173,7 +194,7 @@ export default function AdminTenantManagerInsightPage() {
               void q.refetch();
             }}
           >
-            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4 → 5"}
+            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6"}
           </button>
         </div>
       </div>
@@ -186,8 +207,9 @@ export default function AdminTenantManagerInsightPage() {
       ) : null}
       {!q.data && !q.isFetching && !q.isError ? (
         <p className="text-sm text-stone-600">
-          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4 → 5</span> to
-          fetch and display results.
+          No run yet. Click{" "}
+          <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6</span> to fetch
+          and display results.
         </p>
       ) : null}
 
@@ -440,6 +462,54 @@ export default function AdminTenantManagerInsightPage() {
                     <pre className="mt-2 max-h-40 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
                       {JSON.stringify(g.evidence_pointers, null, 2)}
                     </pre>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">Key achievements (Step 5.5)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              Closed issues + merged/closed PRs (deterministic). Count: {q.data.key_achievements.items.length}{" "}
+              · run_id {q.data.key_achievements.run_id}
+            </p>
+            {q.data.key_achievements.items.length === 0 ? (
+              <p className="mt-3 text-xs text-stone-500">No closed/merged execution items in window.</p>
+            ) : (
+              <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+                {q.data.key_achievements.items.map((k) => (
+                  <li key={k.id} className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs">
+                    <p className="font-medium text-stone-800">{k.title}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-stone-500">{k.id}</p>
+                    <p className="mt-1 text-stone-600">Linked: {k.linked_items.join(", ")}</p>
+                    <ul className="mt-1 list-inside list-disc text-stone-600">
+                      {k.evidence.map((e) => (
+                        <li key={e} className="text-[11px]">
+                          {e}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">Raw highlights (Step 5.6)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              Factual lines only. Count: {q.data.raw_highlights.items.length} · run_id{" "}
+              {q.data.raw_highlights.run_id}
+            </p>
+            {q.data.raw_highlights.items.length === 0 ? (
+              <p className="mt-3 text-xs text-stone-500">No raw highlights for this run.</p>
+            ) : (
+              <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+                {q.data.raw_highlights.items.map((h) => (
+                  <li key={h.id} className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs">
+                    <p className="text-stone-800">{h.text}</p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">sources: {h.sources.join(", ")}</p>
                   </li>
                 ))}
               </ul>
