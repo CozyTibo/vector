@@ -145,6 +145,23 @@ type ManagerInsightFetchDebugResponse = {
       sources: string[];
     }>;
   };
+  signals: {
+    delivery_strength: "low" | "moderate" | "high";
+    urgent_pressure: "low" | "moderate" | "high";
+    expectation_coverage: "high" | "partial" | "low";
+    follow_through: "strong" | "partial" | "weak";
+    blocker_visibility: "visible" | "partial" | "not_visible";
+    repeated_discussion_present: boolean;
+    execution_momentum: "accelerating" | "steady" | "slowing";
+    documentation_linkage: "linked" | "partially_linked" | "not_linked";
+    focus: "focused" | "moderate" | "fragmented";
+    collaboration_intensity: "low" | "moderate" | "high";
+    support_pattern: "gives_help" | "asks_for_help" | "balanced";
+    feedback_reception: "proactive" | "neutral" | "defensive";
+    coordination_role: "driving" | "contributing" | "peripheral";
+    interaction_friction: "present" | "unclear" | "absent";
+    explain: Record<string, string>;
+  };
 };
 
 function tierBadge(tier: ReliabilityTier) {
@@ -183,7 +200,8 @@ export default function AdminTenantManagerInsightPage() {
         <h1 className="text-lg font-semibold text-stone-900">Manager insight</h1>
         <p className="mt-1 text-sm text-stone-600">
           Step 1 (Fetch) + 0.5 (reliability) + 2 (WorkItems) + 3 (Evidence) + 4 (Links) + 5 (Gaps) +
-          5.5 (Key achievements) + 5.6 (Raw highlights). Click run to fetch and inspect each stage.
+          5.5 (Key achievements) + 5.6 (Raw highlights) + 6 (Signals). Click run to fetch and inspect
+          each stage.
         </p>
         <div className="mt-3">
           <button
@@ -194,7 +212,7 @@ export default function AdminTenantManagerInsightPage() {
               void q.refetch();
             }}
           >
-            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6"}
+            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6"}
           </button>
         </div>
       </div>
@@ -208,8 +226,8 @@ export default function AdminTenantManagerInsightPage() {
       {!q.data && !q.isFetching && !q.isError ? (
         <p className="text-sm text-stone-600">
           No run yet. Click{" "}
-          <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6</span> to fetch
-          and display results.
+          <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6</span> to
+          fetch and display results.
         </p>
       ) : null}
 
@@ -514,6 +532,40 @@ export default function AdminTenantManagerInsightPage() {
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">Signals (Step 6)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              Deterministic state vector computed from Steps 2–5.6. Includes explain strings for
+              operator QA.
+            </p>
+            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  ["delivery_strength", q.data.signals.delivery_strength],
+                  ["urgent_pressure", q.data.signals.urgent_pressure],
+                  ["expectation_coverage", q.data.signals.expectation_coverage],
+                  ["follow_through", q.data.signals.follow_through],
+                  ["blocker_visibility", q.data.signals.blocker_visibility],
+                  ["repeated_discussion_present", String(q.data.signals.repeated_discussion_present)],
+                  ["execution_momentum", q.data.signals.execution_momentum],
+                  ["documentation_linkage", q.data.signals.documentation_linkage],
+                  ["focus", q.data.signals.focus],
+                  ["collaboration_intensity", q.data.signals.collaboration_intensity],
+                  ["support_pattern", q.data.signals.support_pattern],
+                  ["feedback_reception", q.data.signals.feedback_reception],
+                  ["coordination_role", q.data.signals.coordination_role],
+                  ["interaction_friction", q.data.signals.interaction_friction],
+                ] as const
+              ).map(([key, value]) => (
+                <li key={key} className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs">
+                  <p className="font-mono text-stone-700">{key}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-stone-900">{value}</p>
+                  <p className="mt-1 text-stone-600">{q.data.signals.explain[key] ?? "—"}</p>
+                </li>
+              ))}
+            </ul>
           </section>
         </div>
       ) : null}

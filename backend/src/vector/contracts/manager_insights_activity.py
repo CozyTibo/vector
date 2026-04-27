@@ -1,4 +1,4 @@
-"""Contracts for Manager insights: fetch, reliability, work items, evidence, and links (Steps 1–4)."""
+"""Contracts for Manager insights debug pipeline artifacts (Steps 1–6)."""
 
 from __future__ import annotations
 
@@ -21,6 +21,18 @@ GapType = Literal[
     "blocker_not_tracked",
     "doc_not_connected_to_execution",
 ]
+SignalDeliveryStrength = Literal["low", "moderate", "high"]
+SignalExpectationCoverage = Literal["high", "partial", "low"]
+SignalFollowThrough = Literal["strong", "partial", "weak"]
+SignalBlockerVisibility = Literal["visible", "partial", "not_visible"]
+SignalExecutionMomentum = Literal["accelerating", "steady", "slowing"]
+SignalDocumentationLinkage = Literal["linked", "partially_linked", "not_linked"]
+SignalFocus = Literal["focused", "moderate", "fragmented"]
+SignalCollaborationIntensity = Literal["low", "moderate", "high"]
+SignalSupportPattern = Literal["gives_help", "asks_for_help", "balanced"]
+SignalFeedbackReception = Literal["proactive", "neutral", "defensive"]
+SignalCoordinationRole = Literal["driving", "contributing", "peripheral"]
+SignalInteractionFriction = Literal["present", "unclear", "absent"]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -269,8 +281,30 @@ class RawHighlightsBundleDebug(BaseModel):
     items: list[RawHighlightItem] = Field(default_factory=list)
 
 
+class SignalsV0Debug(BaseModel):
+    """Step 6 deterministic signal vector plus explainable reasons."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    delivery_strength: SignalDeliveryStrength
+    urgent_pressure: SignalDeliveryStrength
+    expectation_coverage: SignalExpectationCoverage
+    follow_through: SignalFollowThrough
+    blocker_visibility: SignalBlockerVisibility
+    repeated_discussion_present: bool
+    execution_momentum: SignalExecutionMomentum
+    documentation_linkage: SignalDocumentationLinkage
+    focus: SignalFocus
+    collaboration_intensity: SignalCollaborationIntensity
+    support_pattern: SignalSupportPattern
+    feedback_reception: SignalFeedbackReception
+    coordination_role: SignalCoordinationRole
+    interaction_friction: SignalInteractionFriction
+    explain: dict[str, str] = Field(default_factory=dict)
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload through Step 5.6 (Key achievements + Raw highlights)."""
+    """Admin (and internal) debug payload through Step 6 (Signals)."""
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -282,3 +316,4 @@ class ManagerInsightFetchDebugResponse(BaseModel):
     gaps: GapBundle
     key_achievements: KeyAchievementsBundleDebug
     raw_highlights: RawHighlightsBundleDebug
+    signals: SignalsV0Debug

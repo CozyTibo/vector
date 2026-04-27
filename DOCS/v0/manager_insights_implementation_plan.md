@@ -56,7 +56,8 @@ Update this table only when a step is truly complete against its own checklist a
 | Step 5 — Gaps | `completed` | Deterministic `Gap` computation from Step 2/3/4 artifacts (`expected_not_executed`, `discussed_not_linked_to_work`, `blocker_not_tracked`, `doc_not_connected_to_execution`) with evidence pointers; tests; Manager insight tab shows Step 5 artifacts. |
 | Step 5.5 — Key achievements | `completed` | Deterministic closed/merged execution wins from `WorkItem` + optional doc/call reinforcement via medium+ `Link`s; `KeyAchievementItem` / `KeyAchievementsBundleDebug`; tests; admin tab section. |
 | Step 5.6 — Raw highlights | `completed` | Deterministic factual highlight lines (repeated call/Slack terms, closed PRs, gap-backed lines) with `sources[]`; `RawHighlightItem` / `RawHighlightsBundleDebug`; tests; admin tab section. |
-| Step 6+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
+| Step 6 — Signals | `completed` | Deterministic `SignalsV0`-aligned computation (`delivery_strength`, `urgent_pressure`, coverage/follow-through/blocker visibility, repeated discussion flag, momentum, doc linkage, focus, collaboration/support/feedback/coordination/friction) with `explain` reasons; tests; admin tab section. |
+| Step 7+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
 
 **Current note (2026-04-28):**
 
@@ -82,7 +83,9 @@ Update this table only when a step is truly complete against its own checklist a
 - Step 5.5 tests: `backend/tests/vector/domains/manager_insights/test_build_key_achievements.py`.
 - **Step 5.6 (raw highlights)** is implemented in `vector/domains/manager_insights/build_raw_highlights.py`: (1) repeated **4+ char tokens** across distinct **calls/Slack** work items, (2) one line per **closed** pull request (notable list, capped), (3) one line per **gap** with sources from `evidence_pointers`; light banned-token sanitizer. Response field `raw_highlights`; UI **Raw highlights (Step 5.6)**. Admin run label **1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6**.
 - Step 5.6 tests: `backend/tests/vector/domains/manager_insights/test_build_raw_highlights.py`.
-- Remaining work after Step 5.6: **Step 6 (Signals)**. Runtime prerequisites unchanged (tenant OAuth, connector access).
+- **Step 6 (signals)** is implemented in `vector/domains/manager_insights/compute_signals.py`: deterministic state-vector computation from Steps 2–5.6 with no LLM, explicit fallback defaults for sparse fields, and `explain` strings for operator QA. Response field `signals` (`SignalsV0Debug`) on admin fetch-debug; UI section **Signals (Step 6)**; admin run label **1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6**.
+- Step 6 tests: `backend/tests/vector/domains/manager_insights/test_compute_signals.py`.
+- Remaining work after Step 6: **Step 7 (Interpretations)**. Runtime prerequisites unchanged (tenant OAuth, connector access).
 
 ---
 
