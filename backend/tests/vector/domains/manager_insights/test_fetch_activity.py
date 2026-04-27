@@ -55,3 +55,17 @@ def test_run_fetch_activity_bundle_includes_all_connectors(monkeypatch: Any) -> 
     assert sorted(bundle.connectors.keys()) == ["calls", "github", "linear", "notion", "slack"]
     assert bundle.connectors["slack"].window_end == fixed_end
     assert bundle.connectors["slack"].window_start < fixed_end
+
+
+def test_notion_title_extraction_handles_user_named_title_property() -> None:
+    row = {
+        "id": "abc",
+        "properties": {
+            "Name": {
+                "id": "title",
+                "type": "title",
+                "title": [{"plain_text": "V0 - Teammate Report"}],
+            }
+        },
+    }
+    assert mod._notion_result_title(row) == "V0 - Teammate Report"

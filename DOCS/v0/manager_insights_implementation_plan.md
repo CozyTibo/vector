@@ -50,7 +50,8 @@ Update this table only when a step is truly complete against its own checklist a
 | Step 0 — Contracts | `in_progress` | All required models in Step 0 present, wired, and used by downstream steps without ad-hoc fields. |
 | Step 1 — FetchActivity | `completed` | All target connectors implemented to the agreed V0 scope, metadata present, tests passing, and Admin tab checklist row fully satisfied. |
 | Step 0.5 — Data reliability | `completed` | Deterministic tiers + reason codes + overall confidence aligned with defaults/config, tests passing, and Admin tab checklist row fully satisfied. |
-| Step 2+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
+| Step 2 — Normalization → WorkItems | `completed` | Deterministic `raw_* -> WorkItem` mapping from Step 1 payloads, stable IDs + timestamps + source/type fields, tests passing, and Manager insight tab renders Step 2 artifacts for QA. |
+| Step 3+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
 
 **Current note (2026-04-27):**
 
@@ -58,7 +59,9 @@ Update this table only when a step is truly complete against its own checklist a
 - Step 1 now performs bounded-window activity probes per connector (Slack channel history samples, GitHub repo/PR/issue samples, Linear issues/projects window query, Notion edited-page search + users/me probe, Calls calendar + events samples) and emits `fetched_at`, window bounds, caps, errors, coverage stats, completeness stats, and payload summaries.
 - Step 0.5 now consumes explicit per-connector coverage/completeness counters and applies deterministic threshold policy: coverage (>=80 / >=50 / <50), freshness (<24h / <72h / stale), critical-source gating, completeness downgrades, and exact overall confidence rule (critical-low override, >50% low override, >=80% high for overall-high).
 - Step 1 + Step 0.5 tests are passing in `backend/tests/vector/domains/manager_insights/test_fetch_activity.py` and `backend/tests/vector/domains/manager_insights/test_data_reliability.py`.
-- Remaining work for these two steps: **none in scope** (runtime prerequisites still apply: valid OAuth credentials/scopes and connector API access in each tenant environment).
+- Step 2 is now implemented in `vector/domains/manager_insights/build_work_items.py` and exposed via the same admin debug endpoint/UI (`Manager insight` tab): each normalized work item is visible with source/type/status/timestamps and full JSON payload for QA.
+- Step 2 tests are passing in `backend/tests/vector/domains/manager_insights/test_build_work_items.py`.
+- Remaining work after Step 2: **none in scope for Steps 1/0.5/2** (runtime prerequisites still apply: valid OAuth credentials/scopes and connector API access in each tenant environment). Next planned work starts at Step 3.
 
 ---
 

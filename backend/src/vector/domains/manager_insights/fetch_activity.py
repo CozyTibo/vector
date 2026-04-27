@@ -69,6 +69,43 @@ def _iso(dt: datetime) -> str:
     return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _notion_plain_text_from_rich_text(value: object) -> str | None:
+    if not isinstance(value, list):
+        return None
+    chunks: list[str] = []
+    for part in value:
+        if not isinstance(part, dict):
+            continue
+        plain = part.get("plain_text")
+        if isinstance(plain, str) and plain.strip():
+            chunks.append(plain.strip())
+    if not chunks:
+        return None
+    return " ".join(chunks)
+
+
+def _notion_result_title(row: dict[str, Any]) -> str | None:
+    # Databases from search results often carry top-level title rich_text.
+    top_level = _notion_plain_text_from_rich_text(row.get("title"))
+    if top_level:
+        return top_level
+
+    props = row.get("properties")
+    if not isinstance(props, dict):
+        return None
+    # Page entries usually store the title under a user-defined property key
+    # with shape: { type: "title", title: [...] }.
+    for value in props.values():
+        if not isinstance(value, dict):
+            continue
+        if value.get("type") != "title":
+            continue
+        txt = _notion_plain_text_from_rich_text(value.get("title"))
+        if txt:
+            return txt
+    return None
+
+
 def _fetch_slack(
     session: Session,
     *,
@@ -159,6 +196,7 @@ def _fetch_slack(
 
     sampled = channels[:5]
     sampled_rows: list[dict[str, Any]] = []
+    sampled_messages: list[dict[str, Any]] = []
     history_success = 0
     history_capped = 0
     history_non_empty = 0
@@ -202,7 +240,30 @@ def _fetch_slack(
             history_capped += 1
             caps.append(f"slack_history_capped:{ch_id}")
         sampled_rows.append({"channel_id": ch_id, "message_count": msg_count, "has_more": has_more})
+        if isinstance(msgs, list):
+            for m in msgs[:2]:
+                if not isinstance(m, dict):
+                    continue
+                ts = m.get("ts")
+                txt = m.get("text")
+                if not isinstance(ts, str):
+                    continue
+                sampled_messages.append(
+                    {
+                        "channel_id": ch_id,
+                        "thread_ts": str(m.get("thread_ts") or ts),
+                        "text": txt if isinstance(txt, str) else None,
+                        "user": m.get("user") if isinstance(m.get("user"), str) else None,
+                        "created_at": datetime.fromtimestamp(float(ts), tz=window_end.tzinfo).isoformat()
+                        if ts.replace(".", "", 1).isdigit()
+                        else None,
+                        "updated_at": datetime.fromtimestamp(float(ts), tz=window_end.tzinfo).isoformat()
+                        if ts.replace(".", "", 1).isdigit()
+                        else None,
+                    }
+                )
     payload["sampled_channel_activity"] = sampled_rows
+    payload["sampled_channel_messages"] = sampled_messages[:20]
 
     return _base_result(
         "slack",
@@ -314,12 +375,14 @@ def _fetch_github(
     total = data.get("total_count") if isinstance(data, dict) else None
     if isinstance(total, int) and total > nrepos:
         caps.append("github_installation_repositories_capped_at_per_page")
-    sampled_repos = []
+    sampled_repos: list[str] = []
     if isinstance(repos, list):
         for repo in repos[:3]:
             if isinstance(repo, dict) and isinstance(repo.get("full_name"), str):
                 sampled_repos.append(repo["full_name"])
     repo_activity: list[dict[str, Any]] = []
+    sampled_issues: list[dict[str, Any]] = []
+    sampled_pull_requests: list[dict[str, Any]] = []
     source_configured = 1
     source_successful = 1
     critical_configured = 1
@@ -376,11 +439,43 @@ def _fetch_github(
                 capped_sources += 1
                 caps.append(f"github_{kind}_capped:{full_name}")
             repo_activity.append({"repo": full_name, "kind": kind, "count": item_count})
+            target = sampled_pull_requests if kind == "pulls" else sampled_issues
+            for one in items[:5]:
+                if not isinstance(one, dict):
+                    continue
+                num = one.get("number")
+                if not isinstance(num, int):
+                    continue
+                target.append(
+                    {
+                        "repo": full_name,
+                        "number": num,
+                        "title": one.get("title") if isinstance(one.get("title"), str) else None,
+                        "body": one.get("body") if isinstance(one.get("body"), str) else None,
+                        "state": one.get("state") if isinstance(one.get("state"), str) else None,
+                        "html_url": one.get("html_url") if isinstance(one.get("html_url"), str) else None,
+                        "author": one.get("user", {}).get("login")
+                        if isinstance(one.get("user"), dict)
+                        and isinstance(one.get("user", {}).get("login"), str)
+                        else None,
+                        "created_at": one.get("created_at")
+                        if isinstance(one.get("created_at"), str)
+                        else None,
+                        "updated_at": one.get("updated_at")
+                        if isinstance(one.get("updated_at"), str)
+                        else None,
+                        "closed_at": one.get("closed_at")
+                        if isinstance(one.get("closed_at"), str)
+                        else None,
+                    }
+                )
 
     payload = {
         "repository_page_count": nrepos,
         "total_count": total if isinstance(total, int) else None,
         "sampled_repo_activity": repo_activity,
+        "sampled_issues": sampled_issues[:30],
+        "sampled_pull_requests": sampled_pull_requests[:30],
     }
     return _base_result(
         "github",
@@ -434,7 +529,18 @@ def _fetch_linear(
           orderBy: updatedAt,
           filter: { updatedAt: { gte: "%(window_start)s" } }
         ) {
-          nodes { id identifier title }
+          nodes {
+            id
+            identifier
+            title
+            description
+            url
+            createdAt
+            updatedAt
+            state { name }
+            project { name }
+            assignee { name }
+          }
           pageInfo { hasNextPage }
         }
         projects(first: 20) {
@@ -517,11 +623,48 @@ def _fetch_linear(
         caps.append("linear_issues_probe_capped_at_50")
     if projects_has_next:
         caps.append("linear_projects_probe_capped_at_20")
+    sampled_issues: list[dict[str, Any]] = []
+    if isinstance(nodes, list):
+        for one in nodes[:30]:
+            if not isinstance(one, dict):
+                continue
+            sampled_issues.append(
+                {
+                    "id": one.get("id") if isinstance(one.get("id"), str) else None,
+                    "identifier": one.get("identifier")
+                    if isinstance(one.get("identifier"), str)
+                    else None,
+                    "title": one.get("title") if isinstance(one.get("title"), str) else None,
+                    "description": one.get("description")
+                    if isinstance(one.get("description"), str)
+                    else None,
+                    "url": one.get("url") if isinstance(one.get("url"), str) else None,
+                    "state_name": one.get("state", {}).get("name")
+                    if isinstance(one.get("state"), dict)
+                    and isinstance(one.get("state", {}).get("name"), str)
+                    else None,
+                    "project_name": one.get("project", {}).get("name")
+                    if isinstance(one.get("project"), dict)
+                    and isinstance(one.get("project", {}).get("name"), str)
+                    else None,
+                    "assignee_name": one.get("assignee", {}).get("name")
+                    if isinstance(one.get("assignee"), dict)
+                    and isinstance(one.get("assignee", {}).get("name"), str)
+                    else None,
+                    "created_at": one.get("createdAt")
+                    if isinstance(one.get("createdAt"), str)
+                    else None,
+                    "updated_at": one.get("updatedAt")
+                    if isinstance(one.get("updatedAt"), str)
+                    else None,
+                }
+            )
     payload = {
         "issues_probe_count": n,
         "has_more_issues": has_next,
         "projects_probe_count": n_projects,
         "has_more_projects": projects_has_next,
+        "sampled_issues": sampled_issues,
     }
     return _base_result(
         "linear",
@@ -643,6 +786,35 @@ def _fetch_notion(
         if window_start <= edited_dt <= window_end:
             in_window += 1
     n_results = in_window
+    sampled_pages: list[dict[str, Any]] = []
+    if isinstance(rows, list):
+        for row in rows[:30]:
+            if not isinstance(row, dict):
+                continue
+            page_id = row.get("id")
+            if not isinstance(page_id, str):
+                continue
+            title = _notion_result_title(row)
+            sampled_pages.append(
+                {
+                    "id": page_id,
+                    "url": row.get("url") if isinstance(row.get("url"), str) else None,
+                    "title": title,
+                    "owner": row.get("last_edited_by", {}).get("name")
+                    if isinstance(row.get("last_edited_by"), dict)
+                    and isinstance(row.get("last_edited_by", {}).get("name"), str)
+                    else (
+                        row.get("last_edited_by", {}).get("id")
+                        if isinstance(row.get("last_edited_by"), dict)
+                        and isinstance(row.get("last_edited_by", {}).get("id"), str)
+                        else None
+                    ),
+                    "last_edited_time": row.get("last_edited_time")
+                    if isinstance(row.get("last_edited_time"), str)
+                    else None,
+                    "snippet": title,
+                }
+            )
     has_more = bool(body.get("has_more")) if isinstance(body, dict) else False
     caps: list[str] = []
     if has_more:
@@ -680,7 +852,12 @@ def _fetch_notion(
             expected_non_empty_sources=1,
             observed_non_empty_sources=1 if n_results > 0 else 0,
         ),
-        payload={"search_result_count": n_results, "has_more": has_more, "users_me_ok": me_ok},
+        payload={
+            "search_result_count": n_results,
+            "has_more": has_more,
+            "users_me_ok": me_ok,
+            "sampled_pages": sampled_pages,
+        },
     )
 
 
@@ -755,6 +932,7 @@ def _fetch_calls(
     if isinstance(next_page, str) and next_page:
         caps.append("calls_calendar_list_capped_at_20")
     sampled = []
+    sampled_events: list[dict[str, Any]] = []
     events_success = 0
     events_non_empty = 0
     events_capped = 0
@@ -805,6 +983,39 @@ def _fetch_calls(
             events_capped += 1
             caps.append(f"calls_events_capped:{cal_id}")
         sampled.append({"calendar_id": cal_id, "event_count": count, "has_more": has_more})
+        if isinstance(evs, list):
+            for ev in evs[:5]:
+                if not isinstance(ev, dict):
+                    continue
+                eid = ev.get("id")
+                if not isinstance(eid, str):
+                    continue
+                start = ev.get("start")
+                end = ev.get("end")
+                sampled_events.append(
+                    {
+                        "calendar_id": cal_id,
+                        "id": eid,
+                        "summary": ev.get("summary") if isinstance(ev.get("summary"), str) else None,
+                        "description": ev.get("description")
+                        if isinstance(ev.get("description"), str)
+                        else None,
+                        "status": ev.get("status") if isinstance(ev.get("status"), str) else None,
+                        "html_link": ev.get("htmlLink") if isinstance(ev.get("htmlLink"), str) else None,
+                        "organizer_email": ev.get("organizer", {}).get("email")
+                        if isinstance(ev.get("organizer"), dict)
+                        and isinstance(ev.get("organizer", {}).get("email"), str)
+                        else None,
+                        "created": ev.get("created") if isinstance(ev.get("created"), str) else None,
+                        "updated": ev.get("updated") if isinstance(ev.get("updated"), str) else None,
+                        "end": end.get("dateTime")
+                        if isinstance(end, dict) and isinstance(end.get("dateTime"), str)
+                        else None,
+                        "start": start.get("dateTime")
+                        if isinstance(start, dict) and isinstance(start.get("dateTime"), str)
+                        else None,
+                    }
+                )
     return _base_result(
         "calls",
         window_start=window_start,
@@ -829,6 +1040,7 @@ def _fetch_calls(
             "calendar_count": n_items,
             "has_more": bool(next_page),
             "sampled_calendar_events": sampled,
+            "sampled_events": sampled_events[:30],
         },
     )
 

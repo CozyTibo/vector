@@ -27,6 +27,8 @@ type ConnectorFetchResult = {
   window_end: string;
   caps_applied: string[];
   errors: string[];
+  coverage?: Record<string, number>;
+  completeness?: Record<string, number>;
   payload: Record<string, unknown>;
 };
 
@@ -40,6 +42,27 @@ type FetchActivityBundle = {
 type ManagerInsightFetchDebugResponse = {
   fetch: FetchActivityBundle;
   data_reliability: DataReliabilityReport;
+  work_items: {
+    run_id: string;
+    tenant_id: string;
+    window_days: number;
+    items: Array<{
+      id: string;
+      source: string;
+      type: string;
+      title: string;
+      summary: string | null;
+      status: string | null;
+      url: string | null;
+      project: string | null;
+      owner: string | null;
+      participants: string[];
+      created_at: string | null;
+      updated_at: string | null;
+      closed_at: string | null;
+      source_ref: Record<string, string>;
+    }>;
+  };
 };
 
 function tierBadge(tier: ReliabilityTier) {
@@ -65,7 +88,7 @@ export default function AdminTenantManagerInsightPage() {
       adminJson<ManagerInsightFetchDebugResponse>(
         `/admin/tenants/${tenantId}/manager-insight/fetch-debug?window_days=30`,
       ),
-    enabled: Boolean(tenantId),
+    enabled: false,
   });
 
   if (!tenantId) {
@@ -77,15 +100,33 @@ export default function AdminTenantManagerInsightPage() {
       <div>
         <h1 className="text-lg font-semibold text-stone-900">Manager insight</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Step 1 (FetchActivity) + Step 0.5 (data reliability). Re-fetch to see live connector
-          probes for this tenant.
+          Step 1 (FetchActivity) + Step 0.5 (data reliability) + Step 2 (WorkItem normalization).
+          Click run to fetch live connector probes and deterministic normalized work items.
         </p>
+        <div className="mt-3">
+          <button
+            type="button"
+            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-50"
+            disabled={q.isFetching}
+            onClick={() => {
+              void q.refetch();
+            }}
+          >
+            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2"}
+          </button>
+        </div>
       </div>
 
       {q.isLoading ? <p className="text-sm text-stone-600">Loading…</p> : null}
       {q.isError ? (
         <p className="text-sm text-rose-700" role="alert">
           {(q.error as Error).message}
+        </p>
+      ) : null}
+      {!q.data && !q.isFetching && !q.isError ? (
+        <p className="text-sm text-stone-600">
+          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2</span> to fetch and
+          display results.
         </p>
       ) : null}
 
@@ -159,9 +200,69 @@ export default function AdminTenantManagerInsightPage() {
                         <dd className="text-rose-800">{c.errors.join(" · ")}</dd>
                       </div>
                     ) : null}
+                    {c.coverage ? (
+                      <div>
+                        <dt className="font-medium text-stone-700">coverage</dt>
+                        <dd className="font-mono">{JSON.stringify(c.coverage)}</dd>
+                      </div>
+                    ) : null}
+                    {c.completeness ? (
+                      <div>
+                        <dt className="font-medium text-stone-700">completeness</dt>
+                        <dd className="font-mono">{JSON.stringify(c.completeness)}</dd>
+                      </div>
+                    ) : null}
                   </dl>
                   <pre className="mt-2 max-h-64 overflow-auto rounded bg-stone-900/90 p-2 text-xs text-stone-100">
                     {JSON.stringify(c.payload, null, 2)}
+                  </pre>
+                </details>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">WorkItems (Step 2)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              Normalized items: {q.data.work_items.items.length} · run_id {q.data.work_items.run_id}
+            </p>
+            <div className="mt-4 space-y-3">
+              {q.data.work_items.items.length === 0 ? (
+                <p className="text-xs text-stone-500">
+                  No normalized work items produced from current fetch payloads.
+                </p>
+              ) : null}
+              {q.data.work_items.items.map((item) => (
+                <details
+                  key={item.id}
+                  className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2"
+                >
+                  <summary className="cursor-pointer text-sm font-medium text-stone-800">
+                    {item.title}{" "}
+                    <span className="font-normal text-stone-500">
+                      ({item.source} / {item.type})
+                    </span>
+                  </summary>
+                  <dl className="mt-2 grid gap-1 text-xs text-stone-600">
+                    <div>
+                      <dt className="font-medium text-stone-700">id</dt>
+                      <dd className="font-mono">{item.id}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-stone-700">status</dt>
+                      <dd>{item.status ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-stone-700">summary</dt>
+                      <dd>{item.summary ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-stone-700">updated_at</dt>
+                      <dd className="font-mono">{item.updated_at ?? "—"}</dd>
+                    </div>
+                  </dl>
+                  <pre className="mt-2 max-h-64 overflow-auto rounded bg-stone-900/90 p-2 text-xs text-stone-100">
+                    {JSON.stringify(item, null, 2)}
                   </pre>
                 </details>
               ))}

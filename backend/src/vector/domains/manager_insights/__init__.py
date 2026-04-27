@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from vector.contracts.manager_insights_activity import ManagerInsightFetchDebugResponse
+from vector.domains.manager_insights.build_work_items import build_work_items
 from vector.domains.manager_insights.data_reliability import compute_data_reliability
 from vector.domains.manager_insights.fetch_activity import run_fetch_activity_bundle
 from vector.settings import Settings
@@ -31,11 +32,17 @@ def run_manager_insights_fetch_debug(
         as_of=as_of,
     )
     reliability = compute_data_reliability(bundle)
-    return ManagerInsightFetchDebugResponse(fetch=bundle, data_reliability=reliability)
+    work_items = build_work_items(bundle)
+    return ManagerInsightFetchDebugResponse(
+        fetch=bundle,
+        data_reliability=reliability,
+        work_items=work_items,
+    )
 
 
 __all__ = [
     "compute_data_reliability",
+    "build_work_items",
     "run_fetch_activity_bundle",
     "run_manager_insights_fetch_debug",
 ]

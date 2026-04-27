@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 ManagerInsightConnector = Literal["slack", "github", "linear", "notion", "calls"]
 
 DataReliabilityTier = Literal["high", "medium", "low"]
+WorkItemType = Literal["issue", "pull_request", "document", "call", "message_thread"]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -94,10 +95,43 @@ class DataReliabilityReport(BaseModel):
     overall_confidence: DataReliabilityTier
 
 
+class WorkItem(BaseModel):
+    """Step 2 normalized work item consumed by downstream pipeline steps."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    source: ManagerInsightConnector
+    type: WorkItemType
+    title: str
+    summary: str | None = None
+    status: str | None = None
+    url: str | None = None
+    project: str | None = None
+    owner: str | None = None
+    participants: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    closed_at: datetime | None = None
+    source_ref: dict[str, str] = Field(default_factory=dict)
+
+
+class WorkItemBundle(BaseModel):
+    """Step 2 output for one run."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    items: list[WorkItem] = Field(default_factory=list)
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload: Step 1 + Step 0.5 together."""
+    """Admin (and internal) debug payload: Step 1 + Step 0.5 + Step 2."""
 
     model_config = ConfigDict(from_attributes=False)
 
     fetch: FetchActivityBundle
     data_reliability: DataReliabilityReport
+    work_items: WorkItemBundle
