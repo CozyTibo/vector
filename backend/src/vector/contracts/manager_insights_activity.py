@@ -12,6 +12,7 @@ ManagerInsightConnector = Literal["slack", "github", "linear", "notion", "calls"
 
 DataReliabilityTier = Literal["high", "medium", "low"]
 WorkItemType = Literal["issue", "pull_request", "document", "call", "message_thread"]
+EvidenceKind = Literal["action_item", "blocker", "decision"]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -127,11 +128,42 @@ class WorkItemBundle(BaseModel):
     items: list[WorkItem] = Field(default_factory=list)
 
 
+class EvidenceItem(BaseModel):
+    """Step 3 extracted evidence item with strict citation fields."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    kind: EvidenceKind
+    statement: str
+    evidence: str
+    source_work_item_id: str
+    source_connector: ManagerInsightConnector
+    source_type: WorkItemType
+    source_ref: dict[str, str] = Field(default_factory=dict)
+    linked_work_items: list[str] = Field(default_factory=list)
+
+
+class EvidenceBundle(BaseModel):
+    """Step 3 output from evidence extraction."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    action_items: list[EvidenceItem] = Field(default_factory=list)
+    blockers: list[EvidenceItem] = Field(default_factory=list)
+    decisions: list[EvidenceItem] = Field(default_factory=list)
+    discarded_without_evidence: int = Field(default=0, ge=0)
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload: Step 1 + Step 0.5 + Step 2."""
+    """Admin (and internal) debug payload: Step 1 + Step 0.5 + Step 2 + Step 3."""
 
     model_config = ConfigDict(from_attributes=False)
 
     fetch: FetchActivityBundle
     data_reliability: DataReliabilityReport
     work_items: WorkItemBundle
+    evidence: EvidenceBundle

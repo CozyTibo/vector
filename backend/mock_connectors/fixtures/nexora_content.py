@@ -451,10 +451,66 @@ def issue_title_and_body(
         prefix = "[Spike] "
     if issue_index % 11 == 0:
         return f"{identifier} — Untitled / missing triage title", ""
+    desc = append_linear_issue_manager_insight_extras(issue_index, desc)
     return f"{identifier} — {prefix}{title_tmpl}", desc
 
 
-# Comment arcs: (role, body_template). Roles include pm, assignee, eng, design, support, …
+def append_linear_issue_manager_insight_extras(issue_index: int, desc: str) -> str:
+    """Sparse body paragraphs for admin Step-3 QA: verifiable quotes that are not the title line."""
+    if not (desc and desc.strip()):
+        return desc
+    # One in eight issues: short multi-sentence block (decisions / blockers / action / waiting)
+    if issue_index % 8 != 0:
+        return desc
+    block = _MANAGER_INSIGHT_LINEAR_EXTRAS[(issue_index // 8) % len(_MANAGER_INSIGHT_LINEAR_EXTRAS)]
+    return f"{desc.rstrip()}{block}"
+
+
+# Rotating append-only copy for local dev / admin evidence preview (substring-verified in Step 3).
+_MANAGER_INSIGHT_LINEAR_EXTRAS: tuple[str, ...] = (
+    "\n\nWe decided to run the risky migration in two phases. The team agreed to keep the feature flag on through the pilot week.",
+    "\n\nWe are blocked waiting on InfoSec to approve the new outbound domain. We cannot cut a customer release until that sign-off is linked here.",
+    "\n\nNext step: the owner should follow up with SRE about the noisy page after deploy. This is a todo before Friday so on-call is not surprised.",
+    "\n\nThe team selected Postgres for the new audit store; we will not revisit MySQL for this use case. Agreed: document the exception in the security pack.",
+    "\n\nAction item: send the partner the rotated webhook secret after their maintenance window. Must happen before we enable the integration in production.",
+    "\n\nIntegration health is degraded in staging: we are stuck on a partner timeout and need a clear owner. Blocked: cannot promote the dashboard until the dependency is green again.",
+    "\n\nWe agreed to pause scope on bulk import until the CSV contract tests land. Chosen path is to ship row-level warnings first, then hard reject in a follow-up ticket.",
+    "\n\nFollow up from standup: someone must review the runbook and update the rollback steps. Should happen before the next change window, not after.",
+    "\n\nDecided: defer dark mode until the accessibility audit finishes. We will ship contrast fixes only in this cycle.",
+    "\n\nCustomer call notes: we will send the revised DPA on Monday. Next step: legal must confirm the subprocessors list is complete.",
+    "\n\nThe cohort is waiting on the vendor to confirm the signed payload format. Blocked: no code merge until we have a sample 200 response in the ticket.",
+    "\n\nAction item: run the backup restore drill in staging and post screenshots in this thread. Must complete before the production cutover window.",
+)
+
+
+def enrich_github_pr_body_for_manager_insight(issue_index: int, body: str) -> str:
+    """Sparse PR body text so action/blocker/decision evidence can quote description, not only the title."""
+    if issue_index % 7 != 0:
+        return body
+    b = (body or "").rstrip()
+    line = _MANAGER_INSIGHT_GH_PR_EXTRAS[(issue_index // 7) % len(_MANAGER_INSIGHT_GH_PR_EXTRAS)]
+    return f"{b}{line}"
+
+
+# Matched to extract_evidence.py keyword patterns: decided, blocked, must, follow up, etc.
+_MANAGER_INSIGHT_GH_PR_EXTRAS: tuple[str, ...] = (
+    "\n\nWe decided to keep the canary at 5% through the weekend. No further promotion without SRE sign-off.",
+    "\n\nBlocked: cannot merge until the contract tests for the auth plugin pass in CI on every run.",
+    "\n\nNext step: follow up in the release thread with post-deploy error rate screenshots. Should happen within one business day.",
+    "\n\nThe team agreed to treat this as a hotfix. We will roll forward instead of reverting main, and we will document the blast radius in the postmortem draft.",
+    "\n\nAction item: update the on-call runbook with the new rollback command before the next change window. Must be merged with this pull request.",
+    "\n\nWe are waiting on the integration partner to confirm the signed webhook. Blocked: no tag until the vendor sample request is closed.",
+    "\n\nDecided: use feature flag integrations newSigning and keep it at 0% in production until the audit is done. Agreed: no customer traffic without sign-off.",
+    "\n\nThis is a todo for the author: add a follow up ticket for the flaky test so CI stops burning the queue. Should be quick.",
+    "\n\nChosen path is to ship the small client fix only. We will defer bulk retry changes until the next milestone, as agreed in planning.",
+    "\n\nWe agreed to time-box the review: must finish before Friday or we will move the merge to the next window.",
+    "\n\nStuck: we cannot get green until someone from Platform fixes the mock certificate in staging. Please update the thread when the dependency clears.",
+    "\n\nWe will send the final smoke-test checklist to the release channel. Next step: assign an explicit owner in Slack and pin the thread.",
+    "\n\nThe cohort decided to backport this patch to the long-term support branch. We will not cherry-pick after GA unless a customer incident appears.",
+    "\n\nBlocker: integration health is degraded in the dashboard; we cannot ship until the synthetic probe is green for two hours.",
+    "\n\nWe selected Redis for the session path here. We will not add another datastore dependency in this same pull request. Agreed in standup this morning.",
+)
+
 # Placeholders: ident, title_short, repo, customer, project, epic, a_first, c_first, pm_first.
 
 COMMENT_ARCS: tuple[tuple[tuple[str, str], ...], ...] = (

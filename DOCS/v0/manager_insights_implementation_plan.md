@@ -51,7 +51,8 @@ Update this table only when a step is truly complete against its own checklist a
 | Step 1 — FetchActivity | `completed` | All target connectors implemented to the agreed V0 scope, metadata present, tests passing, and Admin tab checklist row fully satisfied. |
 | Step 0.5 — Data reliability | `completed` | Deterministic tiers + reason codes + overall confidence aligned with defaults/config, tests passing, and Admin tab checklist row fully satisfied. |
 | Step 2 — Normalization → WorkItems | `completed` | Deterministic `raw_* -> WorkItem` mapping from Step 1 payloads, stable IDs + timestamps + source/type fields, tests passing, and Manager insight tab renders Step 2 artifacts for QA. |
-| Step 3+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
+| Step 3 — Evidence extraction | `completed` | Deterministic extraction of `action_items` / `blockers` / `decisions` with strict non-empty evidence quotes, source references, and explicit discard tracking; Step 3 artifacts visible in Manager insight tab for QA. |
+| Step 4+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
 
 **Current note (2026-04-27):**
 
@@ -61,7 +62,9 @@ Update this table only when a step is truly complete against its own checklist a
 - Step 1 + Step 0.5 tests are passing in `backend/tests/vector/domains/manager_insights/test_fetch_activity.py` and `backend/tests/vector/domains/manager_insights/test_data_reliability.py`.
 - Step 2 is now implemented in `vector/domains/manager_insights/build_work_items.py` and exposed via the same admin debug endpoint/UI (`Manager insight` tab): each normalized work item is visible with source/type/status/timestamps and full JSON payload for QA.
 - Step 2 tests are passing in `backend/tests/vector/domains/manager_insights/test_build_work_items.py`.
-- Remaining work after Step 2: **none in scope for Steps 1/0.5/2** (runtime prerequisites still apply: valid OAuth credentials/scopes and connector API access in each tenant environment). Next planned work starts at Step 3.
+- Step 3 is now implemented in `vector/domains/manager_insights/extract_evidence.py` and exposed via the same admin debug endpoint/UI: extracted action items, blockers, and decisions are displayed with quote evidence and source work-item references.
+- Step 3 tests are passing in `backend/tests/vector/domains/manager_insights/test_extract_evidence.py`.
+- Remaining work after Step 3: **none in scope for Steps 1/0.5/2/3** (runtime prerequisites still apply: valid OAuth credentials/scopes and connector API access in each tenant environment). Next planned work starts at Step 4.
 
 ---
 

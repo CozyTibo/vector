@@ -63,6 +63,39 @@ type ManagerInsightFetchDebugResponse = {
       source_ref: Record<string, string>;
     }>;
   };
+  evidence: {
+    run_id: string;
+    tenant_id: string;
+    window_days: number;
+    discarded_without_evidence: number;
+    action_items: Array<{
+      id: string;
+      statement: string;
+      evidence: string;
+      source_work_item_id: string;
+      source_connector: string;
+      source_type: string;
+      source_ref: Record<string, string>;
+    }>;
+    blockers: Array<{
+      id: string;
+      statement: string;
+      evidence: string;
+      source_work_item_id: string;
+      source_connector: string;
+      source_type: string;
+      source_ref: Record<string, string>;
+    }>;
+    decisions: Array<{
+      id: string;
+      statement: string;
+      evidence: string;
+      source_work_item_id: string;
+      source_connector: string;
+      source_type: string;
+      source_ref: Record<string, string>;
+    }>;
+  };
 };
 
 function tierBadge(tier: ReliabilityTier) {
@@ -100,8 +133,8 @@ export default function AdminTenantManagerInsightPage() {
       <div>
         <h1 className="text-lg font-semibold text-stone-900">Manager insight</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Step 1 (FetchActivity) + Step 0.5 (data reliability) + Step 2 (WorkItem normalization).
-          Click run to fetch live connector probes and deterministic normalized work items.
+          Step 1 (FetchActivity) + Step 0.5 (data reliability) + Step 2 (WorkItem normalization) +
+          Step 3 (Evidence extraction). Click run to fetch and inspect each stage.
         </p>
         <div className="mt-3">
           <button
@@ -112,7 +145,7 @@ export default function AdminTenantManagerInsightPage() {
               void q.refetch();
             }}
           >
-            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2"}
+            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3"}
           </button>
         </div>
       </div>
@@ -125,7 +158,7 @@ export default function AdminTenantManagerInsightPage() {
       ) : null}
       {!q.data && !q.isFetching && !q.isError ? (
         <p className="text-sm text-stone-600">
-          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2</span> to fetch and
+          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2 → 3</span> to fetch and
           display results.
         </p>
       ) : null}
@@ -265,6 +298,41 @@ export default function AdminTenantManagerInsightPage() {
                     {JSON.stringify(item, null, 2)}
                   </pre>
                 </details>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">Evidence extraction (Step 3)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              Action items: {q.data.evidence.action_items.length} · Blockers:{" "}
+              {q.data.evidence.blockers.length} · Decisions: {q.data.evidence.decisions.length} ·
+              Discarded (no verifiable quote): {q.data.evidence.discarded_without_evidence}
+            </p>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              {(
+                [
+                  ["Action items", q.data.evidence.action_items],
+                  ["Blockers", q.data.evidence.blockers],
+                  ["Decisions", q.data.evidence.decisions],
+                ] as const
+              ).map(([label, rows]) => (
+                <div key={label} className="rounded-md border border-stone-100 bg-stone-50 p-3">
+                  <h3 className="text-sm font-semibold text-stone-800">{label}</h3>
+                  {rows.length === 0 ? (
+                    <p className="mt-2 text-xs text-stone-500">No items extracted.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-2">
+                      {rows.map((row) => (
+                        <li key={row.id} className="rounded border border-stone-200 bg-white p-2 text-xs">
+                          <p className="font-medium text-stone-800">{row.statement}</p>
+                          <p className="mt-1 text-stone-600">Quote: "{row.evidence}"</p>
+                          <p className="mt-1 font-mono text-stone-500">{row.source_work_item_id}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               ))}
             </div>
           </section>

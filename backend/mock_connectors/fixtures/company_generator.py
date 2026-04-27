@@ -1167,7 +1167,9 @@ def _build_github(
                 "number": pr_num,
                 "node_id": f"PR_kwDO{700000 + pr_num}",
                 "title": "fix: cache invalidation for session store",
-                "body": "Shadow path — ticket backfill pending.",
+                "body": nx.enrich_github_pr_body_for_manager_insight(
+                    pr_num, "Shadow path — ticket backfill pending."
+                ),
                 "state": "closed" if merged else "open",
                 "draft": False,
                 "user": gh_user_blob(author),
@@ -1224,6 +1226,7 @@ def _build_github(
         else:
             title = "drive-by rename internal helper"
             body = ""
+        body = nx.enrich_github_pr_body_for_manager_insight(i, body)
         merged = ps.merged_offset_h is not None and not ps.abandoned
         pr = {
             "id": 700000 + pr_num,
