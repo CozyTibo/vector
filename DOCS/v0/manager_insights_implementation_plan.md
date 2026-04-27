@@ -47,14 +47,15 @@ Update this table only when a step is truly complete against its own checklist a
 
 | Step | Status | Completion gate |
 | --- | --- | --- |
-| Step 0 — Contracts | `in_progress` | All required models in Step 0 present, wired, and used by downstream steps without ad-hoc fields. |
+| Step 0 — Contracts | `completed` | Canonical Step-0 contract tree (`UserReportContext`, `SignalsV0`, `InterpretationV0`, `InsightV0`, `InsightArbitrationResult`, `ReportV0`, links/gaps/evidence bundles) exists in code with strict validation (`extra=forbid`) and round-trip JSON tests. |
 | Step 1 — FetchActivity | `completed` | All target connectors implemented to the agreed V0 scope, metadata present, tests passing, and Admin tab checklist row fully satisfied. |
 | Step 0.5 — Data reliability | `completed` | Deterministic tiers + reason codes + overall confidence aligned with defaults/config, tests passing, and Admin tab checklist row fully satisfied. |
 | Step 2 — Normalization → WorkItems | `completed` | Deterministic `raw_* -> WorkItem` mapping from Step 1 payloads, stable IDs + timestamps + source/type fields, tests passing, and Manager insight tab renders Step 2 artifacts for QA. |
 | Step 3 — Evidence extraction | `completed` | Deterministic extraction of `action_items` / `blockers` / `decisions` with strict non-empty evidence quotes, source references, and explicit discard tracking; Step 3 artifacts visible in Manager insight tab for QA. |
-| Step 4+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
+| Step 4 — Links | `completed` | Deterministic token-Jaccard (+ cross-source nudge + shared issue keys + optional Step-3 text hits) work-item `Link` edges with `confidence` + `evidence`; `high` only at/above published thresholds; tests; Manager insight tab shows Step 4. |
+| Step 5+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
 
-**Current note (2026-04-27):**
+**Current note (2026-04-28):**
 
 - Step 1 + Step 0.5 are wired in backend + admin surfaces, including tenant OAuth connect links for all five connectors (Slack, GitHub, Linear, Notion, Calls/Gemini).
 - Step 1 now performs bounded-window activity probes per connector (Slack channel history samples, GitHub repo/PR/issue samples, Linear issues/projects window query, Notion edited-page search + users/me probe, Calls calendar + events samples) and emits `fetched_at`, window bounds, caps, errors, coverage stats, completeness stats, and payload summaries.
@@ -64,7 +65,10 @@ Update this table only when a step is truly complete against its own checklist a
 - Step 2 tests are passing in `backend/tests/vector/domains/manager_insights/test_build_work_items.py`.
 - Step 3 is now implemented in `vector/domains/manager_insights/extract_evidence.py` and exposed via the same admin debug endpoint/UI: extracted action items, blockers, and decisions are displayed with quote evidence and source work-item references.
 - Step 3 tests are passing in `backend/tests/vector/domains/manager_insights/test_extract_evidence.py`.
-- Remaining work after Step 3: **none in scope for Steps 1/0.5/2/3** (runtime prerequisites still apply: valid OAuth credentials/scopes and connector API access in each tenant environment). Next planned work starts at Step 4.
+- **Step 4 (semantic links)** is implemented in `vector/domains/manager_insights/link_work_items.py` (inputs: `WorkItemBundle` + optional `EvidenceBundle`). It produces `WorkItemLink` / `LinkBundle` in `vector/contracts/manager_insights_activity.py` with Jaccard thresholds `high≥0.40`, `medium≥0.24`, `low≥0.14` (plus a small cross-source bonus, shared ticket-key path `NEX-…` → `link_type=shared_reference`, and optional token hits from Step-3 snippets against the *other* work item). Pairs are bounded by sorting and at most 120 work items. Admin debug `GET /admin/tenants/…/manager-insight/fetch-debug` and **Manager insight** tab run **Step 1 → 0.5 → 2 → 3 → 4**; UI section **Semantic links (Step 4)**.
+- Step 4 tests: `backend/tests/vector/domains/manager_insights/test_link_work_items.py`.
+- **Step 0 canonical pass** is now implemented in `vector/contracts/manager_insights.py`: strict (`extra=forbid`) Pydantic models for `WorkItem`, `Link`, `ActionItem`/`Blocker`/`Decision`, `ExpectedWork`/`ActualWork`/`Gap`, `DeliveryMetrics`, `KeyAchievement`/`RawHighlight` bundles, full `SignalsV0` enums, `InterpretationV0`, `InsightV0`, `InsightArbitrationResult`, `ReportV0`, and `UserReportContext`; covered by `backend/tests/vector/contracts/test_manager_insights_contracts.py` (round-trip + unknown-field rejection + report cap check).
+- Remaining work after Step 4 + Step 0 pass: pipeline feature work continues at **Step 5 (Gaps)**. Runtime prerequisites unchanged (tenant OAuth, connector access).
 
 ---
 

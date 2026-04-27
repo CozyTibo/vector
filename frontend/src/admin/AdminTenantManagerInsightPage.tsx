@@ -96,6 +96,22 @@ type ManagerInsightFetchDebugResponse = {
       source_ref: Record<string, string>;
     }>;
   };
+  links: {
+    run_id: string;
+    tenant_id: string;
+    window_days: number;
+    work_items_capped: number;
+    links: Array<{
+      id: string;
+      from_work_item_id: string;
+      to_work_item_id: string;
+      link_type: string;
+      confidence: ReliabilityTier;
+      similarity: number;
+      method: string;
+      evidence: string;
+    }>;
+  };
 };
 
 function tierBadge(tier: ReliabilityTier) {
@@ -134,7 +150,7 @@ export default function AdminTenantManagerInsightPage() {
         <h1 className="text-lg font-semibold text-stone-900">Manager insight</h1>
         <p className="mt-1 text-sm text-stone-600">
           Step 1 (FetchActivity) + Step 0.5 (data reliability) + Step 2 (WorkItem normalization) +
-          Step 3 (Evidence extraction). Click run to fetch and inspect each stage.
+          Step 3 (Evidence) + Step 4 (Links). Click run to fetch and inspect each stage.
         </p>
         <div className="mt-3">
           <button
@@ -145,7 +161,7 @@ export default function AdminTenantManagerInsightPage() {
               void q.refetch();
             }}
           >
-            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3"}
+            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4"}
           </button>
         </div>
       </div>
@@ -158,7 +174,7 @@ export default function AdminTenantManagerInsightPage() {
       ) : null}
       {!q.data && !q.isFetching && !q.isError ? (
         <p className="text-sm text-stone-600">
-          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2 → 3</span> to fetch and
+          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4</span> to fetch and
           display results.
         </p>
       ) : null}
@@ -335,6 +351,50 @@ export default function AdminTenantManagerInsightPage() {
                 </div>
               ))}
             </div>
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">Semantic links (Step 4)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              Best-effort edges (not ground truth). High: {q.data.links.links.filter((L) => L.confidence === "high").length} ·
+              medium: {q.data.links.links.filter((L) => L.confidence === "medium").length} · low:{" "}
+              {q.data.links.links.filter((L) => L.confidence === "low").length} · run_id {q.data.links.run_id}
+              {q.data.links.work_items_capped > 0 ? (
+                <span>
+                  {" "}
+                  · linking capped to first {q.data.links.work_items_capped} work items (by id) for
+                  cost bounds
+                </span>
+              ) : null}
+            </p>
+            {q.data.links.links.length === 0 ? (
+              <p className="mt-3 text-xs text-stone-500">
+                No links above the minimum similarity floor. Add more overlapping titles or shared
+                issue keys (e.g. NEX-12) across tools.
+              </p>
+            ) : (
+              <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+                {q.data.links.links.map((L) => (
+                  <li
+                    key={L.id}
+                    className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs"
+                  >
+                    <div className="flex flex-wrap items-center gap-2 text-stone-800">
+                      <span className="font-mono">{L.from_work_item_id}</span>
+                      <span className="text-stone-400">→</span>
+                      <span className="font-mono">{L.to_work_item_id}</span>
+                      <span className="rounded bg-stone-200/80 px-1.5 py-0.5 text-[10px] uppercase text-stone-600">
+                        {L.link_type.replace("_", " ")}
+                      </span>
+                      {tierBadge(L.confidence)}
+                      <span className="text-stone-500">sim {L.similarity.toFixed(3)}</span>
+                    </div>
+                    <p className="mt-1 text-stone-600">{L.evidence}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-stone-400">{L.method}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </div>
       ) : null}

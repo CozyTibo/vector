@@ -1,4 +1,4 @@
-"""Contracts for Manager insights Step 1 (FetchActivity) + Step 0.5 (Data reliability)."""
+"""Contracts for Manager insights: fetch, reliability, work items, evidence, and links (Steps 1–4)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ ManagerInsightConnector = Literal["slack", "github", "linear", "notion", "calls"
 DataReliabilityTier = Literal["high", "medium", "low"]
 WorkItemType = Literal["issue", "pull_request", "document", "call", "message_thread"]
 EvidenceKind = Literal["action_item", "blocker", "decision"]
+LinkType = Literal["semantic_match", "shared_reference"]
+LinkConfidence = Literal["high", "medium", "low"]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -158,8 +160,41 @@ class EvidenceBundle(BaseModel):
     discarded_without_evidence: int = Field(default=0, ge=0)
 
 
+class WorkItemLink(BaseModel):
+    """Step 4: hypothesis edge between two work items (best-effort, not ground truth)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    from_work_item_id: str
+    to_work_item_id: str
+    link_type: LinkType
+    confidence: LinkConfidence
+    similarity: float = Field(ge=0.0, le=1.0, description="Deterministic 0-1 token overlap score")
+    method: str = Field(default="token_jaccard", description="Scoring method for audits")
+    evidence: str = Field(
+        description="Why we think these relate (overlaps + short snippets, citeable in QA)",
+    )
+
+
+class LinkBundle(BaseModel):
+    """Step 4 output: semantic / reference links for one run."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    links: list[WorkItemLink] = Field(default_factory=list)
+    work_items_capped: int = Field(
+        default=0,
+        ge=0,
+        description="If >0, work item list was truncated to this count before O(n^2) linking",
+    )
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload: Step 1 + Step 0.5 + Step 2 + Step 3."""
+    """Admin (and internal) debug payload: Step 1 + Step 0.5 + Step 2 + Step 3 + Step 4."""
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -167,3 +202,4 @@ class ManagerInsightFetchDebugResponse(BaseModel):
     data_reliability: DataReliabilityReport
     work_items: WorkItemBundle
     evidence: EvidenceBundle
+    links: LinkBundle
