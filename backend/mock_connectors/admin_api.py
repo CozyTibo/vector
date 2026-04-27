@@ -38,6 +38,9 @@ def build_admin_router() -> APIRouter:
         d = state.data
         gh = d["github"]
         lin = d["linear"]
+        notion = d.get("notion") if isinstance(d.get("notion"), dict) else {}
+        calls = d.get("calls") if isinstance(d.get("calls"), dict) else {}
+        slack_events = d.get("slack_events") if isinstance(d.get("slack_events"), list) else []
         return {
             "seed": state.seed,
             "github": {
@@ -60,7 +63,15 @@ def build_admin_router() -> APIRouter:
                 "issue_relations": len(lin["issueRelations"]),
                 "workflow_states": len(lin["workflowStates"]),
             },
+            "slack": {"events": len(slack_events)},
+            "notion": {"pages": len(notion.get("sampled_pages", []))},
+            "calls": {"events": len(calls.get("sampled_events", []))},
         }
+
+    @r.get("/dataset/full")
+    def dataset_full() -> dict[str, Any]:
+        # Local dev only; payload intentionally verbose for manager-insights mock runs.
+        return {"seed": state.seed, **state.data}
 
     @r.get("/scenarios")
     def scenarios() -> list[str]:

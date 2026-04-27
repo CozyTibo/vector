@@ -1,6 +1,6 @@
 # Local mock connectors (development only)
 
-Mock HTTP server for **GitHub REST** and **Linear GraphQL** (and an optional `/linear/oauth/token` stub). **Docker Compose** starts it as the **`mock-connectors`** service (`0.0.0.0:9183` in-container, port **9183** on the host). **Makefile** can run the same app on **127.0.0.1** only for a host-only backend. The Vector backend exchanges Linear OAuth codes with **real** `https://api.linear.app/oauth/token`, resolves viewer/org with **real** `https://api.linear.app/graphql`, then sends **ingestion** GraphQL to this mock when `VECTOR_USE_MOCK_CONNECTORS=true`.
+Mock HTTP server for **GitHub REST** and **Linear GraphQL** (and an optional `/linear/oauth/token` stub), plus a full **mock company dataset** used by Manager Insights mock mode (Slack, Notion, Calls payloads alongside GitHub/Linear). **Docker Compose** starts it as the **`mock-connectors`** service (`0.0.0.0:9183` in-container, port **9183** on the host). **Makefile** can run the same app on **127.0.0.1** only for a host-only backend. The Vector backend exchanges Linear OAuth codes with **real** `https://api.linear.app/oauth/token`, resolves viewer/org with **real** `https://api.linear.app/graphql`, then sends **ingestion** GraphQL to this mock when `VECTOR_USE_MOCK_CONNECTORS=true`.
 
 **Do not** enable this in production, CI, or AWS. Server-side rules: `VECTOR_USE_MOCK_CONNECTORS=true` is valid only when `ENV=development`.
 
@@ -34,7 +34,8 @@ Health (host): `http://127.0.0.1:9183/health` (includes current `seed`).
 | Method | Path | Purpose |
 |--------|------|---------|
 | `POST` | `/admin/reseed?seed=<int>` | Regenerate in-memory dataset (no uvicorn restart). |
-| `GET` | `/admin/dataset` | JSON with `seed`, `github` (…), and `linear` (teams, projects, epics, **initiatives**, **cycles**, **issue_labels**, issues, users, comments, relations, workflow states). |
+| `GET` | `/admin/dataset` | Summary counts for `github`, `linear`, `slack`, `notion`, `calls`. |
+| `GET` | `/admin/dataset/full` | Full deterministic company dataset (`github`, `linear`, `slack_events`, `notion`, `calls`, edges, patterns). |
 | `GET` | `/admin/scenarios` | Scenario slugs present in the dataset (strategy §11). |
 
 Reseed from Makefile (mock server must be running):

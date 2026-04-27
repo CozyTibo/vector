@@ -1,4 +1,4 @@
-"""Unified local mock: GitHub REST + Linear OAuth/GraphQL on one host.
+"""Unified local mock: GitHub + Linear APIs + full company fixture payloads.
 
 **Docker Compose** runs this on `0.0.0.0:9183` as the `mock-connectors` service. **Makefile**
 `mock-connectors-up` binds **127.0.0.1** only for host-only dev. Not for production or CI.

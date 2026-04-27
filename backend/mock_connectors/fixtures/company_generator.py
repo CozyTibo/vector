@@ -1,4 +1,4 @@
-"""Deterministic Nexora dataset for GitHub + Linear mocks (local dev only)."""
+"""Deterministic Nexora dataset for full mock company connectors (local dev only)."""
 
 from __future__ import annotations
 
@@ -172,6 +172,8 @@ class MockDataset:
     github: dict[str, Any]
     linear: dict[str, Any]
     slack_events: list[dict[str, Any]]
+    notion: dict[str, Any]
+    calls: dict[str, Any]
     edges: list[dict[str, str]]
     pattern_coverage: list[str]
     meta: dict[str, Any] = field(default_factory=dict)
@@ -188,6 +190,8 @@ def generate_dataset(seed: int) -> MockDataset:
     gh_pkg = _build_github(seed, rng, users, repos, linear_pkg, t0, end)
     _assert_no_github_activity_for_linear_only_users(users, gh_pkg)
     slack_events = _build_slack(seed, linear_pkg, t0, end)
+    notion_pkg = _build_notion(seed, users, linear_pkg, slack_events, t0, end)
+    calls_pkg = _build_calls(seed, users, linear_pkg, slack_events, t0, end)
     edges = _build_edges(linear_pkg, gh_pkg, users)
     patterns = _verify_patterns(linear_pkg, gh_pkg, slack_events)
 
@@ -197,6 +201,8 @@ def generate_dataset(seed: int) -> MockDataset:
         github=gh_pkg,
         linear=linear_pkg,
         slack_events=slack_events,
+        notion=notion_pkg,
+        calls=calls_pkg,
         edges=edges,
         pattern_coverage=patterns,
         meta={
@@ -217,6 +223,8 @@ def dataset_to_json_dict(ds: MockDataset) -> dict[str, Any]:
         "github": ds.github,
         "linear": linear,
         "slack_events": ds.slack_events,
+        "notion": ds.notion,
+        "calls": ds.calls,
         "edges": ds.edges,
         "pattern_coverage": ds.pattern_coverage,
         "meta": ds.meta,
@@ -1492,6 +1500,128 @@ def _build_edges(
         edges.append({"from": iss["id"], "to": iss["project"]["id"], "kind": "issue_project"})
         i += 1
     return edges
+
+
+def _build_notion(
+    seed: int,
+    users: list[dict[str, Any]],
+    linear_pkg: dict[str, Any],
+    slack_events: list[dict[str, Any]],
+    t0: datetime,
+    end: datetime,
+) -> dict[str, Any]:
+    del t0, end
+    pages: list[dict[str, Any]] = []
+    issues = linear_pkg.get("issues", [])
+    comments = linear_pkg.get("comments", [])
+    for i, issue in enumerate(issues[:24]):
+        owner = users[i % len(users)]
+        title = f"{issue.get('identifier', 'NEX')} - {issue.get('title', 'Execution note')}"
+        snippet = (
+            f"Spec sync for {issue.get('project', {}).get('name', 'core')}. "
+            f"Status: {issue.get('state', {}).get('name', 'unknown')}. "
+            f"Track in {issue.get('identifier', 'NEX')} and related PRs."
+        )
+        edited = issue.get("updatedAt")
+        pages.append(
+            {
+                "id": _u(seed, "notion", "page", str(i)),
+                "url": f"https://www.notion.so/nexora/{_u(seed, 'notion-url', str(i)).replace('-', '')}",
+                "title": title,
+                "owner": owner.get("name") or owner.get("login"),
+                "last_edited_time": edited if isinstance(edited, str) else _iso(datetime.now(tz=UTC)),
+                "snippet": snippet,
+            }
+        )
+    for j, ev in enumerate(slack_events[:8]):
+        title = f"Slack follow-up {j + 1}: {ev.get('channel', '#channel')}"
+        pages.append(
+            {
+                "id": _u(seed, "notion", "slack-page", str(j)),
+                "url": f"https://www.notion.so/nexora/{_u(seed, 'notion-slack', str(j)).replace('-', '')}",
+                "title": title,
+                "owner": ev.get("user_email") or "team@nexora.dev",
+                "last_edited_time": ev.get("ts") if isinstance(ev.get("ts"), str) else _iso(datetime.now(tz=UTC)),
+                "snippet": f"Thread summary: {str(ev.get('text', ''))[:180]}",
+            }
+        )
+    return {
+        "search_result_count": len(pages),
+        "has_more": len(pages) > 20,
+        "users_me_ok": True,
+        "sampled_pages": pages[:30],
+        "source_counts": {"issues": min(len(issues), 24), "slack": min(len(slack_events), 8), "comments": len(comments)},
+    }
+
+
+def _build_calls(
+    seed: int,
+    users: list[dict[str, Any]],
+    linear_pkg: dict[str, Any],
+    slack_events: list[dict[str, Any]],
+    t0: datetime,
+    end: datetime,
+) -> dict[str, Any]:
+    del end
+    calendars = [
+        {"id": "eng-team@nexora.dev", "summary": "Engineering Team"},
+        {"id": "product-sync@nexora.dev", "summary": "Product Sync"},
+        {"id": "incident@nexora.dev", "summary": "Incident"},
+    ]
+    issues = linear_pkg.get("issues", [])
+    events: list[dict[str, Any]] = []
+    for i, issue in enumerate(issues[:18]):
+        cal = calendars[i % len(calendars)]
+        owner = users[(i + 2) % len(users)]
+        start = datetime.fromisoformat(str(issue.get("createdAt", _iso(t0))).replace("Z", "+00:00")) + timedelta(days=1)
+        end_dt = start + timedelta(minutes=45 + (i % 3) * 15)
+        events.append(
+            {
+                "calendar_id": cal["id"],
+                "id": _u(seed, "calls", "event", str(i)),
+                "summary": f"{issue.get('identifier', 'NEX')} discussion - {issue.get('title', 'Execution topic')}",
+                "description": (
+                    f"Agenda: blockers, ownership, and follow-up for {issue.get('identifier', 'NEX')}. "
+                    "Capture next actions and links to issue/PR."
+                ),
+                "status": "confirmed",
+                "html_link": f"https://meet.google.com/{_u(seed, 'meet', str(i))[:10]}",
+                "organizer_email": owner.get("email") or "manager@nexora.dev",
+                "created": _iso(start - timedelta(hours=6)),
+                "updated": _iso(start - timedelta(hours=2)),
+                "start": _iso(start),
+                "end": _iso(end_dt),
+            }
+        )
+    for j, ev in enumerate(slack_events[:6]):
+        start = datetime.fromisoformat(str(ev.get("ts", _iso(t0))).replace("Z", "+00:00")) + timedelta(hours=4)
+        events.append(
+            {
+                "calendar_id": calendars[j % len(calendars)]["id"],
+                "id": _u(seed, "calls", "slack-followup", str(j)),
+                "summary": f"Follow-up on {ev.get('channel', '#discussion')}",
+                "description": str(ev.get("text", ""))[:200],
+                "status": "confirmed",
+                "html_link": f"https://meet.google.com/{_u(seed, 'meet-slack', str(j))[:10]}",
+                "organizer_email": str(ev.get("user_email") or "team@nexora.dev"),
+                "created": _iso(start - timedelta(hours=3)),
+                "updated": _iso(start - timedelta(hours=1)),
+                "start": _iso(start),
+                "end": _iso(start + timedelta(minutes=30)),
+            }
+        )
+    sampled_calendar_events: list[dict[str, Any]] = []
+    for cal in calendars:
+        per_cal = [e for e in events if e["calendar_id"] == cal["id"]]
+        sampled_calendar_events.append(
+            {"calendar_id": cal["id"], "event_count": len(per_cal), "has_more": len(per_cal) > 50}
+        )
+    return {
+        "calendar_count": len(calendars),
+        "has_more": False,
+        "sampled_calendar_events": sampled_calendar_events,
+        "sampled_events": events[:30],
+    }
 
 
 def _verify_patterns(

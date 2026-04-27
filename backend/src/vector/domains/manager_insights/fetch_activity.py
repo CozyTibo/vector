@@ -106,6 +106,377 @@ def _notion_result_title(row: dict[str, Any]) -> str | None:
     return None
 
 
+def _parse_iso(raw: object) -> datetime | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _in_window(raw: object, *, window_start: datetime, window_end: datetime) -> bool:
+    dt = _parse_iso(raw)
+    if dt is None:
+        return False
+    return window_start <= dt <= window_end
+
+
+def _fetch_mock_company_dataset(settings: Settings) -> dict[str, Any]:
+    base = settings.vector_mock_connector_base_url.rstrip("/")
+    url = f"{base}/admin/dataset/full"
+    try:
+        resp = httpx.get(url, timeout=20.0)
+    except httpx.RequestError as e:
+        raise RuntimeError(f"mock_dataset_transport:{e}") from e
+    if resp.status_code >= 400:
+        raise RuntimeError(f"mock_dataset_http_{resp.status_code}")
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise RuntimeError("mock_dataset_non_json") from e
+    if not isinstance(data, dict):
+        raise RuntimeError("mock_dataset_unexpected_shape")
+    return data
+
+
+def _mock_slack_result(
+    dataset: dict[str, Any],
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    now = utc_now()
+    rows = dataset.get("slack_events")
+    if not isinstance(rows, list):
+        rows = []
+    in_window = [r for r in rows if isinstance(r, dict)]
+    channel_counts: dict[str, int] = {}
+    sampled_messages: list[dict[str, Any]] = []
+    for r in in_window:
+        channel = str(r.get("channel") or "unknown")
+        channel_id = channel
+        channel_counts[channel_id] = channel_counts.get(channel_id, 0) + 1
+        ts = str(r.get("ts") or "")
+        if not ts:
+            continue
+        sampled_messages.append(
+            {
+                "channel_id": channel_id,
+                "thread_ts": ts,
+                "text": str(r.get("text") or ""),
+                "user": str(r.get("user_email") or ""),
+                "created_at": ts,
+                "updated_at": ts,
+            }
+        )
+    sampled_channel_activity = [
+        {"channel_id": ch, "message_count": n, "has_more": False}
+        for ch, n in sorted(channel_counts.items())
+    ]
+    return _base_result(
+        "slack",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        coverage=ConnectorCoverageStats(
+            configured_sources=max(1, len(sampled_channel_activity)),
+            successful_sources=max(1, len(sampled_channel_activity)),
+            critical_configured_sources=1,
+            critical_successful_sources=1,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=max(1, len(sampled_channel_activity)),
+            capped_sources=0,
+            expected_non_empty_sources=max(1, len(sampled_channel_activity)),
+            observed_non_empty_sources=max(1, len(sampled_channel_activity)) if sampled_messages else 0,
+        ),
+        payload={
+            "window_start": _iso(window_start),
+            "window_end": _iso(window_end),
+            "mock_mode": True,
+            "public_and_private_channel_count": len(sampled_channel_activity),
+            "sampled_channel_activity": sampled_channel_activity,
+            "sampled_channel_messages": sampled_messages[:40],
+        },
+    )
+
+
+def _mock_github_result(
+    dataset: dict[str, Any],
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    now = utc_now()
+    gh = dataset.get("github")
+    if not isinstance(gh, dict):
+        gh = {}
+    repos = gh.get("repos") if isinstance(gh.get("repos"), list) else []
+    pulls = gh.get("pull_requests") if isinstance(gh.get("pull_requests"), list) else []
+    issues = gh.get("issues") if isinstance(gh.get("issues"), list) else []
+    sampled_pulls: list[dict[str, Any]] = []
+    sampled_issues: list[dict[str, Any]] = []
+    for pr in pulls:
+        if not isinstance(pr, dict):
+            continue
+        updated_at = pr.get("updated_at")
+        created_at = pr.get("created_at")
+        closed_at = pr.get("closed_at")
+        repo = pr.get("_repo_full")
+        if not isinstance(repo, str):
+            base_repo = pr.get("base")
+            if isinstance(base_repo, dict):
+                base_repo_repo = base_repo.get("repo")
+                if isinstance(base_repo_repo, dict) and isinstance(base_repo_repo.get("full_name"), str):
+                    repo = base_repo_repo["full_name"]
+        if not isinstance(repo, str):
+            continue
+        num = pr.get("number")
+        if not isinstance(num, int):
+            continue
+        sampled_pulls.append(
+            {
+                "repo": repo,
+                "number": num,
+                "title": pr.get("title") if isinstance(pr.get("title"), str) else None,
+                "body": pr.get("body") if isinstance(pr.get("body"), str) else None,
+                "state": pr.get("state") if isinstance(pr.get("state"), str) else None,
+                "html_url": pr.get("html_url") if isinstance(pr.get("html_url"), str) else None,
+                "author": pr.get("user", {}).get("login")
+                if isinstance(pr.get("user"), dict) and isinstance(pr.get("user", {}).get("login"), str)
+                else None,
+                "created_at": created_at if isinstance(created_at, str) else None,
+                "updated_at": updated_at if isinstance(updated_at, str) else None,
+                "closed_at": closed_at if isinstance(closed_at, str) else None,
+            }
+        )
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        updated_at = issue.get("updated_at")
+        created_at = issue.get("created_at")
+        repo = issue.get("repository", {}).get("full_name")
+        if not isinstance(repo, str):
+            continue
+        num = issue.get("number")
+        if not isinstance(num, int):
+            continue
+        sampled_issues.append(
+            {
+                "repo": repo,
+                "number": num,
+                "title": issue.get("title") if isinstance(issue.get("title"), str) else None,
+                "body": issue.get("body") if isinstance(issue.get("body"), str) else None,
+                "state": issue.get("state") if isinstance(issue.get("state"), str) else None,
+                "html_url": issue.get("html_url") if isinstance(issue.get("html_url"), str) else None,
+                "author": issue.get("user", {}).get("login")
+                if isinstance(issue.get("user"), dict)
+                and isinstance(issue.get("user", {}).get("login"), str)
+                else None,
+                "created_at": created_at if isinstance(created_at, str) else None,
+                "updated_at": updated_at if isinstance(updated_at, str) else None,
+                "closed_at": issue.get("closed_at") if isinstance(issue.get("closed_at"), str) else None,
+            }
+        )
+    sampled_pulls.sort(key=lambda r: str(r.get("updated_at") or ""), reverse=True)
+    sampled_issues.sort(key=lambda r: str(r.get("updated_at") or ""), reverse=True)
+    return _base_result(
+        "github",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        coverage=ConnectorCoverageStats(
+            configured_sources=max(1, len(repos) * 2),
+            successful_sources=max(1, len(repos) * 2),
+            critical_configured_sources=2,
+            critical_successful_sources=2,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=max(1, len(repos) * 2),
+            capped_sources=0,
+            expected_non_empty_sources=max(1, len(repos)),
+            observed_non_empty_sources=max(1, len(repos)) if sampled_pulls or sampled_issues else 0,
+        ),
+        payload={
+            "mock_mode": True,
+            "repository_page_count": len(repos),
+            "total_count": len(repos),
+            "sampled_repo_activity": [],
+            "sampled_issues": sampled_issues[:30],
+            "sampled_pull_requests": sampled_pulls[:30],
+        },
+    )
+
+
+def _mock_linear_result(
+    dataset: dict[str, Any],
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    now = utc_now()
+    linear = dataset.get("linear")
+    if not isinstance(linear, dict):
+        linear = {}
+    issues = linear.get("issues") if isinstance(linear.get("issues"), list) else []
+    projects = linear.get("projects") if isinstance(linear.get("projects"), list) else []
+    sampled_issues: list[dict[str, Any]] = []
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        created_at = issue.get("createdAt")
+        updated_at = issue.get("updatedAt")
+        identifier = issue.get("identifier")
+        if not isinstance(identifier, str):
+            continue
+        sampled_issues.append(
+            {
+                "id": issue.get("id") if isinstance(issue.get("id"), str) else None,
+                "identifier": identifier,
+                "title": issue.get("title") if isinstance(issue.get("title"), str) else None,
+                "description": issue.get("description") if isinstance(issue.get("description"), str) else None,
+                "url": f"https://linear.app/{identifier.lower()}",
+                "state_name": issue.get("state", {}).get("name")
+                if isinstance(issue.get("state"), dict)
+                and isinstance(issue.get("state", {}).get("name"), str)
+                else None,
+                "project_name": issue.get("project", {}).get("name")
+                if isinstance(issue.get("project"), dict)
+                and isinstance(issue.get("project", {}).get("name"), str)
+                else None,
+                "assignee_name": issue.get("assignee", {}).get("name")
+                if isinstance(issue.get("assignee"), dict)
+                and isinstance(issue.get("assignee", {}).get("name"), str)
+                else None,
+                "created_at": created_at if isinstance(created_at, str) else None,
+                "updated_at": updated_at if isinstance(updated_at, str) else None,
+            }
+        )
+    sampled_issues.sort(key=lambda r: str(r.get("updated_at") or ""), reverse=True)
+    return _base_result(
+        "linear",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        coverage=ConnectorCoverageStats(
+            configured_sources=2,
+            successful_sources=2,
+            critical_configured_sources=1,
+            critical_successful_sources=1,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=2,
+            capped_sources=0,
+            expected_non_empty_sources=1,
+            observed_non_empty_sources=1 if sampled_issues else 0,
+        ),
+        payload={
+            "mock_mode": True,
+            "issues_probe_count": len(sampled_issues),
+            "has_more_issues": len(sampled_issues) > 50,
+            "projects_probe_count": len(projects),
+            "has_more_projects": len(projects) > 20,
+            "sampled_issues": sampled_issues[:30],
+        },
+    )
+
+
+def _mock_notion_result(
+    dataset: dict[str, Any],
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    now = utc_now()
+    notion = dataset.get("notion")
+    if not isinstance(notion, dict):
+        notion = {}
+    pages = notion.get("sampled_pages")
+    if not isinstance(pages, list):
+        pages = []
+    filtered = [p for p in pages if isinstance(p, dict)]
+    return _base_result(
+        "notion",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        coverage=ConnectorCoverageStats(
+            configured_sources=2,
+            successful_sources=2,
+            critical_configured_sources=1,
+            critical_successful_sources=1,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=1,
+            capped_sources=1 if len(filtered) > 20 else 0,
+            expected_non_empty_sources=1,
+            observed_non_empty_sources=1 if filtered else 0,
+        ),
+        payload={
+            "mock_mode": True,
+            "search_result_count": len(filtered),
+            "has_more": bool(notion.get("has_more")),
+            "users_me_ok": bool(notion.get("users_me_ok", True)),
+            "sampled_pages": filtered[:30],
+        },
+    )
+
+
+def _mock_calls_result(
+    dataset: dict[str, Any],
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> ConnectorFetchResult:
+    now = utc_now()
+    calls = dataset.get("calls")
+    if not isinstance(calls, dict):
+        calls = {}
+    events = calls.get("sampled_events")
+    if not isinstance(events, list):
+        events = []
+    filtered_events = [e for e in events if isinstance(e, dict)]
+    per_calendar: dict[str, dict[str, Any]] = {}
+    for e in filtered_events:
+        cid = e.get("calendar_id")
+        if not isinstance(cid, str):
+            continue
+        row = per_calendar.setdefault(cid, {"calendar_id": cid, "event_count": 0, "has_more": False})
+        row["event_count"] += 1
+    sampled_calendar_events = sorted(per_calendar.values(), key=lambda x: str(x["calendar_id"]))
+    return _base_result(
+        "calls",
+        window_start=window_start,
+        window_end=window_end,
+        status="ok",
+        fetched_at=now,
+        coverage=ConnectorCoverageStats(
+            configured_sources=max(1, len(sampled_calendar_events) + 1),
+            successful_sources=max(1, len(sampled_calendar_events) + 1),
+            critical_configured_sources=1,
+            critical_successful_sources=1,
+        ),
+        completeness=ConnectorCompletenessStats(
+            successful_sources=max(1, len(sampled_calendar_events)),
+            capped_sources=0,
+            expected_non_empty_sources=max(1, len(sampled_calendar_events)),
+            observed_non_empty_sources=max(1, len(sampled_calendar_events)) if filtered_events else 0,
+        ),
+        payload={
+            "mock_mode": True,
+            "calendar_count": len(sampled_calendar_events),
+            "has_more": False,
+            "sampled_calendar_events": sampled_calendar_events,
+            "sampled_events": filtered_events[:30],
+        },
+    )
+
+
 def _fetch_slack(
     session: Session,
     *,
@@ -1056,6 +1427,37 @@ def run_fetch_activity_bundle(
     """Execute Step 1 for one tenant (tenant-level connector model only)."""
 
     window_start, window_end = default_window(window_days=window_days, as_of=as_of)
+    if getattr(settings, "vector_use_mock_connectors", False):
+        try:
+            dataset = _fetch_mock_company_dataset(settings)
+            connectors: dict[str, ConnectorFetchResult] = {
+                "slack": _mock_slack_result(dataset, window_start=window_start, window_end=window_end),
+                "github": _mock_github_result(dataset, window_start=window_start, window_end=window_end),
+                "linear": _mock_linear_result(dataset, window_start=window_start, window_end=window_end),
+                "notion": _mock_notion_result(dataset, window_start=window_start, window_end=window_end),
+                "calls": _mock_calls_result(dataset, window_start=window_start, window_end=window_end),
+            }
+        except RuntimeError as e:
+            err = str(e)
+            connectors = {
+                connector: _base_result(
+                    connector,  # type: ignore[arg-type]
+                    window_start=window_start,
+                    window_end=window_end,
+                    status="error",
+                    fetched_at=utc_now(),
+                    errors=[err],
+                    payload={"mock_mode": True},
+                )
+                for connector in ("slack", "github", "linear", "notion", "calls")
+            }
+        return FetchActivityBundle(
+            run_id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            window_days=window_days,
+            connectors=connectors,
+        )
+
     connectors: dict[str, ConnectorFetchResult] = {
         "slack": _fetch_slack(
             session,
