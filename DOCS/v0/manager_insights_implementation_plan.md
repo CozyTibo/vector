@@ -57,7 +57,8 @@ Update this table only when a step is truly complete against its own checklist a
 | Step 5.5 — Key achievements | `completed` | Deterministic closed/merged execution wins from `WorkItem` + optional doc/call reinforcement via medium+ `Link`s; `KeyAchievementItem` / `KeyAchievementsBundleDebug`; tests; admin tab section. |
 | Step 5.6 — Raw highlights | `completed` | Deterministic factual highlight lines (repeated call/Slack terms, closed PRs, gap-backed lines) with `sources[]`; `RawHighlightItem` / `RawHighlightsBundleDebug`; tests; admin tab section. |
 | Step 6 — Signals | `completed` | Deterministic `SignalsV0`-aligned computation (`delivery_strength`, `urgent_pressure`, coverage/follow-through/blocker visibility, repeated discussion flag, momentum, doc linkage, focus, collaboration/support/feedback/coordination/friction) with `explain` reasons; tests; admin tab section. |
-| Step 7+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
+| Step 7 — Interpretations | `completed` | LLM generation of `InterpretationV0[]` from Step 6 signals + grounded evidence with strict schema validation and evidence-citation checks (no new quotes); deterministic fallback path; tests; admin tab section. |
+| Step 8+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
 
 **Current note (2026-04-28):**
 
@@ -85,7 +86,9 @@ Update this table only when a step is truly complete against its own checklist a
 - Step 5.6 tests: `backend/tests/vector/domains/manager_insights/test_build_raw_highlights.py`.
 - **Step 6 (signals)** is implemented in `vector/domains/manager_insights/compute_signals.py`: deterministic state-vector computation from Steps 2–5.6 with no LLM, explicit fallback defaults for sparse fields, and `explain` strings for operator QA. Response field `signals` (`SignalsV0Debug`) on admin fetch-debug; UI section **Signals (Step 6)**; admin run label **1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6**.
 - Step 6 tests: `backend/tests/vector/domains/manager_insights/test_compute_signals.py`.
-- Remaining work after Step 6: **Step 7 (Interpretations)**. Runtime prerequisites unchanged (tenant OAuth, connector access).
+- **Step 7 (interpretations)** is implemented in `vector/domains/manager_insights/generate_interpretations.py`: LLM-based generation from Step-6 signals and grounded Step-3/5/5.6 evidence with strict `InterpretationV0` schema validation and deterministic citation check (evidence must be substring-verifiable from allowed corpora). Invalid LLM rows are dropped; deterministic fallback interpretations are emitted when no valid LLM output is available. Response field `interpretations` (`InterpretationBundleDebug`) includes generation metadata (`generated_via`, `model`, token usage, latency). UI section **Interpretations (Step 7)**; admin run label **1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6 → 7**.
+- Step 7 tests: `backend/tests/vector/domains/manager_insights/test_generate_interpretations.py`.
+- Remaining work after Step 7: **Step 8 (Insights)**. Runtime prerequisites unchanged (tenant OAuth, connector access).
 
 ---
 

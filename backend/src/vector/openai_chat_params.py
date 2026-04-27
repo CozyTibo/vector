@@ -38,3 +38,17 @@ def onboarding_chat_max_completion_tokens(
     if has_connectors_privacy_kb:
         return 280
     return 220
+
+
+def max_completion_tokens_for_manager_insights_interpretations(model: str) -> int:
+    """
+    Step 7 (manager insights) uses Chat Completions JSON.
+
+    As with :func:`onboarding_chat_max_completion_tokens`, ``gpt-5*`` reasoning models can spend the
+    completion budget on internal reasoning, so a small cap can yield **empty** ``message.content``
+    with HTTP 200. Use a larger default for those model families.
+    """
+    m = (model or "").strip().lower()
+    if m.startswith("gpt-5"):
+        return 4096
+    return 1400

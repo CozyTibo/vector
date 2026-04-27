@@ -1,4 +1,8 @@
-from vector.openai_chat_params import onboarding_chat_max_completion_tokens, temperature_for_chat_model
+from vector.openai_chat_params import (
+    max_completion_tokens_for_manager_insights_interpretations,
+    onboarding_chat_max_completion_tokens,
+    temperature_for_chat_model,
+)
 
 
 def test_gpt5_uses_provider_default_temperature() -> None:
@@ -38,3 +42,11 @@ def test_onboarding_chat_gpt4o_keeps_tight_caps() -> None:
         )
         == 200
     )
+
+
+def test_manager_insights_gpt5_uses_high_completion_cap() -> None:
+    assert max_completion_tokens_for_manager_insights_interpretations("gpt-5-mini") == 4096
+
+
+def test_manager_insights_gpt4o_uses_default_cap() -> None:
+    assert max_completion_tokens_for_manager_insights_interpretations("gpt-4o-mini") == 1400

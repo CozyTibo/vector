@@ -33,6 +33,18 @@ SignalSupportPattern = Literal["gives_help", "asks_for_help", "balanced"]
 SignalFeedbackReception = Literal["proactive", "neutral", "defensive"]
 SignalCoordinationRole = Literal["driving", "contributing", "peripheral"]
 SignalInteractionFriction = Literal["present", "unclear", "absent"]
+InterpretationType = Literal[
+    "ownership",
+    "follow_through",
+    "execution_friction",
+    "prioritization",
+    "collaboration_pattern",
+    "autonomy",
+    "support_dependency",
+    "coordination_quality",
+    "leverage",
+]
+InterpretationConfidence = Literal["high", "medium", "low"]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -303,8 +315,64 @@ class SignalsV0Debug(BaseModel):
     explain: dict[str, str] = Field(default_factory=dict)
 
 
+class InterpretationItemDebug(BaseModel):
+    """Step 7 interpretation item (LLM output validated against schema + citations)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    type: InterpretationType
+    description: str
+    based_on_signals: list[str] = Field(default_factory=list, min_length=1)
+    evidence: list[str] = Field(default_factory=list, min_length=1)
+    confidence: InterpretationConfidence
+
+
+class RejectedInterpretationDebug(BaseModel):
+    """LLM row that did not pass schema/citation checks (admin QA only)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    index: int = Field(ge=0, description="0-based index in the model's interpretations[] list")
+    reason: str
+    raw: dict[str, Any] = Field(default_factory=dict)
+
+
+class InterpretationBundleDebug(BaseModel):
+    """Step 7 bundle for admin debug; includes generation metadata for QA."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    items: list[InterpretationItemDebug] = Field(default_factory=list)
+    generated_via: Literal["llm", "fallback"]
+    fallback_reason: str | None = None
+    model: str | None = None
+    latency_ms: int | None = Field(default=None, ge=0)
+    prompt_tokens: int | None = Field(default=None, ge=0)
+    completion_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+    llm_response_text: str | None = Field(
+        default=None,
+        description="Raw assistant text (may be truncated for very large responses).",
+    )
+    llm_response_truncated: bool = False
+    llm_parsed_interpretation_rows: int | None = Field(
+        default=None,
+        ge=0,
+        description="Count of object rows parsed from the model JSON (before validation).",
+    )
+    rejected_interpretations: list[RejectedInterpretationDebug] = Field(default_factory=list)
+    llm_error: str | None = Field(
+        default=None,
+        description="If the OpenAI call failed, a short error string for admin QA (not a stack trace).",
+    )
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload through Step 6 (Signals)."""
+    """Admin (and internal) debug payload through Step 7 (Interpretations)."""
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -317,3 +385,4 @@ class ManagerInsightFetchDebugResponse(BaseModel):
     key_achievements: KeyAchievementsBundleDebug
     raw_highlights: RawHighlightsBundleDebug
     signals: SignalsV0Debug
+    interpretations: InterpretationBundleDebug
