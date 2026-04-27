@@ -15,6 +15,12 @@ WorkItemType = Literal["issue", "pull_request", "document", "call", "message_thr
 EvidenceKind = Literal["action_item", "blocker", "decision"]
 LinkType = Literal["semantic_match", "shared_reference"]
 LinkConfidence = Literal["high", "medium", "low"]
+GapType = Literal[
+    "expected_not_executed",
+    "discussed_not_linked_to_work",
+    "blocker_not_tracked",
+    "doc_not_connected_to_execution",
+]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -193,8 +199,30 @@ class LinkBundle(BaseModel):
     )
 
 
+class GapItem(BaseModel):
+    """Step 5 deterministic gap entry with evidence pointers to Step 2–4 artifacts."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    type: GapType
+    description: str
+    evidence_pointers: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class GapBundle(BaseModel):
+    """Step 5 output: computed gaps for one run."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    gaps: list[GapItem] = Field(default_factory=list)
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload: Step 1 + Step 0.5 + Step 2 + Step 3 + Step 4."""
+    """Admin (and internal) debug payload: Step 1 + 0.5 + 2 + 3 + 4 + 5."""
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -203,3 +231,4 @@ class ManagerInsightFetchDebugResponse(BaseModel):
     work_items: WorkItemBundle
     evidence: EvidenceBundle
     links: LinkBundle
+    gaps: GapBundle

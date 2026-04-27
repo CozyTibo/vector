@@ -112,6 +112,17 @@ type ManagerInsightFetchDebugResponse = {
       evidence: string;
     }>;
   };
+  gaps: {
+    run_id: string;
+    tenant_id: string;
+    window_days: number;
+    gaps: Array<{
+      id: string;
+      type: string;
+      description: string;
+      evidence_pointers: Record<string, string[]>;
+    }>;
+  };
 };
 
 function tierBadge(tier: ReliabilityTier) {
@@ -150,7 +161,8 @@ export default function AdminTenantManagerInsightPage() {
         <h1 className="text-lg font-semibold text-stone-900">Manager insight</h1>
         <p className="mt-1 text-sm text-stone-600">
           Step 1 (FetchActivity) + Step 0.5 (data reliability) + Step 2 (WorkItem normalization) +
-          Step 3 (Evidence) + Step 4 (Links). Click run to fetch and inspect each stage.
+          Step 3 (Evidence) + Step 4 (Links) + Step 5 (Gaps). Click run to fetch and inspect each
+          stage.
         </p>
         <div className="mt-3">
           <button
@@ -161,7 +173,7 @@ export default function AdminTenantManagerInsightPage() {
               void q.refetch();
             }}
           >
-            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4"}
+            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4 → 5"}
           </button>
         </div>
       </div>
@@ -174,8 +186,8 @@ export default function AdminTenantManagerInsightPage() {
       ) : null}
       {!q.data && !q.isFetching && !q.isError ? (
         <p className="text-sm text-stone-600">
-          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4</span> to fetch and
-          display results.
+          No run yet. Click <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4 → 5</span> to
+          fetch and display results.
         </p>
       ) : null}
 
@@ -391,6 +403,43 @@ export default function AdminTenantManagerInsightPage() {
                     </div>
                     <p className="mt-1 text-stone-600">{L.evidence}</p>
                     <p className="mt-0.5 font-mono text-[10px] text-stone-400">{L.method}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">Gaps (Step 5)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              expected_not_executed:{" "}
+              {q.data.gaps.gaps.filter((g) => g.type === "expected_not_executed").length} ·
+              discussed_not_linked_to_work:{" "}
+              {q.data.gaps.gaps.filter((g) => g.type === "discussed_not_linked_to_work").length} ·
+              blocker_not_tracked:{" "}
+              {q.data.gaps.gaps.filter((g) => g.type === "blocker_not_tracked").length} ·
+              doc_not_connected_to_execution:{" "}
+              {q.data.gaps.gaps.filter((g) => g.type === "doc_not_connected_to_execution").length} ·
+              run_id {q.data.gaps.run_id}
+            </p>
+            {q.data.gaps.gaps.length === 0 ? (
+              <p className="mt-3 text-xs text-stone-500">
+                No deterministic gaps found from current work items, evidence, and links.
+              </p>
+            ) : (
+              <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+                {q.data.gaps.gaps.map((g) => (
+                  <li key={g.id} className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-stone-800">
+                      <span className="rounded bg-stone-200/80 px-1.5 py-0.5 text-[10px] uppercase text-stone-600">
+                        {g.type.replace(/_/g, " ")}
+                      </span>
+                      <span className="font-mono text-stone-500">{g.id}</span>
+                    </div>
+                    <p className="mt-1 text-stone-700">{g.description}</p>
+                    <pre className="mt-2 max-h-40 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
+                      {JSON.stringify(g.evidence_pointers, null, 2)}
+                    </pre>
                   </li>
                 ))}
               </ul>
