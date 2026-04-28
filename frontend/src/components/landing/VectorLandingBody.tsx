@@ -606,10 +606,15 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 <h2 id="meet-vector-heading">
                   Meet <span className="accent">Vector</span>
                 </h2>
-                <p className="sub meet-vector__sub">Your AI Junior manager</p>
+                <p className="sub meet-vector__sub">Your new AI team member</p>
                 <p className="sub meet-vector__support">
-                  Vector integrates directly into your tools and workflows to give you a real-time understanding of
-                  your team’s execution and the insights to improve it.
+                  Vector integrates with the tools your team already uses, giving you a real-time view of your
+                  team’s execution. He spots risks early, highlights where progress is slowing down, and helps you
+                  see what needs attention next.
+                </p>
+                <p className="sub meet-vector__support">
+                  Instead of chasing updates across different sources and stakeholders, Vector brings everything
+                  together so you can focus on delivery.
                 </p>
               </div>
               <MeetVectorIntegrationsHub />
