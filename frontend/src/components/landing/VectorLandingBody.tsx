@@ -502,7 +502,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               </div>
               <div className="hero-sub-row">
                 <p className="sub hero-sub">
-                  <strong>Vector lives in your tools, rebuilds execution visibility, and reveals key insights.</strong>
+                  <strong>Vector surfaces risks and guides your next steps based on live data from your team.</strong>
                 </p>
                 <div className="hero-cta-row">
                   <a className="btn-light" href={DEMO_CAL_URL} target="_blank" rel="noopener noreferrer">
