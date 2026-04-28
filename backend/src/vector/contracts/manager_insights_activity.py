@@ -1,4 +1,4 @@
-"""Contracts for Manager insights debug pipeline artifacts (Steps 1–6)."""
+"""Contracts for Manager insights debug pipeline artifacts (Steps 1–8)."""
 
 from __future__ import annotations
 
@@ -45,6 +45,8 @@ InterpretationType = Literal[
     "leverage",
 ]
 InterpretationConfidence = Literal["high", "medium", "low"]
+InsightConfidence = Literal["high", "medium", "low"]
+InsightPriority = Literal["critical", "high", "medium", "low"]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -371,8 +373,67 @@ class InterpretationBundleDebug(BaseModel):
     )
 
 
+class InsightItemDebug(BaseModel):
+    """Step 8 insight item (LLM output validated against schema + grounding checks)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    observation: str
+    interpretation: str
+    implication: str
+    evidence: list[str] = Field(default_factory=list, min_length=1)
+    based_on_interpretations: list[str] = Field(default_factory=list, min_length=1)
+    based_on_signals: list[str] = Field(default_factory=list, min_length=1)
+    confidence: InsightConfidence
+    priority: InsightPriority
+
+
+class RejectedInsightDebug(BaseModel):
+    """LLM insight row that did not pass schema/grounding checks (admin QA only)."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    index: int = Field(ge=0, description="0-based index in the model's insights[] list")
+    reason: str
+    raw: dict[str, Any] = Field(default_factory=dict)
+
+
+class InsightBundleDebug(BaseModel):
+    """Step 8 bundle for admin debug; includes generation metadata for QA."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    tenant_id: uuid.UUID
+    window_days: int = Field(ge=1, le=366)
+    items: list[InsightItemDebug] = Field(default_factory=list)
+    generated_via: Literal["llm", "fallback"]
+    fallback_reason: str | None = None
+    model: str | None = None
+    latency_ms: int | None = Field(default=None, ge=0)
+    prompt_tokens: int | None = Field(default=None, ge=0)
+    completion_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+    llm_response_text: str | None = Field(
+        default=None,
+        description="Raw assistant text (may be truncated for very large responses).",
+    )
+    llm_response_truncated: bool = False
+    llm_parsed_insight_rows: int | None = Field(
+        default=None,
+        ge=0,
+        description="Count of object rows parsed from the model JSON (before validation).",
+    )
+    rejected_insights: list[RejectedInsightDebug] = Field(default_factory=list)
+    llm_error: str | None = Field(
+        default=None,
+        description="If the OpenAI call failed, a short error string for admin QA (not a stack trace).",
+    )
+
+
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload through Step 7 (Interpretations)."""
+    """Admin (and internal) debug payload through Step 8 (Insights)."""
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -386,3 +447,4 @@ class ManagerInsightFetchDebugResponse(BaseModel):
     raw_highlights: RawHighlightsBundleDebug
     signals: SignalsV0Debug
     interpretations: InterpretationBundleDebug
+    insights: InsightBundleDebug

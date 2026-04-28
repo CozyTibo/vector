@@ -1,4 +1,4 @@
-"""Manager insights domain: debug pipeline through Step 7; future: insights/rendering."""
+"""Manager insights domain: debug pipeline through Step 8; future: rendering."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from vector.domains.manager_insights.compute_signals import compute_signals
 from vector.domains.manager_insights.data_reliability import compute_data_reliability
 from vector.domains.manager_insights.extract_evidence import extract_evidence
 from vector.domains.manager_insights.fetch_activity import run_fetch_activity_bundle
+from vector.domains.manager_insights.generate_insights import generate_insights
 from vector.domains.manager_insights.generate_interpretations import generate_interpretations
 from vector.domains.manager_insights.link_work_items import link_work_items
 from vector.settings import Settings
@@ -29,7 +30,7 @@ def run_manager_insights_fetch_debug(
     window_days: int = 30,
     as_of: datetime | None = None,
 ) -> ManagerInsightFetchDebugResponse:
-    """Run Step 1 -> 0.5 -> 2 -> 3 -> 4 -> 5 -> 5.5 -> 5.6 -> 6 -> 7 (admin debug API)."""
+    """Run Step 1 -> 0.5 -> 2 -> 3 -> 4 -> 5 -> 5.5 -> 5.6 -> 6 -> 7 -> 8 (admin debug API)."""
 
     bundle = run_fetch_activity_bundle(
         session,
@@ -55,6 +56,15 @@ def run_manager_insights_fetch_debug(
         key_achievements=key_achievements,
         raw_highlights=raw_highlights,
     )
+    insights = generate_insights(
+        settings,
+        signals=signals,
+        interpretations=interpretations,
+        evidence=evidence,
+        gaps=gaps,
+        key_achievements=key_achievements,
+        raw_highlights=raw_highlights,
+    )
     return ManagerInsightFetchDebugResponse(
         fetch=bundle,
         data_reliability=reliability,
@@ -66,12 +76,14 @@ def run_manager_insights_fetch_debug(
         raw_highlights=raw_highlights,
         signals=signals,
         interpretations=interpretations,
+        insights=insights,
     )
 
 
 __all__ = [
     "compute_data_reliability",
     "compute_signals",
+    "generate_insights",
     "generate_interpretations",
     "build_key_achievements",
     "build_raw_highlights",

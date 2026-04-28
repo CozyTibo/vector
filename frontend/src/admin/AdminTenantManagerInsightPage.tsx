@@ -191,6 +191,38 @@ type ManagerInsightFetchDebugResponse = {
       confidence: "high" | "medium" | "low";
     }>;
   };
+  insights: {
+    run_id: string;
+    tenant_id: string;
+    window_days: number;
+    generated_via: "llm" | "fallback";
+    fallback_reason: string | null;
+    model: string | null;
+    latency_ms: number | null;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+    llm_response_text: string | null;
+    llm_response_truncated: boolean;
+    llm_parsed_insight_rows: number | null;
+    rejected_insights: Array<{
+      index: number;
+      reason: string;
+      raw: Record<string, unknown>;
+    }>;
+    llm_error: string | null;
+    items: Array<{
+      id: string;
+      observation: string;
+      interpretation: string;
+      implication: string;
+      evidence: string[];
+      based_on_interpretations: string[];
+      based_on_signals: string[];
+      confidence: "high" | "medium" | "low";
+      priority: "critical" | "high" | "medium" | "low";
+    }>;
+  };
 };
 
 function tierBadge(tier: ReliabilityTier) {
@@ -229,8 +261,8 @@ export default function AdminTenantManagerInsightPage() {
         <h1 className="text-lg font-semibold text-stone-900">Manager insight</h1>
         <p className="mt-1 text-sm text-stone-600">
           Step 1 (Fetch) + 0.5 (reliability) + 2 (WorkItems) + 3 (Evidence) + 4 (Links) + 5 (Gaps) +
-          5.5 (Key achievements) + 5.6 (Raw highlights) + 6 (Signals) + 7 (Interpretations). Click run
-          to fetch and inspect each stage.
+          5.5 (Key achievements) + 5.6 (Raw highlights) + 6 (Signals) + 7 (Interpretations) + 8
+          (Insights). Click run to fetch and inspect each stage.
         </p>
         <div className="mt-3">
           <button
@@ -241,7 +273,9 @@ export default function AdminTenantManagerInsightPage() {
               void q.refetch();
             }}
           >
-            {q.isFetching ? "Running…" : "Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6 → 7"}
+            {q.isFetching
+              ? "Running…"
+              : "Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6 → 7 → 8"}
           </button>
         </div>
       </div>
@@ -255,7 +289,9 @@ export default function AdminTenantManagerInsightPage() {
       {!q.data && !q.isFetching && !q.isError ? (
         <p className="text-sm text-stone-600">
           No run yet. Click{" "}
-          <span className="font-medium">Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6 → 7</span>{" "}
+          <span className="font-medium">
+            Run Step 1 → 0.5 → 2 → 3 → 4 → 5 → 5.5 → 5.6 → 6 → 7 → 8
+          </span>{" "}
           to fetch and display results.
         </p>
       ) : null}
@@ -664,6 +700,95 @@ export default function AdminTenantManagerInsightPage() {
                       {it.type.replace(/_/g, " ")} · {it.confidence}
                     </p>
                     <p className="mt-1 text-stone-700">{it.description}</p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      based_on_signals: {it.based_on_signals.join(", ")}
+                    </p>
+                    <ul className="mt-1 list-inside list-disc text-stone-600">
+                      {it.evidence.map((ev) => (
+                        <li key={ev} className="text-[11px]">
+                          {ev}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-stone-900">Insights (Step 8)</h2>
+            <p className="mt-1 text-xs text-stone-500">
+              Count: {q.data.insights.items.length} · generated_via {q.data.insights.generated_via}
+              {q.data.insights.generated_via === "fallback" && q.data.insights.fallback_reason
+                ? ` (${q.data.insights.fallback_reason})`
+                : ""}
+              {q.data.insights.model ? ` · model ${q.data.insights.model}` : ""}
+              {q.data.insights.latency_ms !== null ? ` · latency ${q.data.insights.latency_ms}ms` : ""}
+            </p>
+            {q.data.insights.llm_parsed_insight_rows !== null ? (
+              <p className="mt-1 text-xs text-stone-500">
+                LLM JSON rows (dict objects) parsed: {q.data.insights.llm_parsed_insight_rows} · rejected
+                rows: {q.data.insights.rejected_insights.length}
+                {q.data.insights.llm_response_truncated ? " · llm_response_text truncated" : ""}
+              </p>
+            ) : null}
+            {q.data.insights.llm_error ? (
+              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                LLM issue: {q.data.insights.llm_error}
+              </p>
+            ) : null}
+            {q.data.insights.llm_response_text || q.data.insights.rejected_insights.length > 0 ? (
+              <details className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3">
+                <summary className="cursor-pointer text-xs font-semibold text-stone-900">
+                  Rejected / raw LLM output (debug)
+                </summary>
+                {q.data.insights.rejected_insights.length > 0 ? (
+                  <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                    {q.data.insights.rejected_insights.map((r) => (
+                      <li key={r.index} className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs">
+                        <p className="font-mono text-[10px] text-stone-500">row_index={r.index}</p>
+                        <p className="mt-1 text-stone-800">{r.reason}</p>
+                        <pre className="mt-2 max-h-40 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
+                          {JSON.stringify(r.raw, null, 2)}
+                        </pre>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-xs text-stone-500">No per-row rejections recorded.</p>
+                )}
+                {q.data.insights.llm_response_text ? (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-stone-900">Raw assistant text</p>
+                    <pre className="mt-2 max-h-72 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
+                      {q.data.insights.llm_response_text}
+                    </pre>
+                  </div>
+                ) : null}
+              </details>
+            ) : null}
+            {q.data.insights.items.length === 0 ? (
+              <p className="mt-3 text-xs text-stone-500">No insights produced.</p>
+            ) : (
+              <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+                {q.data.insights.items.map((it) => (
+                  <li key={it.id} className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs">
+                    <p className="font-medium text-stone-900">
+                      priority {it.priority} · confidence {it.confidence}
+                    </p>
+                    <p className="mt-1 text-stone-800">
+                      <span className="font-semibold">Observation:</span> {it.observation}
+                    </p>
+                    <p className="mt-1 text-stone-700">
+                      <span className="font-semibold">Interpretation:</span> {it.interpretation}
+                    </p>
+                    <p className="mt-1 text-stone-700">
+                      <span className="font-semibold">Implication:</span> {it.implication}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      based_on_interpretations: {it.based_on_interpretations.join(", ")}
+                    </p>
                     <p className="mt-1 font-mono text-[10px] text-stone-500">
                       based_on_signals: {it.based_on_signals.join(", ")}
                     </p>

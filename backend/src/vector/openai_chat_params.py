@@ -52,3 +52,16 @@ def max_completion_tokens_for_manager_insights_interpretations(model: str) -> in
     if m.startswith("gpt-5"):
         return 4096
     return 1400
+
+
+def max_completion_tokens_for_manager_insights_insights(model: str) -> int:
+    """
+    Step 8 (manager insights) uses Chat Completions JSON.
+
+    Keep the same gpt-5 safety cap as Step 7 to avoid empty ``message.content`` responses
+    when reasoning tokens consume small completion budgets.
+    """
+    m = (model or "").strip().lower()
+    if m.startswith("gpt-5"):
+        return 4096
+    return 1600
