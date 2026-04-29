@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -107,7 +108,7 @@ def test_waitlist_signup_email_render() -> None:
 
     text, html = render_waitlist_signup_email()
     assert "Hi 👋" in text
-    assert "it only takes five minutes" in text
+    assert "only takes five minutes" in text.lower()
     assert "onboarding companies in batches" in html
     assert "cid:vector_avatar" in html
 
@@ -124,6 +125,46 @@ def test_password_reset_email_render() -> None:
     assert "https://app.example/login/reset-password?token=abc" in text
     assert "you@company.com" in html
     assert "Reset password" in html
+    assert "cid:vector_avatar" in html
+
+
+def test_onboarding_activation_subject_no_em_dash() -> None:
+    from vector.infrastructure.email import onboarding_activation as oa
+
+    assert "\u2014" not in oa._SUBJECT
+    assert oa._SUBJECT == "Your Vector workspace is ready: Start onboarding!"
+
+
+def test_outbound_email_copy_avoids_unicode_dashes_and_typographic_triggers() -> None:
+    """No U+2012–U+2015 in templates; plain text avoids ``---`` (some clients convert it to an em rule)."""
+    import vector.infrastructure.email as email_pkg
+
+    root = Path(email_pkg.__path__[0])
+    forbidden = "\u2012\u2013\u2014\u2015"
+    for path in sorted(root.rglob("*.j2")):
+        data = path.read_text(encoding="utf-8")
+        for ch in forbidden:
+            assert ch not in data, f"{path} must not contain {ch!r}"
+        if path.name.endswith(".txt.j2") and "---" in data:
+            pytest.fail(f"{path} must not use '---' (auto-typography in some clients)")
+    for name in ("waitlist_confirmation.py", "password_reset.py", "onboarding_activation.py"):
+        data = (root / name).read_text(encoding="utf-8")
+        for ch in forbidden:
+            assert ch not in data, f"{name} must not contain {ch!r}"
+
+
+def test_onboarding_activation_email_render() -> None:
+    from vector.infrastructure.email.onboarding_activation import render_onboarding_activation_email
+
+    text, html = render_onboarding_activation_email(
+        onboarding_url="https://app.example.com/app/onboarding",
+        full_name="Jane Doe",
+    )
+    assert "Hi Jane" in text
+    assert "activated your workspace" in text.lower()
+    assert "my onboarding" in text.lower()
+    assert "https://app.example.com/app/onboarding" in text
+    assert "Start onboarding" in html
     assert "cid:vector_avatar" in html
 
 

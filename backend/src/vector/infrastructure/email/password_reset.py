@@ -1,4 +1,4 @@
-"""Password reset email — same delivery path as waitlist (multipart + inline avatar)."""
+"""Password reset email (same delivery path as waitlist: multipart + inline avatar)."""
 
 from __future__ import annotations
 

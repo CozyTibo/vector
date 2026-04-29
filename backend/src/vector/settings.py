@@ -193,6 +193,14 @@ class Settings(BaseSettings):
             "Set false in pytest (or CI) to avoid real SMTP when integration tests register users."
         ),
     )
+    onboarding_activation_email_enabled: bool = Field(
+        default=True,
+        validation_alias="VECTOR_ONBOARDING_ACTIVATION_EMAIL",
+        description=(
+            "Send onboarding activation when an admin enables workspace access (waitlist → onboarding). "
+            "Set false in pytest (or CI) to avoid enqueueing SMTP when admin tests toggle access."
+        ),
+    )
 
     @field_validator("github_app_private_key", mode="before")
     @classmethod

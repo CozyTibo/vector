@@ -18,8 +18,8 @@ _AVATAR_CID = "vector_avatar"
 
 _PERSONAL_NOTE = (
     "I wanted to reach out personally to confirm you're on the list. "
-    "I'll get back to you as soon as we can activate your workspace and walk you through onboarding — "
-    "it only takes five minutes!"
+    "I'll get back to you as soon as we can activate your workspace and walk you through onboarding. "
+    "It only takes five minutes!"
 )
 
 _WAITLIST_STATUS = (

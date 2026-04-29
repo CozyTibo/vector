@@ -38,10 +38,13 @@ def _settings_cache() -> Generator[None, None, None]:
     get_settings.cache_clear()
     prev_mock = os.environ.get("VECTOR_USE_MOCK_CONNECTORS")
     prev_waitlist_email = os.environ.get("VECTOR_WAITLIST_SIGNUP_EMAIL")
+    prev_onboarding_activation = os.environ.get("VECTOR_ONBOARDING_ACTIVATION_EMAIL")
     # CI and automated tests must never use local mock connectors (strategy §17).
     os.environ["VECTOR_USE_MOCK_CONNECTORS"] = "false"
     # Integration tests call /auth/register; do not enqueue real waitlist emails to Mailtrap/SES.
     os.environ["VECTOR_WAITLIST_SIGNUP_EMAIL"] = "false"
+    # Admin workspace-access toggles should not enqueue onboarding activation tasks in CI.
+    os.environ["VECTOR_ONBOARDING_ACTIVATION_EMAIL"] = "false"
     yield
     get_settings.cache_clear()
     if prev_mock is None:
@@ -52,6 +55,10 @@ def _settings_cache() -> Generator[None, None, None]:
         os.environ.pop("VECTOR_WAITLIST_SIGNUP_EMAIL", None)
     else:
         os.environ["VECTOR_WAITLIST_SIGNUP_EMAIL"] = prev_waitlist_email
+    if prev_onboarding_activation is None:
+        os.environ.pop("VECTOR_ONBOARDING_ACTIVATION_EMAIL", None)
+    else:
+        os.environ["VECTOR_ONBOARDING_ACTIVATION_EMAIL"] = prev_onboarding_activation
 
 
 @pytest.fixture(scope="session")

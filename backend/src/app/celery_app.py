@@ -59,7 +59,11 @@ celery_app = Celery(
     broker=_broker,
     backend=_backend,
     # Loader imports these on worker startup (in addition to `imports` below).
-    include=["app.tasks.ingestion", "app.tasks.email"],
+    include=[
+        "app.tasks.ingestion",
+        "app.tasks.email",
+        "app.tasks.onboarding_activation_task",
+    ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
 celery_app.conf.task_default_queue = "vector"
@@ -67,13 +71,18 @@ celery_app.conf.task_serializer = "json"
 celery_app.conf.accept_content = ["json"]
 celery_app.conf.result_serializer = "json"
 # Ensure task modules load on every worker process (avoids "unregistered task" if imports differ).
-celery_app.conf.imports = ("app.tasks.ingestion", "app.tasks.email")
+celery_app.conf.imports = (
+    "app.tasks.ingestion",
+    "app.tasks.email",
+    "app.tasks.onboarding_activation_task",
+)
 
 
 def _register_tasks() -> None:
     """Import task modules so they bind to ``celery_app``."""
     importlib.import_module("app.tasks.ingestion")
     importlib.import_module("app.tasks.email")
+    importlib.import_module("app.tasks.onboarding_activation_task")
 
 
 def _configure_beat_schedule() -> None:
@@ -101,3 +110,4 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     """Prefork children must bind task modules to the app (avoids unregistered-task KeyError)."""
     importlib.import_module("app.tasks.ingestion")
     importlib.import_module("app.tasks.email")
+    importlib.import_module("app.tasks.onboarding_activation_task")

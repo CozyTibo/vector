@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>You're on the Vector waitlist</title>
+    <title>Your Vector workspace is ready</title>
   </head>
   <body style="margin:0;padding:0;background-color:#f4f4f6;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f4f6;padding:32px 16px;">
@@ -27,13 +27,21 @@
                         <span style="font-weight:600;color:#0f172a;">Vector</span>
                       </p>
                       <p style="margin:0 0 12px 0;font-size:15px;line-height:1.55;color:#334155;">
-                        Hi 👋
+                        {% if first_name %}Hi {{ first_name }} 👋{% else %}Hi 👋{% endif %}
                       </p>
-                      <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+                      <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#334155;">
                         {{ personal_note }}
                       </p>
-                      <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;">
-                        {{ waitlist_status }}
+                      <p style="margin:0 0 20px 0;">
+                        <a href="{{ onboarding_url }}" style="display:inline-block;padding:12px 22px;background-color:#ec4899;color:#ffffff;text-decoration:none;border-radius:999px;font-size:15px;font-weight:600;">
+                          Start onboarding
+                        </a>
+                      </p>
+                      <p style="margin:0 0 12px 0;font-size:14px;line-height:1.6;color:#64748b;">
+                        If the button does not work, copy and paste this URL into your browser:
+                      </p>
+                      <p style="margin:0;font-size:12px;line-height:1.5;color:#64748b;word-break:break-all;">
+                        {{ onboarding_url }}
                       </p>
                     </td>
                   </tr>
@@ -49,7 +57,7 @@
             </tr>
           </table>
           <p style="margin:20px 0 0 0;font-size:12px;color:#94a3b8;text-align:center;">
-            You received this because you signed up for Vector.
+            You received this because your Vector workspace was activated for onboarding.
           </p>
         </td>
       </tr>

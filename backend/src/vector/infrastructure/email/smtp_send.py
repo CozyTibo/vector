@@ -1,4 +1,4 @@
-"""SMTP delivery (Mailtrap local, Amazon SES SMTP in production — same code path)."""
+"""SMTP delivery (Mailtrap local, Amazon SES SMTP in production; same code path)."""
 
 from __future__ import annotations
 

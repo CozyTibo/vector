@@ -13,6 +13,11 @@ from sqlalchemy.orm import Session
 from vector.api.http.admin_deps import require_admin_basic
 from vector.api.http.deps import get_db, settings_dep
 from vector.api.http.serialization import orm_to_dict
+from vector.infrastructure.email.onboarding_activation import (
+    enqueue_onboarding_activation_email,
+    onboarding_entry_url,
+)
+from vector.settings import get_settings
 from vector.application.services import connector_sync
 from vector.contracts.admin import (
     AdminOnboardingAnswerOptionsResponse,
@@ -915,9 +920,19 @@ def build_admin_router() -> APIRouter:
         t = tenancy_repo.get_tenant_by_id(db, tenant_id)
         if t is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        was_enabled = bool(t.workspace_access_enabled)
         t.workspace_access_enabled = body.workspace_access_enabled
         db.commit()
         db.refresh(t)
+        if body.workspace_access_enabled and not was_enabled:
+            member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
+            if member and member.email:
+                settings = get_settings()
+                enqueue_onboarding_activation_email(
+                    to=str(member.email),
+                    full_name=member.full_name,
+                    onboarding_url=onboarding_entry_url(settings),
+                )
         ob = onboarding_repo.get_onboarding_for_tenant(db, tenant_id)
         conns = dbg.list_tenant_connections_for_tenant(db, tenant_id=tenant_id)
         member = tenancy_repo.get_first_user_for_tenant(db, tenant_id)
