@@ -18,7 +18,9 @@ from vector.contracts.manager_insights import (
 )
 from vector.contracts.manager_insights_activity import (
     EvidenceBundle,
+    EvidenceItem,
     GapBundle,
+    GapItem,
     InterpretationBundleDebug,
     InterpretationItemDebug,
     KeyAchievementsBundleDebug,
@@ -26,6 +28,7 @@ from vector.contracts.manager_insights_activity import (
     RawHighlightsBundleDebug,
     RejectedInterpretationDebug,
     SignalsV0Debug,
+    WorkItemBundle,
 )
 from vector.openai_chat_params import (
     max_completion_tokens_for_manager_insights_interpretations,
@@ -117,22 +120,92 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
     return obj if isinstance(obj, dict) else None
 
 
-def _allowed_evidence_corpus(
-    signals: SignalsV0Debug,
+def _execution_artifact_corpus(
     evidence: EvidenceBundle,
     gaps: GapBundle,
     raw_highlights: RawHighlightsBundleDebug,
     key_achievements: KeyAchievementsBundleDebug,
+    work_items: WorkItemBundle,
 ) -> list[str]:
+    """Quotes must come from Step 2–5.6 execution artifacts (not signal explain strings)."""
     rows: list[str] = []
-    rows.extend(v for v in signals.explain.values() if isinstance(v, str))
-    rows.extend(r.text for r in raw_highlights.items)
-    rows.extend(k.title for k in key_achievements.items)
+    rows.extend(g.id for g in gaps.gaps)
     rows.extend(g.description for g in gaps.gaps)
+    rows.extend(h.id for h in raw_highlights.items)
+    rows.extend(h.text for h in raw_highlights.items)
+    for s in raw_highlights.items:
+        rows.extend(s.sources)
+    rows.extend(k.title for k in key_achievements.items)
+    for wi in work_items.items:
+        rows.append(wi.id)
+        rows.append(wi.title)
+        if wi.summary:
+            rows.append(wi.summary)
+        for v in wi.source_ref.values():
+            if isinstance(v, str) and v.strip():
+                rows.append(v)
     for item in [*evidence.action_items, *evidence.blockers, *evidence.decisions]:
+        rows.append(item.id)
         rows.append(item.statement)
         rows.append(item.evidence)
+        rows.append(item.source_work_item_id)
+        rows.extend(item.linked_work_items)
     return [r for r in rows if isinstance(r, str) and r.strip()]
+
+
+def _gap_work_item_ids(g: GapItem, wi_ids: set[str]) -> list[str]:
+    out: list[str] = []
+    for vals in g.evidence_pointers.values():
+        if isinstance(vals, list):
+            for x in vals:
+                if isinstance(x, str) and x in wi_ids:
+                    out.append(x)
+        elif isinstance(vals, str) and vals in wi_ids:
+            out.append(vals)
+    return sorted(set(out))
+
+
+def _looks_vague_generic_interpretation(description: str) -> bool:
+    d = description.lower()
+    if re.search(r"\b[A-Z][A-Z0-9]{1,6}-\d+\b", description):
+        return False
+    if "gap:" in description:
+        return False
+    if re.search(r"\b[a-z]+:[a-z0-9_:-]{4,}\b", description):
+        return False
+    needles = (
+        "coordination is inconsistent",
+        "the team is",
+        "execution quality",
+        "things are blocked",
+        "collaboration is inconsistent",
+        "team is blocked",
+        "process is",
+    )
+    return any(n in d for n in needles)
+
+
+def _description_cites_grounding_ids(
+    description: str,
+    *,
+    based_on_gaps: list[str],
+    based_on_highlights: list[str],
+    based_on_blockers: list[str],
+    evidence_by_id: dict[str, EvidenceItem],
+) -> bool:
+    for gid in based_on_gaps:
+        if gid not in description:
+            return False
+    for hid in based_on_highlights:
+        if hid not in description:
+            return False
+    for bid in based_on_blockers:
+        row = evidence_by_id.get(bid)
+        if row is None:
+            return False
+        if bid not in description and row.source_work_item_id not in description:
+            return False
+    return True
 
 
 def _evidence_in_corpus(evidence_text: str, corpus: list[str]) -> bool:
@@ -171,18 +244,36 @@ def _serialize_prompt_context(
     links: LinkBundle,
     gaps: GapBundle,
     raw_highlights: RawHighlightsBundleDebug,
+    work_items: WorkItemBundle,
 ) -> str:
     payload = {
-        "signals": signals.model_dump(mode="json"),
-        "allowed_signal_ids_for_based_on_signals": list(_SIGNAL_IDS),
-        "evidence": {
-            "action_items": [x.model_dump(mode="json") for x in evidence.action_items[:24]],
+        "execution_artifacts": {
+            "gaps": [x.model_dump(mode="json") for x in gaps.gaps[:40]],
             "blockers": [x.model_dump(mode="json") for x in evidence.blockers[:24]],
+            "action_items": [x.model_dump(mode="json") for x in evidence.action_items[:24]],
             "decisions": [x.model_dump(mode="json") for x in evidence.decisions[:24]],
+            "raw_highlights": [x.model_dump(mode="json") for x in raw_highlights.items[:30]],
         },
-        "links": [x.model_dump(mode="json") for x in links.links if x.confidence == "high"][:60],
-        "gaps": [x.model_dump(mode="json") for x in gaps.gaps[:40]],
-        "raw_highlights": [x.model_dump(mode="json") for x in raw_highlights.items[:30]],
+        "work_items": [
+            {
+                "id": w.id,
+                "title": w.title,
+                "summary": w.summary,
+                "project": w.project,
+                "type": w.type,
+                "source": w.source,
+                "source_ref": w.source_ref,
+            }
+            for w in work_items.items[:60]
+        ],
+        "allowed_gap_ids": [g.id for g in gaps.gaps[:80]],
+        "allowed_blocker_evidence_ids": [b.id for b in evidence.blockers[:80]],
+        "allowed_highlight_ids": [h.id for h in raw_highlights.items[:80]],
+        "high_confidence_links": [
+            x.model_dump(mode="json") for x in links.links if x.confidence == "high"
+        ][:60],
+        "supporting_signals_only": signals.model_dump(mode="json"),
+        "allowed_signal_ids_for_based_on_signals": list(_SIGNAL_IDS),
     }
     return json.dumps(payload, ensure_ascii=False)
 
@@ -191,10 +282,20 @@ def _validate_interpretations(
     items: list[dict[str, Any]],
     *,
     corpus: list[str],
+    gaps: GapBundle,
+    evidence: EvidenceBundle,
+    raw_highlights: RawHighlightsBundleDebug,
+    work_items: WorkItemBundle,
 ) -> tuple[list[InterpretationItemDebug], list[RejectedInterpretationDebug]]:
     out: list[InterpretationItemDebug] = []
     rejected: list[RejectedInterpretationDebug] = []
     seen_ids: set[str] = set()
+    gap_ids = {g.id for g in gaps.gaps}
+    highlight_ids = {h.id for h in raw_highlights.items}
+    blocker_ids = {b.id for b in evidence.blockers}
+    evidence_by_id = {e.id: e for e in [*evidence.action_items, *evidence.blockers, *evidence.decisions]}
+    wi_ids = {w.id for w in work_items.items}
+
     for i, raw in enumerate(items):
         if not isinstance(raw, dict):
             rejected.append(
@@ -244,12 +345,139 @@ def _validate_interpretations(
                 )
             )
             continue
+        bad_gaps = [g for g in canonical.based_on_gaps if g not in gap_ids]
+        if bad_gaps:
+            rejected.append(
+                RejectedInterpretationDebug(
+                    index=i,
+                    reason=f"invalid based_on_gaps: {bad_gaps!r}",
+                    raw=raw,
+                )
+            )
+            continue
+        bad_h = [h for h in canonical.based_on_highlights if h not in highlight_ids]
+        if bad_h:
+            rejected.append(
+                RejectedInterpretationDebug(
+                    index=i,
+                    reason=f"invalid based_on_highlights: {bad_h!r}",
+                    raw=raw,
+                )
+            )
+            continue
+        bad_b = [b for b in canonical.based_on_blockers if b not in blocker_ids]
+        if bad_b:
+            rejected.append(
+                RejectedInterpretationDebug(
+                    index=i,
+                    reason=f"invalid based_on_blockers (not Step-3 blocker ids): {bad_b!r}",
+                    raw=raw,
+                )
+            )
+            continue
+        blocker_row_invalid = False
+        for bid in canonical.based_on_blockers:
+            row = evidence_by_id.get(bid)
+            if row is None or row.kind != "blocker":
+                rejected.append(
+                    RejectedInterpretationDebug(
+                        index=i,
+                        reason=f"based_on_blockers id {bid!r} is not a blocker evidence row",
+                        raw=raw,
+                    )
+                )
+                blocker_row_invalid = True
+                break
+        if blocker_row_invalid:
+            continue
+
+        if not _description_cites_grounding_ids(
+            canonical.description,
+            based_on_gaps=list(canonical.based_on_gaps),
+            based_on_highlights=list(canonical.based_on_highlights),
+            based_on_blockers=list(canonical.based_on_blockers),
+            evidence_by_id=evidence_by_id,
+        ):
+            rejected.append(
+                RejectedInterpretationDebug(
+                    index=i,
+                    reason="description must literally include each cited gap_id, highlight_id, or "
+                    "each blocker evidence id / its source_work_item_id",
+                    raw=raw,
+                )
+            )
+            continue
+
+        anchored_wi = False
+        for gid in canonical.based_on_gaps:
+            g = next((x for x in gaps.gaps if x.id == gid), None)
+            if g is None:
+                continue
+            for wid in _gap_work_item_ids(g, wi_ids):
+                if wid in canonical.description:
+                    anchored_wi = True
+                    break
+            if anchored_wi:
+                break
+        for bid in canonical.based_on_blockers:
+            row = evidence_by_id.get(bid)
+            if row and row.source_work_item_id in canonical.description:
+                anchored_wi = True
+                break
+        for hid in canonical.based_on_highlights:
+            h = next((x for x in raw_highlights.items if x.id == hid), None)
+            if h is None:
+                continue
+            if any(s in canonical.description for s in h.sources if s in wi_ids):
+                anchored_wi = True
+                break
+        # Shadow-work / discussion rows often anchor only to slack:calls ids with no NEX-* in text;
+        # accept any Step-2 work_item id substring that appears in the description.
+        if not anchored_wi:
+            for wid in wi_ids:
+                if wid and str(wid) in canonical.description:
+                    anchored_wi = True
+                    break
+        # If the model cites an action_item id, require its source_work_item_id in the same line of
+        # reasoning (Step-3 row → Step-2 anchor), not the action_item id alone.
+        if not anchored_wi:
+            for m in re.finditer(r"\baction_item:[a-f0-9]+\b", canonical.description):
+                row = evidence_by_id.get(m.group(0))
+                if (
+                    row is not None
+                    and row.kind == "action_item"
+                    and row.source_work_item_id
+                    and str(row.source_work_item_id) in canonical.description
+                ):
+                    anchored_wi = True
+                    break
+        if not anchored_wi and not re.search(r"\b[A-Z][A-Z0-9]{1,6}-\d+\b", canonical.description):
+            rejected.append(
+                RejectedInterpretationDebug(
+                    index=i,
+                    reason="description must name at least one Step-2 work item id from cited artifacts "
+                    "or a ticket-like identifier (e.g. NEX-105)",
+                    raw=raw,
+                )
+            )
+            continue
+
+        if _looks_vague_generic_interpretation(canonical.description):
+            rejected.append(
+                RejectedInterpretationDebug(
+                    index=i,
+                    reason="description reads as generic management summary without concrete anchors",
+                    raw=raw,
+                )
+            )
+            continue
+
         if not all(_evidence_in_corpus(ev, corpus) for ev in canonical.evidence):
             bad = _unverifiable_evidence_strings(list(canonical.evidence), corpus)
             rejected.append(
                 RejectedInterpretationDebug(
                     index=i,
-                    reason="evidence not verifiable as a substring of allowed context (after whitespace normalize): "
+                    reason="evidence not verifiable as a substring of allowed execution context: "
                     + "; ".join(bad),
                     raw=raw,
                 )
@@ -264,6 +492,9 @@ def _validate_interpretations(
                 based_on_signals=list(canonical.based_on_signals),
                 evidence=list(canonical.evidence),
                 confidence=canonical.confidence,
+                based_on_gaps=list(canonical.based_on_gaps),
+                based_on_blockers=list(canonical.based_on_blockers),
+                based_on_highlights=list(canonical.based_on_highlights),
             )
         )
     return out, rejected
@@ -271,67 +502,120 @@ def _validate_interpretations(
 
 def _fallback_interpretations(
     signals: SignalsV0Debug,
+    gaps: GapBundle,
+    evidence: EvidenceBundle,
+    raw_highlights: RawHighlightsBundleDebug,
+    work_items: WorkItemBundle,
 ) -> list[InterpretationItemDebug]:
+    """Deterministic interpretations from gaps → blockers → highlights (no signal-only summaries)."""
     out: list[InterpretationItemDebug] = []
+    wi_ids = {w.id for w in work_items.items}
+    evidence_by_id = {e.id: e for e in [*evidence.action_items, *evidence.blockers, *evidence.decisions]}
     idx = 1
 
-    def push(itype: str, desc: str, signal_ids: list[str], conf: str) -> None:
+    def push_row(
+        *,
+        itype: str,
+        description: str,
+        quotes: list[str],
+        gap_ids: list[str],
+        blocker_ids: list[str],
+        highlight_ids: list[str],
+        sigs: list[str],
+        conf: str,
+    ) -> None:
         nonlocal idx
         out.append(
             InterpretationItemDebug(
                 id=f"interp_fallback_{idx}",
                 type=itype,  # type: ignore[arg-type]
-                description=desc,
-                based_on_signals=signal_ids,
-                evidence=[signals.explain[sig] for sig in signal_ids if sig in signals.explain][:2]
-                or ["Deterministic fallback based on signal vector."],
+                description=description,
+                based_on_signals=sigs,
+                evidence=quotes[:3],
                 confidence=conf,  # type: ignore[arg-type]
+                based_on_gaps=gap_ids,
+                based_on_blockers=blocker_ids,
+                based_on_highlights=highlight_ids,
             )
         )
         idx += 1
 
-    if signals.follow_through in ("weak", "partial"):
-        push(
-            "follow_through",
-            "Follow-through from discussion to tracked execution is incomplete.",
-            ["follow_through", "expectation_coverage"],
-            "medium",
+    def gap_priority(g: GapItem) -> tuple[int, str]:
+        if g.type in ("expected_not_executed", "discussed_not_linked_to_work"):
+            return (0, g.id)
+        if g.type == "blocker_not_tracked":
+            return (1, g.id)
+        return (3, g.id)
+
+    sorted_gaps = sorted(gaps.gaps, key=gap_priority)
+    for g in sorted_gaps[:4]:
+        parts: list[str] = [g.id, g.description]
+        for wid in _gap_work_item_ids(g, wi_ids)[:3]:
+            parts.append(wid)
+        desc = " — ".join(parts)
+        quotes: list[str] = [g.description]
+        for k, vals in g.evidence_pointers.items():
+            if not isinstance(vals, list):
+                continue
+            for eid in vals:
+                if not isinstance(eid, str):
+                    continue
+                row = evidence_by_id.get(eid)
+                if row:
+                    quotes.append(row.statement)
+        raw_blockers = g.evidence_pointers.get("blocker_item_ids", [])
+        blocker_ids = [b for b in raw_blockers if isinstance(b, str)] if isinstance(raw_blockers, list) else []
+        if g.type in ("expected_not_executed", "discussed_not_linked_to_work"):
+            sigs = ["follow_through", "expectation_coverage"]
+            itype_val = "follow_through"
+        elif g.type == "blocker_not_tracked":
+            sigs = ["blocker_visibility", "follow_through"]
+            itype_val = "execution_friction"
+        else:
+            sigs = ["documentation_linkage", "focus"]
+            itype_val = "execution_friction"
+        push_row(
+            itype=itype_val,
+            description=desc,
+            quotes=quotes or [g.description],
+            gap_ids=[g.id],
+            blocker_ids=blocker_ids,
+            highlight_ids=[],
+            sigs=sigs,
+            conf="medium",
         )
-    if signals.blocker_visibility in ("partial", "not_visible"):
-        push(
-            "coordination_quality",
-            "Blocker visibility in tracked systems is limited.",
-            ["blocker_visibility", "interaction_friction"],
-            "medium",
+
+    for b in evidence.blockers[:2]:
+        desc = f"{b.id} on {b.source_work_item_id}: {b.statement}"
+        push_row(
+            itype="execution_friction",
+            description=desc,
+            quotes=[b.statement, b.evidence],
+            gap_ids=[],
+            blocker_ids=[b.id],
+            highlight_ids=[],
+            sigs=["blocker_visibility", "interaction_friction"],
+            conf="medium",
         )
-    if signals.repeated_discussion_present or signals.interaction_friction == "present":
-        push(
-            "execution_friction",
-            "Recurring discussion patterns suggest execution friction.",
-            ["repeated_discussion_present", "interaction_friction"],
-            "medium",
+
+    for h in raw_highlights.items[:2]:
+        if len(h.sources) < 2 and not any(
+            w in h.text.lower() for w in ("repeated", "multiple", "distinct", "several")
+        ):
+            continue
+        src = next((s for s in h.sources if s in wi_ids), h.sources[0] if h.sources else "unknown")
+        desc = f"{h.id} — {src} — {h.text}"
+        push_row(
+            itype="execution_friction",
+            description=desc,
+            quotes=[h.text],
+            gap_ids=[],
+            blocker_ids=[],
+            highlight_ids=[h.id],
+            sigs=["repeated_discussion_present", "interaction_friction"],
+            conf="medium",
         )
-    if signals.focus == "fragmented" or signals.urgent_pressure == "high":
-        push(
-            "prioritization",
-            "Competing priorities may be reducing execution predictability.",
-            ["focus", "urgent_pressure"],
-            "low",
-        )
-    if signals.support_pattern == "asks_for_help":
-        push(
-            "support_dependency",
-            "Work appears to rely on external unblock/support cycles.",
-            ["support_pattern", "collaboration_intensity"],
-            "low",
-        )
-    if not out:
-        push(
-            "collaboration_pattern",
-            "Current signals are mixed; collaboration pattern remains neutral in this window.",
-            ["collaboration_intensity", "feedback_reception"],
-            "low",
-        )
+
     return out[:6]
 
 
@@ -345,27 +629,34 @@ def _call_llm(
     conf_list = ", ".join(_INTERPRETATION_CONFIDENCE)
     signal_ids_list = ", ".join(_SIGNAL_IDS)
     system = (
-        "You generate grounded engineering execution interpretations. "
-        "Output strict JSON only, no markdown. "
-        f"Each item's \"type\" MUST be exactly one of these strings (no synonyms): {types_list}. "
-        f"Each item's \"confidence\" MUST be exactly one of: {conf_list}. "
-        f"Each string in \"based_on_signals\" MUST be a signal id from this fixed set only "
-        f"(snake_case keys like follow_through, not human sentences): {signal_ids_list}. "
-        "The context JSON includes the same list under allowed_signal_ids_for_based_on_signals. "
-        "Use \"based_on_signals\" to cite which signal *dimensions* you are interpreting. "
-        "Use \"evidence\" for exact quoted lines/metrics; never put signal explain lines, JSON "
-        "snippets, or ad-hoc metric strings in \"based_on_signals\". "
+        "You detect execution patterns from STRUCTURED artifacts only. Output strict JSON, no markdown. "
+        f"Each item's \"type\" MUST be one of: {types_list}. "
+        f"Each item's \"confidence\" MUST be one of: {conf_list}. "
+        "MANDATORY GROUNDING: each interpretation MUST cite at least one of based_on_gaps, "
+        "based_on_blockers (Step-3 blocker evidence row ids), or based_on_highlights using ONLY ids "
+        "from allowed_gap_ids / allowed_blocker_evidence_ids / allowed_highlight_ids in the context. "
+        "\"based_on_signals\" is OPTIONAL supporting context only (subset of "
+        "allowed_signal_ids_for_based_on_signals); you MAY use an empty list. "
+        "\"description\" MUST be a concrete pattern statement: include EVERY cited gap_id and "
+        "highlight_id as literal substrings; for each cited blocker id include that id OR the row's "
+        "source_work_item_id in the description; include at least one Step-2 work_item id from "
+        "work_items (exact id string, e.g. slack:message:..., calls:event:...) OR a ticket key like "
+        "NEX-105 from titles/source_ref. Do not use action_item:... as the only anchor — cite the "
+        "underlying work item id or ticket key. "
+        "BAD: \"coordination is inconsistent\". "
+        "GOOD: \"g1 — calls:c1 — Repeated discussions about NEX-1 are not linked to any tracked issue "
+        "or PR\". "
+        "Do not invent ids. "
+        "\"evidence\" strings MUST be exact substrings of execution_artifacts or work_items text "
+        "(after whitespace normalize). "
         "Schema: {\"interpretations\":[{\"id\":str,\"type\":str,\"description\":str,"
-        "\"based_on_signals\":[str],\"evidence\":[str],\"confidence\":str}]}. "
-        "Map narrative roles (e.g. an observation, a risk, a suggested action) onto the allowed "
-        "\"type\" values — do not output type labels like observation, risk, or action. "
-        "Use only evidence strings that are exact substrings of the provided context "
-        "(after normalizing runs of whitespace). "
-        "Do not invent facts. Keep descriptions concise."
+        "\"based_on_signals\":[str],\"evidence\":[str],\"confidence\":str,"
+        "\"based_on_gaps\":[str],\"based_on_blockers\":[str],\"based_on_highlights\":[str]}]}. "
+        "Generate 3-6 interpretations; skip categories with no cited artifacts."
     )
     user = (
-        "Context JSON follows. Build interpretations from the signal vector, explain strings, and "
-        "the evidence/gaps. Generate 3-6 interpretations.\n"
+        "Context JSON follows. execution_artifacts + work_items are PRIMARY; supporting_signals_only "
+        "is secondary. Build interpretations only from real gaps/blockers/highlights.\n"
         f"{prompt_json}"
     )
     kwargs: dict[str, Any] = {
@@ -444,9 +735,10 @@ def generate_interpretations(
     gaps: GapBundle,
     key_achievements: KeyAchievementsBundleDebug,
     raw_highlights: RawHighlightsBundleDebug,
+    work_items: WorkItemBundle,
 ) -> InterpretationBundleDebug:
     """Generate Step 7 interpretations with strict validation and deterministic fallback."""
-    corpus = _allowed_evidence_corpus(signals, evidence, gaps, raw_highlights, key_achievements)
+    corpus = _execution_artifact_corpus(evidence, gaps, raw_highlights, key_achievements, work_items)
     llm_items: list[InterpretationItemDebug] = []
     rejected: list[RejectedInterpretationDebug] = []
     llm_response_text: str | None = None
@@ -463,7 +755,9 @@ def generate_interpretations(
     )
 
     if settings.openai_api_key.strip():
-        prompt_json = _serialize_prompt_context(signals, evidence, links, gaps, raw_highlights)
+        prompt_json = _serialize_prompt_context(
+            signals, evidence, links, gaps, raw_highlights, work_items
+        )
         try:
             llm, meta = _call_llm(settings, prompt_json)
             llm_response_text = llm.raw_text
@@ -472,7 +766,14 @@ def generate_interpretations(
             if llm.response_level_error:
                 llm_error = llm.response_level_error
             raw_items = llm.items
-            llm_items, row_rejections = _validate_interpretations(raw_items, corpus=corpus)
+            llm_items, row_rejections = _validate_interpretations(
+                raw_items,
+                corpus=corpus,
+                gaps=gaps,
+                evidence=evidence,
+                raw_highlights=raw_highlights,
+                work_items=work_items,
+            )
             rejected.extend(row_rejections)
             if not llm_items:
                 fallback_reason = "llm_output_invalid"
@@ -490,7 +791,9 @@ def generate_interpretations(
     else:
         fallback_reason = "missing_api_key"
 
-    items = llm_items or _fallback_interpretations(signals)
+    items = llm_items or _fallback_interpretations(
+        signals, gaps, evidence, raw_highlights, work_items
+    )
     generated_via = "llm" if llm_items else "fallback"
     return InterpretationBundleDebug(
         run_id=evidence.run_id,

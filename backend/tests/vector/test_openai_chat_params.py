@@ -46,16 +46,20 @@ def test_onboarding_chat_gpt4o_keeps_tight_caps() -> None:
 
 
 def test_manager_insights_gpt5_uses_high_completion_cap() -> None:
-    assert max_completion_tokens_for_manager_insights_interpretations("gpt-5-mini") == 4096
+    assert max_completion_tokens_for_manager_insights_interpretations("gpt-5-mini") == 16_384
+
+
+def test_manager_insights_o_series_uses_high_completion_cap() -> None:
+    assert max_completion_tokens_for_manager_insights_interpretations("o3-mini") == 16_384
 
 
 def test_manager_insights_gpt4o_uses_default_cap() -> None:
-    assert max_completion_tokens_for_manager_insights_interpretations("gpt-4o-mini") == 1400
+    assert max_completion_tokens_for_manager_insights_interpretations("gpt-4o-mini") == 4096
 
 
 def test_manager_insights_step8_gpt5_uses_high_completion_cap() -> None:
-    assert max_completion_tokens_for_manager_insights_insights("gpt-5-mini") == 4096
+    assert max_completion_tokens_for_manager_insights_insights("gpt-5-mini") == 16_384
 
 
 def test_manager_insights_step8_gpt4o_uses_default_cap() -> None:
-    assert max_completion_tokens_for_manager_insights_insights("gpt-4o-mini") == 1600
+    assert max_completion_tokens_for_manager_insights_insights("gpt-4o-mini") == 4096

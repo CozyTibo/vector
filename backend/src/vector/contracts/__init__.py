@@ -2,6 +2,7 @@
 
 from vector.contracts.manager_insights import (
     InsightArbitrationResult,
+    InsightPrimaryEntity,
     InsightV0,
     InterpretationV0,
     Link,
@@ -12,6 +13,7 @@ from vector.contracts.manager_insights import (
 
 __all__ = [
     "InsightArbitrationResult",
+    "InsightPrimaryEntity",
     "InsightV0",
     "InterpretationV0",
     "Link",

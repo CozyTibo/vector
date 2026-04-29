@@ -18,6 +18,8 @@ from vector.contracts.manager_insights_activity import (
     RawHighlightItem,
     RawHighlightsBundleDebug,
     SignalsV0Debug,
+    WorkItem,
+    WorkItemBundle,
 )
 
 mod = import_module("vector.domains.manager_insights.generate_insights")
@@ -59,6 +61,25 @@ def _signals() -> SignalsV0Debug:
 
 
 def _bundles(run_id: uuid.UUID, tenant_id: uuid.UUID) -> dict[str, Any]:
+    work_items = WorkItemBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        items=[
+            WorkItem(
+                id="calls:c1",
+                source="calls",
+                type="call",
+                title="Call about NEX-1",
+                summary="Need help closing NEX-1",
+                status="active",
+                project="NEX",
+                owner=None,
+                participants=[],
+                source_ref={},
+            )
+        ],
+    )
     evidence = EvidenceBundle(
         run_id=run_id,
         tenant_id=tenant_id,
@@ -89,7 +110,10 @@ def _bundles(run_id: uuid.UUID, tenant_id: uuid.UUID) -> dict[str, Any]:
                 id="g1",
                 type="expected_not_executed",
                 description="action item has no linked issue",
-                evidence_pointers={},
+                evidence_pointers={
+                    "action_item_ids": ["a1"],
+                    "source_work_item_ids": ["calls:c1"],
+                },
             )
         ],
     )
@@ -126,14 +150,18 @@ def _bundles(run_id: uuid.UUID, tenant_id: uuid.UUID) -> dict[str, Any]:
             InterpretationItemDebug(
                 id="interp_1",
                 type="follow_through",
-                description="Follow-through is weak.",
+                description="g1 — calls:c1 — Follow-through is weak for tracked execution.",
                 based_on_signals=["follow_through"],
                 evidence=["Need help closing NEX-1"],
                 confidence="medium",
+                based_on_gaps=["g1"],
+                based_on_blockers=[],
+                based_on_highlights=[],
             )
         ],
     )
     return {
+        "work_items": work_items,
         "evidence": evidence,
         "gaps": gaps,
         "highlights": highlights,
@@ -154,6 +182,7 @@ def test_generate_insights_fallback_without_openai_key() -> None:
         gaps=b["gaps"],
         key_achievements=b["achievements"],
         raw_highlights=b["highlights"],
+        work_items=b["work_items"],
     )
     assert out.generated_via == "fallback"
     assert out.fallback_reason == "missing_api_key"
@@ -176,17 +205,28 @@ def test_generate_insights_llm_payload_is_schema_and_grounding_validated(monkeyp
                         message=SimpleNamespace(
                             content=(
                                 '{"insights":['
-                                '{"id":"ins_1","observation":"Follow-through is weak.",'
+                                '{"id":"ins_1","observation":"g1 — calls:c1 and NEX: Follow-through is weak.",'
                                 '"interpretation":"Execution handoffs are inconsistent.",'
                                 '"implication":"Manager should enforce closure criteria.",'
                                 '"evidence":["Need help closing NEX-1"],'
+                                '"evidence_ids":["a1"],'
                                 '"based_on_interpretations":["interp_1"],'
                                 '"based_on_signals":["follow_through"],'
+                                '"primary_work_item_ids":["calls:c1"],'
+                                '"supporting_work_item_ids":[],'
+                                '"primary_entities":[{"name":"NEX","kind":"project"}],'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[],'
                                 '"confidence":"high","priority":"high"},'
-                                '{"id":"ins_bad","observation":"bad","interpretation":"bad","implication":"bad",'
+                                '{"id":"ins_bad","observation":"g1 — calls:c1 and NEX: bad","interpretation":"bad",'
+                                '"implication":"bad",'
                                 '"evidence":["invented quote"],'
+                                '"evidence_ids":["a1"],'
                                 '"based_on_interpretations":["interp_1"],'
                                 '"based_on_signals":["follow_through"],'
+                                '"primary_work_item_ids":["calls:c1"],'
+                                '"supporting_work_item_ids":[],'
+                                '"primary_entities":[{"name":"NEX","kind":"project"}],'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[],'
                                 '"confidence":"high","priority":"high"}'
                                 "]}"
                             )
@@ -213,19 +253,83 @@ def test_generate_insights_llm_payload_is_schema_and_grounding_validated(monkeyp
         gaps=b["gaps"],
         key_achievements=b["achievements"],
         raw_highlights=b["highlights"],
+        work_items=b["work_items"],
     )
     assert out.generated_via == "llm"
     assert out.fallback_reason is None
     assert len(out.items) == 1
     assert out.items[0].id == "ins_1"
+    assert out.items[0].evidence_ids == ["a1"]
+    assert out.items[0].primary_work_item_ids == ["calls:c1"]
+    assert out.items[0].primary_entities[0].name == "NEX"
+    assert out.items[0].based_on_gaps == ["g1"]
     assert out.model == "gpt-5-mini"
     assert out.total_tokens == 178
     assert out.llm_parsed_insight_rows == 2
     assert len(out.rejected_insights) == 1
     assert out.rejected_insights[0].index == 1
-    assert "verifiable" in out.rejected_insights[0].reason
+    assert "cited evidence_ids" in out.rejected_insights[0].reason
     assert out.rejected_insights[0].raw.get("id") == "ins_bad"
     assert out.llm_response_text is not None
+
+
+def test_generate_insights_maps_evidence_id_strings_to_row_quotes(monkeypatch: Any) -> None:
+    """LLM sometimes puts evidence_ids into evidence[]; we normalize to quotable text."""
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    b = _bundles(run_id, tenant_id)
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs: Any) -> Any:
+            del kwargs
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=(
+                                '{"insights":['
+                                '{"id":"ins_ids","observation":"g1 — calls:c1 and NEX: Follow-through.",'
+                                '"interpretation":"Handoffs are weak.",'
+                                '"implication":"Enforce closure.",'
+                                '"evidence":["a1"],'
+                                '"evidence_ids":["a1"],'
+                                '"based_on_interpretations":["interp_1"],'
+                                '"based_on_signals":["follow_through"],'
+                                '"primary_work_item_ids":["calls:c1"],'
+                                '"supporting_work_item_ids":[],'
+                                '"primary_entities":[{"name":"NEX","kind":"project"}],'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[],'
+                                '"confidence":"high","priority":"high"}'
+                                "]}"
+                            )
+                        )
+                    )
+                ],
+                usage=SimpleNamespace(prompt_tokens=10, completion_tokens=10, total_tokens=20),
+            )
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.chat = _FakeChat()
+
+    monkeypatch.setattr(mod, "OpenAI", _FakeClient)
+    out = mod.generate_insights(
+        SimpleNamespace(openai_api_key="sk-test", openai_model="gpt-5-mini"),  # type: ignore[arg-type]
+        signals=_signals(),
+        interpretations=b["interpretations"],
+        evidence=b["evidence"],
+        gaps=b["gaps"],
+        key_achievements=b["achievements"],
+        raw_highlights=b["highlights"],
+        work_items=b["work_items"],
+    )
+    assert out.generated_via == "llm"
+    assert len(out.items) == 1
+    assert out.items[0].evidence == ["Need help closing NEX-1"]
 
 
 def test_generate_insights_reports_invalid_llm_output_reason(monkeypatch: Any) -> None:
@@ -242,10 +346,16 @@ def test_generate_insights_reports_invalid_llm_output_reason(monkeypatch: Any) -
                     SimpleNamespace(
                         message=SimpleNamespace(
                             content=(
-                                '{"insights":[{"id":"x","observation":"bad","interpretation":"bad",'
-                                '"implication":"bad","evidence":["Need help closing NEX-1"],'
+                                '{"insights":[{"id":"x","observation":"g1 — calls:c1 and NEX: bad",'
+                                '"interpretation":"bad","implication":"bad",'
+                                '"evidence":["Need help closing NEX-1"],'
+                                '"evidence_ids":["a1"],'
                                 '"based_on_interpretations":["missing_interp"],'
                                 '"based_on_signals":["follow_through"],'
+                                '"primary_work_item_ids":["calls:c1"],'
+                                '"supporting_work_item_ids":[],'
+                                '"primary_entities":[{"name":"NEX","kind":"project"}],'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[],'
                                 '"confidence":"high","priority":"high"}]}'
                             )
                         )
@@ -271,6 +381,7 @@ def test_generate_insights_reports_invalid_llm_output_reason(monkeypatch: Any) -
         gaps=b["gaps"],
         key_achievements=b["achievements"],
         raw_highlights=b["highlights"],
+        work_items=b["work_items"],
     )
     assert out.generated_via == "fallback"
     assert out.fallback_reason == "llm_output_invalid"

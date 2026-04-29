@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from vector.contracts.manager_insights_activity import DataReliabilityReport
 
@@ -51,6 +51,7 @@ InterpretationType = Literal[
 InterpretationConfidence = Literal["high", "medium", "low"]
 InsightPriority = Literal["critical", "high", "medium", "low"]
 InsightConfidence = Literal["high", "medium", "low"]
+InsightPrimaryEntityKind = Literal["project", "feature", "system"]
 ArbitrationDropReason = Literal[
     "below_priority_band",
     "insufficient_grounding",
@@ -186,9 +187,40 @@ class InterpretationV0(_StrictModel):
     id: str
     type: InterpretationType
     description: str
-    based_on_signals: list[str] = Field(default_factory=list, min_length=1)
+    based_on_signals: list[str] = Field(
+        default_factory=list,
+        description="Optional supporting signal ids; execution grounding uses gaps/blockers/highlights.",
+    )
     evidence: list[str] = Field(default_factory=list, min_length=1)
     confidence: InterpretationConfidence
+    based_on_gaps: list[str] = Field(
+        default_factory=list,
+        description="Step-5 gap ids this interpretation is anchored to.",
+    )
+    based_on_blockers: list[str] = Field(
+        default_factory=list,
+        description="Step-3 evidence item ids (kind=blocker) cited by this interpretation.",
+    )
+    based_on_highlights: list[str] = Field(
+        default_factory=list,
+        description="Step-5.6 raw highlight ids cited by this interpretation.",
+    )
+
+    @model_validator(mode="after")
+    def _interpretation_has_execution_grounding(self) -> Self:
+        if not (self.based_on_gaps or self.based_on_blockers or self.based_on_highlights):
+            raise ValueError(
+                "interpretation must cite at least one of based_on_gaps, based_on_blockers, "
+                "or based_on_highlights"
+            )
+        return self
+
+
+class InsightPrimaryEntity(_StrictModel):
+    """Named execution surface the insight is anchored to (project / feature / system)."""
+
+    name: str = Field(min_length=1)
+    kind: InsightPrimaryEntityKind
 
 
 class InsightV0(_StrictModel):
@@ -197,10 +229,46 @@ class InsightV0(_StrictModel):
     interpretation: str
     implication: str
     evidence: list[str] = Field(default_factory=list, min_length=1)
+    evidence_ids: list[str] = Field(
+        default_factory=list,
+        min_length=1,
+        description="Step-3 evidence item ids (action_item / blocker / decision) backing the insight.",
+    )
     based_on_interpretations: list[str] = Field(default_factory=list)
     based_on_signals: list[str] = Field(default_factory=list)
+    primary_work_item_ids: list[str] = Field(
+        default_factory=list,
+        min_length=1,
+        description="Primary Step-2 work item ids this insight is about.",
+    )
+    supporting_work_item_ids: list[str] = Field(
+        default_factory=list,
+        description="Additional related Step-2 work item ids (may be empty).",
+    )
+    primary_entities: list[InsightPrimaryEntity] = Field(
+        default_factory=list,
+        min_length=1,
+        description="At least one concrete project/feature/system anchor.",
+    )
+    based_on_gaps: list[str] = Field(default_factory=list, description="Step-5 gap ids tied to this insight.")
+    based_on_blockers: list[str] = Field(
+        default_factory=list,
+        description="Step-3 evidence item ids (kind=blocker) tied to this insight.",
+    )
+    based_on_highlights: list[str] = Field(
+        default_factory=list,
+        description="Step-5.6 raw highlight ids tied to this insight.",
+    )
     confidence: InsightConfidence
     priority: InsightPriority
+
+    @model_validator(mode="after")
+    def _insight_has_execution_grounding(self) -> Self:
+        if not (self.based_on_gaps or self.based_on_blockers or self.based_on_highlights):
+            raise ValueError(
+                "insight must cite at least one of based_on_gaps, based_on_blockers, or based_on_highlights"
+            )
+        return self
 
 
 class DroppedInsight(_StrictModel):

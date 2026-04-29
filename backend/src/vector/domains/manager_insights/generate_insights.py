@@ -14,14 +14,19 @@ from pydantic import ValidationError
 from vector.contracts.manager_insights import InsightConfidence, InsightPriority, InsightV0
 from vector.contracts.manager_insights_activity import (
     EvidenceBundle,
+    EvidenceItem,
     GapBundle,
+    GapItem,
     InsightBundleDebug,
     InsightItemDebug,
+    InsightPrimaryEntityItem,
     InterpretationBundleDebug,
     KeyAchievementsBundleDebug,
     RawHighlightsBundleDebug,
     RejectedInsightDebug,
     SignalsV0Debug,
+    WorkItem,
+    WorkItemBundle,
 )
 from vector.openai_chat_params import (
     max_completion_tokens_for_manager_insights_insights,
@@ -110,28 +115,6 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
     return obj if isinstance(obj, dict) else None
 
 
-def _allowed_evidence_corpus(
-    signals: SignalsV0Debug,
-    interpretations: InterpretationBundleDebug,
-    evidence: EvidenceBundle,
-    gaps: GapBundle,
-    raw_highlights: RawHighlightsBundleDebug,
-    key_achievements: KeyAchievementsBundleDebug,
-) -> list[str]:
-    rows: list[str] = []
-    rows.extend(v for v in signals.explain.values() if isinstance(v, str))
-    rows.extend(i.description for i in interpretations.items)
-    for i in interpretations.items:
-        rows.extend(i.evidence)
-    rows.extend(r.text for r in raw_highlights.items)
-    rows.extend(k.title for k in key_achievements.items)
-    rows.extend(g.description for g in gaps.gaps)
-    for item in [*evidence.action_items, *evidence.blockers, *evidence.decisions]:
-        rows.append(item.statement)
-        rows.append(item.evidence)
-    return [r for r in rows if isinstance(r, str) and r.strip()]
-
-
 def _evidence_in_corpus(evidence_text: str, corpus: list[str]) -> bool:
     q = _normalize(evidence_text)
     if not q:
@@ -161,42 +144,216 @@ def _unverifiable_evidence_strings(
     return bad
 
 
-def _serialize_prompt_context(
-    signals: SignalsV0Debug,
+def _iter_evidence_items(evidence: EvidenceBundle) -> list[EvidenceItem]:
+    return [*evidence.action_items, *evidence.blockers, *evidence.decisions]
+
+
+def _evidence_item_by_id(evidence: EvidenceBundle) -> dict[str, EvidenceItem]:
+    return {e.id: e for e in _iter_evidence_items(evidence)}
+
+
+def _cited_evidence_corpus(evidence: EvidenceBundle, evidence_ids: list[str]) -> list[str]:
+    by_id = _evidence_item_by_id(evidence)
+    rows: list[str] = []
+    for eid in evidence_ids:
+        item = by_id.get(eid)
+        if item is None:
+            continue
+        rows.append(item.statement)
+        rows.append(item.evidence)
+    return [r for r in rows if isinstance(r, str) and r.strip()]
+
+
+def _resolve_insight_evidence_strings(
+    evidence_strings: list[str],
+    evidence_ids: list[str],
+    evidence_by_id: dict[str, EvidenceItem],
+) -> list[str]:
+    """LLMs sometimes put evidence row ids in `evidence`[]; map those to quotable row text."""
+    allowed = set(evidence_ids)
+    out: list[str] = []
+    for ev in evidence_strings:
+        if isinstance(ev, str) and ev in allowed:
+            row = evidence_by_id.get(ev)
+            if row is None:
+                out.append(ev)
+                continue
+            quote = (row.statement or "").strip() or (row.evidence or "").strip()
+            out.append(quote[:1200] if quote else ev)
+            continue
+        out.append(ev)
+    return out
+
+
+_WORK_POINTER_KEYS = frozenset(
+    {
+        "source_work_item_ids",
+        "linked_execution_item_ids",
+        "document_work_item_ids",
+    }
+)
+_EVID_POINTER_KEYS = frozenset({"action_item_ids", "blocker_item_ids", "evidence_item_ids"})
+
+
+def _gap_pointer_ids(g: GapItem) -> tuple[list[str], list[str]]:
+    work_ids: list[str] = []
+    ev_ids: list[str] = []
+    for k, vals in g.evidence_pointers.items():
+        if not isinstance(vals, list):
+            continue
+        for x in vals:
+            if not isinstance(x, str):
+                continue
+            if k in _EVID_POINTER_KEYS:
+                ev_ids.append(x)
+            elif k in _WORK_POINTER_KEYS or k not in _EVID_POINTER_KEYS:
+                work_ids.append(x)
+    return sorted(set(work_ids)), sorted(set(ev_ids))
+
+
+def _gap_sort_band(g: GapItem) -> int:
+    if g.type in ("expected_not_executed", "discussed_not_linked_to_work"):
+        return 0
+    if g.type == "blocker_not_tracked":
+        return 1
+    return 3
+
+
+def _build_insight_candidates(
+    gaps: GapBundle,
+    evidence: EvidenceBundle,
+    raw_highlights: RawHighlightsBundleDebug,
+) -> list[dict[str, Any]]:
+    """Phase 1 — deterministic execution-failure candidates (no LLM)."""
+    out: list[dict[str, Any]] = []
+    for g in gaps.gaps:
+        wis, eids = _gap_pointer_ids(g)
+        out.append(
+            {
+                "candidate_id": f"gap:{g.id}",
+                "source_kind": "gap",
+                "gap_id": g.id,
+                "gap_type": g.type,
+                "gap_description": g.description,
+                "related_work_item_ids": wis,
+                "source_evidence_item_ids": eids,
+            }
+        )
+    for b in evidence.blockers:
+        out.append(
+            {
+                "candidate_id": f"blocker:{b.id}",
+                "source_kind": "blocker",
+                "gap_ids": [],
+                "blocker_evidence_id": b.id,
+                "blocker_statement": b.statement,
+                "related_work_item_ids": sorted({b.source_work_item_id, *b.linked_work_items}),
+                "source_evidence_item_ids": [b.id],
+            }
+        )
+    for h in raw_highlights.items:
+        if len(h.sources) >= 2 or any(
+            w in h.text.lower() for w in ("repeated", "multiple", "distinct", "several")
+        ):
+            out.append(
+                {
+                    "candidate_id": f"highlight:{h.id}",
+                    "source_kind": "highlight",
+                    "highlight_id": h.id,
+                    "highlight_text": h.text,
+                    "related_work_item_ids": list(h.sources),
+                    "source_evidence_item_ids": [],
+                }
+            )
+
+    def sort_key(c: dict[str, Any]) -> tuple[int, str]:
+        sk = c.get("source_kind")
+        if sk == "gap":
+            gid = str(c.get("gap_id", ""))
+            g = next((x for x in gaps.gaps if x.id == gid), None)
+            band = _gap_sort_band(g) if g else 9
+            return (band, gid)
+        if sk == "blocker":
+            return (2, str(c.get("candidate_id", "")))
+        return (3, str(c.get("candidate_id", "")))
+
+    out.sort(key=sort_key)
+    return out[:28]
+
+
+def _serialize_insight_llm_payload(
+    candidates: list[dict[str, Any]],
     interpretations: InterpretationBundleDebug,
     evidence: EvidenceBundle,
     gaps: GapBundle,
-    key_achievements: KeyAchievementsBundleDebug,
     raw_highlights: RawHighlightsBundleDebug,
+    work_items: WorkItemBundle,
 ) -> str:
+    wi_rows = [
+        {
+            "id": w.id,
+            "title": w.title,
+            "project": w.project,
+            "type": w.type,
+            "source": w.source,
+            "source_ref": w.source_ref,
+        }
+        for w in work_items.items[:48]
+    ]
     payload = {
-        "signals": signals.model_dump(mode="json"),
-        "interpretations": [x.model_dump(mode="json") for x in interpretations.items[:12]],
-        "allowed_signal_ids_for_based_on_signals": list(_SIGNAL_IDS),
+        "insight_candidates": candidates,
+        "interpretations_for_optional_links": [
+            {"id": x.id, "description": x.description} for x in interpretations.items[:12]
+        ],
         "allowed_interpretation_ids_for_based_on_interpretations": [
             x.id for x in interpretations.items[:12]
         ],
-        "evidence": {
-            "action_items": [x.model_dump(mode="json") for x in evidence.action_items[:24]],
-            "blockers": [x.model_dump(mode="json") for x in evidence.blockers[:24]],
-            "decisions": [x.model_dump(mode="json") for x in evidence.decisions[:24]],
-        },
-        "gaps": [x.model_dump(mode="json") for x in gaps.gaps[:40]],
-        "key_achievements": [x.model_dump(mode="json") for x in key_achievements.items[:30]],
-        "raw_highlights": [x.model_dump(mode="json") for x in raw_highlights.items[:30]],
+        "allowed_signal_ids_for_based_on_signals": list(_SIGNAL_IDS),
+        "allowed_work_item_ids": [w.id for w in work_items.items[:200]],
+        "allowed_evidence_item_ids": [e.id for e in _iter_evidence_items(evidence)][:200],
+        "allowed_gap_ids": [g.id for g in gaps.gaps[:80]],
+        "allowed_blocker_evidence_ids": [b.id for b in evidence.blockers[:80]],
+        "allowed_highlight_ids": [h.id for h in raw_highlights.items[:80]],
+        "work_items_for_grounding": wi_rows,
     }
     return json.dumps(payload, ensure_ascii=False)
+
+
+def _insight_observation_vague(observation: str) -> bool:
+    o = observation.lower()
+    if re.search(r"\b[A-Z][A-Z0-9]{1,6}-\d+\b", observation):
+        return False
+    if "gap:" in observation:
+        return False
+    if re.search(r"\b[a-z]+:[a-z0-9_:-]{4,}\b", observation):
+        return False
+    needles = (
+        "the team ",
+        "team is blocked",
+        "external dependencies",
+        "the process",
+        "things are",
+        "coordination is",
+        "execution quality",
+    )
+    return any(n in o for n in needles)
 
 
 def _validate_insights(
     items: list[dict[str, Any]],
     *,
-    corpus: list[str],
     interpretation_ids: set[str],
+    work_items: WorkItemBundle,
+    evidence: EvidenceBundle,
+    gaps: GapBundle,
+    raw_highlights: RawHighlightsBundleDebug,
 ) -> tuple[list[InsightItemDebug], list[RejectedInsightDebug]]:
     out: list[InsightItemDebug] = []
     rejected: list[RejectedInsightDebug] = []
     seen_ids: set[str] = set()
+    allowed_work_item_ids = {w.id for w in work_items.items}
+    allowed_evidence_ids = {e.id for e in _iter_evidence_items(evidence)}
+    evidence_by_id = _evidence_item_by_id(evidence)
 
     for i, raw in enumerate(items):
         if not isinstance(raw, dict):
@@ -244,16 +401,176 @@ def _validate_insights(
                 )
             )
             continue
-        if not all(_evidence_in_corpus(ev, corpus) for ev in canonical.evidence):
-            bad = _unverifiable_evidence_strings(list(canonical.evidence), corpus)
+
+        gap_ids_allowed = {g.id for g in gaps.gaps}
+        highlight_ids_allowed = {h.id for h in raw_highlights.items}
+        blocker_ids_allowed = {b.id for b in evidence.blockers}
+        bad_gap_refs = [g for g in canonical.based_on_gaps if g not in gap_ids_allowed]
+        if bad_gap_refs:
             rejected.append(
                 RejectedInsightDebug(
                     index=i,
-                    reason="evidence not verifiable as a substring of allowed context: "
+                    reason=f"invalid based_on_gaps: {bad_gap_refs!r}",
+                    raw=raw,
+                )
+            )
+            continue
+        bad_hl_refs = [h for h in canonical.based_on_highlights if h not in highlight_ids_allowed]
+        if bad_hl_refs:
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason=f"invalid based_on_highlights: {bad_hl_refs!r}",
+                    raw=raw,
+                )
+            )
+            continue
+        bad_bl_refs = [b for b in canonical.based_on_blockers if b not in blocker_ids_allowed]
+        if bad_bl_refs:
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason=f"invalid based_on_blockers: {bad_bl_refs!r}",
+                    raw=raw,
+                )
+            )
+            continue
+        blocker_row_invalid = False
+        for bid in canonical.based_on_blockers:
+            row = evidence_by_id.get(bid)
+            if row is None or row.kind != "blocker":
+                rejected.append(
+                    RejectedInsightDebug(
+                        index=i,
+                        reason=f"based_on_blockers id {bid!r} is not a blocker evidence row",
+                        raw=raw,
+                    )
+                )
+                blocker_row_invalid = True
+                break
+        if blocker_row_invalid:
+            continue
+
+        obs_anchor_failed: str | None = None
+        for gid in canonical.based_on_gaps:
+            if gid not in canonical.observation:
+                obs_anchor_failed = f"observation must contain cited gap id substring {gid!r}"
+                break
+        if obs_anchor_failed is None:
+            for hid in canonical.based_on_highlights:
+                if hid not in canonical.observation:
+                    obs_anchor_failed = f"observation must contain cited highlight id substring {hid!r}"
+                    break
+        if obs_anchor_failed is None:
+            for bid in canonical.based_on_blockers:
+                row = evidence_by_id.get(bid)
+                if row is None:
+                    continue
+                if bid not in canonical.observation and row.source_work_item_id not in canonical.observation:
+                    obs_anchor_failed = (
+                        "observation must contain each based_on_blockers id or that row's "
+                        f"source_work_item_id; missing anchor for {bid!r}"
+                    )
+                    break
+        if obs_anchor_failed is not None:
+            rejected.append(RejectedInsightDebug(index=i, reason=obs_anchor_failed, raw=raw))
+            continue
+
+        if _insight_observation_vague(canonical.observation):
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason="observation reads as generic/vague without concrete anchors",
+                    raw=raw,
+                )
+            )
+            continue
+
+        bad_wi = [wid for wid in canonical.primary_work_item_ids if wid not in allowed_work_item_ids]
+        if bad_wi:
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason=f"primary_work_item_ids not in Step-2 bundle: {bad_wi!r}",
+                    raw=raw,
+                )
+            )
+            continue
+        bad_sup = [
+            wid for wid in canonical.supporting_work_item_ids if wid not in allowed_work_item_ids
+        ]
+        if bad_sup:
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason=f"supporting_work_item_ids not in Step-2 bundle: {bad_sup!r}",
+                    raw=raw,
+                )
+            )
+            continue
+
+        missing_eids = [eid for eid in canonical.evidence_ids if eid not in allowed_evidence_ids]
+        if missing_eids:
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason=f"evidence_ids not in Step-3 bundle: {missing_eids!r}",
+                    raw=raw,
+                )
+            )
+            continue
+
+        cited_corpus = _cited_evidence_corpus(evidence, list(canonical.evidence_ids))
+        evidence_resolved = _resolve_insight_evidence_strings(
+            list(canonical.evidence), list(canonical.evidence_ids), evidence_by_id
+        )
+        if not all(_evidence_in_corpus(ev, cited_corpus) for ev in evidence_resolved):
+            bad = _unverifiable_evidence_strings(evidence_resolved, cited_corpus)
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason="evidence quotes must be verifiable against cited evidence_ids rows only: "
                     + "; ".join(bad),
                     raw=raw,
                 )
             )
+            continue
+
+        obs_grounding_failed: str | None = None
+        for wid in canonical.primary_work_item_ids:
+            if wid not in canonical.observation:
+                obs_grounding_failed = f"observation must contain primary work item id substring {wid!r}"
+                break
+        if obs_grounding_failed is None:
+            for ent in canonical.primary_entities:
+                if ent.name not in canonical.observation:
+                    obs_grounding_failed = (
+                        "observation must contain each primary_entities.name as substring; "
+                        f"missing {ent.name!r}"
+                    )
+                    break
+        if obs_grounding_failed is not None:
+            rejected.append(
+                RejectedInsightDebug(index=i, reason=obs_grounding_failed, raw=raw)
+            )
+            continue
+
+        allowed_wi_refs = set(canonical.primary_work_item_ids) | set(
+            canonical.supporting_work_item_ids
+        )
+        ev_link_failed: str | None = None
+        for eid in canonical.evidence_ids:
+            ev_row = evidence_by_id.get(eid)
+            if ev_row is None:
+                continue
+            if ev_row.source_work_item_id not in allowed_wi_refs:
+                ev_link_failed = (
+                    f"evidence_id {eid!r} source_work_item_id {ev_row.source_work_item_id!r} "
+                    "must appear in primary_work_item_ids or supporting_work_item_ids"
+                )
+                break
+        if ev_link_failed is not None:
+            rejected.append(RejectedInsightDebug(index=i, reason=ev_link_failed, raw=raw))
             continue
 
         seen_ids.add(canonical.id)
@@ -263,9 +580,18 @@ def _validate_insights(
                 observation=canonical.observation,
                 interpretation=canonical.interpretation,
                 implication=canonical.implication,
-                evidence=list(canonical.evidence),
+                evidence=evidence_resolved,
+                evidence_ids=list(canonical.evidence_ids),
                 based_on_interpretations=list(canonical.based_on_interpretations),
                 based_on_signals=list(canonical.based_on_signals),
+                primary_work_item_ids=list(canonical.primary_work_item_ids),
+                supporting_work_item_ids=list(canonical.supporting_work_item_ids),
+                primary_entities=[
+                    InsightPrimaryEntityItem(name=e.name, kind=e.kind) for e in canonical.primary_entities
+                ],
+                based_on_gaps=list(canonical.based_on_gaps),
+                based_on_blockers=list(canonical.based_on_blockers),
+                based_on_highlights=list(canonical.based_on_highlights),
                 confidence=canonical.confidence,
                 priority=canonical.priority,
             )
@@ -274,46 +600,117 @@ def _validate_insights(
     return out, rejected
 
 
-def _fallback_insights(interpretations: InterpretationBundleDebug) -> list[InsightItemDebug]:
-    def priority_for_confidence(conf: str) -> str:
-        if conf == "high":
-            return "high"
-        if conf == "medium":
-            return "medium"
-        return "low"
+def _primary_entities_for_work_item(wi: WorkItem) -> list[InsightPrimaryEntityItem]:
+    if getattr(wi, "project", None) and str(wi.project).strip():
+        return [InsightPrimaryEntityItem(name=str(wi.project).strip(), kind="project")]
+    title = (getattr(wi, "title", None) or wi.id or "Work item").strip()
+    return [InsightPrimaryEntityItem(name=title[:160], kind="feature")]
 
+
+def _fallback_insights(
+    candidates: list[dict[str, Any]],
+    interpretations: InterpretationBundleDebug,
+    work_items: WorkItemBundle,
+    evidence: EvidenceBundle,
+) -> list[InsightItemDebug]:
+    """Phase 1 candidates → deterministic insight rows (no LLM)."""
+    wi_by_id = {w.id: w for w in work_items.items}
+    ev_by_id = _evidence_item_by_id(evidence)
     out: list[InsightItemDebug] = []
-    for i, interp in enumerate(interpretations.items[:5], start=1):
+    interp0 = interpretations.items[0].id if interpretations.items else None
+
+    def pick_primary_wid(c: dict[str, Any]) -> str | None:
+        for wid in c.get("related_work_item_ids") or []:
+            if isinstance(wid, str) and wid in wi_by_id:
+                return wid
+        return None
+
+    def pick_evidence_id(c: dict[str, Any], primary_wid: str | None) -> str | None:
+        for eid in c.get("source_evidence_item_ids") or []:
+            if isinstance(eid, str) and eid in ev_by_id:
+                return eid
+        if primary_wid:
+            for ev in _iter_evidence_items(evidence):
+                if ev.source_work_item_id == primary_wid:
+                    return ev.id
+        return None
+
+    idx = 0
+    for c in candidates:
+        primary_wid = pick_primary_wid(c)
+        if primary_wid is None:
+            continue
+        wi = wi_by_id[primary_wid]
+        entities = _primary_entities_for_work_item(wi)
+        ev_id = pick_evidence_id(c, primary_wid)
+        if ev_id is None:
+            continue
+        ev_row = ev_by_id[ev_id]
+        based_on_gaps: list[str] = []
+        based_on_blockers: list[str] = []
+        based_on_highlights: list[str] = []
+        sk = c.get("source_kind")
+        if sk == "gap":
+            gid = str(c.get("gap_id", ""))
+            based_on_gaps = [gid] if gid else []
+            summary = str(c.get("gap_description", ""))
+            observation = f"{gid} — {primary_wid} — {summary}"
+            prio: InsightPriority = (
+                "high"
+                if c.get("gap_type")
+                in ("expected_not_executed", "discussed_not_linked_to_work", "blocker_not_tracked")
+                else "medium"
+            )
+            sigs = ["follow_through", "expectation_coverage"]
+        elif sk == "blocker":
+            bid = str(c.get("blocker_evidence_id", ""))
+            based_on_blockers = [bid] if bid else []
+            summary = str(c.get("blocker_statement", ""))
+            observation = f"{bid} — {primary_wid} — {summary}"
+            prio = "high"
+            sigs = ["blocker_visibility", "interaction_friction"]
+        elif sk == "highlight":
+            hid = str(c.get("highlight_id", ""))
+            based_on_highlights = [hid] if hid else []
+            summary = str(c.get("highlight_text", ""))
+            observation = f"{hid} — {primary_wid} — {summary}"
+            prio = "medium"
+            sigs = ["repeated_discussion_present", "interaction_friction"]
+        else:
+            continue
+
+        quotes = [s for s in (ev_row.statement, ev_row.evidence) if isinstance(s, str) and s.strip()][:3]
+        supporting = [
+            x
+            for x in (c.get("related_work_item_ids") or [])
+            if isinstance(x, str) and x in wi_by_id and x != primary_wid
+        ][:5]
+        idx += 1
         out.append(
             InsightItemDebug(
-                id=f"insight_fallback_{i}",
-                observation=interp.description,
+                id=f"insight_fallback_{idx}",
+                observation=observation,
                 interpretation=(
-                    f"Signal pattern indicates {interp.type.replace('_', ' ')} with {interp.confidence}"
-                    " confidence."
+                    f"Execution risk from {sk} candidate {c.get('candidate_id')}: {summary[:200]}"
                 ),
-                implication="Manager attention is recommended to prevent delivery drift.",
-                evidence=list(interp.evidence[:3]) or ["Deterministic fallback from Step 7 interpretation."],
-                based_on_interpretations=[interp.id],
-                based_on_signals=list(interp.based_on_signals[:3]),
-                confidence=interp.confidence,  # type: ignore[arg-type]
-                priority=priority_for_confidence(interp.confidence),  # type: ignore[arg-type]
+                implication="Assign an owner and link tracking artifacts so closure is visible.",
+                evidence=quotes,
+                evidence_ids=[ev_id],
+                based_on_interpretations=[interp0] if interp0 else [],
+                based_on_signals=sigs,
+                primary_work_item_ids=[primary_wid],
+                supporting_work_item_ids=supporting,
+                primary_entities=entities,
+                based_on_gaps=based_on_gaps,
+                based_on_blockers=based_on_blockers,
+                based_on_highlights=based_on_highlights,
+                confidence="medium",
+                priority=prio,
             )
         )
-    if not out:
-        out.append(
-            InsightItemDebug(
-                id="insight_fallback_1",
-                observation="No validated interpretations were available for this run.",
-                interpretation="Insight generation used deterministic fallback due to missing validated inputs.",
-                implication="Run quality checks on upstream connector coverage and interpretation validation.",
-                evidence=["Deterministic fallback generated without validated Step 7 interpretations."],
-                based_on_interpretations=["none"],
-                based_on_signals=["execution_momentum"],
-                confidence="low",
-                priority="low",
-            )
-        )
+        if len(out) >= 5:
+            break
+
     return out[:5]
 
 
@@ -325,20 +722,34 @@ def _call_llm(settings: Settings, prompt_json: str) -> tuple[_LlmResponse, _LlmM
     priority_list = ", ".join(_INSIGHT_PRIORITY)
     signal_ids_list = ", ".join(_SIGNAL_IDS)
     system = (
-        "You generate grounded engineering-management insights. Output strict JSON only, no markdown. "
+        "You explain PRE-SELECTED execution failures only. Output strict JSON, no markdown. "
+        "Context contains insight_candidates (deterministic, no invention) plus work_items and allowlists. "
+        "Do NOT summarize signals; use candidates as the primary facts. "
         f"Each item's \"confidence\" MUST be one of: {conf_list}. "
         f"Each item's \"priority\" MUST be one of: {priority_list}. "
-        f"Each string in \"based_on_signals\" MUST be from this allowlist only: {signal_ids_list}. "
-        "Each string in \"based_on_interpretations\" MUST be an id present in context field "
-        "\"allowed_interpretation_ids_for_based_on_interpretations\". "
-        "Schema: {\"insights\":[{\"id\":str,\"observation\":str,\"interpretation\":str,"
-        "\"implication\":str,\"evidence\":[str],\"based_on_interpretations\":[str],"
-        "\"based_on_signals\":[str],\"confidence\":str,\"priority\":str}]}. "
-        "No new facts; use only evidence strings that are exact substrings of provided context "
-        "(after whitespace normalization). Keep each field concise."
+        f"\"based_on_signals\" MUST be a subset of: {signal_ids_list} (supporting only; may be empty). "
+        "\"based_on_interpretations\" ids MUST be from allowed_interpretation_ids (or []). "
+        "MANDATORY: non-empty based_on_gaps (subset of allowed_gap_ids) OR based_on_blockers (blocker evidence "
+        "ids from allowed_blocker_evidence_ids) OR based_on_highlights (subset of allowed_highlight_ids); "
+        "observation MUST include every cited gap id, highlight id, and each blocker id OR that row's "
+        "source_work_item_id as literal substrings. "
+        "Also include primary_work_item_ids, evidence_ids, primary_entities as before. "
+        "BAD: \"The team is blocked on external dependencies.\" "
+        "GOOD: \"NEX-105 is blocked on InfoSec approval with no assigned owner, preventing release\" "
+        "(use real ids from candidates/work_items). "
+        "Each \"evidence\" string MUST be a verbatim excerpt from the Step-3 evidence row's `statement` "
+        "or `evidence` field for one of the ids in evidence_ids (do not put raw ids like blocker:... "
+        "into evidence[] — ids belong only in evidence_ids). "
+        "Schema: {\"insights\":[{\"id\":str,\"observation\":str,\"interpretation\":str,\"implication\":str,"
+        "\"evidence\":[str],\"evidence_ids\":[str],\"based_on_interpretations\":[str],"
+        "\"based_on_signals\":[str],\"primary_work_item_ids\":[str],\"supporting_work_item_ids\":[str],"
+        "\"primary_entities\":[{\"name\":str,\"kind\":\"project\"|\"feature\"|\"system\"}],"
+        "\"based_on_gaps\":[str],\"based_on_blockers\":[str],\"based_on_highlights\":[str],"
+        "\"confidence\":str,\"priority\":str}]}. "
+        "Produce 3-5 insights prioritizing gap/blocker candidates first."
     )
     user = (
-        "Context JSON follows. Generate 3-5 insights with clear manager implications.\n"
+        "insight_candidates are authoritative execution failures. Explain them; do not invent new ids or facts.\n"
         f"{prompt_json}"
     )
     kwargs: dict[str, Any] = {
@@ -417,11 +828,10 @@ def generate_insights(
     gaps: GapBundle,
     key_achievements: KeyAchievementsBundleDebug,
     raw_highlights: RawHighlightsBundleDebug,
+    work_items: WorkItemBundle,
 ) -> InsightBundleDebug:
     """Generate Step 8 insights with strict validation and deterministic fallback."""
-    corpus = _allowed_evidence_corpus(
-        signals, interpretations, evidence, gaps, raw_highlights, key_achievements
-    )
+    candidates = _build_insight_candidates(gaps, evidence, raw_highlights)
     interpretation_ids = {x.id for x in interpretations.items}
     llm_items: list[InsightItemDebug] = []
     rejected: list[RejectedInsightDebug] = []
@@ -439,8 +849,13 @@ def generate_insights(
     )
 
     if settings.openai_api_key.strip():
-        prompt_json = _serialize_prompt_context(
-            signals, interpretations, evidence, gaps, key_achievements, raw_highlights
+        prompt_json = _serialize_insight_llm_payload(
+            candidates,
+            interpretations,
+            evidence,
+            gaps,
+            raw_highlights,
+            work_items,
         )
         try:
             llm, meta = _call_llm(settings, prompt_json)
@@ -451,8 +866,11 @@ def generate_insights(
                 llm_error = llm.response_level_error
             llm_items, row_rejections = _validate_insights(
                 llm.items,
-                corpus=corpus,
                 interpretation_ids=interpretation_ids,
+                work_items=work_items,
+                evidence=evidence,
+                gaps=gaps,
+                raw_highlights=raw_highlights,
             )
             rejected.extend(row_rejections)
             if not llm_items:
@@ -471,7 +889,7 @@ def generate_insights(
     else:
         fallback_reason = "missing_api_key"
 
-    items = llm_items or _fallback_insights(interpretations)
+    items = llm_items or _fallback_insights(candidates, interpretations, work_items, evidence)
     generated_via = "llm" if llm_items else "fallback"
     return InsightBundleDebug(
         run_id=interpretations.run_id,

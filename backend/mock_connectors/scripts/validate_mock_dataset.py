@@ -14,6 +14,7 @@ _BACKEND = Path(__file__).resolve().parents[2]
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
+from mock_connectors.fixtures import manager_insights_scenarios as mis  # noqa: E402
 from mock_connectors.fixtures import seed_config as sc  # noqa: E402
 from mock_connectors.fixtures.company_generator import (  # noqa: E402
     dataset_to_json_dict,
@@ -118,12 +119,19 @@ def _check_execution_stories(linear: dict[str, Any], gh: dict[str, Any]) -> list
         "initiative_soc2",
         "initiative_mobile_offline",
         "epic_drift_child",
+        "blocked_release",
+        "fragmented_execution",
+        "healthy_delivery",
     }
-    seen_issue = {
-        (iss.get("metadata") or {}).get("scenario")
-        for iss in linear.get("issues", [])
-        if isinstance(iss.get("metadata"), dict)
-    }
+    seen_issue: set[str] = set()
+    for iss in linear.get("issues", []):
+        md = iss.get("metadata")
+        if not isinstance(md, dict):
+            continue
+        for k in ("scenario", "execution_story"):
+            v = md.get(k)
+            if isinstance(v, str) and v:
+                seen_issue.add(v)
     missing = required_issue_scenarios - {x for x in seen_issue if x}
     if missing:
         errs.append(f"missing issue metadata.scenario values: {sorted(missing)}")
@@ -175,6 +183,9 @@ def main() -> int:
     errs.extend(_check_commits(gh))
     errs.extend(_check_chrono(linear))
     errs.extend(_check_execution_stories(linear, gh))
+    slack_events = data.get("slack_events") if isinstance(data.get("slack_events"), list) else []
+    calls = data.get("calls") if isinstance(data.get("calls"), dict) else {}
+    errs.extend(mis.validate_manager_insight_dataset_strength(linear, gh, slack_events, calls))
 
     if len(gh["repos"]) < sc.TARGET_REPOSITORIES // 2:
         errs.append(f"repo count low: {len(gh['repos'])}")

@@ -17,6 +17,8 @@ from vector.contracts.manager_insights_activity import (
     RawHighlightItem,
     RawHighlightsBundleDebug,
     SignalsV0Debug,
+    WorkItem,
+    WorkItemBundle,
 )
 mod = import_module("vector.domains.manager_insights.generate_interpretations")
 
@@ -57,6 +59,25 @@ def _signals() -> SignalsV0Debug:
 
 
 def _bundles(run_id: uuid.UUID, tenant_id: uuid.UUID) -> dict[str, Any]:
+    work_items = WorkItemBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        items=[
+            WorkItem(
+                id="calls:c1",
+                source="calls",
+                type="call",
+                title="Call about NEX-1",
+                summary="Need help closing NEX-1",
+                status="active",
+                project="NEX",
+                owner=None,
+                participants=[],
+                source_ref={"identifier": "NEX-1"},
+            )
+        ],
+    )
     evidence = EvidenceBundle(
         run_id=run_id,
         tenant_id=tenant_id,
@@ -82,7 +103,17 @@ def _bundles(run_id: uuid.UUID, tenant_id: uuid.UUID) -> dict[str, Any]:
         run_id=run_id,
         tenant_id=tenant_id,
         window_days=30,
-        gaps=[GapItem(id="g1", type="expected_not_executed", description="action item has no linked issue", evidence_pointers={})],
+        gaps=[
+            GapItem(
+                id="g1",
+                type="expected_not_executed",
+                description="action item has no linked issue",
+                evidence_pointers={
+                    "action_item_ids": ["a1"],
+                    "source_work_item_ids": ["calls:c1"],
+                },
+            )
+        ],
     )
     links = LinkBundle(run_id=run_id, tenant_id=tenant_id, window_days=30, links=[], work_items_capped=0)
     highlights = RawHighlightsBundleDebug(
@@ -98,6 +129,7 @@ def _bundles(run_id: uuid.UUID, tenant_id: uuid.UUID) -> dict[str, Any]:
         items=[],
     )
     return {
+        "work_items": work_items,
         "evidence": evidence,
         "gaps": gaps,
         "links": links,
@@ -118,12 +150,13 @@ def test_generate_interpretations_fallback_without_openai_key() -> None:
         gaps=b["gaps"],
         key_achievements=b["achievements"],
         raw_highlights=b["highlights"],
+        work_items=b["work_items"],
     )
     assert out.generated_via == "fallback"
     assert out.fallback_reason == "missing_api_key"
     assert out.items
     assert any(i.type == "follow_through" for i in out.items)
-    assert all(i.based_on_signals for i in out.items)
+    assert all(i.based_on_gaps or i.based_on_blockers or i.based_on_highlights for i in out.items)
 
 
 def test_generate_interpretations_llm_payload_is_schema_and_citation_validated(monkeypatch: Any) -> None:
@@ -141,12 +174,15 @@ def test_generate_interpretations_llm_payload_is_schema_and_citation_validated(m
                         message=SimpleNamespace(
                             content=(
                                 '{"interpretations": ['
-                                '{"id":"interp_1","type":"follow_through","description":"Follow-through is weak.",'
+                                '{"id":"interp_1","type":"follow_through",'
+                                '"description":"g1 — calls:c1 — NEX-1: Follow-through is weak for tracked execution.",'
                                 '"based_on_signals":["follow_through"],'
-                                '"evidence":["Need help closing NEX-1"],"confidence":"medium"},'
-                                '{"id":"interp_bad","type":"follow_through","description":"bad evidence",'
+                                '"evidence":["Need help closing NEX-1"],"confidence":"medium",'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[]},'
+                                '{"id":"interp_bad","type":"follow_through","description":"g1 — calls:c1 — bad evidence",'
                                 '"based_on_signals":["follow_through"],'
-                                '"evidence":["completely invented quote"],"confidence":"medium"}'
+                                '"evidence":["completely invented quote"],"confidence":"medium",'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[]}'
                                 "]}"
                             )
                         )
@@ -172,6 +208,7 @@ def test_generate_interpretations_llm_payload_is_schema_and_citation_validated(m
         gaps=b["gaps"],
         key_achievements=b["achievements"],
         raw_highlights=b["highlights"],
+        work_items=b["work_items"],
     )
     assert out.generated_via == "llm"
     assert out.fallback_reason is None
@@ -200,7 +237,13 @@ def test_generate_interpretations_reports_invalid_llm_output_reason(monkeypatch:
                 choices=[
                     SimpleNamespace(
                         message=SimpleNamespace(
-                            content='{"interpretations":[{"id":"x","type":"follow_through","description":"bad","based_on_signals":["follow_through"],"evidence":["invented quote"],"confidence":"medium"}]}'
+                            content=(
+                                '{"interpretations":[{"id":"x","type":"follow_through",'
+                                '"description":"g1 — calls:c1 — NEX-1 bad",'
+                                '"based_on_signals":["follow_through"],"evidence":["invented quote"],'
+                                '"confidence":"medium","based_on_gaps":["g1"],'
+                                '"based_on_blockers":[],"based_on_highlights":[]}]}'
+                            )
                         )
                     )
                 ],
@@ -224,6 +267,7 @@ def test_generate_interpretations_reports_invalid_llm_output_reason(monkeypatch:
         gaps=b["gaps"],
         key_achievements=b["achievements"],
         raw_highlights=b["highlights"],
+        work_items=b["work_items"],
     )
     assert out.generated_via == "fallback"
     assert out.fallback_reason == "llm_output_invalid"

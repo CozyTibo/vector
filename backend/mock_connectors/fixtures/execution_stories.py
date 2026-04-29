@@ -564,12 +564,16 @@ def build_execution_bundle(
         multi_repo_extra=2,
     )
 
-    return ExecutionBundle(
+    from mock_connectors.fixtures import manager_insights_scenarios as mis
+
+    bundle_out = ExecutionBundle(
         issue_plans=issue_plans,
         orphan_prs=orphan_prs,
         extra_slack=extra_slack,
         epic_drift_epic_index=epic_drift_epic_index,
     )
+    mis.patch_execution_bundle_for_manager_insights(bundle_out)
+    return bundle_out
 
 
 def _trim_issue_prs_to_budget(

@@ -71,7 +71,15 @@ def build_admin_router() -> APIRouter:
     @r.get("/dataset/full")
     def dataset_full() -> dict[str, Any]:
         # Local dev only; payload intentionally verbose for manager-insights mock runs.
-        return {"seed": state.seed, **state.data}
+        d = {"seed": state.seed, **state.data}
+        meta = d.get("meta") if isinstance(d.get("meta"), dict) else {}
+        mi = meta.get("manager_insights_evidence")
+        if isinstance(mi, dict):
+            d["manager_insights"] = {
+                "scenarios": meta.get("manager_insight_scenarios"),
+                "evidence": mi,
+            }
+        return d
 
     @r.get("/scenarios")
     def scenarios() -> list[str]:

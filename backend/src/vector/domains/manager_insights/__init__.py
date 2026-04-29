@@ -55,6 +55,7 @@ def run_manager_insights_fetch_debug(
         gaps=gaps,
         key_achievements=key_achievements,
         raw_highlights=raw_highlights,
+        work_items=work_items,
     )
     insights = generate_insights(
         settings,
@@ -64,6 +65,7 @@ def run_manager_insights_fetch_debug(
         gaps=gaps,
         key_achievements=key_achievements,
         raw_highlights=raw_highlights,
+        work_items=work_items,
     )
     return ManagerInsightFetchDebugResponse(
         fetch=bundle,

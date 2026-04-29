@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from mock_connectors.fixtures import execution_stories as ex
+from mock_connectors.fixtures import manager_insights_scenarios as mis
 from mock_connectors.fixtures import nexora_content as nx
 from mock_connectors.fixtures import seed_config as sc
 
@@ -192,8 +193,20 @@ def generate_dataset(seed: int) -> MockDataset:
     slack_events = _build_slack(seed, linear_pkg, t0, end)
     notion_pkg = _build_notion(seed, users, linear_pkg, slack_events, t0, end)
     calls_pkg = _build_calls(seed, users, linear_pkg, slack_events, t0, end)
+    nex105_id = next(
+        (x["id"] for x in linear_pkg.get("issues", []) if x.get("identifier") == "NEX-105"),
+        None,
+    )
+    mis.extend_slack_events(slack_events, seed=seed, t0=t0, linear_nex105_id=nex105_id)
+    mis.extend_slack_for_nex300_completion(slack_events, seed=seed, t0=t0)
+    mis.extend_calls_package(calls_pkg, seed=seed, t0=t0)
+    mi_errs = mis.validate_manager_insight_dataset_strength(linear_pkg, gh_pkg, slack_events, calls_pkg)
+    if mi_errs:
+        raise RuntimeError("manager_insights_mock_dataset: " + "; ".join(mi_errs))
     edges = _build_edges(linear_pkg, gh_pkg, users)
     patterns = _verify_patterns(linear_pkg, gh_pkg, slack_events)
+    patterns = sorted(set(patterns) | set(mis.scenario_coverage_tags()))
+    mi_evidence = mis.manager_insights_evidence(linear_pkg, gh_pkg, slack_events, calls_pkg)
 
     return MockDataset(
         seed=seed,
@@ -210,6 +223,8 @@ def generate_dataset(seed: int) -> MockDataset:
             "github_org": sc.GITHUB_ORG,
             "linear_org_id": linear_pkg["organization"]["id"],
             "product": nx.NEXORA_BLURB,
+            "manager_insight_scenarios": mis.scenario_coverage_tags(),
+            "manager_insights_evidence": mi_evidence,
         },
     )
 
@@ -714,6 +729,9 @@ def _build_linear(
         }
         if plan.initiative:
             meta["initiative"] = plan.initiative
+        exs = (plan.metadata or {}).get("execution_story")
+        if exs:
+            meta["execution_story"] = exs
 
         issue = {
             "id": iid,
@@ -947,6 +965,8 @@ def _build_linear(
                 },
             )
             c_seq += 1
+
+    mis.decorate_linear_issues_and_comments(issues, comments, seed=seed, users=users)
 
     # IssueLabel nodes (workspace defaults + per-issue labels)
     label_pool: list[dict[str, Any]] = [

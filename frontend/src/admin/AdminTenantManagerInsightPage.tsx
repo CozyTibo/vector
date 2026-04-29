@@ -188,6 +188,9 @@ type ManagerInsightFetchDebugResponse = {
       description: string;
       based_on_signals: string[];
       evidence: string[];
+      based_on_gaps: string[];
+      based_on_blockers: string[];
+      based_on_highlights: string[];
       confidence: "high" | "medium" | "low";
     }>;
   };
@@ -217,8 +220,15 @@ type ManagerInsightFetchDebugResponse = {
       interpretation: string;
       implication: string;
       evidence: string[];
+      evidence_ids: string[];
       based_on_interpretations: string[];
       based_on_signals: string[];
+      primary_work_item_ids: string[];
+      supporting_work_item_ids: string[];
+      primary_entities: Array<{ name: string; kind: "project" | "feature" | "system" }>;
+      based_on_gaps: string[];
+      based_on_blockers: string[];
+      based_on_highlights: string[];
       confidence: "high" | "medium" | "low";
       priority: "critical" | "high" | "medium" | "low";
     }>;
@@ -701,7 +711,12 @@ export default function AdminTenantManagerInsightPage() {
                     </p>
                     <p className="mt-1 text-stone-700">{it.description}</p>
                     <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      based_on_signals: {it.based_on_signals.join(", ")}
+                      based_on_gaps: {it.based_on_gaps.join(", ") || "—"} · based_on_blockers:{" "}
+                      {it.based_on_blockers.join(", ") || "—"} · based_on_highlights:{" "}
+                      {it.based_on_highlights.join(", ") || "—"}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      based_on_signals: {it.based_on_signals.join(", ") || "—"}
                     </p>
                     <ul className="mt-1 list-inside list-disc text-stone-600">
                       {it.evidence.map((ev) => (
@@ -787,7 +802,25 @@ export default function AdminTenantManagerInsightPage() {
                       <span className="font-semibold">Implication:</span> {it.implication}
                     </p>
                     <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      based_on_interpretations: {it.based_on_interpretations.join(", ")}
+                      based_on_gaps: {it.based_on_gaps.join(", ") || "—"} · based_on_blockers:{" "}
+                      {it.based_on_blockers.join(", ") || "—"} · based_on_highlights:{" "}
+                      {it.based_on_highlights.join(", ") || "—"}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      evidence_ids: {it.evidence_ids.join(", ")}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      primary_work_item_ids: {it.primary_work_item_ids.join(", ")}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      supporting_work_item_ids: {it.supporting_work_item_ids.join(", ") || "—"}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      primary_entities:{" "}
+                      {it.primary_entities.map((e) => `${e.name} (${e.kind})`).join(", ")}
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] text-stone-500">
+                      based_on_interpretations: {it.based_on_interpretations.join(", ") || "—"}
                     </p>
                     <p className="mt-1 font-mono text-[10px] text-stone-500">
                       based_on_signals: {it.based_on_signals.join(", ")}

@@ -47,6 +47,7 @@ InterpretationType = Literal[
 InterpretationConfidence = Literal["high", "medium", "low"]
 InsightConfidence = Literal["high", "medium", "low"]
 InsightPriority = Literal["critical", "high", "medium", "low"]
+InsightPrimaryEntityKind = Literal["project", "feature", "system"]
 
 
 class ConnectorCoverageStats(BaseModel):
@@ -325,9 +326,12 @@ class InterpretationItemDebug(BaseModel):
     id: str
     type: InterpretationType
     description: str
-    based_on_signals: list[str] = Field(default_factory=list, min_length=1)
+    based_on_signals: list[str] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list, min_length=1)
     confidence: InterpretationConfidence
+    based_on_gaps: list[str] = Field(default_factory=list)
+    based_on_blockers: list[str] = Field(default_factory=list)
+    based_on_highlights: list[str] = Field(default_factory=list)
 
 
 class RejectedInterpretationDebug(BaseModel):
@@ -373,6 +377,15 @@ class InterpretationBundleDebug(BaseModel):
     )
 
 
+class InsightPrimaryEntityItem(BaseModel):
+    """Named execution surface (project / feature / system) for admin QA."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    name: str
+    kind: InsightPrimaryEntityKind
+
+
 class InsightItemDebug(BaseModel):
     """Step 8 insight item (LLM output validated against schema + grounding checks)."""
 
@@ -383,8 +396,15 @@ class InsightItemDebug(BaseModel):
     interpretation: str
     implication: str
     evidence: list[str] = Field(default_factory=list, min_length=1)
-    based_on_interpretations: list[str] = Field(default_factory=list, min_length=1)
-    based_on_signals: list[str] = Field(default_factory=list, min_length=1)
+    evidence_ids: list[str] = Field(default_factory=list, min_length=1)
+    based_on_interpretations: list[str] = Field(default_factory=list)
+    based_on_signals: list[str] = Field(default_factory=list)
+    primary_work_item_ids: list[str] = Field(default_factory=list, min_length=1)
+    supporting_work_item_ids: list[str] = Field(default_factory=list)
+    primary_entities: list[InsightPrimaryEntityItem] = Field(default_factory=list, min_length=1)
+    based_on_gaps: list[str] = Field(default_factory=list)
+    based_on_blockers: list[str] = Field(default_factory=list)
+    based_on_highlights: list[str] = Field(default_factory=list)
     confidence: InsightConfidence
     priority: InsightPriority
 

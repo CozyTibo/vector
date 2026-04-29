@@ -40,28 +40,34 @@ def onboarding_chat_max_completion_tokens(
     return 220
 
 
+def _manager_insights_reasoning_style_model(model: str) -> bool:
+    """Models that may allocate completion budget to hidden reasoning before visible JSON."""
+    m = (model or "").strip().lower()
+    if m.startswith("gpt-5"):
+        return True
+    # OpenAI o-series (and similar ids) — same empty-content + finish_reason=length failure mode.
+    return m.startswith(("o1", "o3", "o4"))
+
+
 def max_completion_tokens_for_manager_insights_interpretations(model: str) -> int:
     """
     Step 7 (manager insights) uses Chat Completions JSON.
 
-    As with :func:`onboarding_chat_max_completion_tokens`, ``gpt-5*`` reasoning models can spend the
-    completion budget on internal reasoning, so a small cap can yield **empty** ``message.content``
-    with HTTP 200. Use a larger default for those model families.
+    Small caps (e.g. 1400) can yield **empty** ``message.content`` with ``finish_reason="length"``
+    when reasoning-style models burn the whole budget internally, or when the model emits a
+    long grounded JSON payload. Use a high floor for all models; extra headroom for o / gpt-5.
     """
-    m = (model or "").strip().lower()
-    if m.startswith("gpt-5"):
-        return 4096
-    return 1400
+    if _manager_insights_reasoning_style_model(model):
+        return 16_384
+    return 4096
 
 
 def max_completion_tokens_for_manager_insights_insights(model: str) -> int:
     """
     Step 8 (manager insights) uses Chat Completions JSON.
 
-    Keep the same gpt-5 safety cap as Step 7 to avoid empty ``message.content`` responses
-    when reasoning tokens consume small completion budgets.
+    Same rationale as Step 7: avoid truncation and empty assistant text on long structured output.
     """
-    m = (model or "").strip().lower()
-    if m.startswith("gpt-5"):
-        return 4096
-    return 1600
+    if _manager_insights_reasoning_style_model(model):
+        return 16_384
+    return 4096

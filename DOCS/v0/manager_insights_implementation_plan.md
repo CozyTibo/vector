@@ -58,7 +58,7 @@ Update this table only when a step is truly complete against its own checklist a
 | Step 5.6 — Raw highlights | `completed` | Deterministic factual highlight lines (repeated call/Slack terms, closed PRs, gap-backed lines) with `sources[]`; `RawHighlightItem` / `RawHighlightsBundleDebug`; tests; admin tab section. |
 | Step 6 — Signals | `completed` | Deterministic `SignalsV0`-aligned computation (`delivery_strength`, `urgent_pressure`, coverage/follow-through/blocker visibility, repeated discussion flag, momentum, doc linkage, focus, collaboration/support/feedback/coordination/friction) with `explain` reasons; tests; admin tab section. |
 | Step 7 — Interpretations | `completed` | LLM generation of `InterpretationV0[]` from Step 6 signals + grounded evidence with strict schema validation and evidence-citation checks (no new quotes); deterministic fallback path; tests; admin tab section. |
-| Step 8 — Insights | `completed` | LLM generation of `InsightV0[]` from Step 7 interpretations + Step 6 signals + grounded evidence/gaps/highlights with strict schema validation, interpretation/signal reference validation, and evidence-citation checks (no new quotes); deterministic fallback path; tests; admin tab section. |
+| Step 8 — Insights | `completed` | LLM generation of `InsightV0[]` from Step 7 interpretations + Step 6 signals + grounded evidence/gaps/highlights with **entity-grounded** hard constraints (`primary_work_item_ids`, `supporting_work_item_ids`, `primary_entities`, `evidence_ids`), strict schema validation, interpretation/signal allowlists, **cited Step-3 evidence** quote checks, observation substring checks for ids + entity names, evidence `source_work_item_id` linkage to cited work ids; deterministic fallback path; tests; admin tab section. |
 | Step 9+ | `not_started` | Mark one-by-one as each step meets its own checklist and acceptance criteria. |
 
 **Current note (2026-04-28):**
@@ -220,7 +220,7 @@ Below, **“Output”** names are **logical**; map them to `vector/contracts/…
 - `DeliveryMetrics` (the fact bundle: issues completed, PRs merged, etc.)
 - `KeyAchievement`, `RawHighlight` (strict rules from spec)
 - `SignalsV0` (all signal enums / structures exactly as spec)
-- `InterpretationV0`, `InsightsV0` (insight shape: observation, interpretation, implication, evidence, confidence, priority)
+- `InterpretationV0`, `InsightsV0` / `InsightV0` (observation, interpretation, implication, quote `evidence[]`, **`evidence_ids[]` (Step-3 item ids)**, **`primary_work_item_ids[]`**, **`supporting_work_item_ids[]`**, **`primary_entities[]` (`project` \| `feature` \| `system`)**, `based_on_interpretations`, `based_on_signals`, confidence, priority)
 - `UserReportContext` root type composing the above
 - `ReportV0` or `RenderedReportSections` for the **fixed** markdown section contract
 
@@ -597,16 +597,21 @@ arbitration:
 
 ## Step 8 — Insights (LLM layer 2)
 
-**Business goal:** Prioritized, decision-oriented **insight cards** managers actually read.
+**Business goal:** Prioritized, decision-oriented **insight cards** managers actually read — each card **named** to real work items and evidence rows (no vague team-level hand-waving).
 
 **Technical goal:** `generateInsights`:
 
-- Input: interpretations + signals + key gaps/evidence.
-- Output: `InsightsV0[]` with observation, interpretation, implication, evidence, confidence, **priority** (per spec).
+- Input: interpretations + signals + Step-2 work items + Step-3 evidence + key gaps/highlights/achievements (bounded JSON context).
+- Output: `InsightV0[]` with observation, interpretation, implication, quote `evidence[]`, **`evidence_ids[]`**, **`primary_work_item_ids[]`**, **`supporting_work_item_ids[]`**, **`primary_entities[]`**, signal/interpretation backrefs, confidence, **priority** (per spec).
 
 **STRICT RULES:**
 
-- No new facts; only recombination and emphasis of grounded inputs.
+- **Entity-grounded copy:** every insight **MUST** include non-empty `primary_work_item_ids` (subset of Step-2 ids), `evidence_ids` (subset of Step-3 ids), and at least one `primary_entities` entry (`project` \| `feature` \| `system`). `supporting_work_item_ids` may be empty; when present, ids must still be valid Step-2 ids.
+- **Observation anchoring:** `observation` **MUST** contain each primary work item id and each `primary_entities[].name` as **literal substrings** (so prose cannot drift to generics).
+- **Evidence quotes:** each string in `evidence[]` **MUST** verify as a normalized substring of the `statement` / `evidence` text of **at least one** Step-3 row whose `id` is listed in `evidence_ids` (not “nearby” corpus-only paraphrases).
+- **Evidence ↔ work linkage:** for every id in `evidence_ids`, that Step-3 row’s `source_work_item_id` **MUST** appear in `primary_work_item_ids` or `supporting_work_item_ids`.
+- **Prompt quality bar (examples):** ❌ BAD: “The team is blocked on external dependencies.” ✅ GOOD: “NEX-105 and NEX-77 are blocked on InfoSec approval with no owner assigned” — using **real** ids/names from context, not invented tickets.
+- No new facts beyond those anchors; only recombination and emphasis of grounded inputs.
 - Priority ordering should reflect spec’s **One Priority** selection order where possible.
 
 **Output (suggested):** `vector/domains/manager_insights/generate_insights.py`
@@ -615,8 +620,8 @@ arbitration:
 
 **Validation:**
 
-- **Proceed only if** JSON validates and **no new facts** check passes (all cited strings exist in allowed corpora / structured fields).
-- **FAIL** if insight count exceeds configured max for cost control **or** if any insight lacks evidence fields required by Step 0.
+- **Proceed only if** JSON validates, allowlists for `based_on_signals` / `based_on_interpretations` pass, **entity-grounding** checks above pass, and deterministic fallback (if used) emits the same required fields using real Step-2/Step-3 ids.
+- **FAIL** if insight count exceeds configured max for cost control **or** if any insight lacks required Step-0 fields (`evidence_ids`, work item id lists, `primary_entities`, etc.).
 
 ---
 
@@ -731,7 +736,7 @@ This section names how **state**, **meaning**, **observations**, and **decision*
 | ------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Signals**         | Step 6                  | **State** — a compact, deterministic vector describing what the graph + metrics say happened (and unknowns).                                                          |
 | **Interpretations** | Step 7                  | **Meaning** — LLM turns state + evidence into hedged, reusable interpretations **tied to signal ids and quotes**.                                                     |
-| **Insights**        | Step 8                  | **Observations** — LLM composes interpretation + gaps into prioritized insight cards **without new facts**.                                                           |
+| **Insights**        | Step 8                  | **Observations** — LLM composes interpretation + gaps into prioritized insight cards **without new facts**, each **anchored** to Step-2 work items + Step-3 `evidence_ids` + named `primary_entities`.                                                           |
 | **Arbitration**     | Step 6.5 (runs after 8) | **Decision** — deterministic policy picks **one** primary and **≤2** supporting insights for the human-facing report; everything else is dropped with logged reasons. |
 
 
