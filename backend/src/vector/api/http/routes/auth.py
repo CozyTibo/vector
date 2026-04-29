@@ -11,12 +11,21 @@ from sqlalchemy.orm import Session
 
 from vector.api.http.cookie_utils import clear_session_cookie, set_session_cookie
 from vector.api.http.deps import get_db, settings_dep
-from vector.contracts.auth_payloads import AuthOkResponse, LoginRequest, RegisterRequest
+from vector.contracts.auth_payloads import (
+    AuthOkResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    LoginRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+)
 from vector.domains.identity_access.errors import (
     EmailAlreadyRegisteredError,
     GoogleOAuthError,
     InvalidCredentialsError,
     InvalidOAuthStateError,
+    InvalidPasswordResetTokenError,
     OAuthNotConfiguredError,
     WeakPasswordError,
 )
@@ -27,6 +36,10 @@ from vector.domains.identity_access.services.auth_flow import (
 from vector.domains.identity_access.services.local_auth import (
     login_with_email_password,
     register_with_email_password,
+)
+from vector.domains.identity_access.services.password_reset import (
+    request_password_reset,
+    reset_password_with_token,
 )
 from vector.infrastructure.email.waitlist_confirmation import enqueue_waitlist_signup_confirmation
 from vector.settings import Settings
@@ -58,6 +71,33 @@ def register_email_password(
     resp = JSONResponse(content=AuthOkResponse(session_token=token).model_dump())
     set_session_cookie(resp, settings, token, request=request)
     return resp
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(
+    body: ForgotPasswordRequest,
+    settings: Annotated[Settings, Depends(settings_dep)],
+    db: Annotated[Session, Depends(get_db)],
+) -> ForgotPasswordResponse:
+    request_password_reset(db, settings, email=str(body.email))
+    return ForgotPasswordResponse()
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+def reset_password(
+    body: ResetPasswordRequest,
+    db: Annotated[Session, Depends(get_db)],
+) -> ResetPasswordResponse:
+    try:
+        reset_password_with_token(db, token=body.token, new_password=body.password)
+    except InvalidPasswordResetTokenError as e:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset link.",
+        ) from e
+    except WeakPasswordError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return ResetPasswordResponse()
 
 
 @router.post("/login", response_model=AuthOkResponse)

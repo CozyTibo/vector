@@ -6,6 +6,7 @@ import importlib
 import os
 
 from celery import Celery
+from celery.signals import worker_process_init
 
 from vector.infrastructure.redis_url import normalize_rediss_url
 
@@ -57,6 +58,8 @@ celery_app = Celery(
     "vector",
     broker=_broker,
     backend=_backend,
+    # Loader imports these on worker startup (in addition to `imports` below).
+    include=["app.tasks.ingestion", "app.tasks.email"],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
 celery_app.conf.task_default_queue = "vector"
@@ -91,3 +94,10 @@ def _configure_beat_schedule() -> None:
 
 _register_tasks()
 _configure_beat_schedule()
+
+
+@worker_process_init.connect
+def _import_task_modules_after_fork(**_kwargs: object) -> None:
+    """Prefork children must bind task modules to the app (avoids unregistered-task KeyError)."""
+    importlib.import_module("app.tasks.ingestion")
+    importlib.import_module("app.tasks.email")

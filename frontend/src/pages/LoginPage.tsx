@@ -106,6 +106,11 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
+          <p className="mt-2 text-right text-sm">
+            <Link to="/login/forgot-password" className={marketingAccentLink}>
+              Forgot password?
+            </Link>
+          </p>
           <button
             type="button"
             disabled={login.isPending}

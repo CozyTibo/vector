@@ -112,6 +112,21 @@ def test_waitlist_signup_email_render() -> None:
     assert "cid:vector_avatar" in html
 
 
+def test_password_reset_email_render() -> None:
+    from vector.infrastructure.email.password_reset import render_password_reset_email
+
+    text, html = render_password_reset_email(
+        reset_url="https://app.example/login/reset-password?token=abc",
+        email_hint="you@company.com",
+        ttl_hours=1,
+    )
+    assert "reset" in text.lower()
+    assert "https://app.example/login/reset-password?token=abc" in text
+    assert "you@company.com" in html
+    assert "Reset password" in html
+    assert "cid:vector_avatar" in html
+
+
 def test_email_envelope_rejects_empty_to() -> None:
     with pytest.raises(ValidationError):
         EmailEnvelope(to=[], subject="S", body_text="B")

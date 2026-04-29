@@ -41,6 +41,7 @@ from vector.infrastructure.db.models.linear_projection import (
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
+from vector.infrastructure.db.models.password_reset_token import PasswordResetToken
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.infrastructure.db.models.slack_connection_detail import SlackConnectionDetail
 from vector.infrastructure.db.models.tenant import Tenant
@@ -62,6 +63,7 @@ __all__ = [
     "MappingEvent",
     "OnboardingMessage",
     "OnboardingState",
+    "PasswordResetToken",
     "RelationKind",
     "Relationship",
     "Step3CanonicalCursor",

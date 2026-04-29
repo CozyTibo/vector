@@ -35,3 +35,7 @@ class InvalidCredentialsError(IdentityAccessError):
 
 class WeakPasswordError(IdentityAccessError):
     """Password does not meet policy."""
+
+
+class InvalidPasswordResetTokenError(IdentityAccessError):
+    """Unknown, expired, or already-used password reset token."""

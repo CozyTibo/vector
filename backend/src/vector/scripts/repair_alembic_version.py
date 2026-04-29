@@ -12,6 +12,14 @@ from alembic.script import ScriptDirectory
 from alembic.util.exc import CommandError
 from sqlalchemy import create_engine, inspect, text
 
+# DBs stamped with a typo / orphan id that matches no file.
+# Map to the *parent* of the intended migration so `alembic upgrade head` still runs the real
+# revision’s DDL. Mapping directly to the head id would skip the migration (empty table).
+_REVISION_ALIASES: dict[str, str] = {
+    # Mistyped id for password_reset_tokens (revision 20260429_0024; parent 20260422_0023).
+    "20260427_0024": "20260422_0023",
+}
+
 
 def main() -> int:
     url = os.environ.get("DATABASE_URL")
@@ -42,10 +50,42 @@ def main() -> int:
         return 0
 
     current = str(row[0]).strip()
+
+    # Stamped at 0024 without running the migration (e.g. earlier repair mapped typo -> head id).
+    # Rewind to parent so a following `alembic upgrade head` applies the real DDL.
+    if current == "20260429_0024" and not insp.has_table("password_reset_tokens"):
+        parent = "20260422_0023"
+        print(
+            f"repair_alembic_version: {current!r} but password_reset_tokens missing; "
+            f"rewriting to {parent!r} so upgrade can apply"
+        )
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE alembic_version SET version_num = :v"), {"v": parent})
+        return 0
+
+    if current in _REVISION_ALIASES:
+        target = _REVISION_ALIASES[current]
+        try:
+            script.get_revision(target)
+        except CommandError:
+            print(
+                f"repair_alembic_version: alias target {target!r} missing from scripts; "
+                "falling back to clear + stamp",
+                file=sys.stderr,
+            )
+        else:
+            print(f"repair_alembic_version: rewriting {current!r} -> {target!r}")
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE alembic_version SET version_num = :v"), {"v": target})
+            return 0
+
     try:
         script.get_revision(current)
     except CommandError:
-        print(f"repair_alembic_version: unknown revision {current!r}; stamping head")
+        # stamp("head") still resolves the broken row and fails; clear first, then stamp.
+        print(f"repair_alembic_version: unknown revision {current!r}; clearing alembic_version and stamping head")
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM alembic_version"))
         command.stamp(cfg, "head")
         return 0
 

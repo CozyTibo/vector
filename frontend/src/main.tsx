@@ -35,7 +35,9 @@ import AppHomePage from "./pages/app/AppHomePage.tsx";
 import ConnectorsPage from "./pages/app/ConnectorsPage.tsx";
 import OnboardingPage from "./pages/app/OnboardingPage.tsx";
 import LandingPage from "./pages/LandingPage.tsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.tsx";
 import LoginPage from "./pages/LoginPage.tsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 import ProjectionDebugPage from "./pages/ProjectionDebugPage.tsx";
 import RawIngestionDebugPage from "./pages/RawIngestionDebugPage.tsx";
 import SignupPage from "./pages/SignupPage.tsx";
@@ -58,6 +60,8 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/login/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/login/reset-password" element={<ResetPasswordPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/signup/waitlist" element={<SignupWaitlistPage />} />
 
