@@ -34,14 +34,14 @@ export function currentCoveragePresentation(pct: number): CoveragePresentation {
 }
 
 /**
- * Human-readable “size” of a thermometer / stack lane (no numeric weights in UI).
+ * Human-readable “size” of a thermometer / stack row (no numeric weights in UI).
  */
 export function signalSliceConcept(impactWeight: number): string {
   if (impactWeight >= 22) {
-    return "Strong signal lane";
+    return "Strong signal";
   }
   if (impactWeight >= 10) {
-    return "Moderate signal lane";
+    return "Moderate signal";
   }
-  return "Light signal lane";
+  return "Light signal";
 }

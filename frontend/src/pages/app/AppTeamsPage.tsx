@@ -1,4 +1,9 @@
-import { marketingBody, marketingSectionTitle, workspaceFlatPanel } from "../../components/marketing/marketingStyles";
+import {
+  marketingBody,
+  marketingSectionTitle,
+  workspaceAppPageMain,
+  workspaceAppPageSection,
+} from "../../components/marketing/marketingStyles";
 import WorkspaceManagersTab from "../../components/workspace/WorkspaceManagersTab";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
@@ -8,12 +13,14 @@ export default function AppTeamsPage() {
 
   if (me.isPending || !me.data) {
     return (
-      <main className="relative mx-auto flex w-full max-w-[min(100%,96rem)] flex-col items-center justify-center px-6 py-16 sm:px-10 lg:px-12">
+      <main
+        className={`${workspaceAppPageMain} flex flex-col items-center justify-center py-16 sm:py-20`}
+      >
         <div
           className="h-9 w-9 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
           aria-hidden
         />
-        <p className={`${marketingBody} mt-5 text-center text-zinc-600`}>Loading teams…</p>
+        <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading teams…</p>
       </main>
     );
   }
@@ -21,16 +28,18 @@ export default function AppTeamsPage() {
   const companyLabel = me.data.company_name?.trim() ? me.data.company_name : "Your company";
 
   return (
-    <main className="relative mx-auto w-full max-w-[min(100%,96rem)] px-6 py-10 pb-16 sm:px-10 sm:py-12 lg:px-12 lg:py-14">
-      <section className={`${workspaceFlatPanel} px-8 py-9 sm:px-10 sm:py-10 lg:px-12 lg:py-11`}>
-        <h1 className={marketingSectionTitle}>
-          Workspace ({companyLabel}) · Teams
-        </h1>
-        <p className={`${marketingBody} mt-3 max-w-2xl text-zinc-600`}>
-          Name teams and assign people from Slack. Saved for everyone in this workspace.
-        </p>
+    <main className={workspaceAppPageMain}>
+      <section className={workspaceAppPageSection}>
+        <header>
+          <h1 className={marketingSectionTitle}>
+            Workspace ({companyLabel}) · Teams
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-zinc-500 sm:text-base">
+            Build teams from your Slack roster—names and members save for everyone here.
+          </p>
+        </header>
 
-        <div className="mt-10 lg:mt-12">
+        <div className="mt-6 lg:mt-8">
           <WorkspaceManagersTab />
         </div>
       </section>

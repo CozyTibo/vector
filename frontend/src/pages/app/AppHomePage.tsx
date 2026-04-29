@@ -1,4 +1,9 @@
-import { marketingBody, marketingSectionTitle, workspaceFlatPanel } from "../../components/marketing/marketingStyles";
+import {
+  marketingBody,
+  marketingSectionTitle,
+  workspaceAppPageMain,
+  workspaceAppPageSection,
+} from "../../components/marketing/marketingStyles";
 import { currentCoveragePresentation } from "../../components/workspace/signalCoverageCopy";
 import { signalStrengthPercentLive } from "../../components/workspace/signalCatalog";
 import WorkspaceSignalsTab from "../../components/workspace/WorkspaceSignalsTab";
@@ -28,10 +33,8 @@ export default function AppHomePage() {
   const coverageHero = currentCoveragePresentation(pctLive);
 
   return (
-    <main className="relative mx-auto w-full max-w-[min(100%,96rem)] px-6 pt-5 pb-16 sm:px-10 sm:pt-6 sm:pb-12 lg:px-12 lg:pt-7 lg:pb-14">
-      <section
-        className={`${workspaceFlatPanel} px-8 pb-9 pt-[1.125rem] sm:px-10 sm:pb-10 sm:pt-5 lg:px-12 lg:pb-11 lg:pt-[1.375rem]`}
-      >
+    <main className={workspaceAppPageMain}>
+      <section className={workspaceAppPageSection}>
         <h1 className={marketingSectionTitle}>
           Workspace ({companyLabel}) · Signals
         </h1>

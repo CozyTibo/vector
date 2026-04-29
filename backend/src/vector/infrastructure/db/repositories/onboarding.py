@@ -307,7 +307,15 @@ def normalize_workspace_manager_teams_in_place(answers: dict[str, Any]) -> None:
                         "label": label,
                     },
                 )
-        out_teams.append({"id": tid, "name": name, "members": members_out})
+        member_ids = {m["slack_user_id"] for m in members_out}
+        mgr_raw = t.get("manager_slack_user_id")
+        manager_out: str | None = None
+        if isinstance(mgr_raw, str) and mgr_raw.strip() in member_ids:
+            manager_out = mgr_raw.strip()
+        row: dict[str, Any] = {"id": tid, "name": name, "members": members_out}
+        if manager_out is not None:
+            row["manager_slack_user_id"] = manager_out
+        out_teams.append(row)
     raw["teams"] = out_teams
 
 

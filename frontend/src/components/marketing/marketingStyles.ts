@@ -13,6 +13,12 @@ export const marketingSurfaceCard =
 /** Workspace hub: flat surfaces, no drop shadow — modern, low-noise panels. */
 export const workspaceFlatPanel = "rounded-2xl border border-zinc-100 bg-white";
 
+/** Shared shell for product workspace pages (`/app`, `/app/teams`) — matches headline + panel width. */
+export const workspaceAppPageMain =
+  "relative mx-auto w-full max-w-[min(100%,96rem)] px-6 pt-5 pb-16 sm:px-10 sm:pt-6 sm:pb-12 lg:px-12 lg:pt-7 lg:pb-14";
+
+export const workspaceAppPageSection = `${workspaceFlatPanel} px-8 pb-9 pt-[1.125rem] sm:px-10 sm:pb-10 sm:pt-5 lg:px-12 lg:pb-11 lg:pt-[1.375rem]`;
+
 /** Large thank-you / waitlist panel */
 export const marketingCardLg =
   "rounded-[2rem] border border-zinc-200/90 bg-white/80 p-10 shadow-[0_32px_100px_-40px_rgba(15,23,42,0.14),inset_0_0_0_1px_rgba(232,120,190,0.05)] backdrop-blur-xl sm:p-14 lg:p-16";
