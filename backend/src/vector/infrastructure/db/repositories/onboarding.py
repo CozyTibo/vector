@@ -262,6 +262,55 @@ def normalize_slack_introduce_managers_consent_in_place(answers: dict[str, Any])
     answers.pop("slack_introduce_managers_consent", None)
 
 
+def normalize_workspace_manager_teams_in_place(answers: dict[str, Any]) -> None:
+    """Product workspace page: teams of Slack-backed managers (post-onboarding)."""
+    raw = answers.get("workspace_manager_teams")
+    if not isinstance(raw, dict):
+        answers.pop("workspace_manager_teams", None)
+        return
+    teams = raw.get("teams")
+    if not isinstance(teams, list):
+        answers.pop("workspace_manager_teams", None)
+        return
+    out_teams: list[dict[str, Any]] = []
+    for t in teams:
+        if not isinstance(t, dict):
+            continue
+        tid_raw = t.get("id")
+        try:
+            tid = str(uuid.UUID(str(tid_raw))) if tid_raw else str(uuid.uuid4())
+        except (ValueError, TypeError):
+            tid = str(uuid.uuid4())
+        name = str(t.get("name") or "").strip() or "Team"
+        members_raw = t.get("members")
+        seen: set[str] = set()
+        members_out: list[dict[str, str]] = []
+        if isinstance(members_raw, list):
+            for m in members_raw:
+                if not isinstance(m, dict):
+                    continue
+                uid = m.get("slack_user_id")
+                if not isinstance(uid, str) or not uid.strip():
+                    continue
+                uid = uid.strip()
+                if uid in seen:
+                    continue
+                seen.add(uid)
+                un = m.get("username")
+                username = un.strip().lstrip("@") if isinstance(un, str) and un.strip() else uid
+                lab = m.get("label")
+                label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+                members_out.append(
+                    {
+                        "slack_user_id": uid,
+                        "username": username,
+                        "label": label,
+                    },
+                )
+        out_teams.append({"id": tid, "name": name, "members": members_out})
+    raw["teams"] = out_teams
+
+
 def hard_reset_onboarding_progress(session: Session, *, tenant_id: uuid.UUID) -> OnboardingState:
     """Delete persisted chat rows and reset onboarding answers/step to a fresh chat-profile start.
 

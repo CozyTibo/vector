@@ -30,6 +30,10 @@ export default function RequireAuth() {
     },
   });
 
+  const onboardingRoute =
+    loc.pathname === "/app/onboarding" || loc.pathname.startsWith("/app/onboarding/");
+  const shellScrollsWithPage = !onboardingRoute;
+
   if (me.isPending) {
     return (
       <div className="font-display relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
@@ -68,10 +72,9 @@ export default function RequireAuth() {
     return <Navigate to="/signup/waitlist" replace />;
   }
 
-  const onOnboardingRoute = loc.pathname === "/app/onboarding" || loc.pathname.startsWith("/app/onboarding/");
   const mustFinishOnboarding =
     "onboarding_completed" in me.data && me.data.onboarding_completed !== true;
-  if (mustFinishOnboarding && !onOnboardingRoute) {
+  if (mustFinishOnboarding && !onboardingRoute) {
     return <Navigate to="/app/onboarding" replace />;
   }
 
@@ -79,7 +82,13 @@ export default function RequireAuth() {
     !("onboarding_completed" in me.data) || me.data.onboarding_completed === true;
 
   return (
-    <div className="font-display relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
+    <div
+      className={
+        shellScrollsWithPage
+          ? "font-display relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]"
+          : "font-display relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]"
+      }
+    >
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute inset-0 bg-[#FFFFFF]" />
         <div
@@ -99,10 +108,16 @@ export default function RequireAuth() {
         showConnectors={showConnectorsNav}
       />
       {/*
-        flex-1 min-h-0 lets child routes (e.g. onboarding) fill the viewport below the nav and
-        scroll inside their own panel instead of growing the document.
+        Onboarding keeps a fixed viewport and scrolls inside chat panels. Workspace & connectors use
+        normal document flow so the page scrolls once.
       */}
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={
+          shellScrollsWithPage
+            ? "relative flex w-full min-w-0 flex-1 flex-col"
+            : "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        }
+      >
         <Outlet />
       </div>
     </div>

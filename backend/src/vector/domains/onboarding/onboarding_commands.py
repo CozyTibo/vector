@@ -40,6 +40,7 @@ from vector.domains.onboarding.errors import (
     OnboardingAlreadyCompletedError,
     SlackMembersLoadError,
     SlackNotConnectedForWorkspaceError,
+    WorkspaceSettingsForbiddenError,
 )
 from vector.domains.onboarding.onboarding_service import apply_patch_answers_to_profile_and_company
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
@@ -300,7 +301,22 @@ def patch_onboarding(
 ) -> OnboardingGetResponse:
     row = ob_repo.get_or_create_onboarding(db, claims.tenant_id)
     if row.status == STATUS_COMPLETED:
-        raise OnboardingAlreadyCompletedError
+        # Post-onboarding: owners may update workspace manager teams only (no step / chat side effects).
+        if body.current_step is not None or body.answers is None:
+            raise OnboardingAlreadyCompletedError
+        keys = set(body.answers.keys())
+        if keys != {"workspace_manager_teams"}:
+            raise OnboardingAlreadyCompletedError
+        membership = tenancy_repo.get_membership_for_user_tenant(db, claims.user_id, claims.tenant_id)
+        if membership is None or str(membership.role).strip().lower() != "owner":
+            raise WorkspaceSettingsForbiddenError
+        merged = ob_repo.deep_merge_answers_json(row.answers_json or {}, body.answers)
+        ob_repo.normalize_workspace_manager_teams_in_place(merged)
+        row.answers_json = merged
+        row.version = int(row.version) + 1
+        db.commit()
+        db.refresh(row)
+        return _get_response_bundle(db, claims.tenant_id, row)
     if body.current_step is not None:
         if body.current_step not in ONBOARDING_STEPS:
             raise InvalidOnboardingStepError(body.current_step)

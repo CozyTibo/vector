@@ -6,7 +6,7 @@ import { marketingAccentLink, marketingMutedLink } from "./marketing/marketingSt
 type Props = {
   email?: string;
   onLogout?: () => void;
-  /** When false, hide product nav to Connectors (e.g. during onboarding). */
+  /** When false, hide the Teams link (e.g. during onboarding). */
   showConnectors?: boolean;
 };
 
@@ -29,25 +29,20 @@ export default function PublicNav({ email, onLogout, showConnectors = false }: P
         </Link>
         <nav className="flex min-w-0 max-w-[min(100%,36rem)] flex-wrap items-center justify-end gap-3 text-sm font-medium sm:gap-4">
           {showConnectors ? (
-            <Link to="/app/connectors" className={`${marketingAccentLink} text-sm`}>
-              Connectors
+            <Link to="/app/teams" className={`${marketingAccentLink} text-sm`}>
+              Teams
             </Link>
           ) : null}
           {email ? (
-            <>
-              <span className="max-w-[14rem] truncate text-[#52525B]" title={email}>
-                {email}
-              </span>
-              {onLogout ? (
-                <button
-                  type="button"
-                  className={`${marketingMutedLink} cursor-pointer border-0 bg-transparent p-0 underline decoration-zinc-300`}
-                  onClick={onLogout}
-                >
-                  Sign out
-                </button>
-              ) : null}
-            </>
+            onLogout ? (
+              <button
+                type="button"
+                className={`${marketingMutedLink} cursor-pointer border-0 bg-transparent p-0 underline decoration-zinc-300`}
+                onClick={onLogout}
+              >
+                Sign out
+              </button>
+            ) : null
           ) : (
             <Link to="/login" className={marketingAccentLink}>
               Sign in

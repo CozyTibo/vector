@@ -25,3 +25,7 @@ class SlackMembersLoadError(Exception):
     def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message
+
+
+class WorkspaceSettingsForbiddenError(Exception):
+    """Only workspace owners may change post-onboarding workspace settings."""

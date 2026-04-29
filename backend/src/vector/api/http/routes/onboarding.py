@@ -25,6 +25,7 @@ from vector.domains.onboarding.errors import (
     OnboardingAlreadyCompletedError,
     SlackMembersLoadError,
     SlackNotConnectedForWorkspaceError,
+    WorkspaceSettingsForbiddenError,
 )
 from vector.domains.onboarding.onboarding_commands import (
     complete_onboarding as ob_complete_onboarding,
@@ -84,6 +85,11 @@ def build_onboarding_router() -> APIRouter:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
         try:
             return ob_patch_onboarding(db, claims, body)
+        except WorkspaceSettingsForbiddenError as e:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail="Only workspace owners can update manager teams.",
+            ) from e
         except OnboardingAlreadyCompletedError as e:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,

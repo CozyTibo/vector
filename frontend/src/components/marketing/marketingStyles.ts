@@ -6,6 +6,13 @@
 export const marketingCard =
   "rounded-[1.75rem] border border-zinc-200/90 bg-white/80 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.12),inset_0_0_0_1px_rgba(232,120,190,0.05)] backdrop-blur-xl sm:p-10";
 
+/** In-app panels (connectors grid, workspace signals) — same elevation as connector tiles. */
+export const marketingSurfaceCard =
+  "rounded-2xl border border-zinc-200/90 bg-white/90 shadow-[0_12px_40px_-28px_rgba(15,23,42,0.14)] ring-1 ring-zinc-950/[0.03]";
+
+/** Workspace hub: flat surfaces, no drop shadow — modern, low-noise panels. */
+export const workspaceFlatPanel = "rounded-2xl border border-zinc-100 bg-white";
+
 /** Large thank-you / waitlist panel */
 export const marketingCardLg =
   "rounded-[2rem] border border-zinc-200/90 bg-white/80 p-10 shadow-[0_32px_100px_-40px_rgba(15,23,42,0.14),inset_0_0_0_1px_rgba(232,120,190,0.05)] backdrop-blur-xl sm:p-14 lg:p-16";

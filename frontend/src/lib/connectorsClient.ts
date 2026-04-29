@@ -1,0 +1,76 @@
+import { readErrorDetail } from "./canonicalApi";
+import { mergeProductSessionAuth } from "./sessionToken";
+
+export type GithubDetails = {
+  connection_id: string | null;
+  installation_id: number | null;
+  account_login: string | null;
+  account_type: string | null;
+  last_sync_at?: string | null;
+};
+
+export type LinearDetails = {
+  connection_id: string | null;
+  organization_id: string | null;
+  organization_name: string | null;
+  last_sync_at?: string | null;
+};
+
+export type SlackDetails = {
+  connection_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  last_sync_at?: string | null;
+};
+
+export type ConnectorRow =
+  | {
+      provider: "github";
+      display_name: string;
+      connector_configured: boolean;
+      connected: boolean;
+      details: GithubDetails | null;
+    }
+  | {
+      provider: "linear";
+      display_name: string;
+      connector_configured: boolean;
+      connected: boolean;
+      details: LinearDetails | null;
+    }
+  | {
+      provider: "slack";
+      display_name: string;
+      connector_configured: boolean;
+      connected: boolean;
+      details: SlackDetails | null;
+    };
+
+export type ConnectorsResponse = { items: ConnectorRow[] };
+
+export async function fetchConnectors(base: string): Promise<ConnectorsResponse> {
+  const res = await fetch(`${base}/connectors`, mergeProductSessionAuth());
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
+  return res.json() as Promise<ConnectorsResponse>;
+}
+
+export async function disconnectConnector(base: string, provider: string): Promise<void> {
+  const res = await fetch(`${base}/connectors/${provider}`, mergeProductSessionAuth({ method: "DELETE" }));
+  if (!res.ok && res.status !== 204) {
+    throw new Error(await readErrorDetail(res));
+  }
+}
+
+/** Post-OAuth redirect; must satisfy backend `sanitize_*_return_to` (path under `/app/`). */
+export const CONNECTOR_OAUTH_RETURN_PATH = "/app/";
+
+export function connectorInstallUrl(
+  base: string,
+  provider: "github" | "linear" | "slack",
+  returnPath: string = CONNECTOR_OAUTH_RETURN_PATH,
+): string {
+  const q = new URLSearchParams({ return_to: returnPath });
+  return `${base}/connectors/${provider}/install?${q.toString()}`;
+}

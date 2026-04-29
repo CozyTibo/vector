@@ -1472,9 +1472,9 @@ export default function OnboardingPage() {
               <button
                 type="button"
                 className="mt-2 rounded-full bg-gradient-to-r from-[#BE5E94] to-[#E878BE] px-8 py-3 text-sm font-semibold text-white shadow-[0_14px_36px_-18px_rgba(232,120,190,0.55)] transition hover:brightness-[1.03]"
-                onClick={() => navigate("/app/connectors", { replace: true })}
+                onClick={() => navigate("/app", { replace: true })}
               >
-                Go to connectors
+                Go to workspace
               </button>
               <p className="pt-2 text-sm text-zinc-500">
                 <Link to="/app" className="text-[#E878BE] underline decoration-[#E878BE]/40 underline-offset-2 hover:text-[#BE5E94]">
@@ -2173,7 +2173,7 @@ export default function OnboardingPage() {
               {server.slack_connected ? (
                 <div className="mt-3 space-y-1">
                   <p className="text-sm font-medium text-emerald-700">Slack is connected to this workspace.</p>
-                  <p className="text-sm text-zinc-600">When you&apos;re ready, finish setup—you can connect more tools from Connectors later.</p>
+                  <p className="text-sm text-zinc-600">When you&apos;re ready, finish setup—you can connect more tools from your workspace later.</p>
                 </div>
               ) : null}
               <div className="mt-6 flex flex-col items-center gap-3">
