@@ -143,19 +143,19 @@ def _connect_queue_communication_only(tools: dict[str, list[str]]) -> list[str]:
 
 
 def _connect_queue_full_from_tools(tools: dict[str, list[str]]) -> list[str]:
-    """Onboarding OAuth queue: PM (Linear) → engineering (GitHub) → communication."""
+    """Onboarding OAuth queue: communication (Slack) → PM (Linear) → engineering (GitHub)."""
     q: list[str] = []
+    comm = tools.get("communication") or []
+    if "slack" in comm:
+        q.append("slack")
+    elif isinstance(comm, list) and ("ms_teams" in comm or "discord" in comm):
+        q.append("comm_placeholder")
     pm = tools.get("pm") or []
     if "linear" in pm:
         q.append("linear")
     eng = tools.get("engineering") or []
     if "github" in eng:
         q.append("github")
-    comm = tools.get("communication") or []
-    if "slack" in comm:
-        q.append("slack")
-    elif isinstance(comm, list) and ("ms_teams" in comm or "discord" in comm):
-        q.append("comm_placeholder")
     return q
 
 

@@ -188,8 +188,8 @@ def test_tools_selected_without_engineering_does_not_advance() -> None:
     assert "engineering" in r.assistant_prompt_context["instruction"].lower()
 
 
-def test_tools_selected_slack_linear_github_queues_pm_then_eng_then_slack() -> None:
-    """Linear, GitHub, then Slack are queued for in-product OAuth."""
+def test_tools_selected_slack_linear_github_queues_comm_then_linear_then_github() -> None:
+    """Slack, then Linear, then GitHub are queued for in-product OAuth."""
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,
         "profile": {"name": "Ada", "role": "Founder"},
@@ -205,10 +205,10 @@ def test_tools_selected_slack_linear_github_queues_pm_then_eng_then_slack() -> N
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
-    assert r.next_step == STEP_CONNECT_PROJECT_MANAGEMENT
+    assert r.next_step == STEP_CONNECT_COMMUNICATION
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
     assert "github" in r.answers_updates["tools"]["engineering"]
-    assert r.answers_updates["connect_queue"] == ["linear", "github", "slack"]
+    assert r.answers_updates["connect_queue"] == ["slack", "linear", "github"]
     assert r.answers_updates.get("unsupported_mandatory_sections") == []
 
 
@@ -339,11 +339,11 @@ def test_tools_selected_moves_to_connect_pm_with_tools_merged() -> None:
         },
     }
     r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
-    assert r.next_step == STEP_CONNECT_PROJECT_MANAGEMENT
+    assert r.next_step == STEP_CONNECT_COMMUNICATION
     assert r.answers_updates["profile_phase"] == PROFILE_PHASE_DONE
     assert "github" in r.answers_updates["tools"]["engineering"]
     assert "linear" in r.answers_updates["tools"]["pm"]
-    assert r.answers_updates["connect_queue"] == ["linear", "github", "slack"]
+    assert r.answers_updates["connect_queue"] == ["slack", "linear", "github"]
     assert r.answers_updates.get("unsupported_mandatory_sections") == []
 
 

@@ -118,13 +118,19 @@ function NextConnectStep(next: ConnectorQueueId): OnboardingStep {
   return "SCANNING";
 }
 
-/** Order matches backend `onboarding_flow._connect_queue_full_from_tools`. */
+/** Order matches backend `onboarding_flow._connect_queue_full_from_tools` (comm → Linear → GitHub). */
 function connectQueueFromTools(answers: Record<string, unknown>): ConnectorQueueId[] {
   const t = answers.tools as Record<string, string[]> | undefined;
   if (!t) {
     return [];
   }
   const order: ConnectorQueueId[] = [];
+  const comm = t.communication ?? [];
+  if (comm.includes("slack")) {
+    order.push("slack");
+  } else if (comm.includes("ms_teams") || comm.includes("discord")) {
+    order.push("comm_placeholder");
+  }
   const pm = t.pm ?? [];
   if (pm.includes("linear")) {
     order.push("linear");
@@ -132,12 +138,6 @@ function connectQueueFromTools(answers: Record<string, unknown>): ConnectorQueue
   const eng = t.engineering ?? [];
   if (eng.includes("github")) {
     order.push("github");
-  }
-  const comm = t.communication ?? [];
-  if (comm.includes("slack")) {
-    order.push("slack");
-  } else if (comm.includes("ms_teams") || comm.includes("discord")) {
-    order.push("comm_placeholder");
   }
   return order;
 }
@@ -467,15 +467,11 @@ export default function OnboardingPage() {
   }, [tenantId]);
 
   /**
-   * Restore persisted chat from GET /onboarding before bootstrap. Same onboarding row id survives
-   * restart; ``bootstrapCompletedForServerIdRef`` is cleared in ``resetLocalOnboardingUi`` so we
-   * re-hydrate or bootstrap again after ``POST /onboarding/restart``.
+   * Restore persisted chat from GET /onboarding. Always apply when the API returns messages (same row
+   * can gain messages after tool picks / step changes; do not skip just because bootstrap already ran).
    */
   useEffect(() => {
     if (!server) {
-      return;
-    }
-    if (bootstrapCompletedForServerIdRef.current === server.id) {
       return;
     }
     const apiMsgs = server.messages ?? [];
@@ -484,35 +480,7 @@ export default function OnboardingPage() {
     }
     setMessages(apiMsgs.map(mapServerMessageToChatMessage));
     bootstrapCompletedForServerIdRef.current = server.id;
-  }, [server]);
-
-  /** Connector OAuth, Slack stakeholders, and admin CTA: hydrate chat from API (e.g. persisted \"… connected\" lines). */
-  useEffect(() => {
-    if (!server) {
-      return;
-    }
-    const hydrateSteps: OnboardingStep[] = [
-      "CONNECT_PROJECT_MANAGEMENT",
-      "CONNECT_ENGINEERING",
-      "CONNECT_COMMUNICATION",
-      "SLACK_STAKEHOLDERS",
-      "SLACK_COLLABORATORS",
-      "SLACK_COLLABORATORS_CONFIRM",
-      "SLACK_TEAM_MEMBERS",
-      "SLACK_TEAM_MEMBERS_CONFIRM",
-      "SLACK_WATCH_CHANNELS",
-      "SLACK_WATCH_CHANNELS_CONFIRM",
-      "ADMIN_ACCESS",
-    ];
-    if (!hydrateSteps.includes(server.current_step as OnboardingStep)) {
-      return;
-    }
-    const apiMsgs = server.messages;
-    if (!apiMsgs?.length) {
-      return;
-    }
-    setMessages(apiMsgs.map(mapServerMessageToChatMessage));
-  }, [server?.current_step, server?.id, server?.version]);
+  }, [server?.id, server?.version, server?.messages?.length]);
 
   const displayStep: OnboardingStep | null = useMemo(() => {
     if (!server) {
