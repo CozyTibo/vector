@@ -705,6 +705,7 @@ Risk of reduced predictability if urgent work is not resolved quickly.
 
 - `urgent_pressure: high`
 
+
 **Confidence:** high
 
 ---
