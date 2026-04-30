@@ -15,10 +15,8 @@ from sqlalchemy import create_engine, inspect, text
 # DBs stamped with a typo / orphan id that matches no file.
 # Map to the *parent* of the intended migration so `alembic upgrade head` still runs the real
 # revision’s DDL. Mapping directly to the head id would skip the migration (empty table).
-_REVISION_ALIASES: dict[str, str] = {
-    # Mistyped id for password_reset_tokens (revision 20260429_0024; parent 20260422_0023).
-    "20260427_0024": "20260422_0023",
-}
+# (20260427_0024 is now the real Notion/Calls revision — do not alias it.)
+_REVISION_ALIASES: dict[str, str] = {}
 
 
 def main() -> int:
