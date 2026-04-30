@@ -1,8 +1,10 @@
 import {
   marketingBody,
-  marketingSectionTitle,
+  workspaceAppBreadcrumbCurrentLink,
+  workspaceAppBreadcrumbProduct,
+  workspaceAppBreadcrumbSep,
+  workspaceAppPageHeader,
   workspaceAppPageMain,
-  workspaceAppPageSection,
 } from "../../components/marketing/marketingStyles";
 import WorkspaceManagersTab from "../../components/workspace/WorkspaceManagersTab";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
@@ -25,24 +27,36 @@ export default function AppTeamsPage() {
     );
   }
 
-  const companyLabel = me.data.company_name?.trim() ? me.data.company_name : "Your company";
-
   return (
     <main className={workspaceAppPageMain}>
-      <section className={workspaceAppPageSection}>
-        <header>
-          <h1 className={marketingSectionTitle}>
-            Workspace ({companyLabel}) · Teams
+      <header className={workspaceAppPageHeader}>
+        <nav aria-label="Breadcrumb">
+          <h1 className="flex min-w-0 flex-nowrap items-baseline justify-start gap-x-1 leading-none">
+            <span className={workspaceAppBreadcrumbProduct}>Vector</span>
+            <span className={workspaceAppBreadcrumbSep} aria-hidden="true">
+              /
+            </span>
+            <a
+              href="#"
+              className={workspaceAppBreadcrumbCurrentLink}
+              aria-current="page"
+              onClick={(e) => {
+                e.preventDefault();
+              }}
+            >
+              Teams
+            </a>
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-zinc-500 sm:text-base">
-            Build teams from your Slack roster—names and members save for everyone here.
-          </p>
-        </header>
+        </nav>
+      </header>
 
-        <div className="mt-6 lg:mt-8">
-          <WorkspaceManagersTab />
-        </div>
-      </section>
+      <p className="max-w-2xl text-sm leading-snug text-zinc-500 sm:text-base sm:leading-snug">
+        Build teams from your Slack roster—names and members save for everyone here.
+      </p>
+
+      <div className="mt-4 lg:mt-6">
+        <WorkspaceManagersTab />
+      </div>
     </main>
   );
 }

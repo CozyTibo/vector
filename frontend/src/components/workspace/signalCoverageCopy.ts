@@ -32,16 +32,3 @@ export function currentCoveragePresentation(pct: number): CoveragePresentation {
     headlineSentence: "Your signals are still light—connect priority tools to improve coverage.",
   };
 }
-
-/**
- * Human-readable “size” of a thermometer / stack row (no numeric weights in UI).
- */
-export function signalSliceConcept(impactWeight: number): string {
-  if (impactWeight >= 22) {
-    return "Strong signal";
-  }
-  if (impactWeight >= 10) {
-    return "Moderate signal";
-  }
-  return "Light signal";
-}

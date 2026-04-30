@@ -1,20 +1,54 @@
 import { ONBOARDING_TOOL_GROUPS, type ToolPickState } from "../onboarding/onboardingToolGroups";
 
 /**
- * Selected tools in onboarding group order, then item order — one UI row per selection (supports multiple
- * tools per category).
+ * One connector-status card per physical tool (`toolId`). The same id may appear in multiple groups in
+ * `ToolPickState` (e.g. Notion under PM and Documentation); `groupKeys` preserves every group so actions
+ * and payloads stay distinct while the UI does not duplicate the connector.
  */
-export function orderedStackToolRows(pick: ToolPickState): { key: string; groupKey: keyof ToolPickState; toolId: string }[] {
-  const rows: { key: string; groupKey: keyof ToolPickState; toolId: string }[] = [];
+export type StackToolRow = {
+  /** Stable React key — unique per `toolId`. */
+  key: string;
+  toolId: string;
+  /** Groups where this tool is selected (order = first seen walking `ONBOARDING_TOOL_GROUPS`). */
+  groupKeys: (keyof ToolPickState)[];
+};
+
+/**
+ * Selected tools in onboarding group order — one row per `toolId` (deduped across groups).
+ */
+export function orderedStackToolRows(pick: ToolPickState): StackToolRow[] {
+  const byTool = new Map<string, { toolId: string; groupKeys: (keyof ToolPickState)[] }>();
+  const order: string[] = [];
+
   for (const g of ONBOARDING_TOOL_GROUPS) {
     const selected = new Set(pick[g.key] ?? []);
     for (const item of g.items) {
-      if (selected.has(item.id)) {
-        rows.push({ key: `${String(g.key)}:${item.id}`, groupKey: g.key, toolId: item.id });
+      if (!selected.has(item.id)) {
+        continue;
+      }
+      const existing = byTool.get(item.id);
+      if (existing) {
+        if (!existing.groupKeys.includes(g.key)) {
+          existing.groupKeys.push(g.key);
+        }
+      } else {
+        byTool.set(item.id, { toolId: item.id, groupKeys: [g.key] });
+        order.push(item.id);
       }
     }
   }
-  return rows;
+
+  return order.map((toolId) => {
+    const row = byTool.get(toolId)!;
+    return { key: toolId, toolId, groupKeys: row.groupKeys };
+  });
+}
+
+/** Human-readable category line for a deduped row (e.g. "Project management · Documentation"). */
+export function categoryLabelsForStackRow(groupKeys: (keyof ToolPickState)[]): string {
+  return groupKeys
+    .map((k) => ONBOARDING_TOOL_GROUPS.find((g) => g.key === k)?.label ?? String(k))
+    .join(" · ");
 }
 
 export function cloneToolPick(pick: ToolPickState): ToolPickState {

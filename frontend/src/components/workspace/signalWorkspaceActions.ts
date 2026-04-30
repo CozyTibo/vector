@@ -30,17 +30,17 @@ const EXPAND_ROWS: {
   {
     groupKey: "communication",
     title: "Add communication tools",
-    body: "Nothing in this category yet. Use Edit tools to choose Slack, Microsoft Teams, or Discord—then connect Slack from Stack coverage when you’re ready.",
+    body: "Nothing in this category yet. Use Edit tools to choose Slack, Microsoft Teams, or Discord—then connect Slack below when you’re ready.",
   },
   {
     groupKey: "pm",
     title: "Add project management tools",
-    body: "Nothing in this category yet. Use Edit tools to choose Linear, Jira, ClickUp, or Notion—then connect Linear from Stack coverage when it’s available.",
+    body: "Nothing in this category yet. Use Edit tools to choose Linear, Jira, ClickUp, or Notion—then connect Linear below when it’s available.",
   },
   {
     groupKey: "engineering",
     title: "Add engineering tools",
-    body: "Nothing in this category yet. Use Edit tools to choose GitHub, GitLab, or Bitbucket—then connect GitHub from Stack coverage when it’s available.",
+    body: "Nothing in this category yet. Use Edit tools to choose GitHub, GitLab, or Bitbucket—then connect GitHub below when it’s available.",
   },
   {
     groupKey: "calls",

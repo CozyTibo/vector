@@ -13,11 +13,34 @@ export const marketingSurfaceCard =
 /** Workspace hub: flat surfaces, no drop shadow — modern, low-noise panels. */
 export const workspaceFlatPanel = "rounded-2xl border border-zinc-100 bg-white";
 
+/** Max width for authenticated app shell (top nav + `/app` page column). */
+export const workspaceAppShellMaxWidth = "max-w-[min(100%,80rem)]";
+
 /** Shared shell for product workspace pages (`/app`, `/app/teams`) — matches headline + panel width. */
 export const workspaceAppPageMain =
-  "relative mx-auto w-full max-w-[min(100%,96rem)] px-6 pt-5 pb-16 sm:px-10 sm:pt-6 sm:pb-12 lg:px-12 lg:pt-7 lg:pb-14";
+  `relative mx-auto w-full ${workspaceAppShellMaxWidth} px-6 pt-4 pb-16 sm:px-10 sm:pt-5 sm:pb-12 lg:px-12 lg:pt-6 lg:pb-14`;
 
-export const workspaceAppPageSection = `${workspaceFlatPanel} px-8 pb-9 pt-[1.125rem] sm:px-10 sm:pb-10 sm:pt-5 lg:px-12 lg:pb-11 lg:pt-[1.375rem]`;
+/** Sits above main app content — breadcrumb only, left-aligned. */
+export const workspaceAppPageHeader = "mb-3 w-full min-w-0 lg:mb-4";
+
+/** Compact breadcrumb row: long workspace/org label (truncates; use with flex-1). */
+export const workspaceAppBreadcrumbRoot =
+  "min-w-0 flex-1 basis-0 truncate text-sm font-normal text-zinc-500";
+
+/** Product name in app shell breadcrumb (short; stays left). */
+export const workspaceAppBreadcrumbProduct =
+  "shrink-0 text-sm font-normal text-zinc-500";
+
+export const workspaceAppBreadcrumbSep =
+  "shrink-0 select-none px-0.5 text-sm font-normal text-zinc-400";
+
+/** Current page crumb — same `text-sm` as `workspaceAppBreadcrumbProduct`; use with `<a href="#">` + preventDefault until routes exist. */
+export const workspaceAppBreadcrumbCurrentLink =
+  "shrink-0 text-sm font-normal text-zinc-900 no-underline underline-offset-2 transition-colors hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E878BE]";
+
+/** Ancestor crumb (future) — same size as product label; use with real `href` / router `Link`. */
+export const workspaceAppBreadcrumbAncestorLink =
+  "shrink-0 text-sm font-normal text-zinc-500 no-underline underline-offset-2 transition-colors hover:text-zinc-800 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E878BE]";
 
 /** Large thank-you / waitlist panel */
 export const marketingCardLg =

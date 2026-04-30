@@ -83,7 +83,7 @@ export default function EditToolsModal({ open, onClose, initialPick, connected, 
           Tools in your stack
         </h2>
         <p className="mt-2 text-sm text-zinc-600">
-          Same list as onboarding. Checked tools appear under Stack coverage; connect or disconnect on each card.
+          Same list as onboarding. Checked tools appear under Connector status; connect or disconnect on each card.
           While a tool is connected, it stays selected here.
         </p>
         <div className="mt-6 space-y-6">

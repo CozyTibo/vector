@@ -1,11 +1,12 @@
 import {
   marketingBody,
-  marketingSectionTitle,
+  workspaceAppBreadcrumbCurrentLink,
+  workspaceAppBreadcrumbProduct,
+  workspaceAppBreadcrumbSep,
+  workspaceAppPageHeader,
   workspaceAppPageMain,
-  workspaceAppPageSection,
+  workspaceAppShellMaxWidth,
 } from "../../components/marketing/marketingStyles";
-import { currentCoveragePresentation } from "../../components/workspace/signalCoverageCopy";
-import { signalStrengthPercentLive } from "../../components/workspace/signalCatalog";
 import WorkspaceSignalsTab from "../../components/workspace/WorkspaceSignalsTab";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
@@ -15,7 +16,9 @@ export default function AppHomePage() {
 
   if (me.isPending || !me.data) {
     return (
-      <main className="relative mx-auto flex w-full max-w-[min(100%,96rem)] flex-col items-center justify-center px-6 py-16 sm:px-10 lg:px-12">
+      <main
+        className={`relative mx-auto flex w-full ${workspaceAppShellMaxWidth} flex-col items-center justify-center px-6 py-16 sm:px-10 lg:px-12`}
+      >
         <div
           className="h-9 w-9 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
           aria-hidden
@@ -25,30 +28,35 @@ export default function AppHomePage() {
     );
   }
 
-  const { company_name, use_mock_connectors, connected_connectors } = me.data;
-  const companyLabel = company_name?.trim() ? company_name : "Your company";
-  const pctLive = signalStrengthPercentLive(
-    new Set((connected_connectors ?? []).map((c) => c.toLowerCase())),
-  );
-  const coverageHero = currentCoveragePresentation(pctLive);
+  const { use_mock_connectors, connected_connectors } = me.data;
 
   return (
     <main className={workspaceAppPageMain}>
-      <section className={workspaceAppPageSection}>
-        <h1 className={marketingSectionTitle}>
-          Workspace ({companyLabel}) · Signals
-        </h1>
-        <p className={`mt-3 max-w-2xl text-base leading-relaxed sm:text-lg ${coverageHero.toneClass}`}>
-          {coverageHero.headlineSentence}
-        </p>
+      <header className={workspaceAppPageHeader}>
+        <nav aria-label="Breadcrumb">
+          <h1 className="flex min-w-0 flex-nowrap items-baseline justify-start gap-x-1 leading-none">
+            <span className={workspaceAppBreadcrumbProduct}>Vector</span>
+            <span className={workspaceAppBreadcrumbSep} aria-hidden="true">
+              /
+            </span>
+            <a
+              href="#"
+              className={workspaceAppBreadcrumbCurrentLink}
+              aria-current="page"
+              onClick={(e) => {
+                e.preventDefault();
+              }}
+            >
+              Signals
+            </a>
+          </h1>
+        </nav>
+      </header>
 
-        <div className="mt-6 lg:mt-8">
-          <WorkspaceSignalsTab
-            connectedConnectors={connected_connectors ?? []}
-            useMockConnectors={Boolean(use_mock_connectors)}
-          />
-        </div>
-      </section>
+      <WorkspaceSignalsTab
+        connectedConnectors={connected_connectors ?? []}
+        useMockConnectors={Boolean(use_mock_connectors)}
+      />
     </main>
   );
 }

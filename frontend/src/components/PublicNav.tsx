@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import vectorHeroAvatarUrl from "../assets/vector-white-bg.png";
-import { marketingAccentLink, marketingMutedLink } from "./marketing/marketingStyles";
+import { marketingAccentLink, marketingMutedLink, workspaceAppShellMaxWidth } from "./marketing/marketingStyles";
 
 type Props = {
   email?: string;
@@ -117,7 +117,7 @@ export default function PublicNav({ email, onLogout, showConnectors = false }: P
 
   return (
     <header className="relative z-40 border-b border-zinc-200/90 bg-[#FFFFFF]/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[96rem] items-center justify-between gap-4 px-5 py-4 sm:px-8 sm:py-5">
+      <div className={`mx-auto flex ${workspaceAppShellMaxWidth} items-center justify-between gap-4 px-5 py-4 sm:px-8 sm:py-5`}>
         <Link
           to="/app"
           className="group flex items-center gap-2.5 text-lg font-semibold tracking-[-0.02em] text-[#0F0F12] no-underline outline-none transition-opacity hover:opacity-90 sm:text-xl"

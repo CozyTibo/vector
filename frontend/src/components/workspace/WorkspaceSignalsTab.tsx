@@ -13,22 +13,16 @@ import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 import {
   emptyToolPick,
   hydrateToolPickFromAnswers,
-  ONBOARDING_TOOL_GROUPS,
   type ToolPickState,
 } from "../onboarding/onboardingToolGroups";
 import { workspaceFlatPanel } from "../marketing/marketingStyles";
 import EditToolsModal from "./EditToolsModal";
 import { buildSignalWorkspaceActions } from "./signalWorkspaceActions";
-import { currentCoveragePresentation, signalSliceConcept } from "./signalCoverageCopy";
-import {
-  isSlotActive,
-  orderedThermometerSlots,
-  signalStrengthPercentLive,
-  WORKSPACE_SIGNAL_SLOTS,
-  type SignalSlot,
-} from "./signalCatalog";
+import { currentCoveragePresentation } from "./signalCoverageCopy";
+import { isSlotActive, signalStrengthPercentLive, WORKSPACE_SIGNAL_SLOTS, type SignalSlot } from "./signalCatalog";
 import { ToolLogo } from "./toolLogos";
 import {
+  categoryLabelsForStackRow,
   mergeConnectedProvidersIntoPick,
   orderedStackToolRows,
   toolLabelFromOnboarding,
@@ -62,6 +56,102 @@ const disabledConnectClass =
 const cardClass =
   "flex min-h-[10.5rem] flex-col rounded-2xl border border-zinc-100 bg-white p-4 sm:min-h-[11rem] sm:p-5";
 
+/** People vs system buckets — same catalog entries, regrouped for clarity (order fixed). */
+const PEOPLE_SIGNAL_IDS = ["communication", "calls", "calendar"] as const;
+const SYSTEM_SIGNAL_IDS = ["engineering", "pm", "docs"] as const;
+
+function catalogSlotsForIds(ids: readonly string[]): SignalSlot[] {
+  return ids
+    .map((id) => WORKSPACE_SIGNAL_SLOTS.find((s) => s.id === id))
+    .filter((s): s is SignalSlot => s != null);
+}
+
+const PEOPLE_SIGNAL_SLOTS = catalogSlotsForIds(PEOPLE_SIGNAL_IDS);
+const SYSTEM_SIGNAL_SLOTS = catalogSlotsForIds(SYSTEM_SIGNAL_IDS);
+
+function bucketBarAriaLabel(slots: SignalSlot[], connected: Set<string>): string {
+  return slots
+    .map((s) => {
+      if (isSlotActive(s, connected)) {
+        return `${s.label} live`;
+      }
+      if (s.roadmap) {
+        return `${s.label} planned`;
+      }
+      return `${s.label} off`;
+    })
+    .join("; ");
+}
+
+function BucketSignalBar({ slots, connected }: { slots: SignalSlot[]; connected: Set<string> }) {
+  return (
+    <div
+      className="mt-1.5 flex h-4 w-full gap-px overflow-hidden rounded-full bg-zinc-200/80"
+      role="img"
+      aria-label={bucketBarAriaLabel(slots, connected)}
+    >
+      {slots.map((slot) => {
+        const active = isSlotActive(slot, connected);
+        let bg = "bg-zinc-300/80";
+        if (active) {
+          bg = "bg-[#E878BE]";
+        } else if (slot.roadmap) {
+          bg = "bg-zinc-300/60";
+        }
+        return (
+          <div key={slot.id} style={segmentFlexStyle(slot.impactWeight)} className={`min-h-0 min-w-[3px] ${bg}`} />
+        );
+      })}
+    </div>
+  );
+}
+
+function slotScanVisual(
+  slot: SignalSlot,
+  connected: Set<string>,
+): { char: string; glyphClass: string; chipClass: string } {
+  if (isSlotActive(slot, connected)) {
+    return { char: "●", glyphClass: "text-[#E878BE]", chipClass: "" };
+  }
+  if (slot.roadmap) {
+    return { char: "–", glyphClass: "text-zinc-400/70", chipClass: "opacity-45" };
+  }
+  return { char: "○", glyphClass: "text-zinc-400", chipClass: "opacity-75" };
+}
+
+function CompactSignalColumn({
+  title,
+  slots,
+  connected,
+}: {
+  title: string;
+  slots: SignalSlot[];
+  connected: Set<string>;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-zinc-600 sm:text-sm">{title}</p>
+      <BucketSignalBar slots={slots} connected={connected} />
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 leading-snug sm:gap-x-4">
+        {slots.map((slot) => {
+          const { char, glyphClass, chipClass } = slotScanVisual(slot, connected);
+          return (
+            <span
+              key={slot.id}
+              className={`inline-flex items-baseline gap-1 text-sm font-semibold sm:text-base ${chipClass}`}
+            >
+              <span className={`shrink-0 text-base leading-none sm:text-lg ${glyphClass}`} aria-hidden>
+                {char}
+              </span>
+              <span className="text-zinc-900">{slot.label}</span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnectors }: Props) {
   const apiBase = productApiBase();
   const qc = useQueryClient();
@@ -75,8 +165,6 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
   const connected = new Set(connectedConnectors.map((c) => c.toLowerCase()));
   const pctLive = signalStrengthPercentLive(connected);
   const coverageUi = useMemo(() => currentCoveragePresentation(pctLive), [pctLive]);
-
-  const thermSlots = orderedThermometerSlots(connected);
 
   const [banner, setBanner] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -242,118 +330,88 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
     "inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm transition hover:bg-zinc-50";
 
   return (
-    <div className="space-y-12 lg:space-y-14">
-      <div className={`${workspaceFlatPanel} p-8 sm:p-10 lg:p-12`}>
-        <div className="flex flex-col gap-12 lg:flex-row lg:items-stretch lg:gap-14 xl:gap-16">
-          <div className="flex min-w-0 flex-1 gap-3 sm:gap-4 lg:gap-5">
-            <div
-              className="mx-auto flex h-[min(52vh,22rem)] w-4 shrink-0 flex-col gap-px overflow-hidden rounded-full bg-zinc-200/80 sm:h-[min(50vh,24rem)] lg:mx-0 lg:h-[min(56vh,26rem)]"
-              role="img"
-              aria-label={`Signal ladder, signal strength ${coverageUi.label}, ${pctLive} percent of live tools`}
-            >
-              {thermSlots.map((slot, i) => (
-                <ThermometerSegment
-                  key={slot.id}
-                  slot={slot}
-                  connected={connected}
-                  isFirst={i === 0}
-                  isLast={i === thermSlots.length - 1}
-                />
-              ))}
-            </div>
-
-            <div className="flex min-h-[min(52vh,22rem)] min-w-0 flex-1 flex-col sm:min-h-[min(50vh,24rem)] lg:min-h-[min(56vh,26rem)]">
-              {thermSlots.map((slot) => (
-                <div
-                  key={`label-${slot.id}`}
-                  style={segmentFlexStyle(slot.impactWeight)}
-                  className="flex min-h-0 flex-col justify-center border-b border-zinc-100 py-2.5 first:pt-0 last:border-b-0 last:pb-0"
-                >
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold leading-snug text-zinc-900 sm:text-lg">{slot.label}</p>
-                      <ThermometerRowStatus slot={slot} connected={connected} />
-                    </div>
-                    <div className="flex min-w-[8.5rem] flex-1 flex-col items-end justify-center sm:min-w-[10rem]">
-                      <p className="text-right text-sm font-medium text-zinc-600 sm:text-base">
-                        {signalSliceConcept(slot.impactWeight)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex w-full shrink-0 flex-col justify-start border-t border-zinc-100 pt-10 lg:w-[min(100%,17.5rem)] lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.1em] text-zinc-500">Signal strength</p>
-              <p
-                className={`mt-2 text-4xl font-bold tracking-tight sm:text-5xl ${coverageUi.toneClass}`}
-              >
-                {coverageUi.label}
-              </p>
-            </div>
-          </div>
+    <div className="space-y-6 lg:space-y-8">
+      <div className={`${workspaceFlatPanel} p-6 sm:p-8 lg:p-10`}>
+        <div className="border-b border-zinc-100 pb-4 text-center lg:pb-3">
+          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">Signal strength</p>
+          <p
+            className={`mt-1 text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl ${coverageUi.toneClass}`}
+          >
+            {coverageUi.label}
+          </p>
+          <p
+            className={`mx-auto mt-3 max-w-2xl text-center text-sm leading-relaxed sm:text-base ${coverageUi.toneClass}`}
+          >
+            {coverageUi.headlineSentence}
+          </p>
         </div>
 
-        <div className="mt-10 border-t border-zinc-100 pt-10 lg:mt-12 lg:pt-12">
-          <h2 className="text-xl font-bold tracking-tight text-zinc-900">Actions</h2>
-          <p className="mt-2 max-w-2xl text-sm text-zinc-600">
-            Steps that strengthen your signals: connect tools you&apos;ve already added, then fill gaps in Edit tools
-            where needed.
-          </p>
-          {!stackPrefsReady ? (
-            <div className="mt-4 flex min-h-[4rem] items-center gap-3 text-sm text-zinc-500">
-              <div
-                className="h-5 w-5 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
-                aria-hidden
-              />
-              Loading actions…
-            </div>
-          ) : workspaceActions.length > 0 ? (
-            <ul className="mt-5 space-y-3">
-              {workspaceActions.map((action) => (
-                <li
-                  key={action.id}
-                  className="flex flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-                >
-                  {action.kind === "expand_stack" ? (
-                    <>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-zinc-900">
-                          <span className="mr-1.5 inline-block" aria-hidden>
-                            ⚠️
-                          </span>
-                          {action.title}
+        <div className="grid gap-4 pt-4 sm:gap-5 lg:grid-cols-2 lg:gap-8 lg:pt-4 xl:gap-10">
+          <CompactSignalColumn title="People signals" slots={PEOPLE_SIGNAL_SLOTS} connected={connected} />
+          <CompactSignalColumn title="System signals" slots={SYSTEM_SIGNAL_SLOTS} connected={connected} />
+        </div>
+      </div>
+
+      <div className={`${workspaceFlatPanel} p-6 sm:p-8 lg:p-10`}>
+        <div className="flex flex-wrap items-start justify-between gap-3 sm:items-center">
+          <h2 className="min-w-0 text-xl font-bold tracking-tight text-zinc-900">
+            Actions to improve your signals
+          </h2>
+          <button type="button" className={btnSecondary} onClick={openEditTools}>
+            Edit tools
+          </button>
+        </div>
+        {!stackPrefsReady ? (
+          <div className="mt-4 flex min-h-[4rem] items-center gap-3 text-sm text-zinc-500">
+            <div
+              className="h-5 w-5 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
+              aria-hidden
+            />
+            Loading actions…
+          </div>
+        ) : workspaceActions.length > 0 ? (
+          <ul className="mt-4 space-y-2">
+            {workspaceActions.map((action) => (
+              <li
+                key={action.id}
+                className="flex flex-col gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+              >
+                {action.kind === "expand_stack" ? (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-zinc-900">
+                        <span className="mr-1.5 inline-block" aria-hidden>
+                          ⚠️
+                        </span>
+                        {action.title}
+                      </p>
+                      <p className="mt-1 text-sm leading-relaxed text-zinc-600">{action.body}</p>
+                    </div>
+                    <button type="button" className={btnSecondary} onClick={openEditTools}>
+                      Edit tools
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-zinc-900">{action.title}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-zinc-600">{action.body}</p>
+                      {!action.configured ? (
+                        <p className="mt-2 text-xs text-amber-900">
+                          {action.provider === "github" && "GitHub isn’t configured on the API yet."}
+                          {action.provider === "linear" && "Linear OAuth isn’t configured on the API yet."}
+                          {action.provider === "slack" && "Slack OAuth isn’t configured on the API yet."}
                         </p>
-                        <p className="mt-1 text-sm leading-relaxed text-zinc-600">{action.body}</p>
-                      </div>
-                      <button type="button" className={btnSecondary} onClick={openEditTools}>
-                        Edit tools
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-zinc-900">{action.title}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-zinc-600">{action.body}</p>
-                        {!action.configured ? (
-                          <p className="mt-2 text-xs text-amber-900">
-                            {action.provider === "github" && "GitHub isn’t configured on the API yet."}
-                            {action.provider === "linear" && "Linear OAuth isn’t configured on the API yet."}
-                            {action.provider === "slack" && "Slack OAuth isn’t configured on the API yet."}
-                          </p>
-                        ) : null}
-                      </div>
-                      {action.configured ? (
-                        <a className={`${btnConnectSmall} shrink-0 sm:px-5`} href={action.installUrl}>
-                          {action.title}
-                        </a>
                       ) : null}
-                    </>
-                  )}
-                </li>
+                    </div>
+                    {action.configured ? (
+                      <a className={`${btnConnectSmall} shrink-0 sm:px-5`} href={action.installUrl}>
+                        {action.title}
+                      </a>
+                    ) : null}
+                  </>
+                )}
+              </li>
               ))}
             </ul>
           ) : (
@@ -362,40 +420,37 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
               steps pending right now.
             </p>
           )}
+      </div>
+
+      <div className={`${workspaceFlatPanel} p-6 sm:p-8 lg:p-10`}>
+        <div className="flex flex-wrap items-start justify-between gap-3 sm:items-center">
+          <h2 className="text-xl font-bold tracking-tight text-zinc-900">Connector status</h2>
+          <button type="button" className={btnSecondary} onClick={openEditTools}>
+            Edit tools
+          </button>
         </div>
 
-        <div className="mt-10 border-t border-zinc-100 pt-10 lg:mt-12 lg:pt-12">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-xl font-bold tracking-tight text-zinc-900">Stack coverage</h2>
-            <button
-              type="button"
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm transition hover:bg-zinc-50"
-              onClick={openEditTools}
-            >
-              Edit tools
-            </button>
-          </div>
-
+        <div className="mt-4 space-y-4">
           {useMockConnectors ? (
-            <p className="mt-4 rounded-lg border-l-4 border-rose-400 bg-rose-50 py-3 pl-4 pr-4 text-sm text-rose-900">
+            <p className="rounded-lg border-l-4 border-rose-400 bg-rose-50 py-3 pl-4 pr-4 text-sm text-rose-900">
               Development mode: mock connectors. OAuth flows may still hit real services; data can be sample-only.
             </p>
           ) : null}
 
           {banner ? (
-            <div className="mt-4 rounded-lg border border-amber-200/90 bg-amber-50 py-3 px-4 text-sm text-amber-950">
+            <div className="rounded-lg border border-amber-200/90 bg-amber-50 py-3 px-4 text-sm text-amber-950">
               {banner}
             </div>
           ) : null}
 
           {connectorsQ.isError ? (
-            <p className="mt-4 rounded-lg border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-900">
+            <p className="rounded-lg border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-900">
               {(connectorsQ.error as Error).message}
             </p>
           ) : null}
 
           {onboardingQ.isPending && savedStackPick == null ? (
-            <div className="mt-6 flex min-h-[8rem] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50">
+            <div className="flex min-h-[8rem] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50">
               <div className="flex flex-col items-center gap-3">
                 <div
                   className="h-8 w-8 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
@@ -405,7 +460,7 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
               </div>
             </div>
           ) : connectorsQ.isPending ? (
-            <div className="mt-6 flex min-h-[12rem] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50">
+            <div className="flex min-h-[12rem] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50">
               <div className="flex flex-col items-center gap-3">
                 <div
                   className="h-8 w-8 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
@@ -417,16 +472,16 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
           ) : (
             <>
               {stackToolRows.length === 0 ? (
-                <p className="mt-6 text-sm text-zinc-600">
+                <p className="text-sm text-zinc-600">
                   Nothing in your stack yet. Use <span className="font-medium text-zinc-900">Edit tools</span> to add
                   tools—each selection appears here.
                 </p>
               ) : (
-                <div className="mt-6 grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                   {stackToolRows.map((row) => (
                     <StackToolCard
                       key={row.key}
-                      groupKey={row.groupKey}
+                      groupKeys={row.groupKeys}
                       toolId={row.toolId}
                       apiBase={apiBase}
                       connected={connected}
@@ -455,34 +510,78 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
   );
 }
 
+/** Signal catalog slot for roadmap strip (docs / calls / calendar). */
+function roadmapSlotIdForStackRow(groupKeys: (keyof ToolPickState)[]): string | null {
+  if (groupKeys.includes("docs")) {
+    return "docs";
+  }
+  if (groupKeys.includes("calls")) {
+    return "calls";
+  }
+  if (groupKeys.includes("calendars")) {
+    return "calendar";
+  }
+  return null;
+}
+
+/** Pick one group for comm/PM/engineering “live tool today” copy when multiple groups share a row. */
+function primaryGroupForNarrative(groupKeys: (keyof ToolPickState)[]): keyof ToolPickState {
+  const priority: (keyof ToolPickState)[] = [
+    "communication",
+    "pm",
+    "engineering",
+    "calls",
+    "docs",
+    "calendars",
+  ];
+  for (const k of priority) {
+    if (groupKeys.includes(k)) {
+      return k;
+    }
+  }
+  return groupKeys[0]!;
+}
+
 function comingSoonDescriptionForTool(
-  groupKey: keyof ToolPickState,
+  groupKeys: (keyof ToolPickState)[],
   toolId: string,
   slotById: Map<string, SignalSlot>,
 ): string {
-  if (groupKey === "calls") {
+  if (toolId === "notion") {
+    if (groupKeys.includes("docs")) {
+      return slotById.get("docs")?.description ?? "Documentation ingestion is planned as we expand connectors.";
+    }
+    return (
+      slotById.get("docs")?.description ??
+      "Notion for plans and docs is planned as we expand PM and documentation connectors."
+    );
+  }
+
+  const g = primaryGroupForNarrative(groupKeys);
+
+  if (g === "calls") {
     return slotById.get("calls")?.description ?? "Recordings and transcripts are planned as we expand connectors.";
   }
-  if (groupKey === "docs") {
+  if (g === "docs") {
     return slotById.get("docs")?.description ?? "Documentation ingestion is planned as we expand connectors.";
   }
-  if (groupKey === "calendars") {
+  if (g === "calendars") {
     return slotById.get("calendar")?.description ?? "Calendar intelligence is planned as we expand connectors.";
   }
-  if (groupKey === "communication" && toolId !== "slack") {
+  if (g === "communication" && toolId !== "slack") {
     return "Slack is the live integration today; we’ll add more communication tools as connectors ship.";
   }
-  if (groupKey === "pm" && toolId !== "linear") {
+  if (g === "pm" && toolId !== "linear") {
     return "Linear is the live integration today; we’ll add more PM tools as connectors ship.";
   }
-  if (groupKey === "engineering" && toolId !== "github") {
+  if (g === "engineering" && toolId !== "github") {
     return "GitHub is the live integration today; we’ll add more code hosts as connectors ship.";
   }
   return "Not available to connect yet.";
 }
 
 function StackToolCard({
-  groupKey,
+  groupKeys,
   toolId,
   apiBase,
   connected,
@@ -492,7 +591,7 @@ function StackToolCard({
   linDisconnect,
   slackDisconnect,
 }: {
-  groupKey: keyof ToolPickState;
+  groupKeys: (keyof ToolPickState)[];
   toolId: string;
   apiBase: string;
   connected: Set<string>;
@@ -503,7 +602,7 @@ function StackToolCard({
   slackDisconnect: UseMutationResult<void, Error, void, unknown>;
 }) {
   const name = toolLabelFromOnboarding(toolId);
-  const categoryLabel = ONBOARDING_TOOL_GROUPS.find((g) => g.key === groupKey)?.label ?? "";
+  const categoryLabel = categoryLabelsForStackRow(groupKeys);
 
   const liveSlot: SignalSlot | undefined =
     toolId === "slack"
@@ -530,7 +629,6 @@ function StackToolCard({
           </div>
         </div>
         <p className="mt-3 text-sm leading-relaxed text-zinc-600">{liveSlot.description}</p>
-        <p className="mt-3 text-sm text-zinc-600">{signalSliceConcept(liveSlot.impactWeight)}</p>
         <div className="mt-auto pt-4">
           {liveSlot.liveConnector === "github" ? (
             <LiveConnectorActions
@@ -565,8 +663,7 @@ function StackToolCard({
     );
   }
 
-  const roadmapSlotId =
-    groupKey === "calls" ? "calls" : groupKey === "docs" ? "docs" : groupKey === "calendars" ? "calendar" : null;
+  const roadmapSlotId = roadmapSlotIdForStackRow(groupKeys);
   const roadmapSlot = roadmapSlotId ? slotById.get(roadmapSlotId) : undefined;
 
   return (
@@ -580,11 +677,8 @@ function StackToolCard({
         </div>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-zinc-600">
-        {roadmapSlot?.description ?? comingSoonDescriptionForTool(groupKey, toolId, slotById)}
+        {roadmapSlot?.description ?? comingSoonDescriptionForTool(groupKeys, toolId, slotById)}
       </p>
-      {roadmapSlot ? (
-        <p className="mt-3 text-sm text-zinc-600">{signalSliceConcept(roadmapSlot.impactWeight)}</p>
-      ) : null}
       <div className="mt-auto pt-4">
         <p className="text-xs text-zinc-500">Shipping later.</p>
         <button type="button" disabled className={`${disabledConnectClass} mt-3 w-full`}>
@@ -641,50 +735,4 @@ function LiveConnectorActions({
       {connectLabel}
     </a>
   );
-}
-
-function ThermometerSegment({
-  slot,
-  connected,
-  isFirst,
-  isLast,
-}: {
-  slot: SignalSlot;
-  connected: Set<string>;
-  isFirst: boolean;
-  isLast: boolean;
-}) {
-  const active = isSlotActive(slot, connected);
-  const round =
-    isFirst && isLast ? "rounded-full" : isFirst ? "rounded-t-full" : isLast ? "rounded-b-full" : "";
-
-  let inner: string;
-  if (slot.roadmap) {
-    inner = "bg-zinc-300/50";
-  } else if (active) {
-    inner = "bg-[#E878BE]";
-  } else {
-    inner = "bg-zinc-200";
-  }
-
-  return (
-    <div style={segmentFlexStyle(slot.impactWeight)} className="min-h-0 w-full min-h-[4px]">
-      <div
-        className={`h-full w-full ${round} ${inner}`}
-        title={`${slot.label}: ${signalSliceConcept(slot.impactWeight)}`}
-      />
-    </div>
-  );
-}
-
-/** Thermometer rows: On/Off only — roadmap slots omit status; connect/disconnect lives on stack cards. */
-function ThermometerRowStatus({ slot, connected }: { slot: SignalSlot; connected: Set<string> }) {
-  if (slot.roadmap) {
-    return null;
-  }
-  const active = isSlotActive(slot, connected);
-  if (active) {
-    return <p className="mt-1 text-sm text-zinc-600">On</p>;
-  }
-  return <p className="mt-1 text-sm text-amber-700">Off</p>;
 }
