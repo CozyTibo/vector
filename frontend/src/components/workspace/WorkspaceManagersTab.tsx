@@ -20,28 +20,17 @@ import {
   fetchOnboarding,
   fetchSlackWorkspaceMembers,
   patchOnboarding,
-  type SlackCollaboratorMember,
   type SlackWorkspaceMember,
 } from "../../lib/onboardingApi";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
-import { defaultTeamsFromOnboarding, type ManagerTeam } from "../../lib/workspaceManagerTeams";
+import {
+  defaultTeamsFromOnboarding,
+  membersOrderedWithManagerFirst,
+  type ManagerTeam,
+} from "../../lib/workspaceManagerTeams";
 import SlackUserAvatar from "./SlackUserAvatar";
 
 export type { ManagerTeam };
-
-/** Renders manager first when set, then the rest in their existing order. */
-function membersOrderedWithManagerFirst(team: ManagerTeam): SlackCollaboratorMember[] {
-  const mgrId = team.manager_slack_user_id;
-  if (!mgrId) {
-    return team.members;
-  }
-  const manager = team.members.find((m) => m.slack_user_id === mgrId);
-  if (!manager) {
-    return team.members;
-  }
-  const others = team.members.filter((m) => m.slack_user_id !== mgrId);
-  return [manager, ...others];
-}
 
 /** Name + at least one member + manager chosen from members (same rules as save validation). */
 function isTeamStructurallyComplete(team: ManagerTeam): boolean {

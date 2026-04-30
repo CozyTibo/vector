@@ -8,6 +8,20 @@ export type ManagerTeam = {
   manager_slack_user_id: string | null;
 };
 
+/** Renders manager first when set, then the rest in their existing order. */
+export function membersOrderedWithManagerFirst(team: ManagerTeam): SlackCollaboratorMember[] {
+  const mgrId = team.manager_slack_user_id;
+  if (!mgrId) {
+    return team.members;
+  }
+  const manager = team.members.find((m) => m.slack_user_id === mgrId);
+  if (!manager) {
+    return team.members;
+  }
+  const others = team.members.filter((m) => m.slack_user_id !== mgrId);
+  return [manager, ...others];
+}
+
 /** Teams from onboarding answers: persisted `workspace_manager_teams`, else Slack-derived default. */
 export function defaultTeamsFromOnboarding(answers: Record<string, unknown>): ManagerTeam[] {
   const existing = answers.workspace_manager_teams as { teams?: ManagerTeam[] } | undefined;
