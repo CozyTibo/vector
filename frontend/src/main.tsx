@@ -32,6 +32,7 @@ import ActorDetailPage from "./pages/debug/ActorDetailPage.tsx";
 import ArtifactDetailPage from "./pages/debug/ArtifactDetailPage.tsx";
 import CanonicalDebugPage from "./pages/debug/CanonicalDebugPage.tsx";
 import AppHomePage from "./pages/app/AppHomePage.tsx";
+import AppTeamSpacePage from "./pages/app/AppTeamSpacePage.tsx";
 import AppTeamsPage from "./pages/app/AppTeamsPage.tsx";
 import OnboardingPage from "./pages/app/OnboardingPage.tsx";
 import LandingPage from "./pages/LandingPage.tsx";
@@ -67,6 +68,7 @@ createRoot(document.getElementById("root")!).render(
 
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<AppHomePage />} />
+            <Route path="/app/teams/:teamId" element={<AppTeamSpacePage />} />
             <Route path="/app/teams" element={<AppTeamsPage />} />
             <Route path="/app/onboarding" element={<OnboardingPage />} />
             <Route path="/app/connectors" element={<Navigate to="/app" replace />} />

@@ -1,7 +1,6 @@
 import {
   marketingBody,
   workspaceAppBreadcrumbCurrentLink,
-  workspaceAppBreadcrumbProduct,
   workspaceAppBreadcrumbSep,
   workspaceAppPageHeader,
   workspaceAppPageMain,
@@ -25,12 +24,16 @@ export default function AppTeamsPage() {
     );
   }
 
+  const companyName = me.data.company_name.trim() || "Workspace";
+
   return (
     <main className={workspaceAppPageMain}>
       <header className={workspaceAppPageHeader}>
         <nav aria-label="Breadcrumb">
           <h1 className="flex min-w-0 flex-nowrap items-baseline justify-start gap-x-1 leading-none">
-            <span className={workspaceAppBreadcrumbProduct}>Vector</span>
+            <span className="min-w-0 max-w-[min(100%,24rem)] shrink truncate text-sm font-normal text-zinc-500">
+              {companyName}
+            </span>
             <span className={workspaceAppBreadcrumbSep} aria-hidden="true">
               /
             </span>
