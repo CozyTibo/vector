@@ -7,6 +7,7 @@ import {
   workspaceAppPageMain,
   workspaceAppShellMaxWidth,
 } from "../../components/marketing/marketingStyles";
+import { workspaceSpinnerHero } from "../../components/workspace/workspaceUiTokens";
 import WorkspaceSignalsTab from "../../components/workspace/WorkspaceSignalsTab";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
@@ -19,10 +20,7 @@ export default function AppHomePage() {
       <main
         className={`relative mx-auto flex w-full ${workspaceAppShellMaxWidth} flex-col items-center justify-center px-6 py-16 sm:px-10 lg:px-12`}
       >
-        <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
-          aria-hidden
-        />
+        <div className={workspaceSpinnerHero} aria-hidden />
         <p className={`${marketingBody} mt-5 text-center text-zinc-600`}>Loading your workspace…</p>
       </main>
     );

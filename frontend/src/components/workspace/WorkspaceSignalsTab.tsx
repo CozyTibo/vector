@@ -16,6 +16,15 @@ import {
   type ToolPickState,
 } from "../onboarding/onboardingToolGroups";
 import { workspaceFlatPanel } from "../marketing/marketingStyles";
+import {
+  workspacePrimaryButton,
+  workspacePrimaryButtonSm,
+  workspaceSecondaryButton,
+  workspaceSignalBarActive,
+  workspaceSignalGlyphActive,
+  workspaceSpinner,
+  workspaceSpinnerLg,
+} from "./workspaceUiTokens";
 import EditToolsModal from "./EditToolsModal";
 import { buildSignalWorkspaceActions } from "./signalWorkspaceActions";
 import { currentCoveragePresentation } from "./signalCoverageCopy";
@@ -41,11 +50,9 @@ function segmentFlexStyle(weight: number): CSSProperties {
   return { flex: `${weight} 1 0%`, minHeight: 0 };
 }
 
-const btnConnect =
-  "inline-flex w-full items-center justify-center rounded-lg bg-[#E878BE] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#df6aad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E878BE]";
+const btnConnect = workspacePrimaryButton;
 
-const btnConnectSmall =
-  "inline-flex items-center justify-center rounded-lg bg-[#E878BE] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#df6aad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E878BE] sm:px-4 sm:py-2 sm:text-sm";
+const btnConnectSmall = workspacePrimaryButtonSm;
 
 const disconnectBtnClass =
   "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50";
@@ -94,7 +101,7 @@ function BucketSignalBar({ slots, connected }: { slots: SignalSlot[]; connected:
         const active = isSlotActive(slot, connected);
         let bg = "bg-zinc-300/80";
         if (active) {
-          bg = "bg-[#E878BE]";
+          bg = workspaceSignalBarActive;
         } else if (slot.roadmap) {
           bg = "bg-zinc-300/60";
         }
@@ -111,7 +118,7 @@ function slotScanVisual(
   connected: Set<string>,
 ): { char: string; glyphClass: string; chipClass: string } {
   if (isSlotActive(slot, connected)) {
-    return { char: "●", glyphClass: "text-[#E878BE]", chipClass: "" };
+    return { char: "●", glyphClass: workspaceSignalGlyphActive, chipClass: "" };
   }
   if (slot.roadmap) {
     return { char: "–", glyphClass: "text-zinc-400/70", chipClass: "opacity-45" };
@@ -326,9 +333,6 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
     connectorsQ.isFetched,
   ]);
 
-  const btnSecondary =
-    "inline-flex shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm transition hover:bg-zinc-50";
-
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className={`${workspaceFlatPanel} p-6 sm:p-8 lg:p-10`}>
@@ -357,14 +361,14 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
           <h2 className="min-w-0 text-xl font-bold tracking-tight text-zinc-900">
             Actions to improve your signals
           </h2>
-          <button type="button" className={btnSecondary} onClick={openEditTools}>
+          <button type="button" className={workspaceSecondaryButton} onClick={openEditTools}>
             Edit tools
           </button>
         </div>
         {!stackPrefsReady ? (
           <div className="mt-4 flex min-h-[4rem] items-center gap-3 text-sm text-zinc-500">
             <div
-              className="h-5 w-5 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
+              className={workspaceSpinner}
               aria-hidden
             />
             Loading actions…
@@ -387,7 +391,7 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
                       </p>
                       <p className="mt-1 text-sm leading-relaxed text-zinc-600">{action.body}</p>
                     </div>
-                    <button type="button" className={btnSecondary} onClick={openEditTools}>
+                    <button type="button" className={workspaceSecondaryButton} onClick={openEditTools}>
                       Edit tools
                     </button>
                   </>
@@ -425,7 +429,7 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
       <div className={`${workspaceFlatPanel} p-6 sm:p-8 lg:p-10`}>
         <div className="flex flex-wrap items-start justify-between gap-3 sm:items-center">
           <h2 className="text-xl font-bold tracking-tight text-zinc-900">Connector status</h2>
-          <button type="button" className={btnSecondary} onClick={openEditTools}>
+          <button type="button" className={workspaceSecondaryButton} onClick={openEditTools}>
             Edit tools
           </button>
         </div>
@@ -453,7 +457,7 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
             <div className="flex min-h-[8rem] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50">
               <div className="flex flex-col items-center gap-3">
                 <div
-                  className="h-8 w-8 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
+                  className={workspaceSpinnerLg}
                   aria-hidden
                 />
                 <p className="text-sm text-zinc-600">Loading stack preferences…</p>
@@ -463,7 +467,7 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
             <div className="flex min-h-[12rem] items-center justify-center rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50">
               <div className="flex flex-col items-center gap-3">
                 <div
-                  className="h-8 w-8 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
+                  className={workspaceSpinnerLg}
                   aria-hidden
                 />
                 <p className="text-sm text-zinc-600">Loading connector status…</p>

@@ -28,7 +28,7 @@ export function currentCoveragePresentation(pct: number): CoveragePresentation {
   }
   return {
     label: "Low",
-    toneClass: "text-rose-600",
+    toneClass: "text-red-600",
     headlineSentence: "Your signals are still light—connect priority tools to improve coverage.",
   };
 }

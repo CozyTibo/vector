@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import vectorHeroAvatarUrl from "../assets/vector-white-bg.png";
-import { marketingAccentLink, marketingMutedLink, workspaceAppShellMaxWidth } from "./marketing/marketingStyles";
+import { workspaceAppShellMaxWidth } from "./marketing/marketingStyles";
+import { workspaceAuthGateLink, workspaceNavLinkCurrent, workspaceNavLinkRest } from "./workspace/workspaceUiTokens";
 
 type Props = {
   email?: string;
@@ -77,7 +78,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E878BE]"
+        className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400"
         aria-expanded={open}
         aria-haspopup="menu"
         aria-controls={open ? menuId : undefined}
@@ -134,13 +135,10 @@ export default function PublicNav({ email, onLogout, showConnectors = false }: P
         <nav className="flex min-w-0 max-w-[min(100%,36rem)] flex-wrap items-center justify-end gap-3 text-sm font-medium sm:gap-4">
           {showConnectors ? (
             <>
-              <Link to="/app" className={onSignals ? `${marketingAccentLink} text-sm` : `${marketingMutedLink} text-sm`}>
+              <Link to="/app" className={onSignals ? workspaceNavLinkCurrent : workspaceNavLinkRest}>
                 Signals
               </Link>
-              <Link
-                to="/app/teams"
-                className={onTeams ? `${marketingAccentLink} text-sm` : `${marketingMutedLink} text-sm`}
-              >
+              <Link to="/app/teams" className={onTeams ? workspaceNavLinkCurrent : workspaceNavLinkRest}>
                 Teams
               </Link>
             </>
@@ -150,7 +148,7 @@ export default function PublicNav({ email, onLogout, showConnectors = false }: P
               <AccountMenu onLogout={onLogout} />
             ) : null
           ) : (
-            <Link to="/login" className={marketingAccentLink}>
+            <Link to="/login" className={workspaceAuthGateLink}>
               Sign in
             </Link>
           )}

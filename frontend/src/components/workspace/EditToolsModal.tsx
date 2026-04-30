@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ONBOARDING_TOOL_GROUPS, type ToolPickState } from "../onboarding/onboardingToolGroups";
 import { ToolLogo } from "./toolLogos";
+import { workspacePrimaryButtonCompact } from "./workspaceUiTokens";
 import {
   cloneToolPick,
   isLiveConnectorToolId,
@@ -104,7 +105,7 @@ export default function EditToolsModal({ open, onClose, initialPick, connected, 
                       >
                         <input
                           type="checkbox"
-                          className="h-4 w-4 shrink-0 rounded border-zinc-300 text-[#E878BE] focus:ring-[#E878BE] disabled:cursor-not-allowed"
+                          className="h-4 w-4 shrink-0 rounded border-zinc-300 accent-zinc-700 focus:ring-2 focus:ring-zinc-400/35 focus:ring-offset-0 disabled:cursor-not-allowed"
                           checked={checked}
                           disabled={locked}
                           onChange={() => toggle(group.key, item.id)}
@@ -132,7 +133,7 @@ export default function EditToolsModal({ open, onClose, initialPick, connected, 
           </button>
           <button
             type="button"
-            className="rounded-lg bg-[#E878BE] px-4 py-2 text-sm font-semibold text-white hover:bg-[#df6aad]"
+            className={workspacePrimaryButtonCompact}
             onClick={handleSave}
           >
             Save

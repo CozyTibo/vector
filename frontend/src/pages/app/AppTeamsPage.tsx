@@ -6,6 +6,7 @@ import {
   workspaceAppPageHeader,
   workspaceAppPageMain,
 } from "../../components/marketing/marketingStyles";
+import { workspaceSpinnerHero } from "../../components/workspace/workspaceUiTokens";
 import WorkspaceManagersTab from "../../components/workspace/WorkspaceManagersTab";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
@@ -18,10 +19,7 @@ export default function AppTeamsPage() {
       <main
         className={`${workspaceAppPageMain} flex flex-col items-center justify-center py-16 sm:py-20`}
       >
-        <div
-          className="h-9 w-9 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
-          aria-hidden
-        />
+        <div className={workspaceSpinnerHero} aria-hidden />
         <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading teams…</p>
       </main>
     );
@@ -49,10 +47,6 @@ export default function AppTeamsPage() {
           </h1>
         </nav>
       </header>
-
-      <p className="max-w-2xl text-sm leading-snug text-zinc-500 sm:text-base sm:leading-snug">
-        Build teams from your Slack roster—names and members save for everyone here.
-      </p>
 
       <div className="mt-4 lg:mt-6">
         <WorkspaceManagersTab />

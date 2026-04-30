@@ -36,11 +36,11 @@ export const workspaceAppBreadcrumbSep =
 
 /** Current page crumb — same `text-sm` as `workspaceAppBreadcrumbProduct`; use with `<a href="#">` + preventDefault until routes exist. */
 export const workspaceAppBreadcrumbCurrentLink =
-  "shrink-0 text-sm font-normal text-zinc-900 no-underline underline-offset-2 transition-colors hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E878BE]";
+  "shrink-0 text-sm font-normal text-zinc-900 no-underline underline-offset-2 transition-colors hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400";
 
 /** Ancestor crumb (future) — same size as product label; use with real `href` / router `Link`. */
 export const workspaceAppBreadcrumbAncestorLink =
-  "shrink-0 text-sm font-normal text-zinc-500 no-underline underline-offset-2 transition-colors hover:text-zinc-800 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E878BE]";
+  "shrink-0 text-sm font-normal text-zinc-500 no-underline underline-offset-2 transition-colors hover:text-zinc-800 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400";
 
 /** Large thank-you / waitlist panel */
 export const marketingCardLg =

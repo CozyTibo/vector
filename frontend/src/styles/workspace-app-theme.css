@@ -1,0 +1,20 @@
+/**
+ * Authenticated app shell only — applied via `.workspace-app` on the RequireAuth layout.
+ * Landing, login, signup, and marketing pages do not use this class.
+ */
+.workspace-app {
+  --workspace-text-primary: #18181b;
+  --workspace-text-muted: #71717a;
+  --workspace-bg: #fafaf9;
+  --workspace-surface: #ffffff;
+  --workspace-border-subtle: #e4e4e7;
+  /* Semantic data / status (not brand) */
+  --workspace-success: #059669;
+  --workspace-warning: #d97706;
+  --workspace-danger: #dc2626;
+  --workspace-inactive: #a1a1aa;
+  /* Primary CTAs — workspace only (operational blue; not marketing pink) */
+  --color-action-primary: #2563eb;
+  --color-action-hover: #1d4ed8;
+  --color-action-active: #1e40af;
+}

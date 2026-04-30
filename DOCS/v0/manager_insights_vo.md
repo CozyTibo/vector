@@ -15,13 +15,13 @@
 For each run, Vector pulls fresh data (nothing precomputed):
 
 - **Slack** `data.fetch_slack_activity`
-    **We pull:**
+  **We pull:**
   - Last **N days messages authored by the user**
   - Thread participation (replies vs root messages)
   - Channels they’re active in
   - Mentions (`@user`) and replies received
   - Reaction counts (basic signal of engagement)
-    **We keep (after filtering + caps):**
+  **We keep (after filtering + caps):**
   - `message_samples` (max ~30–50)
     - short cleaned snippets (no full dumps)
   - `activity_counts`
@@ -39,18 +39,18 @@ For each run, Vector pulls fresh data (nothing precomputed):
   - **Coaching Questions**
     - communication gaps / overload / silence
 - **Linear** `data.fetch_github_activity`
-    **We pull:**
+  **We pull:**
   - Issues assigned to the user
   - Issues completed in window
   - Priority / urgent issues
   - Cycle info (if exists)
   - Last updated timestamps
-    **We keep:**
+  **We keep:**
   - `issues_completed` (count)
   - `open_urgent_items` (count)
   - `active_projects` (derived from issue grouping)
   - lightweight issue summaries (titles only)
-    **What this becomes in the report:**
+  **What this becomes in the report:**
   - **Delivery Pulse**
     - core output signal
   - **Open Action Items**
@@ -86,7 +86,7 @@ For each run, Vector pulls fresh data (nothing precomputed):
     - “Merged PR: X”
     - “Reviewed critical change in Y”
 - **Gemini**  `data.fetch_call_activity`
-    (*Assuming Google Meet / transcripts / call summaries*)
+  (*Assuming Google Meet / transcripts / call summaries*)
   ### We pull
   - Calls attended in window
   - Call titles / context
@@ -110,15 +110,15 @@ For each run, Vector pulls fresh data (nothing precomputed):
   - **Raw highlights**
     - “Discussed rollout strategy for X”
 - **Notion** `data.fetch_notion_content`
-    **We pull:**
+  **We pull:**
   - Pages owned or edited by user
   - Relevant project docs (linked to work)
   - Last edited timestamps
-    **We keep:**
+  **We keep:**
   - Page titles
   - Short extracted summaries (first lines / headings)
   - Edit activity counts
-    **What this becomes in the report:**
+  **What this becomes in the report:**
   - **Recent Wins**
     - docs shipped, specs written
   - **Execution Signals**

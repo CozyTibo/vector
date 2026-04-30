@@ -36,7 +36,7 @@ export default function RequireAuth() {
 
   if (me.isPending) {
     return (
-      <div className="font-display relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]">
+      <div className="workspace-app font-display relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-stone-50 text-[#0F0F12] antialiased selection:bg-zinc-200/60 selection:text-[#0F0F12]">
         <div className="pointer-events-none fixed inset-0">
           <div className="absolute inset-0 bg-[#FFFFFF]" />
           <div
@@ -54,7 +54,7 @@ export default function RequireAuth() {
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-5 py-12">
             <div
-              className="h-8 w-8 animate-spin rounded-full border-2 border-[#E878BE]/25 border-t-[#E878BE]"
+              className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-700"
               aria-hidden
             />
             <p className="text-center text-base text-[#52525B]">Loading…</p>
@@ -85,8 +85,8 @@ export default function RequireAuth() {
     <div
       className={
         shellScrollsWithPage
-          ? "font-display relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]"
-          : "font-display relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-[#FFFFFF] text-[#0F0F12] antialiased selection:bg-[#E878BE]/18 selection:text-[#0F0F12]"
+          ? "workspace-app font-display relative flex min-h-[100dvh] flex-col overflow-x-hidden bg-stone-50 text-[#0F0F12] antialiased selection:bg-zinc-200/60 selection:text-[#0F0F12]"
+          : "workspace-app font-display relative flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-stone-50 text-[#0F0F12] antialiased selection:bg-zinc-200/60 selection:text-[#0F0F12]"
       }
     >
       <div className="pointer-events-none fixed inset-0">

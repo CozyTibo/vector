@@ -70,7 +70,7 @@ export const SIGNAL_WEIGHT_TOTAL = WORKSPACE_SIGNAL_SLOTS.reduce((s, x) => s + x
 /**
  * Canonical top → bottom order for slots **within** a group (roadmap, connectable, or connected).
  * Full thermometer order is built dynamically so roadmap stays at the top, “can connect” in the middle,
- * and completed connectors at the bottom — avoiding a grey segment between pink bands.
+ * and completed connectors at the bottom — avoiding a grey segment between live bands.
  */
 export const THERMOMETER_SLOT_ORDER: string[] = [
   "calendar",
