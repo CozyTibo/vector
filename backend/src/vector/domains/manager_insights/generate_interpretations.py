@@ -391,6 +391,27 @@ def _validate_interpretations(
         if blocker_row_invalid:
             continue
 
+        # Models often list extra raw_highlight ids but only paste a subset into `description`.
+        # Drop uncited highlight ids so strict grounding matches what the model actually anchored.
+        effective_highlights = [h for h in canonical.based_on_highlights if h in canonical.description]
+        if canonical.based_on_highlights:
+            if (
+                not effective_highlights
+                and not canonical.based_on_gaps
+                and not canonical.based_on_blockers
+            ):
+                rejected.append(
+                    RejectedInterpretationDebug(
+                        index=i,
+                        reason="based_on_highlights ids must appear verbatim in description when they are "
+                        "the only grounding (gaps/blockers empty)",
+                        raw=raw,
+                    )
+                )
+                continue
+            if len(effective_highlights) != len(canonical.based_on_highlights):
+                canonical = canonical.model_copy(update={"based_on_highlights": effective_highlights})
+
         if not _description_cites_grounding_ids(
             canonical.description,
             based_on_gaps=list(canonical.based_on_gaps),

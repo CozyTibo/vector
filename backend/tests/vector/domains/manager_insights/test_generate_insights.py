@@ -273,6 +273,258 @@ def test_generate_insights_llm_payload_is_schema_and_grounding_validated(monkeyp
     assert out.llm_response_text is not None
 
 
+def test_resolve_bundle_work_item_id_maps_linear_ticket_to_canonical_id() -> None:
+    w = WorkItem(
+        id="linear:issue:550e8400-e29b-41d4-a716-446655440000",
+        source="linear",
+        type="issue",
+        title="NEX-5 — Integration dashboard",
+        summary=None,
+        status="open",
+        project="NEX",
+        owner=None,
+        participants=[],
+        source_ref={"identifier": "NEX-5"},
+    )
+    assert (
+        mod._resolve_bundle_work_item_id("linear:issue:NEX-5", [w])
+        == "linear:issue:550e8400-e29b-41d4-a716-446655440000"
+    )
+    assert mod._resolve_bundle_work_item_id("linear:issue:NEX-404", [w]) is None
+
+
+def test_insight_evidence_gap_boilerplate_triggers_replace_with_row_quotes(monkeypatch: Any) -> None:
+    """LLM gap-summary phrases → substitute Step-3 evidence quotes when validating."""
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    b = _bundles(run_id, tenant_id)
+    b["evidence"] = EvidenceBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        action_items=[],
+        blockers=[
+            EvidenceItem(
+                id="blocker:z",
+                kind="blocker",
+                statement="War room: blocked on approval",
+                evidence="War room: blocked on approval",
+                source_work_item_id="calls:c1",
+                source_connector="calls",
+                source_type="call",
+                source_ref={},
+                linked_work_items=[],
+            )
+        ],
+        decisions=[],
+        discarded_without_evidence=0,
+    )
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs: Any) -> Any:
+            del kwargs
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=(
+                                '{"insights":['
+                                '{"id":"ins_boiler","observation":"g1 — calls:c1 — NEX: blocker linkage.",'
+                                '"interpretation":"x","implication":"y",'
+                                '"evidence":["Blocker is mentioned but not linked to a tracked issue/PR."],'
+                                '"evidence_ids":["blocker:z"],'
+                                '"based_on_interpretations":["interp_1"],'
+                                '"based_on_signals":["blocker_visibility"],'
+                                '"primary_work_item_ids":["calls:c1"],'
+                                '"supporting_work_item_ids":[],'
+                                '"primary_entities":[{"name":"NEX","kind":"project"}],'
+                                '"based_on_gaps":["g1"],"based_on_blockers":["blocker:z"],"based_on_highlights":[],'
+                                '"confidence":"high","priority":"high"}'
+                                "]}"
+                            )
+                        )
+                    )
+                ],
+                usage=SimpleNamespace(prompt_tokens=10, completion_tokens=10, total_tokens=20),
+            )
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+            self.chat = _FakeChat()
+
+    monkeypatch.setattr(mod, "OpenAI", _FakeClient)
+    out = mod.generate_insights(
+        SimpleNamespace(openai_api_key="sk-test", openai_model="gpt-5-mini"),  # type: ignore[arg-type]
+        signals=_signals(),
+        interpretations=b["interpretations"],
+        evidence=b["evidence"],
+        gaps=b["gaps"],
+        key_achievements=b["achievements"],
+        raw_highlights=b["highlights"],
+        work_items=b["work_items"],
+    )
+    assert out.generated_via == "llm"
+    assert len(out.items) == 1
+    assert out.items[0].evidence == ["War room: blocked on approval"]
+
+
+def test_insight_accepts_gap_ids_in_interpretation_not_observation(monkeypatch: Any) -> None:
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    b = _bundles(run_id, tenant_id)
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs: Any) -> Any:
+            del kwargs
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=(
+                                '{"insights":['
+                                '{"id":"ins_split","observation":"blocker:3738cc61aa15 — calls:c1 — NEX-1 narrative.",'
+                                '"interpretation":"Anchored to gap g1 and calls:c1.",'
+                                '"implication":"Do something.",'
+                                '"evidence":["Need help closing NEX-1"],'
+                                '"evidence_ids":["a1"],'
+                                '"based_on_interpretations":["interp_1"],'
+                                '"based_on_signals":["follow_through"],'
+                                '"primary_work_item_ids":["calls:c1"],'
+                                '"supporting_work_item_ids":[],'
+                                '"primary_entities":[{"name":"NEX","kind":"project"}],'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[],'
+                                '"confidence":"high","priority":"high"}'
+                                "]}"
+                            )
+                        )
+                    )
+                ],
+                usage=SimpleNamespace(prompt_tokens=10, completion_tokens=10, total_tokens=20),
+            )
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+            self.chat = _FakeChat()
+
+    monkeypatch.setattr(mod, "OpenAI", _FakeClient)
+    out = mod.generate_insights(
+        SimpleNamespace(openai_api_key="sk-test", openai_model="gpt-5-mini"),  # type: ignore[arg-type]
+        signals=_signals(),
+        interpretations=b["interpretations"],
+        evidence=b["evidence"],
+        gaps=b["gaps"],
+        key_achievements=b["achievements"],
+        raw_highlights=b["highlights"],
+        work_items=b["work_items"],
+    )
+    assert out.generated_via == "llm"
+    assert len(out.items) == 1
+    assert out.items[0].id == "ins_split"
+
+
+def test_insight_adds_supporting_work_item_from_cited_evidence_source(monkeypatch: Any) -> None:
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    b = _bundles(run_id, tenant_id)
+    slack_wi = WorkItem(
+        id="slack:message:#incident-review:2025-10-11T14:00:00Z",
+        source="slack",
+        type="message_thread",
+        title="incident thread",
+        summary="review notes",
+        status=None,
+        project=None,
+        owner=None,
+        participants=[],
+        source_ref={},
+    )
+    b["work_items"].items.append(slack_wi)
+    b["evidence"] = EvidenceBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        action_items=[
+            EvidenceItem(
+                id="action:x",
+                kind="action_item",
+                statement="Follow up from incident review",
+                evidence="Follow up from incident review",
+                source_work_item_id=slack_wi.id,
+                source_connector="slack",
+                source_type="message_thread",
+                source_ref={},
+                linked_work_items=["calls:c1"],
+            )
+        ],
+        blockers=[],
+        decisions=[],
+        discarded_without_evidence=0,
+    )
+
+    class _FakeCompletions:
+        @staticmethod
+        def create(**kwargs: Any) -> Any:
+            del kwargs
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=(
+                                '{"insights":['
+                                '{"id":"ins_sup","observation":"g1 — calls:c1 — NEX-1 gap narrative.",'
+                                '"interpretation":"Uses action:x evidence.",'
+                                '"implication":"Add supporting slack.",'
+                                '"evidence":["Follow up from incident review"],'
+                                '"evidence_ids":["action:x"],'
+                                '"based_on_interpretations":["interp_1"],'
+                                '"based_on_signals":["follow_through"],'
+                                '"primary_work_item_ids":["calls:c1"],'
+                                '"supporting_work_item_ids":[],'
+                                '"primary_entities":[{"name":"NEX","kind":"project"}],'
+                                '"based_on_gaps":["g1"],"based_on_blockers":[],"based_on_highlights":[],'
+                                '"confidence":"high","priority":"high"}'
+                                "]}"
+                            )
+                        )
+                    )
+                ],
+                usage=SimpleNamespace(prompt_tokens=10, completion_tokens=10, total_tokens=20),
+            )
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+            self.chat = _FakeChat()
+
+    monkeypatch.setattr(mod, "OpenAI", _FakeClient)
+    out = mod.generate_insights(
+        SimpleNamespace(openai_api_key="sk-test", openai_model="gpt-5-mini"),  # type: ignore[arg-type]
+        signals=_signals(),
+        interpretations=b["interpretations"],
+        evidence=b["evidence"],
+        gaps=b["gaps"],
+        key_achievements=b["achievements"],
+        raw_highlights=b["highlights"],
+        work_items=b["work_items"],
+    )
+    assert out.generated_via == "llm"
+    assert len(out.items) == 1
+    assert slack_wi.id in out.items[0].supporting_work_item_ids
+
+
 def test_generate_insights_maps_evidence_id_strings_to_row_quotes(monkeypatch: Any) -> None:
     """LLM sometimes puts evidence_ids into evidence[]; we normalize to quotable text."""
     run_id = uuid.uuid4()

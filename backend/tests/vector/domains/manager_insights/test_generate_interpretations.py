@@ -138,6 +138,44 @@ def _bundles(run_id: uuid.UUID, tenant_id: uuid.UUID) -> dict[str, Any]:
     }
 
 
+def test_validate_interpretations_prunes_highlights_not_in_description() -> None:
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    b = _bundles(run_id, tenant_id)
+    b["highlights"].items.append(
+        RawHighlightItem(id="rh2", text="other highlight", sources=["calls:c1"]),
+    )
+    corpus = mod._execution_artifact_corpus(
+        b["evidence"],
+        b["gaps"],
+        b["highlights"],
+        b["achievements"],
+        b["work_items"],
+    )
+    row = {
+        "id": "i1",
+        "type": "follow_through",
+        "description": "g1 — rh1 — calls:c1 — NEX-1: coordination gap narrative.",
+        "based_on_signals": ["follow_through"],
+        "evidence": ["Need help closing NEX-1"],
+        "confidence": "medium",
+        "based_on_gaps": ["g1"],
+        "based_on_blockers": [],
+        "based_on_highlights": ["rh1", "rh2"],
+    }
+    out, rej = mod._validate_interpretations(
+        [row],
+        corpus=corpus,
+        gaps=b["gaps"],
+        evidence=b["evidence"],
+        raw_highlights=b["highlights"],
+        work_items=b["work_items"],
+    )
+    assert not rej
+    assert len(out) == 1
+    assert out[0].based_on_highlights == ["rh1"]
+
+
 def test_generate_interpretations_fallback_without_openai_key() -> None:
     run_id = uuid.uuid4()
     tenant_id = uuid.uuid4()

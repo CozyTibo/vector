@@ -95,6 +95,92 @@ def _normalize(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
 
 
+# Gap `description` strings from compute_gaps.py — LLMs often paste these instead of Step-3 quotes.
+_GAP_DESCRIPTION_BOILERPLATES_NORM: frozenset[str] = frozenset(
+    _normalize(x)
+    for x in (
+        "Blocker is mentioned but not linked to a tracked issue/PR.",
+        "Action item has no linked closed issue or merged PR in tracked systems.",
+        "Discussion evidence is not linked to any tracked issue or PR.",
+        "Document has no medium/high-confidence link to tracked issue or PR.",
+    )
+)
+
+_LINEAR_ISSUE_TICKET_RE = re.compile(r"^linear:issue:([A-Z][A-Z0-9]{1,6}-\d+)$")
+
+
+def _resolve_bundle_work_item_id(ref: str, items: list[WorkItem]) -> str | None:
+    allowed = {w.id for w in items}
+    ref = ref.strip()
+    if ref in allowed:
+        return ref
+    m = _LINEAR_ISSUE_TICKET_RE.match(ref)
+    if not m:
+        return None
+    ident = m.group(1)
+    for w in items:
+        if w.source != "linear" or w.type != "issue":
+            continue
+        sr = w.source_ref.get("identifier") if isinstance(w.source_ref, dict) else None
+        if sr == ident:
+            return w.id
+    return None
+
+
+def _observation_covers_work_item(wid: str, observation: str, wi_by_id: dict[str, WorkItem]) -> bool:
+    if wid in observation:
+        return True
+    w = wi_by_id.get(wid)
+    if w is None:
+        return False
+    if w.source == "linear" and w.type == "issue":
+        ident = w.source_ref.get("identifier") if isinstance(w.source_ref, dict) else None
+        if isinstance(ident, str) and ident and ident in observation:
+            return True
+    return False
+
+
+def _insight_evidence_is_gap_boilerplate(evidence_strings: list[str]) -> bool:
+    return bool(evidence_strings) and all(
+        _normalize(e) in _GAP_DESCRIPTION_BOILERPLATES_NORM for e in evidence_strings
+    )
+
+
+def _insight_narrative_text(c: InsightV0) -> str:
+    """LLMs often put gap ids only in interpretation; anchor checks use the full narrative."""
+    return f"{c.observation}\n{c.interpretation}\n{c.implication}"
+
+
+def _merge_supporting_from_cited_evidence(
+    primary_ids: list[str],
+    supporting_ids: list[str],
+    evidence_ids: list[str],
+    evidence_by_id: dict[str, EvidenceItem],
+    wi_list: list[WorkItem],
+    allowed_work_item_ids: set[str],
+) -> list[str]:
+    """Ensure each cited evidence row's source work item is listed if it exists in Step-2."""
+    primary_set = set(primary_ids)
+    out: list[str] = []
+    seen: set[str] = set()
+    for w in supporting_ids:
+        if w not in seen:
+            seen.add(w)
+            out.append(w)
+    for eid in evidence_ids:
+        row = evidence_by_id.get(eid)
+        if row is None or not row.source_work_item_id:
+            continue
+        raw_src = row.source_work_item_id
+        resolved = _resolve_bundle_work_item_id(raw_src, wi_list)
+        wid = resolved if resolved is not None else raw_src
+        if wid not in allowed_work_item_ids or wid in primary_set or wid in seen:
+            continue
+        seen.add(wid)
+        out.append(wid)
+    return out
+
+
 def _extract_json_object(text: str) -> dict[str, Any] | None:
     t = (text or "").strip()
     if not t:
@@ -125,6 +211,67 @@ def _evidence_in_corpus(evidence_text: str, corpus: list[str]) -> bool:
     return False
 
 
+def _evidence_in_corpus_insight(evidence_text: str, corpus: list[str]) -> bool:
+    """Quote ⊆ corpus row, or a substantive corpus fragment ⊆ quote (LLM paraphrase)."""
+    q = _normalize(evidence_text)
+    if not q:
+        return False
+    for source in corpus:
+        ns = _normalize(source)
+        if not ns:
+            continue
+        if q in ns:
+            return True
+        if len(ns) >= 14 and ns in q:
+            return True
+    return False
+
+
+def _insight_evidence_allowed_paraphrase(
+    ev: str,
+    evidence_ids: list[str],
+    evidence_by_id: dict[str, EvidenceItem],
+) -> bool:
+    """Accept short gap-style summaries when evidence_ids ground to matching Step-3 kinds."""
+    q = _normalize(ev)
+    if not q:
+        return False
+    kinds = {evidence_by_id[e].kind for e in evidence_ids if evidence_by_id.get(e)}
+    if "blocker" in kinds:
+        needles = (
+            "not linked to a tracked issue",
+            "not linked to a tracked issue/pr",
+            "blocker is mentioned but not linked",
+            "no tracked issue",
+            "no tracked owner",
+            "not assigned owner",
+        )
+        if any(n in q for n in needles):
+            return True
+    if "action_item" in kinds:
+        needles = (
+            "no linked closed issue",
+            "merged pr in tracked systems",
+            "not linked to tracked",
+            "discussion evidence is not linked",
+            "deferring creating tracked",
+        )
+        if any(n in q for n in needles):
+            return True
+    return False
+
+
+def _insight_quote_verifies(
+    ev: str,
+    corpus: list[str],
+    evidence_ids: list[str],
+    evidence_by_id: dict[str, EvidenceItem],
+) -> bool:
+    if _evidence_in_corpus_insight(ev, corpus):
+        return True
+    return _insight_evidence_allowed_paraphrase(ev, evidence_ids, evidence_by_id)
+
+
 def _unverifiable_evidence_strings(
     evidence: list[str], corpus: list[str], *, max_examples: int = 3
 ) -> list[str]:
@@ -134,6 +281,30 @@ def _unverifiable_evidence_strings(
             bad.append("<non-string evidence>")
             continue
         if _evidence_in_corpus(ev, corpus):
+            continue
+        t = (ev or "").replace("\n", " ").strip()
+        if len(t) > 140:
+            t = t[:140] + "..."
+        bad.append(t or "<empty evidence>")
+        if len(bad) >= max_examples:
+            break
+    return bad
+
+
+def _unverifiable_insight_evidence_strings(
+    evidence: list[str],
+    corpus: list[str],
+    evidence_ids: list[str],
+    evidence_by_id: dict[str, EvidenceItem],
+    *,
+    max_examples: int = 3,
+) -> list[str]:
+    bad: list[str] = []
+    for ev in evidence:
+        if not isinstance(ev, str):
+            bad.append("<non-string evidence>")
+            continue
+        if _insight_quote_verifies(ev, corpus, evidence_ids, evidence_by_id):
             continue
         t = (ev or "").replace("\n", " ").strip()
         if len(t) > 140:
@@ -162,6 +333,35 @@ def _cited_evidence_corpus(evidence: EvidenceBundle, evidence_ids: list[str]) ->
         rows.append(item.statement)
         rows.append(item.evidence)
     return [r for r in rows if isinstance(r, str) and r.strip()]
+
+
+def _cited_evidence_corpus_for_insights(
+    evidence: EvidenceBundle,
+    evidence_ids: list[str],
+    gaps: GapBundle,
+) -> list[str]:
+    """Step-3 row text plus deterministic gap descriptions that cite those evidence ids."""
+    rows = list(_cited_evidence_corpus(evidence, evidence_ids))
+    by_id = _evidence_item_by_id(evidence)
+    linked_desc: set[str] = set()
+    pointer_keys = ("blocker_item_ids", "action_item_ids", "evidence_item_ids")
+    for eid in evidence_ids:
+        if by_id.get(eid) is None:
+            continue
+        for g in gaps.gaps:
+            matched = False
+            for k in pointer_keys:
+                vals = g.evidence_pointers.get(k)
+                if isinstance(vals, list) and eid in vals:
+                    matched = True
+                    break
+            if not matched:
+                continue
+            d = (g.description or "").strip()
+            if d and d not in linked_desc:
+                linked_desc.add(d)
+                rows.append(d)
+    return rows
 
 
 def _resolve_insight_evidence_strings(
@@ -402,6 +602,47 @@ def _validate_insights(
             )
             continue
 
+        wi_list = list(work_items.items)
+        wi_by_id = {w.id: w for w in wi_list}
+
+        primary_resolved: list[str] = []
+        primary_unresolved: str | None = None
+        for wid in canonical.primary_work_item_ids:
+            r = _resolve_bundle_work_item_id(wid, wi_list)
+            if r is None:
+                primary_unresolved = wid
+                break
+            primary_resolved.append(r)
+        if primary_unresolved is not None:
+            rejected.append(
+                RejectedInsightDebug(
+                    index=i,
+                    reason=f"primary_work_item_ids not in Step-2 bundle: {[primary_unresolved]!r}",
+                    raw=raw,
+                )
+            )
+            continue
+
+        supporting_resolved: list[str] = []
+        for wid in canonical.supporting_work_item_ids:
+            r = _resolve_bundle_work_item_id(wid, wi_list)
+            if r is not None:
+                supporting_resolved.append(r)
+        supporting_augmented = _merge_supporting_from_cited_evidence(
+            primary_resolved,
+            supporting_resolved,
+            list(canonical.evidence_ids),
+            evidence_by_id,
+            wi_list,
+            allowed_work_item_ids,
+        )
+        canonical = canonical.model_copy(
+            update={
+                "primary_work_item_ids": primary_resolved,
+                "supporting_work_item_ids": supporting_augmented,
+            }
+        )
+
         gap_ids_allowed = {g.id for g in gaps.gaps}
         highlight_ids_allowed = {h.id for h in raw_highlights.items}
         blocker_ids_allowed = {b.id for b in evidence.blockers}
@@ -451,25 +692,51 @@ def _validate_insights(
         if blocker_row_invalid:
             continue
 
+        narrative = _insight_narrative_text(canonical)
+        effective_insight_highlights = [h for h in canonical.based_on_highlights if h in narrative]
+        if canonical.based_on_highlights:
+            if (
+                not effective_insight_highlights
+                and not canonical.based_on_gaps
+                and not canonical.based_on_blockers
+            ):
+                rejected.append(
+                    RejectedInsightDebug(
+                        index=i,
+                        reason="based_on_highlights ids must appear verbatim in insight narrative when "
+                        "they are the only grounding (gaps/blockers empty)",
+                        raw=raw,
+                    )
+                )
+                continue
+            if len(effective_insight_highlights) != len(canonical.based_on_highlights):
+                canonical = canonical.model_copy(update={"based_on_highlights": effective_insight_highlights})
+
         obs_anchor_failed: str | None = None
         for gid in canonical.based_on_gaps:
-            if gid not in canonical.observation:
-                obs_anchor_failed = f"observation must contain cited gap id substring {gid!r}"
+            if gid not in narrative:
+                obs_anchor_failed = (
+                    "insight narrative (observation/interpretation/implication) must contain cited gap id "
+                    f"substring {gid!r}"
+                )
                 break
         if obs_anchor_failed is None:
             for hid in canonical.based_on_highlights:
-                if hid not in canonical.observation:
-                    obs_anchor_failed = f"observation must contain cited highlight id substring {hid!r}"
+                if hid not in narrative:
+                    obs_anchor_failed = (
+                        "insight narrative (observation/interpretation/implication) must contain cited "
+                        f"highlight id substring {hid!r}"
+                    )
                     break
         if obs_anchor_failed is None:
             for bid in canonical.based_on_blockers:
                 row = evidence_by_id.get(bid)
                 if row is None:
                     continue
-                if bid not in canonical.observation and row.source_work_item_id not in canonical.observation:
+                if bid not in narrative and row.source_work_item_id not in narrative:
                     obs_anchor_failed = (
-                        "observation must contain each based_on_blockers id or that row's "
-                        f"source_work_item_id; missing anchor for {bid!r}"
+                        "insight narrative (observation/interpretation/implication) must contain each "
+                        f"based_on_blockers id or that row's source_work_item_id; missing anchor for {bid!r}"
                     )
                     break
         if obs_anchor_failed is not None:
@@ -520,12 +787,47 @@ def _validate_insights(
             )
             continue
 
-        cited_corpus = _cited_evidence_corpus(evidence, list(canonical.evidence_ids))
+        cited_corpus = _cited_evidence_corpus_for_insights(
+            evidence, list(canonical.evidence_ids), gaps
+        )
         evidence_resolved = _resolve_insight_evidence_strings(
             list(canonical.evidence), list(canonical.evidence_ids), evidence_by_id
         )
-        if not all(_evidence_in_corpus(ev, cited_corpus) for ev in evidence_resolved):
-            bad = _unverifiable_evidence_strings(evidence_resolved, cited_corpus)
+        eid_list = list(canonical.evidence_ids)
+        corpus_ok = all(
+            _insight_quote_verifies(ev, cited_corpus, eid_list, evidence_by_id)
+            for ev in evidence_resolved
+        )
+        if not corpus_ok and _insight_evidence_is_gap_boilerplate(evidence_resolved):
+            fallback_quotes: list[str] = []
+            for eid in canonical.evidence_ids:
+                row = evidence_by_id.get(eid)
+                if row is None:
+                    continue
+                q = (row.statement or row.evidence or "").strip()
+                if q:
+                    fallback_quotes.append(q)
+            if fallback_quotes:
+                evidence_resolved = fallback_quotes
+                corpus_ok = all(
+                    _insight_quote_verifies(ev, cited_corpus, eid_list, evidence_by_id)
+                    for ev in evidence_resolved
+                )
+        if corpus_ok and _insight_evidence_is_gap_boilerplate(evidence_resolved):
+            row_quotes: list[str] = []
+            for eid in canonical.evidence_ids:
+                row = evidence_by_id.get(eid)
+                if row is None:
+                    continue
+                q = (row.statement or row.evidence or "").strip()
+                if q:
+                    row_quotes.append(q)
+            if row_quotes:
+                evidence_resolved = row_quotes
+        if not corpus_ok:
+            bad = _unverifiable_insight_evidence_strings(
+                evidence_resolved, cited_corpus, eid_list, evidence_by_id
+            )
             rejected.append(
                 RejectedInsightDebug(
                     index=i,
@@ -538,14 +840,17 @@ def _validate_insights(
 
         obs_grounding_failed: str | None = None
         for wid in canonical.primary_work_item_ids:
-            if wid not in canonical.observation:
-                obs_grounding_failed = f"observation must contain primary work item id substring {wid!r}"
+            if not _observation_covers_work_item(wid, narrative, wi_by_id):
+                obs_grounding_failed = (
+                    "insight narrative must contain primary work item id substring "
+                    f"{wid!r} (or Linear identifier when id is canonical)"
+                )
                 break
         if obs_grounding_failed is None:
             for ent in canonical.primary_entities:
-                if ent.name not in canonical.observation:
+                if ent.name not in narrative:
                     obs_grounding_failed = (
-                        "observation must contain each primary_entities.name as substring; "
+                        "insight narrative must contain each primary_entities.name as substring; "
                         f"missing {ent.name!r}"
                     )
                     break
