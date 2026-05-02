@@ -29,7 +29,7 @@ def test_build_perception_qa_regex_only_when_flag_off() -> None:
         query_include_execution_graph=False,
         query_master_plan_debug=False,
         query_max_decisions=None,
-        max_decisions_cap_applied=3,
+        max_decisions_cap_applied=6,
         decisions_prioritized_full_count=0,
         query_persist_decisions=False,
         step42_gap_demotion_by_gap_type={},

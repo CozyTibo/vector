@@ -25,6 +25,7 @@ def test_coordination_flags_default_false() -> None:
         assert s.vector_manager_insights_skip_narrative_steps is False
         assert s.vector_manager_insights_gaps_use_graph is False
         assert s.vector_manager_insights_hold_start_affected_wi_threshold == 2
+        assert s.vector_manager_insights_llm_interpretation is False
     finally:
         get_settings.cache_clear()
         _restore_all(old)
@@ -43,6 +44,7 @@ def test_coordination_flags_env_true() -> None:
         assert s.vector_manager_insights_skip_narrative_steps is True
         assert s.vector_manager_insights_gaps_use_graph is True
         assert s.vector_manager_insights_hold_start_affected_wi_threshold == 2
+        assert s.vector_manager_insights_llm_interpretation is True
     finally:
         get_settings.cache_clear()
         _restore_all(old)
@@ -53,6 +55,7 @@ _FLAG_ENVS = (
     "VECTOR_MANAGER_INSIGHTS_INCLUDE_EXECUTION_GRAPH",
     "VECTOR_MANAGER_INSIGHTS_SKIP_NARRATIVE_STEPS",
     "VECTOR_MANAGER_INSIGHTS_GAPS_USE_GRAPH",
+    "VECTOR_MANAGER_INSIGHTS_LLM_INTERPRETATION",
 )
 
 

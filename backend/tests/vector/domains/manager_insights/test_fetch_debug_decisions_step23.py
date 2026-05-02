@@ -77,7 +77,11 @@ def test_fetch_debug_decisions_bundle_matches_gaps(monkeypatch: pytest.MonkeyPat
     out = run_manager_insights_fetch_debug(session, _settings(), tenant_id=tid, max_decisions=50)
     assert isinstance(out.perception_qa.step42_gap_demotion_by_gap_type, dict)
     assert out.decisions is not None
-    assert len(out.decisions.items) == len(out.gaps.gaps)
+    ng, nd = len(out.gaps.gaps), len(out.decisions.items)
+    if ng <= 1:
+        assert nd == ng
+    else:
+        assert 1 <= nd <= min(6, ng)
     assert out.decisions.run_id == out.gaps.run_id
     assert out.decisions_prioritized is not None
     assert len(out.decisions_prioritized) == len(out.decisions.items)
@@ -85,7 +89,7 @@ def test_fetch_debug_decisions_bundle_matches_gaps(monkeypatch: pytest.MonkeyPat
 
 
 def test_fetch_debug_decisions_non_empty_when_gaps_present(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Orchestrator passes gaps into compute_decisions — one row per gap when gaps exist."""
+    """Orchestrator passes gaps into compute_decisions — situation pipeline still surfaces injected gap ids."""
     tid = uuid.UUID("33333333-3333-3333-3333-333333333333")
     monkeypatch.setattr(
         "vector.domains.manager_insights.run_fetch_activity_bundle",
@@ -107,10 +111,16 @@ def test_fetch_debug_decisions_non_empty_when_gaps_present(monkeypatch: pytest.M
     out = run_manager_insights_fetch_debug(session, _settings(), tenant_id=tid, max_decisions=50)
     assert out.decisions is not None
     assert len(out.decisions.items) >= 1
-    assert len(out.decisions.items) == len(out.gaps.gaps)
-    last = out.decisions.items[-1].decision
-    assert last.gap_id == "step23-inject-gap"
-    assert last.decision_type == "BLOCKER_ESCALATION"
-    assert "ev-1" in last.evidence_refs
+    assert sum(1 for r in out.decisions.items if r.decision.dominant) == 1
+    mb = [
+        r.decision
+        for r in out.decisions.items
+        if r.decision.decision_type == "MAKE_BLOCKERS_EXPLICIT"
+        and "step23-inject-gap" in (r.decision.required_inputs.get("underlying_gap_ids") or [])
+    ]
+    assert mb, "expected injected blocker gap to map to MAKE_BLOCKERS_EXPLICIT somewhere in the narrative bundle"
+    inv = mb[0]
+    assert inv.gap_type == "aggregated_situation"
+    assert "ev-1" in inv.evidence_refs
     assert out.decisions_prioritized is not None
     assert len(out.decisions_prioritized) == len(out.decisions.items)

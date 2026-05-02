@@ -1562,6 +1562,7 @@ def _build_notion(
                 "url": f"https://www.notion.so/nexora/{_u(seed, 'notion-url', str(i)).replace('-', '')}",
                 "title": title,
                 "owner": owner.get("name") or owner.get("login"),
+                "last_edited_by_id": str(owner.get("linear_user_id", "")),
                 "last_edited_time": edited if isinstance(edited, str) else _iso(datetime.now(tz=UTC)),
                 "snippet": snippet,
             }
@@ -1574,6 +1575,7 @@ def _build_notion(
                 "url": f"https://www.notion.so/nexora/{_u(seed, 'notion-slack', str(j)).replace('-', '')}",
                 "title": title,
                 "owner": ev.get("user_email") or "team@nexora.dev",
+                "last_edited_by_id": str(ev.get("id") or ""),
                 "last_edited_time": ev.get("ts") if isinstance(ev.get("ts"), str) else _iso(datetime.now(tz=UTC)),
                 "snippet": f"Thread summary: {str(ev.get('text', ''))[:180]}",
             }
@@ -1620,6 +1622,7 @@ def _build_calls(
                 "status": "confirmed",
                 "html_link": f"https://meet.google.com/{_u(seed, 'meet', str(i))[:10]}",
                 "organizer_email": owner.get("email") or "manager@nexora.dev",
+                "organizer_id": str(owner.get("linear_user_id", "")),
                 "created": _iso(start - timedelta(hours=6)),
                 "updated": _iso(start - timedelta(hours=2)),
                 "start": _iso(start),
@@ -1637,6 +1640,7 @@ def _build_calls(
                 "status": "confirmed",
                 "html_link": f"https://meet.google.com/{_u(seed, 'meet-slack', str(j))[:10]}",
                 "organizer_email": str(ev.get("user_email") or "team@nexora.dev"),
+                "organizer_id": str(ev.get("id") or ""),
                 "created": _iso(start - timedelta(hours=3)),
                 "updated": _iso(start - timedelta(hours=1)),
                 "start": _iso(start),

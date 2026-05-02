@@ -7,6 +7,8 @@ text is merged into term-based signals (support, feedback, friction) without raw
 
 from __future__ import annotations
 
+import uuid
+from collections import Counter
 from datetime import datetime, timedelta
 
 from vector.contracts.manager_insights_activity import (
@@ -64,6 +66,90 @@ _CONTRADICTION_TERMS = (
     "two different",
     "on second thought",
 )
+
+
+def _norm_identity_str(value: str) -> str:
+    return value.strip().lower()
+
+
+def _identity_tuple_actor_or_string(
+    *,
+    actor_id: uuid.UUID | None,
+    source: str,
+    role: str,
+    display: str | None,
+) -> tuple[object, ...] | None:
+    """Stable bucket for coordination faces: prefer canonical actor, else normalized display string."""
+    if actor_id is not None:
+        return ("a", actor_id)
+    if display and str(display).strip():
+        return ("s", source, role, _norm_identity_str(str(display)))
+    return None
+
+
+def _identity_keys_for_item(w: WorkItem) -> list[tuple[object, ...]]:
+    keys: list[tuple[object, ...]] = []
+    owner_key = _identity_tuple_actor_or_string(
+        actor_id=w.owner_actor_id,
+        source=w.source,
+        role="owner",
+        display=w.owner,
+    )
+    if owner_key is not None:
+        keys.append(owner_key)
+    participants = list(w.participants or [])
+    actor_ids = list(w.participant_actor_ids or [])
+    for i, p in enumerate(participants):
+        aid = actor_ids[i] if i < len(actor_ids) else None
+        pk = _identity_tuple_actor_or_string(
+            actor_id=aid if isinstance(aid, uuid.UUID) else None,
+            source=w.source,
+            role="participant",
+            display=p,
+        )
+        if pk is not None:
+            keys.append(pk)
+    return keys
+
+
+def _open_exec_owner_bucket(w: WorkItem) -> tuple[object, ...] | None:
+    if w.owner_actor_id is not None:
+        return ("a", w.owner_actor_id)
+    if w.owner and str(w.owner).strip():
+        return ("s", w.source, "owner", _norm_identity_str(str(w.owner)))
+    return None
+
+
+def _actor_fragmentation_count(items: list[WorkItem]) -> int:
+    bag: set[tuple[object, ...]] = set()
+    for w in items:
+        bag.update(_identity_keys_for_item(w))
+    return len(bag)
+
+
+def _actor_load_score(open_exec: list[WorkItem]) -> int:
+    counts: Counter[tuple[object, ...]] = Counter()
+    for w in open_exec:
+        b = _open_exec_owner_bucket(w)
+        if b is not None:
+            counts[b] += 1
+    return max(counts.values()) if counts else 0
+
+
+def _actor_consistency_score(discussion_items: list[WorkItem], open_exec: list[WorkItem]) -> float:
+    disc: set[tuple[object, ...]] = set()
+    for w in discussion_items:
+        b = _open_exec_owner_bucket(w)
+        if b is not None:
+            disc.add(b)
+    exe: set[tuple[object, ...]] = set()
+    for w in open_exec:
+        b = _open_exec_owner_bucket(w)
+        if b is not None:
+            exe.add(b)
+    if not disc or not exe:
+        return 0.0
+    return len(disc & exe) / len(disc | exe)
 
 
 def _signal_level_high_mod_low(
@@ -460,6 +546,21 @@ def compute_signals(
         merged_rows,
     )
 
+    actor_fragmentation = _actor_fragmentation_count(work_items.items)
+    actor_load = _actor_load_score(open_exec)
+    actor_consistency = _actor_consistency_score(discussion_items, open_exec)
+    explain_actor_frag = (
+        f"distinct coordination identities={actor_fragmentation} across {len(work_items.items)} work items "
+        f"(actor UUID when present else per-source string bucket)"
+    )
+    explain_actor_load = (
+        f"max open execution items per owner identity={actor_load} over {len(open_exec)} open execution rows"
+    )
+    explain_actor_consistency = (
+        f"owner identity Jaccard(discussion, open_exec)={actor_consistency:.2f} "
+        f"(discussion={len(discussion_items)}, open_exec={len(open_exec)})"
+    )
+
     return SignalsV0Debug(
         delivery_strength=delivery_strength,
         urgent_pressure=urgent_pressure,
@@ -478,6 +579,9 @@ def compute_signals(
         scope_ambiguity=scope_ambiguity,
         discussion_churn=discussion_churn,
         contradiction_density=contradiction_density,
+        actor_fragmentation=actor_fragmentation,
+        actor_load=actor_load,
+        actor_consistency=actor_consistency,
         explain={
             "delivery_strength": explain_delivery,
             "urgent_pressure": explain_urgent,
@@ -496,5 +600,8 @@ def compute_signals(
             "scope_ambiguity": explain_scope,
             "discussion_churn": explain_churn,
             "contradiction_density": explain_contra,
+            "actor_fragmentation": explain_actor_frag,
+            "actor_load": explain_actor_load,
+            "actor_consistency": explain_actor_consistency,
         },
     )

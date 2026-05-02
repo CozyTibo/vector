@@ -78,3 +78,15 @@ def max_completion_tokens_for_manager_insights_perception(model: str) -> int:
     if _manager_insights_reasoning_style_model(model):
         return 16_384
     return 4096
+
+
+def max_completion_tokens_for_manager_insights_decision_interpretation(model: str) -> int:
+    """
+    Small visible output (three strings), but ``gpt-5*`` / o-style models may allocate much of the
+    completion budget to hidden reasoning first — low caps risk empty ``message.content`` (same
+    failure mode as ``onboarding_chat_max_completion_tokens``). Use **5120** (4096 + 25% headroom)
+    for those models; keep a tight cap for non-reasoning chat models.
+    """
+    if _manager_insights_reasoning_style_model(model):
+        return 5120
+    return 512

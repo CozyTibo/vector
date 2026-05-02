@@ -30,6 +30,8 @@ def manager_insight_decision_from_item(
     """Map a coordination ``DecisionItem`` to a new ORM instance (not yet flushed)."""
     row_id = manager_insight_decision_id_for_engine_row(tenant_id=tenant_id, engine_decision_id=item.id)
     status = item.status if item.status is not None else "proposed"
+    req = dict(item.required_inputs)
+    req["narrative_dominant"] = item.dominant
     return ManagerInsightDecision(
         id=row_id,
         tenant_id=tenant_id,
@@ -40,7 +42,7 @@ def manager_insight_decision_from_item(
         title=item.title,
         rationale=item.rationale,
         default_action=item.default_action.model_dump(mode="json"),
-        required_inputs=dict(item.required_inputs),
+        required_inputs=req,
         evidence_refs=list(item.evidence_refs),
         signal_refs=list(item.signal_refs),
         status=status,

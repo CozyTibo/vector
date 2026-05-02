@@ -2,14 +2,18 @@
 
 Sort key (stable, documented in code):
 
-1. ``decision_type`` priority (safety / escalation first).
-2. When ``signals.urgent_pressure == \"high\"``, ``blocker_not_tracked`` gaps sort earlier within
+1. ``DecisionItem.dominant`` (headline row first).
+2. Actor coordination execution situations (``OWNERSHIP_FRAGMENTED``, ``KEY_PERSON_BOTTLENECK``,
+   ``DECISION_NOT_CONNECTED_TO_OWNER``, ``UNKNOWN_OWNERSHIP``) before baseline hygiene rows whose
+   ``decision_type`` is ``LINK_WORK`` or ``TRACK_BLOCKER``.
+3. ``decision_type`` priority (safety / escalation first).
+4. When ``signals.urgent_pressure == \"high\"``, ``blocker_not_tracked`` gaps sort earlier within
    the same decision-type band.
-3. Combined gap order: ``gap_type_rank * STRIDE + learning_demotion`` (**§6 Step 42**; see
+5. Combined gap order: ``gap_type_rank * STRIDE + learning_demotion`` (**§6 Step 42**; see
    ``decision_sort_learning``). ``STRIDE`` keeps zero-demotion ordering aligned with legacy
-   ``gap_type`` priority; large demotions can move a gap later across bands. Omitted
+   ``gap_type`` priority; large demotions can move a row later across bands. Omitted
    ``learning`` → demotion **0** everywhere.
-4. ``decision.id`` (lexicographic tie-break).
+6. ``decision.id`` (lexicographic tie-break).
 
 §6 Step 28 applies ``max_decisions`` cap to this ordering; this step does **not** truncate.
 """
@@ -25,6 +29,7 @@ from vector.contracts.manager_insights_activity import (
     SignalsV0Debug,
 )
 from vector.domains.manager_insights.decision_sort_learning import DecisionSortLearning
+from vector.domains.manager_insights.detect_execution_situations import ACTOR_COORDINATION_SITUATION_TYPES
 
 # Upper bound for §6 Step 28 cap (query, env default, and applied slice).
 MAX_DECISIONS_SURFACED_UPPER = 50
@@ -53,16 +58,34 @@ def cap_prioritized_decisions(
     return items[:m], before
 
 
-# Lower = earlier in the surfaced list.
+# Lower = earlier in the surfaced list (safety / ownership / contradiction first).
+_DEFAULT_DECISION_RANK = 40
 _DECISION_TYPE_RANK: dict[CoordinationDecisionType, int] = {
     "HOLD_START": 0,
+    "BLOCK_RELEASE": 1,
+    "MAKE_BLOCKERS_EXPLICIT": 1,
+    "TRACK_BLOCKER": 1,
     "BLOCKER_ESCALATION": 1,
-    "RECENTER": 2,
-    "PAUSE_INVESTMENT": 3,
-    "CLARIFY_SPEC": 4,
-    "LINK_OR_CLOSE_COMMITMENT": 5,
-    "THREAD_TO_TRACKING_LINK": 6,
-    "DOC_EXECUTION_BRIDGE": 7,
+    "STRUCTURE_INCIDENT": 2,
+    "ASSIGN_OWNER": 2,
+    "RESOLVE_OWNERSHIP": 3,
+    "RESOLVE_STATE_MISMATCH": 4,
+    "RECENTER": 4,
+    "UNBLOCK_REVIEW": 5,
+    "FORCE_DECISION": 5,
+    "REALIGN_PRIORITY": 6,
+    "REDUCE_WIP": 6,
+    "FORCE_PROGRESS_CHECK": 7,
+    "RECENTER_WORK": 8,
+    "PAUSE_INVESTMENT": 8,
+    "CLARIFY_SPEC": 9,
+    "SPLIT_SCOPE": 10,
+    "CAPTURE_WORK": 11,
+    "VERIFY_STATUS": 12,
+    "LINK_WORK": 13,
+    "LINK_OR_CLOSE_COMMITMENT": 13,
+    "THREAD_TO_TRACKING_LINK": 13,
+    "DOC_EXECUTION_BRIDGE": 14,
 }
 
 _GAP_TYPE_RANK: dict[GapType, int] = {
@@ -70,6 +93,7 @@ _GAP_TYPE_RANK: dict[GapType, int] = {
     "expected_not_executed": 1,
     "discussed_not_linked_to_work": 2,
     "doc_not_connected_to_execution": 3,
+    "aggregated_situation": 2,
 }
 
 # §6 Step 42 — must stay **below** typical max demotion (~10.8k) so suppressed gaps can move
@@ -77,10 +101,23 @@ _GAP_TYPE_RANK: dict[GapType, int] = {
 _GAP_RANK_LEARNING_STRIDE = 5_000
 
 
+def _actor_coordination_priority(row: DecisionBundleItem) -> int:
+    """Lower sorts earlier: actor coordination situations beat baseline hygiene (LINK_WORK / TRACK_BLOCKER)."""
+    dbg = row.decision_debug
+    if dbg and dbg.execution_situation in ACTOR_COORDINATION_SITUATION_TYPES:
+        return 0
+    d = row.decision
+    if d.decision_type in ("LINK_WORK", "TRACK_BLOCKER"):
+        return 2
+    return 1
+
+
 def _blocker_urgency_boost(decision: DecisionItem, signals: SignalsV0Debug | None) -> int:
     """0 = boost (sort earlier) when urgent pressure is high and gap is a blocker."""
     if signals is not None and signals.urgent_pressure == "high":
         if decision.gap_type == "blocker_not_tracked":
+            return 0
+        if decision.decision_type in ("MAKE_BLOCKERS_EXPLICIT", "BLOCK_RELEASE"):
             return 0
     return 1
 
@@ -88,10 +125,12 @@ def _blocker_urgency_boost(decision: DecisionItem, signals: SignalsV0Debug | Non
 def _sort_tuple(
     row: DecisionBundleItem,
     signals: SignalsV0Debug | None,
-) -> tuple[int, int, int, str]:
+) -> tuple[int, int, int, int, int, str]:
     d = row.decision
     return (
-        _DECISION_TYPE_RANK[d.decision_type],
+        0 if d.dominant else 1,
+        _actor_coordination_priority(row),
+        _DECISION_TYPE_RANK.get(d.decision_type, _DEFAULT_DECISION_RANK),
         _blocker_urgency_boost(d, signals),
         _GAP_TYPE_RANK[d.gap_type],
         d.id,
@@ -107,10 +146,12 @@ def _sort_tuple_with_learning(
     row: DecisionBundleItem,
     signals: SignalsV0Debug | None,
     learning: DecisionSortLearning | None,
-) -> tuple[int, int, int, str]:
+) -> tuple[int, int, int, int, int, str]:
     d = row.decision
     return (
-        _DECISION_TYPE_RANK[d.decision_type],
+        0 if d.dominant else 1,
+        _actor_coordination_priority(row),
+        _DECISION_TYPE_RANK.get(d.decision_type, _DEFAULT_DECISION_RANK),
         _blocker_urgency_boost(d, signals),
         _gap_learning_sort_key(d.gap_type, learning),
         d.id,

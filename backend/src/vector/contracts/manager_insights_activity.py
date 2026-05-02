@@ -20,9 +20,27 @@ GapType = Literal[
     "discussed_not_linked_to_work",
     "blocker_not_tracked",
     "doc_not_connected_to_execution",
+    # Step 7 — synthetic gap row for execution-situation aggregation (not emitted by Step 5).
+    "aggregated_situation",
+]
+
+# Step 7 — derived coordination failure (computed only; not persisted).
+ExecutionFailure = Literal[
+    "OWNERSHIP_MISSING",
+    "OWNERSHIP_CONFLICT",
+    "STATE_MISMATCH",
+    "FAKE_PROGRESS",
+    "STALLED_PROGRESS",
+    "DISCUSSION_WITHOUT_DECISION",
+    "SCOPE_AMBIGUITY",
+    "SCOPE_DRIFT",
+    "EXECUTION_FRAGMENTATION",
+    "SHADOW_WORK",
+    "UNTRACKED_BLOCKER",
 ]
 
 CoordinationDecisionType = Literal[
+    # Legacy / compatibility (older rows + migrations)
     "LINK_OR_CLOSE_COMMITMENT",
     "THREAD_TO_TRACKING_LINK",
     "BLOCKER_ESCALATION",
@@ -31,6 +49,44 @@ CoordinationDecisionType = Literal[
     "CLARIFY_SPEC",
     "RECENTER",
     "PAUSE_INVESTMENT",
+    # Step 7 — managerial coordination actions (preferred for new engine output)
+    "LINK_WORK",
+    "TRACK_BLOCKER",
+    "ASSIGN_OWNER",
+    "RESOLVE_OWNERSHIP",
+    "RESOLVE_STATE_MISMATCH",
+    "VERIFY_STATUS",
+    "FORCE_PROGRESS_CHECK",
+    "REDUCE_WIP",
+    "FORCE_DECISION",
+    "SPLIT_SCOPE",
+    "CAPTURE_WORK",
+    "RECENTER_WORK",
+    # Step 7 — situation-mapped coordination actions (preferred when derived from ExecutionSituation).
+    "MAKE_BLOCKERS_EXPLICIT",
+    "UNBLOCK_REVIEW",
+    "REALIGN_PRIORITY",
+    "STRUCTURE_INCIDENT",
+    "BLOCK_RELEASE",
+]
+
+# Step 6.5 — execution context (computed only; not persisted).
+ExecutionSituationType = Literal[
+    "INVISIBLE_BLOCKERS",
+    "DECISION_LOOP",
+    "FRAGMENTED_EXECUTION",
+    "OWNERSHIP_CONFUSION",
+    "SHADOW_WORK",
+    "MISALIGNED_REALITY",
+    "SCOPE_DRIFT",
+    "REVIEW_BOTTLENECK",
+    "PRIORITY_CONFLICT",
+    "UNCONTROLLED_INCIDENT",
+    "RISKY_SHIPPING",
+    "OWNERSHIP_FRAGMENTED",
+    "KEY_PERSON_BOTTLENECK",
+    "DECISION_NOT_CONNECTED_TO_OWNER",
+    "UNKNOWN_OWNERSHIP",
 ]
 
 DecisionLifecycleStatus = Literal["proposed", "accepted", "dismissed", "completed", "failed"]
@@ -177,6 +233,14 @@ class WorkItem(BaseModel):
     updated_at: datetime | None = None
     closed_at: datetime | None = None
     source_ref: dict[str, str] = Field(default_factory=dict)
+    owner_actor_id: uuid.UUID | None = Field(
+        default=None,
+        description="Canonical actor when resolved via ActorExternalIdentity (optional; dual-write with owner).",
+    )
+    participant_actor_ids: list[uuid.UUID | None] = Field(
+        default_factory=list,
+        description="Parallel to participants: same length when populated; None = unresolved for that slot.",
+    )
 
 
 class WorkItemBundle(BaseModel):
@@ -368,6 +432,10 @@ class DecisionItem(BaseModel):
         default_factory=list,
         description="SignalsV0 / extension keys that influenced ordering only.",
     )
+    dominant: bool = Field(
+        default=False,
+        description="True when this decision is the narrative headline (dominant execution situation).",
+    )
     created_at: datetime
     run_id: uuid.UUID
     status: DecisionLifecycleStatus | None = Field(
@@ -387,6 +455,35 @@ class DecisionRuleTraceDebug(BaseModel):
         description="Rule id or label from deterministic tables.",
     )
     conditions_met: dict[str, bool] = Field(default_factory=dict)
+    execution_failure: str | None = Field(
+        default=None,
+        description="When derived from Step 7 execution-failure detection (ExecutionFailure literal).",
+    )
+    condition_details: list[str] = Field(
+        default_factory=list,
+        description="Human-readable predicates that fired for this row (debug iteration).",
+    )
+    execution_situation: ExecutionSituationType | None = Field(
+        default=None,
+        description="Step 6.5 — when this decision was derived from an aggregated execution situation.",
+    )
+    situation_support_count: int = Field(
+        default=0,
+        ge=0,
+        description="Number of underlying gaps tied to execution_situation (admin trace).",
+    )
+    narrative_theme: str | None = Field(
+        default=None,
+        description="When Step 7 narrative composition matched a reinforcement theme (e.g. coordination_breakdown).",
+    )
+    narrative_dominant: bool | None = Field(
+        default=None,
+        description="Mirrors DecisionItem.dominant for fetch-debug QA when present.",
+    )
+    actor_situation_metrics: dict[str, Any] | None = Field(
+        default=None,
+        description="Deterministic actor ids + threshold counts when a row is driven by actor coordination situations.",
+    )
 
 
 class DecisionEmissionTraceDebug(BaseModel):
@@ -424,6 +521,35 @@ class DecisionEmissionTraceDebug(BaseModel):
     )
 
 
+class ExecutionSituation(BaseModel):
+    """Step 6.5 — aggregated execution context before Step 7 decisions (not persisted)."""
+
+    model_config = ConfigDict(extra="forbid", from_attributes=False)
+
+    type: ExecutionSituationType
+    severity: float = Field(ge=0.0, le=1.0)
+    supporting_gap_ids: list[str] = Field(default_factory=list)
+    supporting_signals: list[str] = Field(default_factory=list)
+    rationale: str = Field(min_length=1)
+    decision_override: CoordinationDecisionType | None = Field(
+        default=None,
+        description="Rare override (e.g. HOLD_START on a scope cluster instead of SPLIT_SCOPE).",
+    )
+    hold_start_emission_trace: DecisionEmissionTraceDebug | None = None
+    actor_situation_metrics: dict[str, Any] | None = Field(
+        default=None,
+        description="Deterministic actor ids and threshold counts for actor-driven situations (mirrored on decision_debug).",
+    )
+    aggregated_failure_mode: str | None = Field(
+        default=None,
+        description="When set, this situation represents a collapsed failure mode (Step 7 aggregate above symptoms).",
+    )
+    aggregated_supporting_situation_types: list[ExecutionSituationType] = Field(
+        default_factory=list,
+        description="Other situation types folded into this failure-mode row (representative excluded).",
+    )
+
+
 class DecisionBundleItem(BaseModel):
     """One decision plus optional per-row debug."""
 
@@ -434,6 +560,18 @@ class DecisionBundleItem(BaseModel):
     decision_emission_debug: DecisionEmissionTraceDebug | None = Field(
         default=None,
         description="§6 Step 26 — HOLD_START three-guard trace when scope extension is evaluated.",
+    )
+    llm_headline: str | None = Field(
+        default=None,
+        description="Optional LLM rewrite of the headline; never affects decision_type or ordering (VECTOR_MANAGER_INSIGHTS_LLM_INTERPRETATION).",
+    )
+    llm_explanation: str | None = Field(
+        default=None,
+        description="Optional causal narrative from the interpretation layer; UI may fall back to decision.rationale.",
+    )
+    llm_next_step: str | None = Field(
+        default=None,
+        description="Optional manager-facing next step from the interpretation layer.",
     )
 
 
@@ -652,6 +790,22 @@ class SignalsV0Debug(BaseModel):
     contradiction_density: SignalDeliveryStrength = Field(
         default="low",
         description="§6 Steps 19–20 — contradiction density signal; Step 20 computes in compute_signals.",
+    )
+    actor_fragmentation: int = Field(
+        default=0,
+        ge=0,
+        description="Distinct coordination identities (mapped actors + unmapped string buckets) across work items.",
+    )
+    actor_load: int = Field(
+        default=0,
+        ge=0,
+        description="Max open execution items sharing one coordination identity (owner actor or string bucket).",
+    )
+    actor_consistency: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Jaccard overlap of owner identities (actor UUID when set, else string bucket) between discussion and open execution items.",
     )
     explain: dict[str, str] = Field(default_factory=dict)
 
@@ -888,6 +1042,10 @@ class ManagerInsightsCoordinationSettingsDebug(BaseModel):
         ge=1,
         le=50,
         description="VECTOR_MANAGER_INSIGHTS_MAX_DECISIONS_SURFACED (§6 Step 28) — default cap before optional ?max_decisions=.",
+    )
+    llm_interpretation: bool = Field(
+        default=False,
+        description="VECTOR_MANAGER_INSIGHTS_LLM_INTERPRETATION — enrich decision rows with llm_* fields after compute_decisions.",
     )
 
 

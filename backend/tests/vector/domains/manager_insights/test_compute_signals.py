@@ -372,7 +372,7 @@ def test_compute_signals_balanced_dataset_produces_expected_vector() -> None:
     assert signals.coordination_role == "driving"
     assert signals.interaction_friction == "present"
     assert signals.discussion_churn == "moderate"  # §6 Step 20: discussed_not_linked gap + repeated-term highlight
-    assert len(signals.explain.keys()) == 17
+    assert len(signals.explain.keys()) == 20
     assert "§6 Step 20" in signals.explain["scope_ambiguity"]
     assert "§6 Step 20" in signals.explain["discussion_churn"]
     assert "§6 Step 20" in signals.explain["contradiction_density"]

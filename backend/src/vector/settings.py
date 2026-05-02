@@ -209,7 +209,7 @@ class Settings(BaseSettings):
         ),
     )
     vector_manager_insights_max_decisions_surfaced: int = Field(
-        default=3,
+        default=6,
         ge=1,
         le=50,
         validation_alias="VECTOR_MANAGER_INSIGHTS_MAX_DECISIONS_SURFACED",
@@ -224,6 +224,14 @@ class Settings(BaseSettings):
         description=(
             "§6 Step 38: allow POST …/decisions/{id}/apply with dry_run=false "
             "(Slack post_message + noop; persists receipt)."
+        ),
+    )
+    vector_manager_insights_llm_interpretation: bool = Field(
+        default=False,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_LLM_INTERPRETATION",
+        description=(
+            "§6 coordination: after deterministic compute_decisions, call a small LLM pass to fill "
+            "DecisionBundleItem.llm_headline / llm_explanation / llm_next_step only (no effect on selection)."
         ),
     )
     openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")

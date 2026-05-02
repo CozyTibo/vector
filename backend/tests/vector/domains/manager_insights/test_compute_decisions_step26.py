@@ -138,7 +138,7 @@ def test_step26_hold_start_emits_when_guards_pass() -> None:
     assert em.guard_open_execution_count_ok is True
     assert em.open_execution_count >= 3
     assert out.items[0].decision_debug is not None
-    assert out.items[0].decision_debug.matched_rule == "extension:hold_start_scope_cluster:v1"
+    assert out.items[0].decision_debug.matched_rule == "execution_situation:SCOPE_DRIFT:HOLD_START"
 
 
 def test_step26_hold_start_suppressed_when_decision_evidence_in_cluster() -> None:

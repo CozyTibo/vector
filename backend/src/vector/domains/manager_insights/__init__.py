@@ -24,6 +24,7 @@ from vector.contracts.manager_insights_activity import (
 from vector.domains.manager_insights.build_execution_graph import build_execution_graph
 from vector.domains.manager_insights.build_key_achievements import build_key_achievements
 from vector.domains.manager_insights.build_raw_highlights import build_raw_highlights
+from vector.domains.manager_insights.actor_resolve import make_actor_resolver
 from vector.domains.manager_insights.build_work_items import build_work_items
 from vector.domains.manager_insights.compute_decisions import compute_decisions
 from vector.domains.manager_insights.compute_gaps import compute_gaps
@@ -67,7 +68,7 @@ def _coordination_contracts_debug(
         id="coordination:contract:example",
         gap_id="coordination:contract:gap:example",
         gap_type="expected_not_executed",
-        decision_type="LINK_OR_CLOSE_COMMITMENT",
+        decision_type="VERIFY_STATUS",
         title="Example decision (contract QA only)",
         rationale=(
             "Validates DecisionItem JSON in fetch-debug; live fetch-debug rows come from "
@@ -85,7 +86,7 @@ def _coordination_contracts_debug(
         id="coordination:contract:example-2",
         gap_id="coordination:contract:gap:example-2",
         gap_type="discussed_not_linked_to_work",
-        decision_type="THREAD_TO_TRACKING_LINK",
+        decision_type="LINK_WORK",
         title="Second example (no row debug)",
         rationale="Demonstrates a bundle row without decision_debug.",
         default_action=DecisionDefaultAction(kind="noop"),
@@ -105,7 +106,7 @@ def _coordination_contracts_debug(
                 decision=decision_item_example,
                 decision_debug=DecisionRuleTraceDebug(
                     gap_id=decision_item_example.gap_id,
-                    matched_rule="gap:expected_not_executed:v1",
+                    matched_rule="gap:expected_not_executed:baseline",
                     conditions_met={"gap_present": True, "signal_tiebreak": False},
                 ),
             ),
@@ -187,7 +188,8 @@ def run_manager_insights_fetch_debug(
     merges perception text into term-based signals and uses the same merged adjacency as ``compute_gaps``.
 
     **§6 Step 19:** ``SignalsV0Debug`` includes ``scope_ambiguity``, ``discussion_churn``, ``contradiction_density``
-    (defaults + placeholder explain; **§6 Step 20** implements the predicates).
+    plus actor coordination metrics (``actor_fragmentation``, ``actor_load``, ``actor_consistency``); **§6 Step 20**
+    implements the coordination-extension predicates and actor metric explain strings in ``compute_signals``.
 
     **§6 Steps 22–23 + 25–26:** ``compute_decisions(...)`` builds the engine ``DecisionBundle`` (base mapping, Step 25
     extensions, Step 26 ``HOLD_START`` when guards pass + ``decision_emission_debug``); fetch-debug sets ``decisions``
@@ -219,7 +221,8 @@ def run_manager_insights_fetch_debug(
         as_of=as_of,
     )
     reliability = compute_data_reliability(bundle)
-    work_items = build_work_items(bundle)
+    resolve_actor = make_actor_resolver(session, tenant_id) if isinstance(session, Session) else None
+    work_items = build_work_items(bundle, resolve_actor=resolve_actor)
     perception_llm_effective = settings.vector_manager_insights_perception_llm or master_plan_debug
     perception_settings = settings.model_copy(
         update={"vector_manager_insights_perception_llm": perception_llm_effective}
@@ -338,6 +341,7 @@ def run_manager_insights_fetch_debug(
             gaps_use_graph=settings.vector_manager_insights_gaps_use_graph,
             hold_start_affected_wi_threshold=settings.vector_manager_insights_hold_start_affected_wi_threshold,
             max_decisions_surfaced=settings.vector_manager_insights_max_decisions_surfaced,
+            llm_interpretation=settings.vector_manager_insights_llm_interpretation,
         ),
         perception_qa=build_perception_qa_debug(
             settings,

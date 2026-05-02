@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import zlib
 from datetime import datetime
 from typing import Any
 
@@ -160,12 +161,20 @@ def _mock_slack_result(
         ts = str(r.get("ts") or "")
         if not ts:
             continue
+        user_display = str(r.get("user_email") or "")
+        slack_user_id = r.get("slack_user_id")
+        if not isinstance(slack_user_id, str) or not slack_user_id.strip():
+            if "@" in user_display:
+                slack_user_id = f"U_MOCK_{zlib.crc32(user_display.lower().encode()):08X}"
+            else:
+                slack_user_id = user_display if user_display else None
         sampled_messages.append(
             {
                 "channel_id": channel_id,
                 "thread_ts": ts,
                 "text": str(r.get("text") or ""),
-                "user": str(r.get("user_email") or ""),
+                "user": user_display,
+                "slack_user_id": slack_user_id,
                 "created_at": ts,
                 "updated_at": ts,
             }
@@ -247,6 +256,9 @@ def _mock_github_result(
                 "author": pr.get("user", {}).get("login")
                 if isinstance(pr.get("user"), dict) and isinstance(pr.get("user", {}).get("login"), str)
                 else None,
+                "author_id": str(pr.get("user", {}).get("id"))
+                if isinstance(pr.get("user"), dict) and pr.get("user", {}).get("id") is not None
+                else None,
                 "created_at": created_at if isinstance(created_at, str) else None,
                 "updated_at": updated_at if isinstance(updated_at, str) else None,
                 "closed_at": closed_at if isinstance(closed_at, str) else None,
@@ -274,6 +286,9 @@ def _mock_github_result(
                 "author": issue.get("user", {}).get("login")
                 if isinstance(issue.get("user"), dict)
                 and isinstance(issue.get("user", {}).get("login"), str)
+                else None,
+                "author_id": str(issue.get("user", {}).get("id"))
+                if isinstance(issue.get("user"), dict) and issue.get("user", {}).get("id") is not None
                 else None,
                 "created_at": created_at if isinstance(created_at, str) else None,
                 "updated_at": updated_at if isinstance(updated_at, str) else None,
@@ -350,6 +365,10 @@ def _mock_linear_result(
                 "assignee_name": issue.get("assignee", {}).get("name")
                 if isinstance(issue.get("assignee"), dict)
                 and isinstance(issue.get("assignee", {}).get("name"), str)
+                else None,
+                "assignee_id": issue.get("assignee", {}).get("id")
+                if isinstance(issue.get("assignee"), dict)
+                and isinstance(issue.get("assignee", {}).get("id"), str)
                 else None,
                 "created_at": created_at if isinstance(created_at, str) else None,
                 "updated_at": updated_at if isinstance(updated_at, str) else None,
@@ -620,12 +639,14 @@ def _fetch_slack(
                 txt = m.get("text")
                 if not isinstance(ts, str):
                     continue
+                slack_uid = m.get("user") if isinstance(m.get("user"), str) else None
                 sampled_messages.append(
                     {
                         "channel_id": ch_id,
                         "thread_ts": str(m.get("thread_ts") or ts),
                         "text": txt if isinstance(txt, str) else None,
-                        "user": m.get("user") if isinstance(m.get("user"), str) else None,
+                        "user": slack_uid,
+                        "slack_user_id": slack_uid,
                         "created_at": datetime.fromtimestamp(float(ts), tz=window_end.tzinfo).isoformat()
                         if ts.replace(".", "", 1).isdigit()
                         else None,
@@ -830,6 +851,9 @@ def _fetch_github(
                         if isinstance(one.get("user"), dict)
                         and isinstance(one.get("user", {}).get("login"), str)
                         else None,
+                        "author_id": str(one.get("user", {}).get("id"))
+                        if isinstance(one.get("user"), dict) and one.get("user", {}).get("id") is not None
+                        else None,
                         "created_at": one.get("created_at")
                         if isinstance(one.get("created_at"), str)
                         else None,
@@ -911,7 +935,7 @@ def _fetch_linear(
             updatedAt
             state { name }
             project { name }
-            assignee { name }
+            assignee { id name }
           }
           pageInfo { hasNextPage }
         }
@@ -1022,6 +1046,10 @@ def _fetch_linear(
                     "assignee_name": one.get("assignee", {}).get("name")
                     if isinstance(one.get("assignee"), dict)
                     and isinstance(one.get("assignee", {}).get("name"), str)
+                    else None,
+                    "assignee_id": one.get("assignee", {}).get("id")
+                    if isinstance(one.get("assignee"), dict)
+                    and isinstance(one.get("assignee", {}).get("id"), str)
                     else None,
                     "created_at": one.get("createdAt")
                     if isinstance(one.get("createdAt"), str)
@@ -1167,20 +1195,17 @@ def _fetch_notion(
             if not isinstance(page_id, str):
                 continue
             title = _notion_result_title(row)
+            last_edited = row.get("last_edited_by") if isinstance(row.get("last_edited_by"), dict) else {}
+            led_id = last_edited.get("id") if isinstance(last_edited.get("id"), str) else None
             sampled_pages.append(
                 {
                     "id": page_id,
                     "url": row.get("url") if isinstance(row.get("url"), str) else None,
                     "title": title,
-                    "owner": row.get("last_edited_by", {}).get("name")
-                    if isinstance(row.get("last_edited_by"), dict)
-                    and isinstance(row.get("last_edited_by", {}).get("name"), str)
-                    else (
-                        row.get("last_edited_by", {}).get("id")
-                        if isinstance(row.get("last_edited_by"), dict)
-                        and isinstance(row.get("last_edited_by", {}).get("id"), str)
-                        else None
-                    ),
+                    "owner": last_edited.get("name")
+                    if isinstance(last_edited.get("name"), str)
+                    else (led_id if isinstance(led_id, str) else None),
+                    "last_edited_by_id": led_id,
                     "last_edited_time": row.get("last_edited_time")
                     if isinstance(row.get("last_edited_time"), str)
                     else None,
@@ -1364,6 +1389,8 @@ def _fetch_calls(
                     continue
                 start = ev.get("start")
                 end = ev.get("end")
+                org = ev.get("organizer") if isinstance(ev.get("organizer"), dict) else {}
+                org_id = org.get("id") if isinstance(org.get("id"), str) else None
                 sampled_events.append(
                     {
                         "calendar_id": cal_id,
@@ -1374,10 +1401,8 @@ def _fetch_calls(
                         else None,
                         "status": ev.get("status") if isinstance(ev.get("status"), str) else None,
                         "html_link": ev.get("htmlLink") if isinstance(ev.get("htmlLink"), str) else None,
-                        "organizer_email": ev.get("organizer", {}).get("email")
-                        if isinstance(ev.get("organizer"), dict)
-                        and isinstance(ev.get("organizer", {}).get("email"), str)
-                        else None,
+                        "organizer_email": org.get("email") if isinstance(org.get("email"), str) else None,
+                        "organizer_id": org_id,
                         "created": ev.get("created") if isinstance(ev.get("created"), str) else None,
                         "updated": ev.get("updated") if isinstance(ev.get("updated"), str) else None,
                         "end": end.get("dateTime")

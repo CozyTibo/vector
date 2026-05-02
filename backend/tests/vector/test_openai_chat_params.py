@@ -1,4 +1,5 @@
 from vector.openai_chat_params import (
+    max_completion_tokens_for_manager_insights_decision_interpretation,
     max_completion_tokens_for_manager_insights_insights,
     max_completion_tokens_for_manager_insights_interpretations,
     max_completion_tokens_for_manager_insights_perception,
@@ -69,3 +70,8 @@ def test_manager_insights_step8_gpt4o_uses_default_cap() -> None:
 def test_manager_insights_perception_matches_interpretations_caps() -> None:
     assert max_completion_tokens_for_manager_insights_perception("gpt-5-mini") == 16_384
     assert max_completion_tokens_for_manager_insights_perception("gpt-4o-mini") == 4096
+
+
+def test_manager_insights_decision_interpretation_caps() -> None:
+    assert max_completion_tokens_for_manager_insights_decision_interpretation("gpt-5-mini") == 5120
+    assert max_completion_tokens_for_manager_insights_decision_interpretation("gpt-4o-mini") == 512

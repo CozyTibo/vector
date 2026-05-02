@@ -135,14 +135,15 @@ def test_fetch_debug_persist_on_writes_capped_rows_and_returns_ids(monkeypatch: 
     )
     assert out.perception_qa.query_persist_decisions is True
     assert out.decisions_prioritized is not None
-    assert len(out.decisions_prioritized) == 2
+    cap_n = min(2, len(out.decisions.items))
+    assert len(out.decisions_prioritized) == cap_n
     assert len(calls) == 1
     items, ranks = calls[0]
-    assert len(items) == 2
-    assert ranks == [1, 2]
+    assert len(items) == cap_n
+    assert ranks == list(range(1, cap_n + 1))
     assert out.decisions is not None
     full_order = prioritize_decisions(out.decisions, signals=out.signals)
-    assert [d.id for d in items] == [x.decision.id for x in full_order[:2]]
+    assert [d.id for d in items] == [x.decision.id for x in full_order[:cap_n]]
     expected_ids = [
         manager_insight_decision_id_for_engine_row(tenant_id=tid, engine_decision_id=d.id) for d in items
     ]

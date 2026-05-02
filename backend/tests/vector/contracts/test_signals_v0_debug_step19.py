@@ -26,6 +26,9 @@ def test_signals_v0_debug_step19_fields_default_low() -> None:
     assert s.scope_ambiguity == "low"
     assert s.discussion_churn == "low"
     assert s.contradiction_density == "low"
+    assert s.actor_fragmentation == 0
+    assert s.actor_load == 0
+    assert s.actor_consistency == 0.0
 
 
 def test_signals_v0_debug_round_trip_json_includes_step19_keys() -> None:
