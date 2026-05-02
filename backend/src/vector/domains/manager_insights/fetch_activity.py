@@ -423,6 +423,7 @@ def _mock_notion_result(
             "has_more": bool(notion.get("has_more")),
             "users_me_ok": bool(notion.get("users_me_ok", True)),
             "sampled_pages": filtered[:30],
+            "databases": notion.get("databases") if isinstance(notion.get("databases"), dict) else {},
         },
     )
 

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from mock_connectors.fixtures import execution_chaos as ex_chaos
 from mock_connectors.fixtures import execution_stories as ex
 from mock_connectors.fixtures import manager_insights_scenarios as mis
 from mock_connectors.fixtures import nexora_content as nx
@@ -200,12 +201,23 @@ def generate_dataset(seed: int) -> MockDataset:
     mis.extend_slack_events(slack_events, seed=seed, t0=t0, linear_nex105_id=nex105_id)
     mis.extend_slack_for_nex300_completion(slack_events, seed=seed, t0=t0)
     mis.extend_calls_package(calls_pkg, seed=seed, t0=t0)
+    chaos_tags = ex_chaos.apply_execution_chaos(
+        seed,
+        t0,
+        end,
+        users,
+        linear_pkg,
+        gh_pkg,
+        slack_events,
+        notion_pkg,
+        calls_pkg,
+    )
     mi_errs = mis.validate_manager_insight_dataset_strength(linear_pkg, gh_pkg, slack_events, calls_pkg)
     if mi_errs:
         raise RuntimeError("manager_insights_mock_dataset: " + "; ".join(mi_errs))
     edges = _build_edges(linear_pkg, gh_pkg, users)
     patterns = _verify_patterns(linear_pkg, gh_pkg, slack_events)
-    patterns = sorted(set(patterns) | set(mis.scenario_coverage_tags()))
+    patterns = sorted(set(patterns) | set(mis.scenario_coverage_tags()) | set(chaos_tags))
     mi_evidence = mis.manager_insights_evidence(linear_pkg, gh_pkg, slack_events, calls_pkg)
 
     return MockDataset(
@@ -225,6 +237,7 @@ def generate_dataset(seed: int) -> MockDataset:
             "product": nx.NEXORA_BLURB,
             "manager_insight_scenarios": mis.scenario_coverage_tags(),
             "manager_insights_evidence": mi_evidence,
+            "execution_chaos_tags": chaos_tags,
         },
     )
 

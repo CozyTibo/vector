@@ -64,7 +64,12 @@ def build_admin_router() -> APIRouter:
                 "workflow_states": len(lin["workflowStates"]),
             },
             "slack": {"events": len(slack_events)},
-            "notion": {"pages": len(notion.get("sampled_pages", []))},
+            "notion": {
+                "pages": len(notion.get("sampled_pages", [])),
+                "databases": len((notion.get("databases") or {}).keys())
+                if isinstance(notion.get("databases"), dict)
+                else 0,
+            },
             "calls": {"events": len(calls.get("sampled_events", []))},
         }
 

@@ -1126,6 +1126,993 @@ function humanDecisionTypeLabel(t: CoordinationDecisionType): string {
   return map[t] ?? t.replace(/_/g, " ");
 }
 
+/** Short category label for debug JSON (replaces raw `gap_type`). */
+function humanGapKindLabel(gapType: GapType): string {
+  const m: Record<GapType, string> = {
+    expected_not_executed: "Commitment vs execution",
+    discussed_not_linked_to_work: "Discussion vs tracking",
+    blocker_not_tracked: "Blocker tracking",
+    doc_not_connected_to_execution: "Documentation vs execution",
+  };
+  return m[gapType];
+}
+
+/** One-line human situation for a gap type — never raw enum strings. */
+function humanGapSituationLine(gapType: GapType): string {
+  const m: Record<GapType, string> = {
+    expected_not_executed:
+      "Something was committed or expected in conversation, but there’s no matching tracked execution item yet.",
+    discussed_not_linked_to_work:
+      "People discussed work in Slack or threads, but nothing is linked to an issue or PR.",
+    blocker_not_tracked: "A blocker was mentioned, but it isn’t represented as a tracked issue or PR.",
+    doc_not_connected_to_execution: "Documentation moved, but there’s no linked task or PR carrying execution forward.",
+  };
+  return m[gapType];
+}
+
+/** Tighter context copy for alert-style cards. */
+function humanGapSituationTight(gapType: GapType): string {
+  const m: Record<GapType, string> = {
+    expected_not_executed: "Commitment shows up in conversation, but nothing in tracking shows execution.",
+    discussed_not_linked_to_work: "Discussion is happening, but no issue or PR captures it.",
+    blocker_not_tracked: "Blocker discussed, but no issue or PR exists to track it.",
+    doc_not_connected_to_execution: "Docs moved, but no execution task or PR is tied to the change.",
+  };
+  return m[gapType];
+}
+
+/** Short clause for titles — concrete, no snake_case. */
+function humanGapTitleClause(gapType: GapType): string {
+  const m: Record<GapType, string> = {
+    expected_not_executed: "no tracked follow-through yet",
+    discussed_not_linked_to_work: "discussion not linked to tracking",
+    blocker_not_tracked: "blocker not tracked",
+    doc_not_connected_to_execution: "doc not tied to execution",
+  };
+  return m[gapType];
+}
+
+type EvidenceRow = ManagerInsightFetchDebugResponse["evidence"]["action_items"][number];
+
+function buildEvidenceById(data: ManagerInsightFetchDebugResponse): Map<string, EvidenceRow> {
+  const m = new Map<string, EvidenceRow>();
+  for (const x of data.evidence.action_items) {
+    m.set(x.id, x);
+  }
+  for (const x of data.evidence.blockers) {
+    m.set(x.id, x);
+  }
+  for (const x of data.evidence.decisions) {
+    m.set(x.id, x);
+  }
+  return m;
+}
+
+/** First evidence row for headline anchoring (same resolution order as card snippets). */
+function findFirstEvidenceRow(
+  refs: string[],
+  evById: Map<string, EvidenceRow>,
+  data: ManagerInsightFetchDebugResponse,
+): EvidenceRow | null {
+  for (const ref of refs) {
+    const evRow = evById.get(ref);
+    const ev =
+      evRow ??
+      [...data.evidence.action_items, ...data.evidence.blockers, ...data.evidence.decisions].find(
+        (e) => e.source_work_item_id === ref,
+      );
+    if (!ev) {
+      continue;
+    }
+    const text = (ev.evidence || ev.statement).trim();
+    if (text) {
+      return ev;
+    }
+  }
+  return null;
+}
+
+function workItemsById(data: ManagerInsightFetchDebugResponse): Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]> {
+  return new Map(data.work_items.items.map((w) => [w.id, w]));
+}
+
+/** Short label for chips / titles: issue keys, PR numbers, or trimmed title. */
+function artifactLabel(wi: ManagerInsightFetchDebugResponse["work_items"]["items"][number]): string {
+  const id = wi.id;
+  const issueKey = id.match(/(?:linear:issue:|github:issue:)([\w-]+)/i);
+  if (issueKey) {
+    return issueKey[1];
+  }
+  if (wi.type === "pull_request") {
+    const tail = id.split("/").pop() ?? id.split(":").pop() ?? "";
+    const digits = tail.replace(/\D/g, "");
+    return digits ? `PR #${digits}` : wi.title.trim().slice(0, 48) || "Pull request";
+  }
+  if (wi.type === "issue") {
+    return wi.title.trim().slice(0, 56) || "Issue";
+  }
+  if (wi.type === "document") {
+    return wi.title.trim().slice(0, 48) || "Doc";
+  }
+  if (wi.type === "message_thread" || wi.type === "call") {
+    return wi.title.trim().slice(0, 40) || (wi.type === "message_thread" ? "Slack thread" : "Call");
+  }
+  return wi.title.trim().slice(0, 48) || "Work item";
+}
+
+function ownerFirstToken(owner: string | null): string | null {
+  if (!owner?.trim()) {
+    return null;
+  }
+  const s = owner.split(/[@(<]/)[0]?.trim();
+  if (!s) {
+    return null;
+  }
+  return s.split(/\s+/)[0] ?? null;
+}
+
+function connectorPlaceLabel(source: ManagerInsightConnector): string {
+  const m: Record<ManagerInsightConnector, string> = {
+    slack: "Slack",
+    github: "GitHub",
+    linear: "Linear",
+    notion: "Notion",
+    calls: "Call",
+  };
+  return m[source];
+}
+
+/** Best-effort Slack user id → display name from connector payload (no backend change). */
+function buildSlackUserLookupFromFetch(fetch: ManagerInsightFetchDebugResponse["fetch"]): Map<string, string> {
+  const m = new Map<string, string>();
+  const walk = (o: unknown, depth: number) => {
+    if (depth > 12 || o === null || o === undefined) {
+      return;
+    }
+    if (typeof o === "string" || typeof o === "number" || typeof o === "boolean") {
+      return;
+    }
+    if (Array.isArray(o)) {
+      for (const x of o) {
+        walk(x, depth + 1);
+      }
+      return;
+    }
+    const r = o as Record<string, unknown>;
+    const id = r.user_id ?? r.id;
+    const name =
+      (typeof r.real_name === "string" && r.real_name) ||
+      (typeof r.display_name === "string" && r.display_name) ||
+      (typeof r.name === "string" && r.name && String(r.name).length < 48 ? String(r.name) : "");
+    if (typeof id === "string" && id.startsWith("U") && name) {
+      m.set(id, name.split(/\s+/)[0] ?? name);
+    }
+    if (typeof r.user === "string" && typeof r.user_profile === "object" && r.user_profile) {
+      const p = r.user_profile as Record<string, unknown>;
+      const dn = typeof p.display_name === "string" ? p.display_name : typeof p.real_name === "string" ? p.real_name : "";
+      if (dn) {
+        m.set(r.user, dn.split(/\s+/)[0] ?? dn);
+      }
+    }
+    for (const v of Object.values(r)) {
+      walk(v, depth + 1);
+    }
+  };
+  for (const c of Object.values(fetch.connectors)) {
+    walk(c.payload, 0);
+  }
+  return m;
+}
+
+function sourceRefAuthorHints(sr: Record<string, string>): string | null {
+  const keys = ["user_display_name", "display_name", "real_name", "user_name", "username", "author", "author_name"];
+  for (const k of keys) {
+    const v = sr[k];
+    if (typeof v === "string" && v.trim()) {
+      return ownerFirstToken(v.trim()) ?? v.trim().split(/\s+/)[0] ?? null;
+    }
+  }
+  return null;
+}
+
+function inferAuthorForEvidence(
+  ev: EvidenceRow,
+  wi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | undefined,
+  slackLookup: Map<string, string>,
+): string {
+  const hint = sourceRefAuthorHints(ev.source_ref);
+  if (hint) {
+    return hint;
+  }
+  const uid =
+    typeof ev.source_ref.user_id === "string"
+      ? ev.source_ref.user_id
+      : typeof ev.source_ref.slack_user_id === "string"
+        ? ev.source_ref.slack_user_id
+        : null;
+  if (uid && slackLookup.has(uid)) {
+    return slackLookup.get(uid)!;
+  }
+  if (wi?.owner) {
+    const o = ownerFirstToken(wi.owner);
+    if (o) {
+      return o;
+    }
+  }
+  if (wi?.participants?.length) {
+    for (const p of wi.participants) {
+      const t = ownerFirstToken(p);
+      if (t) {
+        return t;
+      }
+    }
+  }
+  return "Someone";
+}
+
+function slackThreadHint(wi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | undefined): string | null {
+  if (!wi) {
+    return null;
+  }
+  const t = wi.title.match(/#[\w-]+/);
+  return t ? t[0] : null;
+}
+
+function sourceLabelForSnippet(ev: EvidenceRow): string {
+  const c = ev.source_connector;
+  if (c === "github" && ev.source_type === "pull_request") {
+    return "GitHub PR";
+  }
+  if (c === "github") {
+    return "GitHub";
+  }
+  if (c === "linear") {
+    return "Linear";
+  }
+  return connectorPlaceLabel(c);
+}
+
+function buildImpactLine(
+  gapType: GapType,
+  signals: ManagerInsightFetchDebugResponse["signals"],
+  decisionType: CoordinationDecisionType,
+): string {
+  if (signals.urgent_pressure === "high" && (gapType === "blocker_not_tracked" || gapType === "discussed_not_linked_to_work")) {
+    return "Release progress is blocked right now.";
+  }
+  if (signals.execution_momentum === "slowing") {
+    return "Momentum is slowing — the team needs a clear tracked path.";
+  }
+  if (signals.scope_ambiguity === "high" && (decisionType === "CLARIFY_SPEC" || decisionType === "HOLD_START")) {
+    return "Scope is unclear — execution risk stays high until owners pin scope.";
+  }
+  if (gapType === "blocker_not_tracked") {
+    return "No tracked owner or ticket ties the risk to an issue — execution can’t rely on it.";
+  }
+  if (gapType === "expected_not_executed") {
+    return "Follow-through isn’t visible in tracking — accountability and planning suffer.";
+  }
+  if (gapType === "discussed_not_linked_to_work") {
+    return "Work is happening off-ticket — reviews and sequencing miss it.";
+  }
+  if (gapType === "doc_not_connected_to_execution") {
+    return "Execution can’t proceed safely until work is wired to a tracked task.";
+  }
+  return "Resolve this to unblock coordinated execution.";
+}
+
+function buildNextStepHint(decisionType: CoordinationDecisionType): string {
+  const m: Partial<Record<CoordinationDecisionType, string>> = {
+    LINK_OR_CLOSE_COMMITMENT: "Create or close the link between chat and a tracked issue.",
+    THREAD_TO_TRACKING_LINK: "Link this thread to an issue or PR so the team can execute.",
+    BLOCKER_ESCALATION: "File or link an issue and assign an owner for the blocker.",
+    DOC_EXECUTION_BRIDGE: "Attach a task or PR so doc changes drive execution.",
+    HOLD_START: "Pause new scope until owners and tracking are explicit.",
+    CLARIFY_SPEC: "Clarify owners and scope before more build work lands.",
+    RECENTER: "Reset scope with the right owners before continuing.",
+    PAUSE_INVESTMENT: "Stop incremental spend until tracking matches reality.",
+  };
+  return m[decisionType] ?? "Add tracking so the team can ship with confidence.";
+}
+
+/**
+ * Impact-first title: concrete object + action — no “this/that”, no bare “the blocker”.
+ * Anchor priority: work item key/title → person → Slack channel → evidence hook.
+ */
+function buildAlertHeadline(
+  gapType: GapType,
+  signals: ManagerInsightFetchDebugResponse["signals"],
+  decisionType: CoordinationDecisionType,
+  primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null,
+  artifact: string | null,
+  ownerFirst: string | null,
+  issueKeyShort: string | null,
+  firstEvidence: { text: string; author: string } | null,
+): string {
+  const ch = channelFromWorkItem(primaryWi);
+  const hook = firstEvidence ? evidenceHookFromText(firstEvidence.text) : null;
+  const namedAuthor =
+    firstEvidence && firstEvidence.author !== "Someone" ? firstEvidence.author : null;
+  const person = namedAuthor ?? ownerFirst;
+  const obj = concreteObjectLabelForHeadline(primaryWi, issueKeyShort, artifact, firstEvidence);
+  const vagueObject = obj === "untracked coordination gap";
+
+  if (gapType === "blocker_not_tracked") {
+    if (signals.urgent_pressure === "high" && issueKeyShort) {
+      return headlineCapWords(`Release blocked — track ${issueKeyShort} in issues or PRs`);
+    }
+    if (issueKeyShort) {
+      return headlineCapWords(`${issueKeyShort} cannot ship — add tracked issue or pull request`);
+    }
+    if (ch && hook && person) {
+      return headlineCapWords(`Create issue from ${ch} note — ${hook} (${person})`);
+    }
+    if (ch && hook) {
+      return headlineCapWords(`Track ${ch} blocker — ${hook}`);
+    }
+    if (ch && person) {
+      return headlineCapWords(`Assign owner to ${ch} blocker raised by ${person}`);
+    }
+    if (ch) {
+      return headlineCapWords(`Track ${ch} blocker in issues or pull requests`);
+    }
+    if (person && hook) {
+      return headlineCapWords(`Track blocker ${person} flagged — ${hook}`);
+    }
+    if (hook) {
+      return headlineCapWords(`Track Slack-reported blocker — ${hook}`);
+    }
+    if (person) {
+      return headlineCapWords(`Assign owner to blocker raised by ${person}`);
+    }
+    return headlineCapWords(
+      vagueObject ? `Add issue or pull request for reported release blocker` : `Add tracked issue for ${obj}`,
+    );
+  }
+
+  if (gapType === "discussed_not_linked_to_work") {
+    if (decisionType === "HOLD_START") {
+      return headlineCapWords(`Hold new scope — pin tracking for ${issueKeyShort ?? (vagueObject ? "owners" : obj)}`);
+    }
+    if (issueKeyShort) {
+      return headlineCapWords(`Link active discussion to ${issueKeyShort} or new issue`);
+    }
+    if (ch && hook) {
+      return headlineCapWords(`Link ${ch} thread to tracked work — ${hook}`);
+    }
+    if (ch) {
+      return headlineCapWords(`Link ${ch} discussion to issue or pull request`);
+    }
+    if (person) {
+      return headlineCapWords(`Connect ${person}'s discussion to tracked issue or PR`);
+    }
+    return headlineCapWords(
+      vagueObject ? `Link off-ticket discussion to issue or pull request` : `Connect discussion to tracking — ${obj}`,
+    );
+  }
+
+  if (gapType === "expected_not_executed") {
+    if (issueKeyShort && person) {
+      return headlineCapWords(`Match ${issueKeyShort} to ${person}'s commitment in tracking`);
+    }
+    if (issueKeyShort) {
+      return headlineCapWords(`Show tracked execution for ${issueKeyShort} commitments`);
+    }
+    if (person && !vagueObject && obj !== person) {
+      return headlineCapWords(`Assign owner to ${obj} — ${person}'s commitment`);
+    }
+    if (person) {
+      return headlineCapWords(`Surface ${person}'s commitment in tracked issues`);
+    }
+    return headlineCapWords(
+      vagueObject ? `Surface commitment in tracked issues or pull requests` : `Surface commitment tied to ${obj}`,
+    );
+  }
+
+  if (gapType === "doc_not_connected_to_execution") {
+    const docTitle =
+      primaryWi?.type === "document"
+        ? truncateTitleWords(scrubVagueHeadlineWords(primaryWi.title), 8)
+        : truncateTitleWords(scrubVagueHeadlineWords(obj), 8);
+    return headlineCapWords(`Wire ${docTitle} to execution task or pull request`);
+  }
+
+  return headlineCapWords(
+    vagueObject ? `Add tracked issue or pull request for open work` : `Add tracking for ${obj}`,
+  );
+}
+
+function computeBlastRadiusLine(
+  data: ManagerInsightFetchDebugResponse,
+  refs: string[],
+  wiById: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+  evById: Map<string, EvidenceRow>,
+): string | null {
+  const cluster = new Set<string>();
+  for (const r of refs) {
+    const w = wiById.get(r);
+    if (w) {
+      cluster.add(w.id);
+    }
+    const ev = evById.get(r);
+    if (ev) {
+      cluster.add(ev.source_work_item_id);
+    }
+  }
+  for (const link of data.links.links) {
+    if (cluster.has(link.from_work_item_id) || cluster.has(link.to_work_item_id)) {
+      cluster.add(link.from_work_item_id);
+      cluster.add(link.to_work_item_id);
+    }
+  }
+  const eg = data.execution_graph;
+  if (eg && Array.isArray(eg.edges)) {
+    for (const e of eg.edges as Array<Record<string, unknown>>) {
+      const a = typeof e.from_id === "string" ? e.from_id : typeof e.from === "string" ? e.from : null;
+      const b = typeof e.to_id === "string" ? e.to_id : typeof e.to === "string" ? e.to : null;
+      if (a && b && (cluster.has(a) || cluster.has(b))) {
+        cluster.add(a);
+        cluster.add(b);
+      }
+    }
+  }
+  const n = cluster.size;
+  if (n === 0) {
+    return null;
+  }
+  let threads = 0;
+  const people = new Set<string>();
+  for (const id of cluster) {
+    const w = wiById.get(id);
+    if (w?.type === "message_thread") {
+      threads += 1;
+    }
+    const o = ownerFirstToken(w?.owner ?? null);
+    if (o) {
+      people.add(o);
+    }
+    for (const p of w?.participants ?? []) {
+      const t = ownerFirstToken(p);
+      if (t) {
+        people.add(t);
+      }
+    }
+  }
+  const bits: string[] = [];
+  bits.push(`Touches ${n} work item${n === 1 ? "" : "s"}`);
+  if (threads > 0) {
+    bits.push(`across ${threads} thread${threads === 1 ? "" : "s"}`);
+  }
+  if (people.size > 0) {
+    bits.push(`${people.size} engineer${people.size === 1 ? "" : "s"} in the loop`);
+  }
+  return bits.join(" · ");
+}
+
+function extractIssueKeyForHeadline(
+  wis: ManagerInsightFetchDebugResponse["work_items"]["items"][number][],
+): string | null {
+  for (const w of wis) {
+    const id = w.id;
+    const m = id.match(/(?:linear:issue:|github:issue:)([\w-]+)/i);
+    if (m) {
+      return m[1];
+    }
+    if (w.type === "pull_request") {
+      return artifactLabel(w);
+    }
+  }
+  for (const w of wis) {
+    if (w.type === "issue") {
+      const t = w.title.trim();
+      const keyLike = t.match(/^[\w]+-\d+/);
+      if (keyLike) {
+        return keyLike[0];
+      }
+    }
+  }
+  return null;
+}
+
+const HEADLINE_MAX_WORDS = 12;
+
+function truncateTitleWords(s: string, maxWords: number): string {
+  const parts = s.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= maxWords) {
+    return parts.join(" ");
+  }
+  return parts.slice(0, maxWords).join(" ");
+}
+
+/** Remove vague demonstratives from free-text anchors — whole words only. */
+function scrubVagueHeadlineWords(s: string): string {
+  return s
+    .replace(/\b(this|that)\b/gi, "")
+    .replace(/\bthe\s+blocker\b/gi, "untracked blocker")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function headlineCapWords(s: string, maxWords: number = HEADLINE_MAX_WORDS): string {
+  const parts = s.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= maxWords) {
+    return parts.join(" ");
+  }
+  return `${parts.slice(0, maxWords).join(" ")}…`;
+}
+
+/** Short hook from evidence for titles — no LLM, deterministic trim + scrub. */
+function evidenceHookFromText(raw: string | null): string | null {
+  if (!raw?.trim()) {
+    return null;
+  }
+  let t = raw.trim().replace(/^["'`\s]+|["'`\s]+$/g, "").trim();
+  t = scrubVagueHeadlineWords(t);
+  t = truncateTitleWords(t, 7);
+  return t || null;
+}
+
+function channelFromWorkItem(wi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null): string | null {
+  if (!wi) {
+    return null;
+  }
+  const fromTitle = wi.title.match(/#[\w-]+/);
+  if (fromTitle) {
+    return fromTitle[0];
+  }
+  for (const k of ["channel_name", "channel"]) {
+    const v = wi.source_ref[k];
+    if (typeof v === "string" && v.trim()) {
+      const c = v.trim();
+      if (c.startsWith("C") && c.length <= 12) {
+        continue;
+      }
+      return c.startsWith("#") ? c : `#${c.replace(/^#/, "")}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Best single concrete noun phrase for the decision (issue key / PR / doc / channel / evidence hook).
+ * Priority: tracked key → typed title → channel → evidence hook → artifact label.
+ */
+function concreteObjectLabelForHeadline(
+  primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null,
+  issueKeyShort: string | null,
+  artifact: string | null,
+  firstEvidence: { text: string; author: string } | null,
+): string {
+  if (issueKeyShort) {
+    return issueKeyShort;
+  }
+  if (primaryWi) {
+    if (primaryWi.type === "issue") {
+      const keyLike = primaryWi.title.match(/^([\w]+-\d+)/);
+      if (keyLike) {
+        return keyLike[1];
+      }
+      return truncateTitleWords(scrubVagueHeadlineWords(primaryWi.title), 6);
+    }
+    if (primaryWi.type === "pull_request") {
+      return artifact ?? artifactLabel(primaryWi);
+    }
+    if (primaryWi.type === "document") {
+      return truncateTitleWords(scrubVagueHeadlineWords(primaryWi.title), 8);
+    }
+    if (primaryWi.type === "message_thread") {
+      const ch = channelFromWorkItem(primaryWi);
+      if (ch) {
+        return ch;
+      }
+      return truncateTitleWords(scrubVagueHeadlineWords(primaryWi.title.replace(/^Slack:?\s*/i, "")), 6);
+    }
+  }
+  const hook = firstEvidence ? evidenceHookFromText(firstEvidence.text) : null;
+  if (hook) {
+    return hook;
+  }
+  if (artifact?.trim() && !/^slack thread$/i.test(artifact.trim()) && !/^work item$/i.test(artifact.trim())) {
+    return scrubVagueHeadlineWords(artifact.trim());
+  }
+  return "untracked coordination gap";
+}
+
+type PerceptionAcceptedRow = {
+  work_item_id?: string;
+  statement?: string;
+  quote?: string;
+  waits_on?: string[];
+  blocked_by?: string[];
+  kind?: string;
+};
+
+function parsePerceptionAccepted(perception: Record<string, unknown> | null): PerceptionAcceptedRow[] {
+  if (!perception) {
+    return [];
+  }
+  const raw = perception.accepted;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter(isRecord) as PerceptionAcceptedRow[];
+}
+
+/** `evidence_refs` may list work item ids or evidence item ids — normalize to work items. */
+function workItemsFromEvidenceRefs(
+  refs: string[],
+  wiById: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+  evById: Map<string, EvidenceRow>,
+): ManagerInsightFetchDebugResponse["work_items"]["items"][number][] {
+  const out: ManagerInsightFetchDebugResponse["work_items"]["items"][number][] = [];
+  const seen = new Set<string>();
+  for (const r of refs) {
+    const direct = wiById.get(r);
+    if (direct) {
+      if (!seen.has(direct.id)) {
+        seen.add(direct.id);
+        out.push(direct);
+      }
+      continue;
+    }
+    const ev = evById.get(r);
+    if (ev) {
+      const w = wiById.get(ev.source_work_item_id);
+      if (w && !seen.has(w.id)) {
+        seen.add(w.id);
+        out.push(w);
+      }
+    }
+  }
+  return out;
+}
+
+function pickPrimaryWorkItem(
+  refs: string[],
+  wiById: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+  evById: Map<string, EvidenceRow>,
+): ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null {
+  const candidates = workItemsFromEvidenceRefs(refs, wiById, evById);
+  if (candidates.length === 0) {
+    return null;
+  }
+  const pr = candidates.find((w) => w.type === "pull_request");
+  if (pr) {
+    return pr;
+  }
+  const issue = candidates.find((w) => w.type === "issue");
+  if (issue) {
+    return issue;
+  }
+  return candidates[0];
+}
+
+type EvidencePreviewEntry = {
+  author: string;
+  sourceLabel: string;
+  quote: string;
+  threadHint: string | null;
+};
+
+type PrioritizedDecisionPresentation = {
+  headline: string;
+  impactLine: string;
+  nextStepLine: string;
+  contextLine: string;
+  blastRadius: string | null;
+  chips: Array<{ key: string; emoji: string; label: string }>;
+  evidencePreview: EvidencePreviewEntry[];
+};
+
+/** Pure presentation mapping — uses perception, evidence, gaps, work items, signals, links, graph; never surfaces gap_id. */
+function buildPrioritizedDecisionPresentation(
+  data: ManagerInsightFetchDebugResponse,
+  row: CoordinationDecisionBundleExample["items"][number],
+): PrioritizedDecisionPresentation {
+  const wiMap = workItemsById(data);
+  const evById = buildEvidenceById(data);
+  const slackUsers = buildSlackUserLookupFromFetch(data.fetch);
+  const gap = data.gaps.gaps.find((g) => g.id === row.decision.gap_id);
+  const gapType = row.decision.gap_type;
+  const refs = row.decision.evidence_refs;
+  const primaryWi = pickPrimaryWorkItem(refs, wiMap, evById);
+  const accepted = parsePerceptionAccepted(data.perception);
+  const expandedRefSet = new Set<string>();
+  for (const r of refs) {
+    expandedRefSet.add(r);
+    const ev = evById.get(r);
+    if (ev) {
+      expandedRefSet.add(ev.source_work_item_id);
+    }
+  }
+  const perceptionForGap = accepted.filter((p) => p.work_item_id && expandedRefSet.has(p.work_item_id));
+
+  const ownerName = primaryWi ? ownerFirstToken(primaryWi.owner) : null;
+  const artifact = primaryWi ? artifactLabel(primaryWi) : null;
+  const wisCluster = workItemsFromEvidenceRefs(refs, wiMap, evById);
+  const issueKeyShort = extractIssueKeyForHeadline(wisCluster);
+
+  const firstEvRow = findFirstEvidenceRow(refs, evById, data);
+  const firstEvidenceHeadline = firstEvRow
+    ? {
+        text: (firstEvRow.evidence || firstEvRow.statement).trim(),
+        author: inferAuthorForEvidence(firstEvRow, wiMap.get(firstEvRow.source_work_item_id), slackUsers),
+      }
+    : null;
+
+  const headline = buildAlertHeadline(
+    gapType,
+    data.signals,
+    row.decision.decision_type,
+    primaryWi,
+    artifact,
+    ownerName,
+    issueKeyShort,
+    firstEvidenceHeadline,
+  );
+  const impactLine = buildImpactLine(gapType, data.signals, row.decision.decision_type);
+  const nextStepLine = buildNextStepHint(row.decision.decision_type);
+
+  let contextLine = "";
+  if (gap?.description?.trim()) {
+    let d = gap.description.trim();
+    if (d.length > 200) {
+      const cut = d.slice(0, 197);
+      const sp = cut.lastIndexOf(" ");
+      d = (sp > 60 ? cut.slice(0, sp) : cut) + "…";
+    }
+    contextLine = d;
+  } else if (perceptionForGap.length > 0) {
+    const p = perceptionForGap[0];
+    contextLine = (p.statement ?? p.quote ?? "").trim() || humanGapSituationTight(gapType);
+  } else {
+    contextLine = humanGapSituationTight(gapType);
+  }
+
+  const chips: PrioritizedDecisionPresentation["chips"] = [];
+  const seenChip = new Set<string>();
+
+  const pushChip = (emoji: string, label: string, key: string) => {
+    const k = `${emoji}:${label}`;
+    if (seenChip.has(k) || chips.length >= 8) {
+      return;
+    }
+    seenChip.add(k);
+    chips.push({ emoji, label, key });
+  };
+
+  if (ownerName) {
+    pushChip("👤", ownerName, "owner");
+  }
+  for (const p of perceptionForGap) {
+    for (const w of p.waits_on ?? []) {
+      const label = w.replace(/^@/, "").trim();
+      if (label) {
+        pushChip("👤", label, `wait-${label}`);
+      }
+    }
+  }
+  if (primaryWi) {
+    pushChip("🔧", artifactLabel(primaryWi), `wi-${primaryWi.id}`);
+  }
+  const secondaryWis = wisCluster.filter((w) => w.id !== primaryWi?.id);
+  for (const w of secondaryWis.slice(0, 2)) {
+    pushChip("🔧", artifactLabel(w), `ref-${w.id}`);
+  }
+  if (primaryWi) {
+    pushChip("📍", connectorPlaceLabel(primaryWi.source), `src-${primaryWi.source}`);
+    const th = slackThreadHint(primaryWi);
+    if (th) {
+      pushChip("💬", th, "thread-hint");
+    }
+  } else if (refs.length) {
+    const w = wiMap.get(refs[0]) ?? wisCluster[0];
+    if (w) {
+      pushChip("📍", connectorPlaceLabel(w.source), `src-${w.source}`);
+    }
+  }
+
+  const evidencePreview: EvidencePreviewEntry[] = [];
+  const seenSnip = new Set<string>();
+  for (const ref of refs) {
+    if (evidencePreview.length >= 2) {
+      break;
+    }
+    const evRow = evById.get(ref);
+    const ev = evRow
+      ? evRow
+      : [...data.evidence.action_items, ...data.evidence.blockers, ...data.evidence.decisions].find(
+          (e) => e.source_work_item_id === ref,
+        );
+    if (!ev) {
+      continue;
+    }
+    const text = (ev.evidence || ev.statement).trim();
+    if (!text || seenSnip.has(text)) {
+      continue;
+    }
+    seenSnip.add(text);
+    const wi = wiMap.get(ev.source_work_item_id);
+    const author = inferAuthorForEvidence(ev, wi, slackUsers);
+    const quote = text.length > 220 ? text.slice(0, 217) + "…" : text;
+    evidencePreview.push({
+      author,
+      sourceLabel: sourceLabelForSnippet(ev),
+      quote,
+      threadHint: slackThreadHint(wi),
+    });
+  }
+  if (evidencePreview.length === 0 && perceptionForGap.length > 0) {
+    const q = (perceptionForGap[0].quote ?? perceptionForGap[0].statement ?? "").trim();
+    if (q) {
+      const wiP = perceptionForGap[0].work_item_id ? wiMap.get(perceptionForGap[0].work_item_id!) : undefined;
+      evidencePreview.push({
+        author: wiP?.owner ? ownerFirstToken(wiP.owner) ?? "Someone" : "Someone",
+        sourceLabel: "Perception",
+        quote: q.length > 220 ? q.slice(0, 217) + "…" : q,
+        threadHint: slackThreadHint(wiP),
+      });
+    }
+  }
+
+  const blastRadius = computeBlastRadiusLine(data, refs, wiMap, evById);
+
+  return { headline, impactLine, nextStepLine, contextLine, blastRadius, chips, evidencePreview };
+}
+
+/** Debug JSON without `gap_id` / raw `gap_type` (operator-safe expandable). */
+function decisionBundleItemWithoutGapIds(row: CoordinationDecisionBundleExample["items"][number]): unknown {
+  const clone = JSON.parse(JSON.stringify(row)) as {
+    decision: CoordinationDecisionBundleExample["items"][number]["decision"] & {
+      gap_id?: string;
+      gap_type?: GapType;
+    };
+    decision_debug: { gap_id?: string } | null;
+  };
+  if (clone.decision.gap_id !== undefined) {
+    delete clone.decision.gap_id;
+  }
+  if (clone.decision.gap_type !== undefined) {
+    const gt = clone.decision.gap_type;
+    delete clone.decision.gap_type;
+    (clone.decision as Record<string, unknown>).gap_kind = humanGapKindLabel(gt);
+  }
+  if (clone.decision_debug?.gap_id !== undefined) {
+    delete clone.decision_debug.gap_id;
+  }
+  return clone;
+}
+
+function PrioritizedDecisionCard(props: {
+  data: ManagerInsightFetchDebugResponse;
+  row: CoordinationDecisionBundleExample["items"][number];
+  rank: number;
+  density?: "comfortable" | "compact";
+  "data-testid"?: string;
+}) {
+  const { data, row, rank, density = "comfortable", "data-testid": tid } = props;
+  const pres = buildPrioritizedDecisionPresentation(data, row);
+  const loose = density === "comfortable";
+  const isTop = rank === 1;
+  return (
+    <li
+      className={`group rounded-2xl border bg-white transition-all duration-200 ease-out ${
+        isTop
+          ? `border-orange-200/90 border-l-[5px] border-l-orange-500 bg-gradient-to-br from-orange-50/50 via-white to-white ${
+              loose ? "p-7 shadow-lg ring-1 ring-orange-200/50" : "p-5 shadow-md ring-1 ring-orange-200/40"
+            } hover:-translate-y-0.5 hover:shadow-xl`
+          : `border-slate-200/80 ${
+              loose ? "p-6 shadow-md ring-1 ring-slate-100/80" : "p-4 shadow-sm ring-1 ring-slate-100"
+            } opacity-[0.97] hover:-translate-y-0.5 hover:shadow-lg`
+      }`}
+      data-testid={tid}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-900 ring-1 ring-indigo-100">
+            {humanDecisionTypeLabel(row.decision.decision_type)}
+          </span>
+          {isTop ? (
+            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-950 ring-1 ring-orange-200/80">
+              Top priority
+            </span>
+          ) : null}
+        </div>
+        <span
+          className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold tabular-nums ${
+            isTop ? "bg-orange-100 text-orange-950 ring-1 ring-orange-200/80" : "bg-slate-100 text-slate-700"
+          }`}
+          title="Priority rank"
+        >
+          #{rank}
+        </span>
+      </div>
+      <h3 className={`mt-4 font-bold leading-snug tracking-tight text-slate-900 ${loose ? "text-xl" : "text-lg"}`}>
+        {pres.headline}
+      </h3>
+      <p className={`mt-2 font-semibold leading-snug text-orange-950 ${loose ? "text-sm" : "text-xs"}`}>{pres.impactLine}</p>
+      <p className={`mt-3 leading-relaxed text-slate-700 ${loose ? "text-sm" : "text-xs"}`}>{pres.contextLine}</p>
+      {pres.blastRadius ? (
+        <p className={`mt-2 font-medium text-slate-600 ${loose ? "text-xs" : "text-[11px]"}`}>
+          <span className="text-slate-500">Scope ·</span> {pres.blastRadius}
+        </p>
+      ) : null}
+      <p className={`mt-2 text-slate-600 ${loose ? "text-xs" : "text-[11px]"}`}>
+        <span className="font-medium text-slate-700">Next ·</span> {pres.nextStepLine}
+      </p>
+      {pres.chips.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2" aria-label="People and artifacts">
+          {pres.chips.map((c) => (
+            <span
+              key={c.key}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-800"
+            >
+              <span aria-hidden>{c.emoji}</span>
+              {c.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {pres.evidencePreview.length > 0 ? (
+        <div className="mt-5 space-y-3">
+          {pres.evidencePreview.map((s, i) => (
+            <div
+              key={`${s.quote.slice(0, 20)}-${i}`}
+              className="rounded-lg border border-slate-100 bg-slate-50/90 px-3 py-2.5 italic text-slate-800 shadow-inner"
+            >
+              <p className="font-sans text-[12px] not-italic leading-snug">
+                <span className="mr-1" aria-hidden>
+                  💬
+                </span>
+                <span className="font-semibold text-slate-900">{s.author}</span>
+                <span className="text-slate-500"> ({s.sourceLabel}):</span>
+              </p>
+              <p className="mt-1.5 font-mono text-[12px] not-italic leading-relaxed text-slate-800">
+                “{s.quote}”
+              </p>
+              {s.threadHint ? (
+                <p className="mt-1.5 font-sans text-[10px] not-italic text-slate-500">Thread {s.threadHint}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <details className="group/details mt-5 overflow-hidden rounded-xl border border-slate-100 bg-slate-50/60 transition-[box-shadow] duration-200 open:shadow-md">
+        <summary className="cursor-pointer list-none px-4 py-2.5 text-sm font-medium text-slate-800 marker:content-none [&::-webkit-details-marker]:hidden">
+          Show more <span className="font-normal text-slate-500">(rationale &amp; debug)</span>
+        </summary>
+        <div className="space-y-3 border-t border-slate-100 px-4 py-3 text-xs text-slate-600">
+          <p>
+            <span className="font-medium text-slate-700">System title</span> — {row.decision.title}
+          </p>
+          <p className="leading-relaxed text-slate-700">{row.decision.rationale}</p>
+          <pre className="max-h-56 overflow-auto rounded-md border border-slate-200 bg-white p-3 text-[10px] leading-snug text-slate-800">
+            {JSON.stringify(decisionBundleItemWithoutGapIds(row), null, 2)}
+          </pre>
+        </div>
+      </details>
+      <div className="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-5">
+        <button
+          type="button"
+          className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
+          disabled
+          title="Coming soon"
+        >
+          Resolve / Track this
+        </button>
+        <button
+          type="button"
+          className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+          disabled
+          title="Coming soon"
+        >
+          Dismiss
+        </button>
+      </div>
+    </li>
+  );
+}
+
 function humanSignalHeading(key: ManagerInsightSignalRowKey): string {
   const m: Partial<Record<ManagerInsightSignalRowKey, string>> = {
     delivery_strength: "Delivery strength",
@@ -1280,7 +2267,8 @@ function ExecutionRunSummaryMetrics(props: { data: ManagerInsightFetchDebugRespo
       : data.data_reliability.overall_confidence === "medium"
         ? "Mixed"
         : "Attention";
-  const top = data.decisions_prioritized?.[0]?.decision.title ?? null;
+  const firstRow = data.decisions_prioritized?.[0];
+  const top = firstRow ? buildPrioritizedDecisionPresentation(data, firstRow).headline : null;
   const nDec = prioritizedDecisionCount(data);
   const nGaps = data.gaps.gaps.length;
 
@@ -1406,9 +2394,9 @@ function PrioritizedDecisionsSpotlight(props: { data: ManagerInsightFetchDebugRe
   return (
     <ExecutionRunSectionShell
       sectionIndex="4"
-      kicker="What to do next"
-      title="Prioritized decisions"
-      description="Ranked actions derived from gaps and signals. Evidence stays behind each card — approve or ignore when you wire actions."
+      kicker="What needs attention"
+      title="Execution alerts"
+      description="Ranked by the engine for this run. #1 is highlighted as top priority. Impact lines use gap type + signals only (no LLM). Evidence shows who said what when we can resolve authors from connectors, work items, or perception."
       data-testid="manager-insight-prioritized-spotlight"
     >
       {rows.length === 0 ? (
@@ -1416,60 +2404,16 @@ function PrioritizedDecisionsSpotlight(props: { data: ManagerInsightFetchDebugRe
           No prioritized decisions — usually zero gaps, an empty engine bundle, or a cap of zero.
         </div>
       ) : (
-        <ul className="space-y-6">
+        <ul className="space-y-8">
           {rows.map((row, idx) => (
-            <li
+            <PrioritizedDecisionCard
               key={`${row.decision.id}-spot-${idx}`}
-              className="rounded-xl border border-slate-200/90 bg-slate-50/40 p-6 shadow-sm ring-1 ring-slate-100"
+              data={props.data}
+              row={row}
+              rank={idx + 1}
+              density="comfortable"
               data-testid={`manager-insight-prioritized-spotlight-card-${idx}`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-900 ring-1 ring-indigo-100">
-                    {humanDecisionTypeLabel(row.decision.decision_type)}
-                  </span>
-                  <h3 className="mt-3 text-xl font-semibold leading-snug text-slate-900">{row.decision.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-slate-600">{row.decision.rationale}</p>
-                </div>
-                <span className="shrink-0 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-700">
-                  #{idx + 1}
-                </span>
-              </div>
-              <details className="mt-6 rounded-xl border border-slate-100 bg-slate-50/50">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-800">Evidence &amp; refs</summary>
-                <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-600">
-                  {row.decision.evidence_refs.length ? (
-                    <ul className="list-inside list-disc space-y-1">
-                      {row.decision.evidence_refs.map((r) => (
-                        <li key={r} className="font-mono text-[11px]">
-                          {r}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-slate-500">No evidence refs on this row.</p>
-                  )}
-                </div>
-              </details>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-                  disabled
-                  title="Coming soon"
-                >
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                  disabled
-                  title="Coming soon"
-                >
-                  Ignore
-                </button>
-              </div>
-            </li>
+            />
           ))}
         </ul>
       )}
@@ -1658,70 +2602,33 @@ function CoordinationDecisionsTable(props: {
   );
 }
 
-/** §6 Step 29 — same rows as `decisions_prioritized` with rank 1..n (Step 27 order, Step 28 cap). */
-function PrioritizedDecisionsSurfaceTable(props: {
-  items: CoordinationDecisionBundleExample["items"];
-}) {
-  const { items } = props;
+/** §6 Step 29 — same rows as `decisions_prioritized` (Step 27 order, Step 28 cap); human cards + expandable debug. */
+function PrioritizedDecisionsSurfaceTable(props: { data: ManagerInsightFetchDebugResponse }) {
+  const items = props.data.decisions_prioritized ?? [];
   return (
-    <div className="mt-4 overflow-x-auto rounded-md border border-teal-200/90 bg-white shadow-sm">
-      <h4 className="border-b border-teal-100 bg-teal-50/80 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-teal-950">
+    <div
+      className="mt-4 rounded-xl border border-teal-200/90 bg-teal-50/20 p-4 shadow-sm ring-1 ring-teal-100/60"
+      data-testid="manager-insight-prioritized-decisions-table"
+    >
+      <h4 className="mb-4 text-xs font-semibold uppercase tracking-wide text-teal-950">
         Prioritized surface <span className="font-normal text-teal-800">(§6 Steps 27–29)</span>
       </h4>
-      <table
-        className="w-full min-w-[36rem] border-collapse text-left text-xs text-stone-800"
-        data-testid="manager-insight-prioritized-decisions-table"
-      >
-        <thead>
-          <tr className="border-b border-teal-100 bg-teal-50/60">
-            <th scope="col" className="w-[1%] whitespace-nowrap px-3 py-2 font-semibold text-teal-950">
-              rank
-            </th>
-            <th scope="col" className="px-3 py-2 font-semibold text-stone-900">
-              decision_type
-            </th>
-            <th scope="col" className="px-3 py-2 font-semibold text-stone-900">
-              gap_id
-            </th>
-            <th scope="col" className="min-w-[12rem] px-3 py-2 font-semibold text-stone-900">
-              title
-            </th>
-            <th scope="col" className="w-[1%] whitespace-nowrap px-3 py-2 font-semibold text-stone-900">
-              JSON
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+      {items.length === 0 ? (
+        <p className="text-xs text-stone-600">No prioritized rows.</p>
+      ) : (
+        <ul className="space-y-4">
           {items.map((row, idx) => (
-            <tr
+            <PrioritizedDecisionCard
               key={`${row.decision.id}-prio-${idx}`}
-              className="border-b border-teal-50 last:border-b-0"
+              data={props.data}
+              row={row}
+              rank={idx + 1}
+              density="compact"
               data-testid={`manager-insight-prioritized-decision-row-${idx}`}
-            >
-              <td className="align-top px-3 py-2 text-center font-mono text-[11px] font-semibold tabular-nums text-teal-900">
-                {idx + 1}
-              </td>
-              <td className="align-top px-3 py-2 font-mono text-[11px] text-stone-800">
-                {row.decision.decision_type}
-              </td>
-              <td className="align-top px-3 py-2 font-mono text-[11px] text-stone-700">
-                {row.decision.gap_id}
-              </td>
-              <td className="align-top px-3 py-2 text-stone-900">{row.decision.title}</td>
-              <td className="align-top px-3 py-2">
-                <details className="group/rowjson max-w-xs">
-                  <summary className="cursor-pointer list-none text-[11px] font-medium text-teal-900 underline decoration-teal-300 underline-offset-2 marker:content-none [&::-webkit-details-marker]:hidden">
-                    {row.decision_debug || row.decision_emission_debug ? "Expand (incl. debug)" : "Expand"}
-                  </summary>
-                  <pre className="mt-2 max-h-56 overflow-auto rounded border border-teal-100 bg-stone-50 p-2 text-[10px] leading-snug text-stone-800">
-                    {JSON.stringify(row, null, 2)}
-                  </pre>
-                </details>
-              </td>
-            </tr>
+            />
           ))}
-        </tbody>
-      </table>
+        </ul>
+      )}
     </div>
   );
 }
@@ -3289,7 +4196,7 @@ export default function AdminTenantManagerInsightPage() {
                       <CoordinationDecisionsTable items={q.data.decisions.items} />
                     ) : null}
                     {q.data.decisions_prioritized !== null && q.data.decisions_prioritized.length > 0 ? (
-                      <PrioritizedDecisionsSurfaceTable items={q.data.decisions_prioritized} />
+                      <PrioritizedDecisionsSurfaceTable data={q.data} />
                     ) : null}
                   </div>
                 ) : null}
@@ -4427,7 +5334,7 @@ export default function AdminTenantManagerInsightPage() {
                   <>
                     <CoordinationDecisionsTable items={q.data.decisions.items} />
                     {q.data.decisions_prioritized !== null && q.data.decisions_prioritized.length > 0 ? (
-                      <PrioritizedDecisionsSurfaceTable items={q.data.decisions_prioritized} />
+                      <PrioritizedDecisionsSurfaceTable data={q.data} />
                     ) : null}
                   </>
                 ) : null}
