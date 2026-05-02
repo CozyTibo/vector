@@ -1,4 +1,4 @@
-"""Manager insights domain: debug pipeline through Step 8; future: rendering."""
+"""Manager insights domain: coordination fetch-debug pipeline; narrative V0 generators live in separate modules."""
 
 from __future__ import annotations
 
@@ -16,8 +16,6 @@ from vector.contracts.manager_insights_activity import (
     DecisionItem,
     DecisionRuleTraceDebug,
     EvidenceBundle,
-    InsightBundleDebug,
-    InterpretationBundleDebug,
     ManagerInsightFetchDebugResponse,
     ManagerInsightsCoordinationSettingsDebug,
     OutcomeItem,
@@ -41,8 +39,6 @@ from vector.domains.manager_insights.decision_sort_learning import (
 )
 from vector.domains.manager_insights.extract_evidence import extract_evidence
 from vector.domains.manager_insights.fetch_activity import run_fetch_activity_bundle
-from vector.domains.manager_insights.generate_insights import generate_insights
-from vector.domains.manager_insights.generate_interpretations import generate_interpretations
 from vector.domains.manager_insights.link_work_items import link_work_items
 from vector.domains.manager_insights.perceive_execution_state import (
     build_perception_execution_state_demo_debug,
@@ -152,50 +148,6 @@ def _coordination_contracts_debug(
     )
 
 
-def _skipped_interpretation_bundle(evidence: EvidenceBundle) -> InterpretationBundleDebug:
-    """§6 Step 35 — empty P7 bundle without running ``generate_interpretations``."""
-    return InterpretationBundleDebug(
-        run_id=evidence.run_id,
-        tenant_id=evidence.tenant_id,
-        window_days=evidence.window_days,
-        items=[],
-        generated_via="fallback",
-        fallback_reason="skip_interpretations_fetch_debug",
-        model=None,
-        latency_ms=None,
-        prompt_tokens=None,
-        completion_tokens=None,
-        total_tokens=None,
-        llm_response_text=None,
-        llm_response_truncated=False,
-        llm_parsed_interpretation_rows=None,
-        rejected_interpretations=[],
-        llm_error=None,
-    )
-
-
-def _skipped_insight_bundle(*, interpretations: InterpretationBundleDebug) -> InsightBundleDebug:
-    """§6 Step 35 — empty P8 bundle without running ``generate_insights``."""
-    return InsightBundleDebug(
-        run_id=interpretations.run_id,
-        tenant_id=interpretations.tenant_id,
-        window_days=interpretations.window_days,
-        items=[],
-        generated_via="fallback",
-        fallback_reason="skip_insights_fetch_debug",
-        model=None,
-        latency_ms=None,
-        prompt_tokens=None,
-        completion_tokens=None,
-        total_tokens=None,
-        llm_response_text=None,
-        llm_response_truncated=False,
-        llm_parsed_insight_rows=None,
-        rejected_insights=[],
-        llm_error=None,
-    )
-
-
 def run_manager_insights_fetch_debug(
     session: Session,
     settings: Settings,
@@ -208,17 +160,15 @@ def run_manager_insights_fetch_debug(
     master_plan_debug: bool = False,
     max_decisions: int | None = None,
     persist_decisions: bool = False,
-    skip_interpretations: bool = False,
-    skip_insights: bool = False,
 ) -> ManagerInsightFetchDebugResponse:
-    """Run Step 1 -> 0.5 -> 2 -> 3 -> 4 -> 5 -> 5.5 -> 5.6 -> 6 -> 7 -> 8 (admin debug API).
+    """Run coordination fetch-debug: Step 1 → 0.5 → 2 → … → signals → decisions → prioritize → cap → …
 
-    **Legacy narrative P7/P8** (interpretations / insights) always use ``skip_llm=True`` on this route — no OpenAI
-    calls for the old report-style steps; deterministic fallbacks only.
+    **Narrative V0** (interpretations / insights bundles) is **not** included in this response. Use unit tests /
+    ``generate_interpretations`` / ``generate_insights`` directly if you need those generators.
 
     **``master_plan_debug``** (``?master_plan_debug=1``): for this request only, run the coordination path with
     perception LLM on, attach ``execution_graph``, and merge graph edges into ``compute_gaps`` — without changing
-    process env. Still no P7/P8 LLM.
+    process env.
 
     When perception LLM is effective (env **or** ``master_plan_debug``), **§6 Step 10** runs
     ``perceive_execution_state`` then ``validate_perception_rows`` after work items (before evidence/linking); regex
@@ -259,11 +209,6 @@ def run_manager_insights_fetch_debug(
 
     **§6 Step 32:** When ``persist_decisions`` is true (``?persist_decisions=1``), upsert **capped**
     ``decisions_prioritized`` rows into ``manager_insight_decisions`` and return ``persisted_decision_ids``.
-
-    **§6 Step 35:** When ``skip_interpretations`` / ``skip_insights`` (``?skip_interpretations=1``,
-    ``?skip_insights=1``), the orchestrator **does not call** ``generate_interpretations`` / ``generate_insights``;
-    returns empty narrative bundles with ``fallback_reason`` set for admin QA. P7/P8 deterministic fallbacks are
-    skipped entirely (faster than ``skip_llm`` alone).
     """
 
     bundle = run_fetch_activity_bundle(
@@ -306,34 +251,6 @@ def run_manager_insights_fetch_debug(
         raw_highlights,
         coordination_input=coordination_input,
     )
-    if skip_interpretations:
-        interpretations = _skipped_interpretation_bundle(evidence)
-    else:
-        interpretations = generate_interpretations(
-            settings,
-            signals=signals,
-            evidence=evidence,
-            links=links,
-            gaps=gaps,
-            key_achievements=key_achievements,
-            raw_highlights=raw_highlights,
-            work_items=work_items,
-            skip_llm=True,
-        )
-    if skip_insights:
-        insights = _skipped_insight_bundle(interpretations=interpretations)
-    else:
-        insights = generate_insights(
-            settings,
-            signals=signals,
-            interpretations=interpretations,
-            evidence=evidence,
-            gaps=gaps,
-            key_achievements=key_achievements,
-            raw_highlights=raw_highlights,
-            work_items=work_items,
-            skip_llm=True,
-        )
     want_execution_graph = (
         include_execution_graph
         or settings.vector_manager_insights_include_execution_graph
@@ -408,8 +325,6 @@ def run_manager_insights_fetch_debug(
         key_achievements=key_achievements,
         raw_highlights=raw_highlights,
         signals=signals,
-        interpretations=interpretations,
-        insights=insights,
         decisions=decision_bundle,
         decisions_prioritized=decisions_prioritized,
         persisted_decision_ids=persisted_decision_ids,
@@ -434,8 +349,6 @@ def run_manager_insights_fetch_debug(
             max_decisions_cap_applied=eff_cap,
             decisions_prioritized_full_count=prioritized_before_cap,
             query_persist_decisions=persist_decisions,
-            query_skip_interpretations=skip_interpretations,
-            query_skip_insights=skip_insights,
             step42_gap_demotion_by_gap_type=decision_sort_learning.gap_demotions_for_qa(),
         ),
         coordination_contracts=_coordination_contracts_debug(

@@ -6,12 +6,12 @@
 | If you are…                                                                                      | Follow this file                                                                                                                                    |
 | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Deciding **product intent** and report vocabulary (language safety, gap types, signal meaning)   | [manager_insights_vo.md](manager_insights_vo.md) — **reference**, not the execution checklist.                                                      |
-| Auditing **what the V0 report pipeline already shipped** (steps 0–8, admin fetch-debug, tests)   | [manager_insights_implementation_plan.md](manager_insights_implementation_plan.md) — **§ Implementation status (living)** table + admin milestones. |
+| Auditing **what the V0 report pipeline already shipped** (steps 0–8, admin fetch-debug, tests)   | [manager_insights_master_implementation_plan.md](manager_insights_master_implementation_plan.md) **§1.1** (V0 numbering + status).                    |
 | Designing **where the product is going** (decisions, actions, graph, outcomes, no LLM in Decide) | [manager_insights_coordination_plan.md](manager_insights_coordination_plan.md) — **target architecture**.                                           |
 | **Executing the next engineering work** from current `main` → coordination                       | **This file** — **§6** (`S01`–`S13`) + **§8** (admin after each step). Update **Status** cells here as you ship.                                    |
 
 
-**Important:** [manager_insights_implementation_plan.md](manager_insights_implementation_plan.md) describes **Step 7 = Interpretations** and **Step 8 = Insights** as core runtime steps. [manager_insights_coordination_plan.md](manager_insights_coordination_plan.md) reuses numbers differently (**Step 7 = Decision engine**, **Step 8 = Action layer**). When planning coordination work, **ignore step numbers in the old implementation plan** for “what comes next”; use **this file’s `S01`–`S13`** and the coordination plan’s glossary instead.
+**Important:** In **V0 report numbering** (see **§1.1** in [manager_insights_master_implementation_plan.md](manager_insights_master_implementation_plan.md)), **Step 7 = Interpretations** and **Step 8 = Insights**. [manager_insights_coordination_plan.md](manager_insights_coordination_plan.md) reuses numbers differently (**Step 7 = Decision engine**, **Step 8 = Action layer**). When planning coordination work, **do not** mix those schemes; use **this file’s `S01`–`S13`**, the coordination plan’s glossary, and **§6** in the master plan for execution.
 
 ---
 
@@ -21,9 +21,8 @@
 | Document                                                                                         | Role                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [manager_insights_vo.md](manager_insights_vo.md)                                                 | Original **user-report** shape: `UserReportContext`, `SignalsV0`, evidence kinds, gap types, optional `InterpretationsV0` / `InsightsV0` / `ReportV0`, Slack report narrative, coaching, “one priority”. |
-| [manager_insights_implementation_plan.md](manager_insights_implementation_plan.md)               | **V0 report pipeline** plan + **living status** (through admin Step 8 today); remaining items **Step 9+** (rendering, Slack delivery, arbitration, orchestration, persisted snapshots per that doc).     |
 | [manager_insights_coordination_plan.md](manager_insights_coordination_plan.md)                   | Target **coordination** system: **Perceive → … → Act → Learn**, `DecisionItem`, Action Layer, ephemeral `ExecutionGraph`, `OutcomeItem`, no LLM in Decide/Act.                                           |
-| [manager_insights_master_implementation_plan.md](manager_insights_master_implementation_plan.md) | **Single execution checklist** (`M-001`–`M-026`): API + admin + DB per narrow step; merges VO + coordination + transition + baseline.                                                                    |
+| [manager_insights_master_implementation_plan.md](manager_insights_master_implementation_plan.md) | **Single execution checklist** (§6 Steps 1–46) + **§1.1** V0 report baseline status; API + admin + DB per narrow step; merges VO + coordination + transition + baseline.                                  |
 
 
 **Status column (for this file):** use `—` until shipped; set to `done` or a short `missing: …` note. Update in place; do not duplicate the coordination plan’s full spec here.
@@ -164,7 +163,7 @@ There is **no** admin section yet for: **LLM perception**, **execution graph**, 
 For each tracker step **S01–S13** that changes behavior or adds artifacts:
 
 1. **Prefer** extending `**ManagerInsightFetchDebugResponse`** (and the admin page types) so **one run** still shows the full trace—new blocks appear as additional top-level keys or nested debug structs.
-2. **Optional query params** (e.g. `include_graph=1`, `skip_insights=1`, `max_decisions=3`) are acceptable to keep payloads small and to match the **coordination** ordering when narrative steps are demoted.
+2. **Optional query params** (e.g. `include_graph=1`, `max_decisions=3`) are acceptable to keep payloads small and to match the **coordination** ordering.
 3. **Persistence (S10+)**: add **dedicated admin GETs** (list decisions / outcomes for tenant) when state is no longer only in the debug response; the debug run can still return `**decision_ids`** or `**dry_run_decisions`** for correlation.
 
 ### 8.3 Step → backend → admin (expected delta)
@@ -183,7 +182,7 @@ For each tracker step **S01–S13** that changes behavior or adds artifacts:
 | **S10**     | **New** `GET /admin/tenants/{id}/manager-insight/decisions` (list) + optional `POST` replay; debug run may **write** then return ids.                                                                                                                                                                         | **Persisted decisions** table + link from debug `run_id`.                                                                  |
 | **S11**     | **New** `POST …/decisions/{id}/apply` (admin-only, gated) or Slack test hook; return receipt in response.                                                                                                                                                                                                     | Button **Apply (dry-run / live)** with confirmation + receipt panel.                                                       |
 | **S12**     | **New** `GET …/outcomes` or embed recent outcomes on decision row; evaluation job writes rows.                                                                                                                                                                                                                | **Outcomes** tab: `false_positive`, `outcome_type`, timestamps.                                                            |
-| **S13**     | `skip_interpretations=1` / `skip_insights=1` default or flag; narrative sections collapse.                                                                                                                                                                                                                    | Toggles to hide legacy Step 7/8 panels when coordination-only.                                                             |
+| **S13**     | **Done (coordination-only admin):** fetch-debug omits V0 narrative bundles; optional narrative remains in standalone modules/tests if needed later.                                                                                                                                                              | No admin panels for legacy narrative on fetch-debug.                                                                      |
 
 
 ### 8.4 “Done when” for admin
@@ -217,7 +216,7 @@ A tracker step is **admin-complete** when: a developer can **open the admin Mana
 - **S10** — Decision persistence (10.5)
 - **S11** — Action layer (one connector / Slack receipt)
 - **S12** — Outcome tracking (10.6)
-- **S13** — Optional narrative (insights/report) behind flag
+- **S13** — Narrative not on admin fetch-debug; optional report path remains product scope
 
 ---
 

@@ -32,8 +32,6 @@ def test_build_perception_qa_regex_only_when_flag_off() -> None:
         max_decisions_cap_applied=3,
         decisions_prioritized_full_count=0,
         query_persist_decisions=False,
-        query_skip_interpretations=False,
-        query_skip_insights=False,
         step42_gap_demotion_by_gap_type={},
     )
 

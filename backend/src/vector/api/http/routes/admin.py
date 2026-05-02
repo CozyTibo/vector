@@ -2171,7 +2171,7 @@ def build_admin_router() -> APIRouter:
                 le=1,
                 description=(
                     "When 1: request-scoped coordination debug — perception LLM on, execution_graph attached, "
-                    "gaps_use_graph for this run; P7/P8 narrative LLM stays off (fallbacks). Admin defaults this on."
+                    "gaps_use_graph for this run. Admin UI often defaults this on."
                 ),
             ),
         ] = 0,
@@ -2191,24 +2191,8 @@ def build_admin_router() -> APIRouter:
                 description="§6 Step 32: when 1, upsert capped `decisions_prioritized` into manager_insight_decisions; response lists `persisted_decision_ids`.",
             ),
         ] = 0,
-        skip_interpretations: Annotated[
-            int,
-            Query(
-                ge=0,
-                le=1,
-                description="§6 Step 35: when 1, do not run P7 interpretations (empty bundle, no fallback work).",
-            ),
-        ] = 0,
-        skip_insights: Annotated[
-            int,
-            Query(
-                ge=0,
-                le=1,
-                description="§6 Step 35: when 1, do not run P8 insights (empty bundle, no fallback work).",
-            ),
-        ] = 0,
     ) -> ManagerInsightFetchDebugResponse:
-        """Run Manager insights Step 1 + 0.5 + 2 + 3 + 4 + 5 + 5.5 + 5.6 + 6 + 7 + 8 for debugging."""
+        """Run Manager insights coordination fetch-debug (perceive → detect → decide; narrative bundles omitted)."""
         _assert_tenant(db, tenant_id)
         return run_manager_insights_fetch_debug(
             db,
@@ -2220,8 +2204,6 @@ def build_admin_router() -> APIRouter:
             master_plan_debug=bool(master_plan_debug),
             max_decisions=max_decisions,
             persist_decisions=bool(persist_decisions),
-            skip_interpretations=bool(skip_interpretations),
-            skip_insights=bool(skip_insights),
         )
 
     return r

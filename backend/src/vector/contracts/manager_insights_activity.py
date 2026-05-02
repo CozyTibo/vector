@@ -826,7 +826,7 @@ class ManagerInsightPerceptionQaDebug(BaseModel):
         default=False,
         description=(
             "True when fetch-debug used ?master_plan_debug=1 — request-scoped coordination path: perception LLM on, "
-            "execution_graph attached, gaps_use_graph for this run; P7/P8 narrative LLM stays off (fallbacks)."
+            "execution_graph attached, gaps_use_graph for this run."
         ),
     )
     query_max_decisions: int | None = Field(
@@ -847,14 +847,6 @@ class ManagerInsightPerceptionQaDebug(BaseModel):
     query_persist_decisions: bool = Field(
         default=False,
         description="§6 Step 32: true when fetch-debug used ?persist_decisions=1 (writes surfaced rows to DB).",
-    )
-    query_skip_interpretations: bool = Field(
-        default=False,
-        description="§6 Step 35: true when fetch-debug used ?skip_interpretations=1 (does not run P7 narrative bundle).",
-    )
-    query_skip_insights: bool = Field(
-        default=False,
-        description="§6 Step 35: true when fetch-debug used ?skip_insights=1 (does not run P8 narrative bundle).",
     )
     step42_gap_demotion_by_gap_type: dict[str, int] = Field(
         default_factory=dict,
@@ -933,7 +925,7 @@ class InsightBundleDebug(BaseModel):
 
 
 class ManagerInsightFetchDebugResponse(BaseModel):
-    """Admin (and internal) debug payload through Step 8 (Insights)."""
+    """Admin fetch-debug payload through capped decisions (excludes V0 narrative bundles)."""
 
     model_config = ConfigDict(from_attributes=False)
 
@@ -946,8 +938,6 @@ class ManagerInsightFetchDebugResponse(BaseModel):
     key_achievements: KeyAchievementsBundleDebug
     raw_highlights: RawHighlightsBundleDebug
     signals: SignalsV0Debug
-    interpretations: InterpretationBundleDebug
-    insights: InsightBundleDebug
     decisions: DecisionBundle | None = Field(
         default=None,
         description=(

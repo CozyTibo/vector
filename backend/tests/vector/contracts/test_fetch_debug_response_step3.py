@@ -19,8 +19,6 @@ from vector.contracts.manager_insights_activity import (
     EvidenceBundle,
     FetchActivityBundle,
     GapBundle,
-    InsightBundleDebug,
-    InterpretationBundleDebug,
     KeyAchievementsBundleDebug,
     LinkBundle,
     ManagerInsightFetchDebugResponse,
@@ -114,22 +112,6 @@ def _minimal_fetch_debug_response() -> ManagerInsightFetchDebugResponse:
         interaction_friction="absent",
         explain={},
     )
-    interp = InterpretationBundleDebug(
-        run_id=rid,
-        tenant_id=tid,
-        window_days=wd,
-        items=[],
-        generated_via="fallback",
-        fallback_reason="test",
-    )
-    ins = InsightBundleDebug(
-        run_id=rid,
-        tenant_id=tid,
-        window_days=wd,
-        items=[],
-        generated_via="fallback",
-        fallback_reason="test",
-    )
     di = DecisionItem(
         id="x",
         gap_id="g",
@@ -172,8 +154,6 @@ def _minimal_fetch_debug_response() -> ManagerInsightFetchDebugResponse:
         key_achievements=ka,
         raw_highlights=rh,
         signals=sig,
-        interpretations=interp,
-        insights=ins,
         decisions=None,
         decisions_prioritized=None,
         rejected_perception_rows=[],

@@ -23,8 +23,6 @@ const PIPELINE = {
   p55: "P5.5",
   p56: "P5.6",
   p6: "P6",
-  p7: "P7",
-  p8: "P8",
 } as const;
 
 /**
@@ -193,10 +191,6 @@ type ManagerInsightPerceptionQaDebug = {
   decisions_prioritized_full_count: number;
   /** §6 Step 32 — true when fetch used `?persist_decisions=1`. */
   query_persist_decisions: boolean;
-  /** §6 Step 35 — true when fetch used `?skip_interpretations=1` (P7 bundle empty, generator not run). */
-  query_skip_interpretations: boolean;
-  /** §6 Step 35 — true when fetch used `?skip_insights=1` (P8 bundle empty, generator not run). */
-  query_skip_insights: boolean;
   /** §6 Step 42 — per gap_type demotion totals applied in prioritize_decisions (empty when none). */
   step42_gap_demotion_by_gap_type: Record<string, number>;
 };
@@ -597,77 +591,6 @@ type ManagerInsightFetchDebugResponse = {
     discussion_churn: "low" | "moderate" | "high";
     contradiction_density: "low" | "moderate" | "high";
     explain: Record<string, string>;
-  };
-  interpretations: {
-    run_id: string;
-    tenant_id: string;
-    window_days: number;
-    generated_via: "llm" | "fallback";
-    fallback_reason: string | null;
-    model: string | null;
-    latency_ms: number | null;
-    prompt_tokens: number | null;
-    completion_tokens: number | null;
-    total_tokens: number | null;
-    llm_response_text: string | null;
-    llm_response_truncated: boolean;
-    llm_parsed_interpretation_rows: number | null;
-    rejected_interpretations: Array<{
-      index: number;
-      reason: string;
-      raw: Record<string, unknown>;
-    }>;
-    llm_error: string | null;
-    items: Array<{
-      id: string;
-      type: string;
-      description: string;
-      based_on_signals: string[];
-      evidence: string[];
-      based_on_gaps: string[];
-      based_on_blockers: string[];
-      based_on_highlights: string[];
-      confidence: "high" | "medium" | "low";
-    }>;
-  };
-  insights: {
-    run_id: string;
-    tenant_id: string;
-    window_days: number;
-    generated_via: "llm" | "fallback";
-    fallback_reason: string | null;
-    model: string | null;
-    latency_ms: number | null;
-    prompt_tokens: number | null;
-    completion_tokens: number | null;
-    total_tokens: number | null;
-    llm_response_text: string | null;
-    llm_response_truncated: boolean;
-    llm_parsed_insight_rows: number | null;
-    rejected_insights: Array<{
-      index: number;
-      reason: string;
-      raw: Record<string, unknown>;
-    }>;
-    llm_error: string | null;
-    items: Array<{
-      id: string;
-      observation: string;
-      interpretation: string;
-      implication: string;
-      evidence: string[];
-      evidence_ids: string[];
-      based_on_interpretations: string[];
-      based_on_signals: string[];
-      primary_work_item_ids: string[];
-      supporting_work_item_ids: string[];
-      primary_entities: Array<{ name: string; kind: "project" | "feature" | "system" }>;
-      based_on_gaps: string[];
-      based_on_blockers: string[];
-      based_on_highlights: string[];
-      confidence: "high" | "medium" | "low";
-      priority: "critical" | "high" | "medium" | "low";
-    }>;
   };
   decisions: CoordinationDecisionBundleExample | null;
   decisions_prioritized: CoordinationDecisionBundleExample["items"] | null;
@@ -2012,8 +1935,6 @@ export default function AdminTenantManagerInsightPage() {
   /** §6 Step 32 — append `persist_decisions=1` to persist capped prioritized rows to PostgreSQL. */
   const [appendPersistDecisionsQuery, setAppendPersistDecisionsQuery] = useState(false);
   /** §6 Steps 35–36 — skip P7 / P8 narrative bundles entirely (faster QA; stricter than skip_llm fallbacks). */
-  const [appendSkipInterpretationsQuery, setAppendSkipInterpretationsQuery] = useState(false);
-  const [appendSkipInsightsQuery, setAppendSkipInsightsQuery] = useState(false);
   /** §6 Step 28 — optional `?max_decisions=` (empty = omit; server uses env default, usually 3). */
   const [maxDecisionsQuery, setMaxDecisionsQuery] = useState("");
   /** Default on: request-scoped §6 coordination path (perception LLM, execution_graph, gaps graph) — no P7/P8 LLM. */
@@ -2067,8 +1988,6 @@ export default function AdminTenantManagerInsightPage() {
       appendPerceptionRegexQuery,
       appendIncludeExecutionGraphQuery,
       appendPersistDecisionsQuery,
-      appendSkipInterpretationsQuery,
-      appendSkipInsightsQuery,
       fullCoordinationDebug,
       maxDecisionsQuery,
     ],
@@ -2085,12 +2004,6 @@ export default function AdminTenantManagerInsightPage() {
       }
       if (appendPersistDecisionsQuery) {
         params.set("persist_decisions", "1");
-      }
-      if (appendSkipInterpretationsQuery) {
-        params.set("skip_interpretations", "1");
-      }
-      if (appendSkipInsightsQuery) {
-        params.set("skip_insights", "1");
       }
       const rawMax = maxDecisionsQuery.trim();
       if (rawMax !== "") {
@@ -2388,19 +2301,6 @@ export default function AdminTenantManagerInsightPage() {
           <code className="text-[11px]">gap_id</code>, <code className="text-[11px]">run_id</code>), copy-id, and a parity hint vs
           fetch-debug <span className="font-mono text-xs">persisted_decision_ids</span> when a debug run is loaded.
         </p>
-        <p className="mt-1 text-xs text-slate-700" data-testid="manager-insight-step35-skip-narrative-note">
-          §6 Step 35 (API): <code className="text-[11px]">?skip_interpretations=1</code> /{" "}
-          <code className="text-[11px]">?skip_insights=1</code> on fetch-debug skip P7/P8 generators entirely (empty bundles,
-          stricter than narrative fallbacks). Response <span className="font-mono text-xs">perception_qa</span> echoes the
-          flags.
-        </p>
-        <p className="mt-1 text-xs text-slate-700" data-testid="manager-insight-step36-skip-narrative-note">
-          §6 Step 36 (admin): Use the checkboxes below to append those query params without hand-editing the URL. After a run,
-          confirm teal <span className="font-mono text-xs">interpretations</span> / <span className="font-mono text-xs">insights</span>{" "}
-          JSON and amber <span className="font-mono text-xs">perception_qa</span> badges (
-          <code className="text-[11px]">manager-insight-query-skip-interpretations-badge</code>,{" "}
-          <code className="text-[11px]">manager-insight-query-skip-insights-badge</code>).
-        </p>
         <p className="mt-1 text-xs text-slate-700" data-testid="manager-insight-step37-apply-note">
           §6 Step 37: <code className="text-[11px]">POST /admin/tenants/{"{tenant}"}/manager-insight/decisions/{"{id}"}/apply</code> with body{" "}
           <code className="text-[11px]">{"{ \"dry_run\": true }"}</code> returns the planned payload only (no Slack/connector I/O). In{" "}
@@ -2455,8 +2355,8 @@ export default function AdminTenantManagerInsightPage() {
           <code className="text-[11px]">perception_llm</code>, <code className="text-[11px]">include_execution_graph</code>,{" "}
           <code className="text-[11px]">skip_narrative_steps</code>, <code className="text-[11px]">gaps_use_graph</code>{" "}
           from the server env (defaults off; §6 Step 18 wires graph merge into <span className="font-mono text-xs">compute_gaps</span>).{" "}
-          This admin run already skips narrative OpenAI on <span className="font-mono text-xs">{PIPELINE.p7}/{PIPELINE.p8}</span>. Set{" "}
-          <code className="text-[11px]">VECTOR_MANAGER_INSIGHTS_*</code> for other flags.
+          Admin fetch-debug does not return V0 narrative bundles; set <code className="text-[11px]">VECTOR_MANAGER_INSIGHTS_*</code> for
+          coordination flags.
         </p>
         <p className="mt-1 text-xs text-stone-600">
           §6 Step 7: <span className="font-medium text-stone-800">perception_row_example</span> in the contract reference block mirrors the{" "}
@@ -2508,8 +2408,8 @@ export default function AdminTenantManagerInsightPage() {
             <span>
               <span className="font-semibold text-stone-800">Full coordination debug</span> (
               <span className="font-mono text-[11px]">master_plan_debug=1</span>) — for this run only: §6 perception LLM
-              on, <span className="font-mono text-[11px]">execution_graph</span> attached, graph merged into gaps. Leaves
-              legacy {PIPELINE.p7}/{PIPELINE.p8} on fallbacks (no narrative LLM). Uncheck to rely on server env flags only.
+              on, <span className="font-mono text-[11px]">execution_graph</span> attached, graph merged into gaps. Uncheck to
+              rely on server env flags only.
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-xs text-stone-700">
@@ -2565,35 +2465,6 @@ export default function AdminTenantManagerInsightPage() {
             />
             §6 Step 32 — append <code className="text-[11px]">persist_decisions=1</code> (upsert capped surface to DB)
           </label>
-          <div
-            className="flex w-full flex-wrap items-center gap-3 border-t border-dashed border-stone-200 pt-2"
-            data-testid="manager-insight-step36-fetch-debug-skip-controls"
-          >
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-stone-700">
-              <input
-                type="checkbox"
-                className="rounded border-stone-300 text-amber-700 focus:ring-amber-600"
-                checked={appendSkipInterpretationsQuery}
-                onChange={(e) => {
-                  setAppendSkipInterpretationsQuery(e.target.checked);
-                }}
-                data-testid="manager-insight-append-skip-interpretations-query"
-              />
-              §6 Step 36 — append <code className="text-[11px]">skip_interpretations=1</code> (skip P7 entirely)
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-stone-700">
-              <input
-                type="checkbox"
-                className="rounded border-stone-300 text-amber-700 focus:ring-amber-600"
-                checked={appendSkipInsightsQuery}
-                onChange={(e) => {
-                  setAppendSkipInsightsQuery(e.target.checked);
-                }}
-                data-testid="manager-insight-append-skip-insights-query"
-              />
-              §6 Step 36 — append <code className="text-[11px]">skip_insights=1</code> (skip P8 entirely)
-            </label>
-          </div>
         </div>
           </div>
         </details>
@@ -3579,24 +3450,6 @@ export default function AdminTenantManagerInsightPage() {
                       Query: persist_decisions=1
                     </span>
                   ) : null}
-                  {q.data.perception_qa.query_skip_interpretations ? (
-                    <span
-                      className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-950 ring-1 ring-inset ring-amber-200"
-                      data-testid="manager-insight-query-skip-interpretations-badge"
-                      title="Fetch used ?skip_interpretations=1"
-                    >
-                      Query: skip_interpretations=1
-                    </span>
-                  ) : null}
-                  {q.data.perception_qa.query_skip_insights ? (
-                    <span
-                      className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-950 ring-1 ring-inset ring-amber-200"
-                      data-testid="manager-insight-query-skip-insights-badge"
-                      title="Fetch used ?skip_insights=1"
-                    >
-                      Query: skip_insights=1
-                    </span>
-                  ) : null}
                   <span
                     className="rounded-md bg-stone-100 px-2 py-1 text-xs text-stone-700 ring-1 ring-inset ring-stone-200"
                     data-testid="manager-insight-cap-applied-badge"
@@ -4510,7 +4363,7 @@ export default function AdminTenantManagerInsightPage() {
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-1 py-1 text-sm font-semibold text-stone-900 marker:content-none [&::-webkit-details-marker]:hidden">
                 <span>
                   Coordination decisions <span className="font-normal text-stone-600">(gap → actions)</span>{" "}
-                  <span className="font-normal text-stone-500">§6 Steps 24–29 — not {PIPELINE.p7} narrative</span>
+                  <span className="font-normal text-stone-500">§6 Steps 24–29 — engine decisions (not narrative)</span>
                 </span>
                 <span className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                   <span
@@ -4601,215 +4454,6 @@ export default function AdminTenantManagerInsightPage() {
             </details>
           </section>
 
-          <details
-            className="rounded-lg border border-dashed border-stone-300 bg-stone-50/80 p-3 shadow-sm"
-            data-testid="manager-insight-legacy-narrative-p7-p8"
-          >
-            <summary className="cursor-pointer text-sm font-semibold text-stone-800 marker:text-stone-600">
-              Legacy narrative — {PIPELINE.p7} / {PIPELINE.p8}{" "}
-              <span className="font-normal text-stone-500">(report-style; deterministic / skippable on this route)</span>
-            </summary>
-            <div className="mt-4 space-y-4 border-t border-stone-200 pt-4">
-          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-stone-900">
-              <span className="font-mono font-normal text-stone-500">{PIPELINE.p7}</span> Interpretations
-            </h2>
-            <p className="mt-1 text-xs text-stone-500">
-              Count: {q.data.interpretations.items.length} · generated_via{" "}
-              {q.data.interpretations.generated_via}
-              {q.data.interpretations.generated_via === "fallback" &&
-              q.data.interpretations.fallback_reason
-                ? ` (${q.data.interpretations.fallback_reason})`
-                : ""}
-              {q.data.interpretations.model ? ` · model ${q.data.interpretations.model}` : ""}
-              {q.data.interpretations.latency_ms !== null
-                ? ` · latency ${q.data.interpretations.latency_ms}ms`
-                : ""}
-            </p>
-            {q.data.interpretations.llm_parsed_interpretation_rows !== null ? (
-              <p className="mt-1 text-xs text-stone-500">
-                LLM JSON rows (dict objects) parsed: {q.data.interpretations.llm_parsed_interpretation_rows} ·
-                rejected rows: {q.data.interpretations.rejected_interpretations.length}
-                {q.data.interpretations.llm_response_truncated ? " · llm_response_text truncated" : ""}
-              </p>
-            ) : null}
-            {q.data.interpretations.llm_error ? (
-              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                LLM issue: {q.data.interpretations.llm_error}
-              </p>
-            ) : null}
-            {q.data.interpretations.llm_response_text ||
-            q.data.interpretations.rejected_interpretations.length > 0 ? (
-              <details className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3">
-                <summary className="cursor-pointer text-xs font-semibold text-stone-900">
-                  Rejected / raw LLM output (debug)
-                </summary>
-                {q.data.interpretations.rejected_interpretations.length > 0 ? (
-                  <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-                    {q.data.interpretations.rejected_interpretations.map((r) => (
-                      <li key={r.index} className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs">
-                        <p className="font-mono text-[10px] text-stone-500">row_index={r.index}</p>
-                        <p className="mt-1 text-stone-800">{r.reason}</p>
-                        <pre className="mt-2 max-h-40 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
-                          {JSON.stringify(r.raw, null, 2)}
-                        </pre>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-xs text-stone-500">No per-row rejections recorded.</p>
-                )}
-                {q.data.interpretations.llm_response_text ? (
-                  <div className="mt-3">
-                    <p className="text-xs font-semibold text-stone-900">Raw assistant text</p>
-                    <pre className="mt-2 max-h-72 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
-                      {q.data.interpretations.llm_response_text}
-                    </pre>
-                  </div>
-                ) : null}
-              </details>
-            ) : null}
-            {q.data.interpretations.items.length === 0 ? (
-              <p className="mt-3 text-xs text-stone-500">No interpretations produced.</p>
-            ) : (
-              <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
-                {q.data.interpretations.items.map((it) => (
-                  <li key={it.id} className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs">
-                    <p className="font-medium text-stone-900">
-                      {it.type.replace(/_/g, " ")} · {it.confidence}
-                    </p>
-                    <p className="mt-1 text-stone-700">{it.description}</p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      based_on_gaps: {it.based_on_gaps.join(", ") || "—"} · based_on_blockers:{" "}
-                      {it.based_on_blockers.join(", ") || "—"} · based_on_highlights:{" "}
-                      {it.based_on_highlights.join(", ") || "—"}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      based_on_signals: {it.based_on_signals.join(", ") || "—"}
-                    </p>
-                    <ul className="mt-1 list-inside list-disc text-stone-600">
-                      {it.evidence.map((ev) => (
-                        <li key={ev} className="text-[11px]">
-                          {ev}
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-stone-900">
-              <span className="font-mono font-normal text-stone-500">{PIPELINE.p8}</span> Insights
-            </h2>
-            <p className="mt-1 text-xs text-stone-500">
-              Count: {q.data.insights.items.length} · generated_via {q.data.insights.generated_via}
-              {q.data.insights.generated_via === "fallback" && q.data.insights.fallback_reason
-                ? ` (${q.data.insights.fallback_reason})`
-                : ""}
-              {q.data.insights.model ? ` · model ${q.data.insights.model}` : ""}
-              {q.data.insights.latency_ms !== null ? ` · latency ${q.data.insights.latency_ms}ms` : ""}
-            </p>
-            {q.data.insights.llm_parsed_insight_rows !== null ? (
-              <p className="mt-1 text-xs text-stone-500">
-                LLM JSON rows (dict objects) parsed: {q.data.insights.llm_parsed_insight_rows} · rejected
-                rows: {q.data.insights.rejected_insights.length}
-                {q.data.insights.llm_response_truncated ? " · llm_response_text truncated" : ""}
-              </p>
-            ) : null}
-            {q.data.insights.llm_error ? (
-              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                LLM issue: {q.data.insights.llm_error}
-              </p>
-            ) : null}
-            {q.data.insights.llm_response_text || q.data.insights.rejected_insights.length > 0 ? (
-              <details className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3">
-                <summary className="cursor-pointer text-xs font-semibold text-stone-900">
-                  Rejected / raw LLM output (debug)
-                </summary>
-                {q.data.insights.rejected_insights.length > 0 ? (
-                  <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto">
-                    {q.data.insights.rejected_insights.map((r) => (
-                      <li key={r.index} className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs">
-                        <p className="font-mono text-[10px] text-stone-500">row_index={r.index}</p>
-                        <p className="mt-1 text-stone-800">{r.reason}</p>
-                        <pre className="mt-2 max-h-40 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
-                          {JSON.stringify(r.raw, null, 2)}
-                        </pre>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-xs text-stone-500">No per-row rejections recorded.</p>
-                )}
-                {q.data.insights.llm_response_text ? (
-                  <div className="mt-3">
-                    <p className="text-xs font-semibold text-stone-900">Raw assistant text</p>
-                    <pre className="mt-2 max-h-72 overflow-auto rounded bg-stone-900/90 p-2 text-[11px] text-stone-100">
-                      {q.data.insights.llm_response_text}
-                    </pre>
-                  </div>
-                ) : null}
-              </details>
-            ) : null}
-            {q.data.insights.items.length === 0 ? (
-              <p className="mt-3 text-xs text-stone-500">No insights produced.</p>
-            ) : (
-              <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
-                {q.data.insights.items.map((it) => (
-                  <li key={it.id} className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-xs">
-                    <p className="font-medium text-stone-900">
-                      priority {it.priority} · confidence {it.confidence}
-                    </p>
-                    <p className="mt-1 text-stone-800">
-                      <span className="font-semibold">Observation:</span> {it.observation}
-                    </p>
-                    <p className="mt-1 text-stone-700">
-                      <span className="font-semibold">Interpretation:</span> {it.interpretation}
-                    </p>
-                    <p className="mt-1 text-stone-700">
-                      <span className="font-semibold">Implication:</span> {it.implication}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      based_on_gaps: {it.based_on_gaps.join(", ") || "—"} · based_on_blockers:{" "}
-                      {it.based_on_blockers.join(", ") || "—"} · based_on_highlights:{" "}
-                      {it.based_on_highlights.join(", ") || "—"}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      evidence_ids: {it.evidence_ids.join(", ")}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      primary_work_item_ids: {it.primary_work_item_ids.join(", ")}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      supporting_work_item_ids: {it.supporting_work_item_ids.join(", ") || "—"}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      primary_entities:{" "}
-                      {it.primary_entities.map((e) => `${e.name} (${e.kind})`).join(", ")}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      based_on_interpretations: {it.based_on_interpretations.join(", ") || "—"}
-                    </p>
-                    <p className="mt-1 font-mono text-[10px] text-stone-500">
-                      based_on_signals: {it.based_on_signals.join(", ")}
-                    </p>
-                    <ul className="mt-1 list-inside list-disc text-stone-600">
-                      {it.evidence.map((ev) => (
-                        <li key={ev} className="text-[11px]">
-                          {ev}
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-            </div>
-          </details>
 
           <details
             className="rounded-lg border border-violet-200 bg-violet-50/40 p-4 shadow-sm"

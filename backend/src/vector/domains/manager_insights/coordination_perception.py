@@ -28,8 +28,6 @@ def build_perception_qa_debug(
     max_decisions_cap_applied: int | None = None,
     decisions_prioritized_full_count: int | None = None,
     query_persist_decisions: bool = False,
-    query_skip_interpretations: bool = False,
-    query_skip_insights: bool = False,
     step42_gap_demotion_by_gap_type: dict[str, int] | None = None,
 ) -> ManagerInsightPerceptionQaDebug:
     """§6 Step 11 — labels for admin QA (flag-driven + optional ``?perception=regex`` echo).
@@ -60,8 +58,6 @@ def build_perception_qa_debug(
         max_decisions_cap_applied=cap,
         decisions_prioritized_full_count=full_n,
         query_persist_decisions=query_persist_decisions,
-        query_skip_interpretations=query_skip_interpretations,
-        query_skip_insights=query_skip_insights,
         step42_gap_demotion_by_gap_type=step42,
     )
 
