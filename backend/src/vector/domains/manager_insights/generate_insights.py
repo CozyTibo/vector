@@ -1134,8 +1134,12 @@ def generate_insights(
     key_achievements: KeyAchievementsBundleDebug,
     raw_highlights: RawHighlightsBundleDebug,
     work_items: WorkItemBundle,
+    skip_llm: bool = False,
 ) -> InsightBundleDebug:
-    """Generate Step 8 insights with strict validation and deterministic fallback."""
+    """Generate Step 8 insights with strict validation and deterministic fallback.
+
+    When ``skip_llm`` is True (admin fetch-debug), OpenAI is not called and deterministic fallbacks run.
+    """
     candidates = _build_insight_candidates(gaps, evidence, raw_highlights)
     interpretation_ids = {x.id for x in interpretations.items}
     llm_items: list[InsightItemDebug] = []
@@ -1153,7 +1157,9 @@ def generate_insights(
         total_tokens=None,
     )
 
-    if settings.openai_api_key.strip():
+    if skip_llm:
+        fallback_reason = "skip_llm_fetch_debug"
+    elif settings.openai_api_key.strip():
         prompt_json = _serialize_insight_llm_payload(
             candidates,
             interpretations,

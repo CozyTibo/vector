@@ -683,6 +683,12 @@
   gap: clamp(1.25rem, 3vw, 2.25rem);
   align-items: start;
 }
+@media (max-width: 767px) {
+  #vector-landing .impact-strip__row {
+    grid-template-columns: 1fr;
+    gap: clamp(1.35rem, 4vw, 2rem);
+  }
+}
 #vector-landing .impact-strip__col {
   margin: 0;
   text-align: center;
@@ -717,12 +723,6 @@
 @media (min-width: 640px) {
   #vector-landing .impact-strip__copy {
     font-size: clamp(0.9rem, 0.22vw + 0.82rem, 1.125rem);
-  }
-}
-@media (max-width: 767px) {
-  #vector-landing .impact-strip__row {
-    grid-template-columns: 1fr;
-    gap: clamp(1.35rem, 4vw, 2rem);
   }
 }
 
@@ -1217,11 +1217,54 @@
   }
 }
 
-/* “How Vector shows up” - match hero / Meet Vector width (~1200px) so scroll rhythm stays even */
-#vector-landing #core-features .section-inner > header {
+/* Value pillars (perception → action): match hero / Meet Vector width (~1200px) */
+#vector-landing #core-features .value-pillar__header {
   max-width: min(75rem, 100%);
   margin-left: auto;
   margin-right: auto;
+  margin-bottom: clamp(2rem, 4vw, 2.75rem);
+}
+#vector-landing #core-features .value-pillar-features {
+  margin-top: 3rem;
+  max-width: min(75rem, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+#vector-landing .empower-cap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#vector-landing .empower-cap-list--grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-cap-list--grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(0.75rem, 1.8vw, 1.1rem);
+  }
+}
+@media (min-width: 768px) {
+  #vector-landing .empower-cap-list--grid {
+    gap: clamp(1rem, 2.2vw, 1.5rem);
+  }
+}
+#vector-landing .empower-cap-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 1rem;
+  border: 1px solid rgba(228, 228, 231, 0.85);
+  background: #fff;
+  padding: 1rem 1.15rem;
+  box-shadow: 0 8px 28px -28px rgba(15, 23, 42, 0.35);
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-cap-item {
+    padding: 1.05rem 1.2rem;
+  }
 }
 
 /* Empowers - tabbed split: nav left, detail right */

@@ -71,3 +71,10 @@ def max_completion_tokens_for_manager_insights_insights(model: str) -> int:
     if _manager_insights_reasoning_style_model(model):
         return 16_384
     return 4096
+
+
+def max_completion_tokens_for_manager_insights_perception(model: str) -> int:
+    """§6 coordination — execution-state perception LLM returns grounded JSON rows."""
+    if _manager_insights_reasoning_style_model(model):
+        return 16_384
+    return 4096

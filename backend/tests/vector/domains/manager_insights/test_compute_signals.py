@@ -6,12 +6,14 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from vector.contracts.manager_insights_activity import (
+    CoordinationLinkInputBundle,
     EvidenceBundle,
     EvidenceItem,
     GapBundle,
     GapItem,
     KeyAchievementsBundleDebug,
     LinkBundle,
+    PerceptionRow,
     RawHighlightItem,
     RawHighlightsBundleDebug,
     WorkItem,
@@ -343,7 +345,6 @@ def test_compute_signals_balanced_dataset_produces_expected_vector() -> None:
 
     signals = compute_signals(
         work_items=work_items,
-        evidence=evidence,
         links=links,
         gaps=gaps,
         key_achievements=KeyAchievementsBundleDebug(
@@ -355,6 +356,7 @@ def test_compute_signals_balanced_dataset_produces_expected_vector() -> None:
             window_days=30,
             items=[RawHighlightItem(id="rh1", text='Term "incident" appears in 3 distinct calls/Slack work items.', sources=["calls:c1", "calls:c2", "slack:s1"])],
         ),
+        coordination_input=CoordinationLinkInputBundle(evidence=evidence, perception_rows=[]),
     )
 
     assert signals.delivery_strength == "moderate"
@@ -369,7 +371,11 @@ def test_compute_signals_balanced_dataset_produces_expected_vector() -> None:
     assert signals.feedback_reception == "neutral"
     assert signals.coordination_role == "driving"
     assert signals.interaction_friction == "present"
-    assert len(signals.explain.keys()) == 14
+    assert signals.discussion_churn == "moderate"  # §6 Step 20: discussed_not_linked gap + repeated-term highlight
+    assert len(signals.explain.keys()) == 17
+    assert "§6 Step 20" in signals.explain["scope_ambiguity"]
+    assert "§6 Step 20" in signals.explain["discussion_churn"]
+    assert "§6 Step 20" in signals.explain["contradiction_density"]
     assert "action coverage=" in signals.explain["expectation_coverage"]
 
 
@@ -398,7 +404,15 @@ def test_compute_signals_sparse_inputs_default_to_neutral_sentinels() -> None:
     highlights = RawHighlightsBundleDebug(run_id=run_id, tenant_id=tenant_id, window_days=30, items=[])
     achievements = KeyAchievementsBundleDebug(run_id=run_id, tenant_id=tenant_id, window_days=30, items=[])
 
-    signals = compute_signals(work_items, evidence, links, gaps, achievements, highlights)
+    coord = CoordinationLinkInputBundle(evidence=evidence, perception_rows=[])
+    signals = compute_signals(
+        work_items,
+        links,
+        gaps,
+        achievements,
+        highlights,
+        coordination_input=coord,
+    )
     assert signals.delivery_strength == "low"
     assert signals.urgent_pressure == "low"
     assert signals.expectation_coverage == "partial"
@@ -407,3 +421,215 @@ def test_compute_signals_sparse_inputs_default_to_neutral_sentinels() -> None:
     assert signals.repeated_discussion_present is False
     assert signals.feedback_reception == "neutral"
     assert signals.interaction_friction == "absent"
+
+
+def test_step14_regression_omitted_vs_empty_perception_list() -> None:
+    """§6 Step 14 — explicit empty perception_rows matches default empty list."""
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    work_items = WorkItemBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        items=[
+            _wi("notion:d1", source="notion", item_type="document", title="Unlinked doc"),
+        ],
+    )
+    evidence = EvidenceBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        action_items=[],
+        blockers=[],
+        decisions=[],
+        discarded_without_evidence=0,
+    )
+    links = LinkBundle(run_id=run_id, tenant_id=tenant_id, window_days=30, links=[], work_items_capped=0)
+    gaps = GapBundle(run_id=run_id, tenant_id=tenant_id, window_days=30, gaps=[])
+    highlights = RawHighlightsBundleDebug(run_id=run_id, tenant_id=tenant_id, window_days=30, items=[])
+    achievements = KeyAchievementsBundleDebug(run_id=run_id, tenant_id=tenant_id, window_days=30, items=[])
+    a = compute_signals(
+        work_items,
+        links,
+        gaps,
+        achievements,
+        highlights,
+        coordination_input=CoordinationLinkInputBundle(evidence=evidence),
+    )
+    b = compute_signals(
+        work_items,
+        links,
+        gaps,
+        achievements,
+        highlights,
+        coordination_input=CoordinationLinkInputBundle(evidence=evidence, perception_rows=[]),
+    )
+    assert a.model_dump() == b.model_dump()
+
+
+def test_step14_perception_text_increases_friction_markers() -> None:
+    """Validated perception prose is merged into term-based friction (architecture lock)."""
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    work_items = WorkItemBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        items=[
+            _wi("notion:d1", source="notion", item_type="document", title="Unlinked doc"),
+        ],
+    )
+    evidence = EvidenceBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        action_items=[],
+        blockers=[],
+        decisions=[],
+        discarded_without_evidence=0,
+    )
+    links = LinkBundle(run_id=run_id, tenant_id=tenant_id, window_days=30, links=[], work_items_capped=0)
+    gaps = GapBundle(run_id=run_id, tenant_id=tenant_id, window_days=30, gaps=[])
+    highlights = RawHighlightsBundleDebug(run_id=run_id, tenant_id=tenant_id, window_days=30, items=[])
+    achievements = KeyAchievementsBundleDebug(run_id=run_id, tenant_id=tenant_id, window_days=30, items=[])
+    base = compute_signals(
+        work_items,
+        links,
+        gaps,
+        achievements,
+        highlights,
+        coordination_input=CoordinationLinkInputBundle(evidence=evidence, perception_rows=[]),
+    )
+    assert base.interaction_friction == "absent"
+    row = PerceptionRow(
+        id="p-step14",
+        work_item_id="notion:d1",
+        kind="risk",
+        statement="blocked waiting on clarification confusion unclear disagree",
+        quote="blocked waiting on clarification confusion unclear disagree",
+    )
+    with_perception = compute_signals(
+        work_items,
+        links,
+        gaps,
+        achievements,
+        highlights,
+        coordination_input=CoordinationLinkInputBundle(evidence=evidence, perception_rows=[row]),
+    )
+    assert with_perception.interaction_friction == "present"
+
+
+def _minimal_signals_inputs(
+    *,
+    perception_rows: list[PerceptionRow],
+    gaps: list[GapItem],
+    raw_items: list[RawHighlightItem] | None = None,
+) -> tuple[WorkItemBundle, LinkBundle, GapBundle, KeyAchievementsBundleDebug, RawHighlightsBundleDebug, CoordinationLinkInputBundle]:
+    """Tiny bundle for §6 Step 20 signal predicate tests."""
+    run_id = uuid.uuid4()
+    tenant_id = uuid.uuid4()
+    work_items = WorkItemBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        items=[_wi("linear:x1", source="linear", item_type="issue", title="Scope creep and unclear scope on boundary", summary="")],
+    )
+    evidence = EvidenceBundle(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        action_items=[],
+        blockers=[],
+        decisions=[],
+        discarded_without_evidence=0,
+    )
+    links = LinkBundle(run_id=run_id, tenant_id=tenant_id, window_days=30, links=[], work_items_capped=0)
+    gap_bundle = GapBundle(run_id=run_id, tenant_id=tenant_id, window_days=30, gaps=gaps)
+    highlights = RawHighlightsBundleDebug(
+        run_id=run_id,
+        tenant_id=tenant_id,
+        window_days=30,
+        items=raw_items or [],
+    )
+    achievements = KeyAchievementsBundleDebug(run_id=run_id, tenant_id=tenant_id, window_days=30, items=[])
+    coord = CoordinationLinkInputBundle(evidence=evidence, perception_rows=perception_rows)
+    return work_items, links, gap_bundle, achievements, highlights, coord
+
+
+def test_step20_scope_ambiguity_high_from_two_unclear_scope_rows() -> None:
+    rows = [
+        PerceptionRow(
+            id="p1",
+            work_item_id="linear:x1",
+            kind="ambiguity",
+            statement="Scope is unclear",
+            quote="Scope is unclear",
+            ambiguity_class="unclear_scope",
+        ),
+        PerceptionRow(
+            id="p2",
+            work_item_id="linear:x1",
+            kind="ambiguity",
+            statement="Still unclear scope",
+            quote="Still unclear scope",
+            ambiguity_class="unclear_scope",
+        ),
+    ]
+    wi, li, gb, ach, hi, coord = _minimal_signals_inputs(perception_rows=rows, gaps=[])
+    s = compute_signals(wi, li, gb, ach, hi, coordination_input=coord)
+    assert s.scope_ambiguity == "high"
+    assert "unclear_scope perception rows=2" in s.explain["scope_ambiguity"]
+
+
+def test_step20_discussion_churn_high_from_two_discussion_loop_rows() -> None:
+    rows = [
+        PerceptionRow(
+            id="p1",
+            work_item_id="linear:x1",
+            kind="ambiguity",
+            statement="Thread keeps reopening",
+            quote="Thread keeps reopening",
+            ambiguity_class="discussion_loop",
+        ),
+        PerceptionRow(
+            id="p2",
+            work_item_id="linear:x1",
+            kind="ambiguity",
+            statement="Circling again",
+            quote="Circling again",
+            ambiguity_class="discussion_loop",
+        ),
+    ]
+    wi, li, gb, ach, hi, coord = _minimal_signals_inputs(perception_rows=rows, gaps=[])
+    s = compute_signals(wi, li, gb, ach, hi, coordination_input=coord)
+    assert s.discussion_churn == "high"
+    assert "discussion_loop rows=2" in s.explain["discussion_churn"]
+
+
+def test_step20_contradiction_density_high_from_two_contradiction_rows() -> None:
+    rows = [
+        PerceptionRow(
+            id="p1",
+            work_item_id="linear:x1",
+            kind="ambiguity",
+            statement="Says A",
+            quote="Says A",
+            ambiguity_class="contradiction",
+            ambiguity_quote="Says A",
+            contradiction_pair_id="pair-1",
+        ),
+        PerceptionRow(
+            id="p2",
+            work_item_id="linear:x1",
+            kind="ambiguity",
+            statement="Says B",
+            quote="Says B",
+            ambiguity_class="contradiction",
+            ambiguity_quote="Says B",
+            contradiction_pair_id="pair-1",
+        ),
+    ]
+    wi, li, gb, ach, hi, coord = _minimal_signals_inputs(perception_rows=rows, gaps=[])
+    s = compute_signals(wi, li, gb, ach, hi, coordination_input=coord)
+    assert s.contradiction_density == "high"
+    assert "contradiction perception rows=2" in s.explain["contradiction_density"]

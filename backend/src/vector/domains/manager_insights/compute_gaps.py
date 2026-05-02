@@ -1,20 +1,30 @@
-"""Step 5 — Deterministic gap computation from work items + evidence + links."""
+"""Step 5 — Deterministic gap computation from work items + evidence + links.
+
+§6 Step 13: ``compute_gaps`` takes the same ``CoordinationLinkInputBundle`` as ``link_work_items``
+(validated ``PerceptionRow`` + Step-3 evidence). When ``perception_rows`` is empty, behavior matches
+the pre–Step 13 path (link adjacency only). Non-empty rows add **mention adjacency**: undirected edges
+when another work item id (substring containing ``:``) appears in grounded perception text, so
+``_linked_execution_ids`` can see execution neighbors without duplicating raw LLM JSON.
+"""
 
 from __future__ import annotations
 
 import hashlib
 
 from vector.contracts.manager_insights_activity import (
-    EvidenceBundle,
+    CoordinationLinkInputBundle,
     EvidenceItem,
+    ExecutionGraph,
     GapBundle,
     GapItem,
     GapType,
     LinkBundle,
     LinkConfidence,
+    PerceptionRow,
     WorkItem,
     WorkItemBundle,
 )
+from vector.domains.manager_insights.build_execution_graph import build_execution_graph
 
 _EXEC_TYPES = {"issue", "pull_request"}
 _LINK_CONFIDENCE_ALLOWED: set[LinkConfidence] = {"high", "medium"}
@@ -58,6 +68,60 @@ def _adjacency(links: LinkBundle) -> dict[str, set[str]]:
     return out
 
 
+def _execution_graph_undirected_adjacency(graph: ExecutionGraph) -> dict[str, set[str]]:
+    """§6 Step 18 — treat each execution graph edge as an undirected 1-hop link between endpoints."""
+    out: dict[str, set[str]] = {}
+    for e in graph.edges:
+        out.setdefault(e.from_id, set()).add(e.to_id)
+        out.setdefault(e.to_id, set()).add(e.from_id)
+    return out
+
+
+def _merge_adjacency(
+    a: dict[str, set[str]],
+    b: dict[str, set[str]],
+) -> dict[str, set[str]]:
+    keys = set(a) | set(b)
+    out: dict[str, set[str]] = {}
+    for k in keys:
+        merged = a.get(k, set()) | b.get(k, set())
+        if merged:
+            out[k] = merged
+    return out
+
+
+def _perception_mention_adjacency(
+    rows: list[PerceptionRow],
+    by_id: dict[str, WorkItem],
+) -> dict[str, set[str]]:
+    """Edges when perception text (validated rows only) mentions another work item id as substring."""
+    if not rows:
+        return {}
+    out: dict[str, set[str]] = {}
+    # Longer ids first so e.g. linear:issue:abc wins over accidental short overlaps.
+    sorted_ids = sorted(by_id.keys(), key=len, reverse=True)
+    for row in rows:
+        parts: list[str] = [row.statement, row.quote]
+        if row.ambiguity_quote and row.ambiguity_quote.strip():
+            parts.append(row.ambiguity_quote)
+        if row.state_transition is not None:
+            parts.append(row.state_transition.quote)
+        parts.extend(row.waits_on or [])
+        parts.extend(row.blocked_by or [])
+        blob = " ".join(p for p in parts if p)
+        src = row.work_item_id
+        for wid in sorted_ids:
+            if wid == src:
+                continue
+            # Require ':' to match canonical cross-tool ids (call:x, linear:issue:y, …).
+            if ":" not in wid:
+                continue
+            if wid in blob:
+                out.setdefault(src, set()).add(wid)
+                out.setdefault(wid, set()).add(src)
+    return out
+
+
 def _linked_execution_ids(
     row: EvidenceItem,
     adj: dict[str, set[str]],
@@ -77,12 +141,33 @@ def _linked_execution_ids(
 
 def compute_gaps(
     work_items: WorkItemBundle,
-    evidence: EvidenceBundle,
     links: LinkBundle,
+    coordination_input: CoordinationLinkInputBundle,
+    *,
+    gaps_use_graph: bool = False,
 ) -> GapBundle:
-    """Compute V0 gaps (no LLM): expected vs actual, discussed-not-linked, blockers, docs linkage."""
+    """Compute V0 gaps (no LLM): expected vs actual, discussed-not-linked, blockers, docs linkage.
+
+    §6 Step 13: use ``coordination_input.evidence`` and merge link adjacency with
+    ``_perception_mention_adjacency`` when ``coordination_input.perception_rows`` is non-empty.
+
+    §6 Step 18: when ``gaps_use_graph`` is true, merge undirected 1-hop neighbors from
+    ``build_execution_graph`` (references + perception depends_on/blocks edges).
+    """
+    evidence = coordination_input.evidence
     by_id = {w.id: w for w in work_items.items}
-    adj = _adjacency(links)
+    adj = _merge_adjacency(
+        _adjacency(links),
+        _perception_mention_adjacency(coordination_input.perception_rows, by_id),
+    )
+    gaps_debug: str | None = None
+    if gaps_use_graph:
+        exg = build_execution_graph(work_items, links, coordination_input)
+        adj = _merge_adjacency(adj, _execution_graph_undirected_adjacency(exg))
+        n_edges = len(exg.edges)
+        gaps_debug = (
+            f"§6 Step 18: merged execution-graph 1-hop adjacency ({n_edges} graph edges into gap neighborhood)."
+        )
     gaps: list[GapItem] = []
     seen: set[tuple[GapType, str]] = set()
 
@@ -174,5 +259,6 @@ def compute_gaps(
         tenant_id=work_items.tenant_id,
         window_days=work_items.window_days,
         gaps=gaps,
+        gaps_debug=gaps_debug,
     )
 

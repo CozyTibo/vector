@@ -39,6 +39,11 @@ from vector.infrastructure.db.models.linear_projection import (
     LinearTeam,
     LinearUser,
 )
+from vector.infrastructure.db.models.manager_insight_decision import ManagerInsightDecision
+from vector.infrastructure.db.models.manager_insight_outcome import ManagerInsightOutcome
+from vector.infrastructure.db.models.manager_insight_policy_counter import (
+    ManagerInsightPolicyCounter,
+)
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.notion_connection_detail import NotionConnectionDetail
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
@@ -85,6 +90,9 @@ __all__ = [
     "LinearProject",
     "LinearTeam",
     "LinearUser",
+    "ManagerInsightDecision",
+    "ManagerInsightOutcome",
+    "ManagerInsightPolicyCounter",
     "SlackConnectionDetail",
     "RawIngestionRecord",
     "Tenant",

@@ -170,6 +170,62 @@ class Settings(BaseSettings):
         validation_alias="VECTOR_MOCK_SEED",
         description="Deterministic seed for mock dataset generation.",
     )
+    vector_manager_insights_perception_llm: bool = Field(
+        default=False,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_PERCEPTION_LLM",
+        description=(
+            "§6 coordination: when true and perception is wired (Steps 9–10), use LLM perception path "
+            "instead of regex-only evidence."
+        ),
+    )
+    vector_manager_insights_include_execution_graph: bool = Field(
+        default=False,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_INCLUDE_EXECUTION_GRAPH",
+        description="§6 coordination: include ephemeral execution graph in fetch-debug when built (Steps 15–16).",
+    )
+    vector_manager_insights_skip_narrative_steps: bool = Field(
+        default=False,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_SKIP_NARRATIVE_STEPS",
+        description=(
+            "§6 coordination: skip interpretations/insights LLM stages when wired (see Steps 35–36); "
+            "default off preserves current pipeline."
+        ),
+    )
+    vector_manager_insights_gaps_use_graph: bool = Field(
+        default=False,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_GAPS_USE_GRAPH",
+        description=(
+            "§6 Step 18: merge execution graph edges as undirected 1-hop adjacency when computing gaps "
+            "(same graph as build_execution_graph)."
+        ),
+    )
+    vector_manager_insights_hold_start_affected_wi_threshold: int = Field(
+        default=2,
+        ge=0,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_HOLD_START_AFFECTED_WI_THRESHOLD",
+        description=(
+            "§6 Step 26: emit HOLD_START only when open issue/PR count in the gap cluster exceeds this value "
+            "(strict >). Default 2 requires at least three open execution items."
+        ),
+    )
+    vector_manager_insights_max_decisions_surfaced: int = Field(
+        default=3,
+        ge=1,
+        le=50,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_MAX_DECISIONS_SURFACED",
+        description=(
+            "§6 Step 28: default cap for fetch-debug `decisions_prioritized` after Step 27 sort; "
+            "override per request with `?max_decisions=`."
+        ),
+    )
+    vector_manager_insights_live_apply_enabled: bool = Field(
+        default=False,
+        validation_alias="VECTOR_MANAGER_INSIGHTS_LIVE_APPLY_ENABLED",
+        description=(
+            "§6 Step 38: allow POST …/decisions/{id}/apply with dry_run=false "
+            "(Slack post_message + noop; persists receipt)."
+        ),
+    )
     openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_MODEL")
     smtp_host: str = Field(

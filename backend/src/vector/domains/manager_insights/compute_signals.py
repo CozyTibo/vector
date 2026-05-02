@@ -1,24 +1,35 @@
-"""Step 6 — deterministic signal computation (no LLM)."""
+"""Step 6 — deterministic signal computation (no LLM).
+
+§6 Step 14: ``compute_signals`` takes the same ``CoordinationLinkInputBundle`` as linking and gaps
+(Step-3 evidence + validated ``PerceptionRow`` list). Mention adjacency matches ``compute_gaps``; perception
+text is merged into term-based signals (support, feedback, friction) without raw LLM JSON.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 
 from vector.contracts.manager_insights_activity import (
+    CoordinationLinkInputBundle,
     EvidenceBundle,
     GapBundle,
     KeyAchievementsBundleDebug,
     LinkBundle,
+    PerceptionRow,
     RawHighlightsBundleDebug,
+    SignalDeliveryStrength,
     SignalsV0Debug,
     WorkItem,
-    WorkItemLink,
     WorkItemBundle,
+)
+from vector.domains.manager_insights.compute_gaps import (
+    _adjacency,
+    _merge_adjacency,
+    _perception_mention_adjacency,
 )
 
 _EXEC_TYPES = {"issue", "pull_request"}
 _DISCUSSION_TYPES = {"call", "message_thread"}
-_LINK_OK = {"high", "medium"}
 _DONE_STATUS = {"done", "closed", "merged", "completed", "complete", "canceled", "cancelled"}
 _URGENT_TERMS = ("urgent", "p0", "p1", "critical", "sev1", "incident")
 _ASK_HELP_TERMS = ("need help", "can someone", "blocked", "stuck", "waiting on")
@@ -26,6 +37,108 @@ _GIVE_HELP_TERMS = ("i can help", "i will help", "happy to help", "paired", "rev
 _DEFENSIVE_TERMS = ("won't fix", "wont fix", "not changing", "disagree")
 _PROACTIVE_TERMS = ("addressed review", "updated per feedback", "followed up", "resolved review")
 _FRICTION_TERMS = ("clarification", "confusion", "unclear", "disagree", "blocked", "waiting on")
+
+# §6 Step 20 — coordination extension signals (deterministic; no LLM). See coordination plan §2.3 Step 6.
+_SCOPE_AMBIGUITY_TERMS = (
+    "unclear scope",
+    "scope creep",
+    "out of scope",
+    "requirements tbd",
+    "not defined",
+    "boundary",
+    "success criteria",
+)
+_DISCUSSION_CHURN_TERMS = (
+    "reopen",
+    "circling",
+    "still discussing",
+    "going in circles",
+    "long thread",
+    "another round",
+    "back to this",
+)
+_CONTRADICTION_TERMS = (
+    "contradiction",
+    "contradicts",
+    "conflicting",
+    "two different",
+    "on second thought",
+)
+
+
+def _signal_level_high_mod_low(
+    *,
+    score_high: bool,
+    score_moderate: bool,
+) -> SignalDeliveryStrength:
+    if score_high:
+        return "high"
+    if score_moderate:
+        return "moderate"
+    return "low"
+
+
+def _scope_ambiguity_signal(
+    perception_rows: list[PerceptionRow],
+    merged_rows: list[str],
+) -> tuple[SignalDeliveryStrength, str]:
+    """Count ``unclear_scope`` perception rows + scope-ish terms (coordination plan §2.3)."""
+    n_unclear = sum(1 for r in perception_rows if r.ambiguity_class == "unclear_scope")
+    scope_term_hits = sum(_count_terms(t, _SCOPE_AMBIGUITY_TERMS) for t in merged_rows)
+    high = n_unclear >= 2 or (n_unclear >= 1 and scope_term_hits >= 3) or scope_term_hits >= 5
+    moderate = not high and (n_unclear >= 1 or scope_term_hits >= 2)
+    level = _signal_level_high_mod_low(score_high=high, score_moderate=moderate)
+    explain = (
+        f"unclear_scope perception rows={n_unclear}, scope-term hits={scope_term_hits} "
+        f"(§6 Step 20; coordination §2.3)"
+    )
+    return level, explain
+
+
+def _discussion_churn_signal(
+    perception_rows: list[PerceptionRow],
+    merged_rows: list[str],
+    gap_counts: dict[str, int],
+    raw_highlights: RawHighlightsBundleDebug,
+) -> tuple[SignalDeliveryStrength, str]:
+    """``discussion_loop`` rows + discussed-not-linked gaps + churn terms + repeated-term highlights."""
+    n_loop = sum(1 for r in perception_rows if r.ambiguity_class == "discussion_loop")
+    discussed_gaps = gap_counts.get("discussed_not_linked_to_work", 0)
+    churn_term_hits = sum(_count_terms(t, _DISCUSSION_CHURN_TERMS) for t in merged_rows)
+    term_highlights = sum(1 for h in raw_highlights.items if h.text.lower().startswith("term "))
+    high = (
+        n_loop >= 2
+        or discussed_gaps >= 2
+        or (n_loop >= 1 and discussed_gaps >= 1)
+        or churn_term_hits >= 4
+    )
+    moderate = not high and (
+        n_loop >= 1 or discussed_gaps >= 1 or churn_term_hits >= 2 or term_highlights >= 1
+    )
+    level = _signal_level_high_mod_low(score_high=high, score_moderate=moderate)
+    explain = (
+        f"discussion_loop rows={n_loop}, discussed_not_linked gaps={discussed_gaps}, "
+        f"churn-term hits={churn_term_hits}, repeated-term highlights={term_highlights} "
+        f"(§6 Step 20; coordination §2.3)"
+    )
+    return level, explain
+
+
+def _contradiction_density_signal(
+    perception_rows: list[PerceptionRow],
+    merged_rows: list[str],
+) -> tuple[SignalDeliveryStrength, str]:
+    """Contradiction-class perception rows + contradiction-ish terms."""
+    n_contra = sum(1 for r in perception_rows if r.ambiguity_class == "contradiction")
+    contra_term_hits = sum(_count_terms(t, _CONTRADICTION_TERMS) for t in merged_rows)
+    high = n_contra >= 2 or contra_term_hits >= 4
+    moderate = not high and (n_contra >= 1 or contra_term_hits >= 2)
+    level = _signal_level_high_mod_low(score_high=high, score_moderate=moderate)
+    explain = (
+        f"contradiction perception rows={n_contra}, contradiction-term hits={contra_term_hits} "
+        f"(§6 Step 20; coordination §2.3)"
+    )
+    return level, explain
 
 
 def _is_done(item: WorkItem) -> bool:
@@ -40,16 +153,6 @@ def _is_open(item: WorkItem) -> bool:
 
 def _blob(*parts: str | None) -> str:
     return " ".join((p or "") for p in parts).lower()
-
-
-def _adjacency(links: LinkBundle) -> dict[str, set[str]]:
-    out: dict[str, set[str]] = {}
-    for edge in links.links:
-        if edge.confidence not in _LINK_OK:
-            continue
-        out.setdefault(edge.from_work_item_id, set()).add(edge.to_work_item_id)
-        out.setdefault(edge.to_work_item_id, set()).add(edge.from_work_item_id)
-    return out
 
 
 def _linked_exec_ids(source_id: str, links: dict[str, set[str]], by_id: dict[str, WorkItem]) -> list[str]:
@@ -103,12 +206,34 @@ def _count_terms(text: str, terms: tuple[str, ...]) -> int:
     return sum(1 for t in terms if t in lower)
 
 
-def _merge_texts(work_items: WorkItemBundle, evidence: EvidenceBundle) -> list[str]:
+def _perception_text_blobs(rows: list[PerceptionRow]) -> list[str]:
+    """Validated perception prose only (same fields as link merge surface)."""
+    out: list[str] = []
+    for row in rows:
+        parts: list[str] = [row.statement, row.quote]
+        if row.ambiguity_quote and row.ambiguity_quote.strip():
+            parts.append(row.ambiguity_quote)
+        if row.state_transition is not None:
+            parts.append(row.state_transition.quote)
+        parts.extend(row.waits_on or [])
+        parts.extend(row.blocked_by or [])
+        blob = _blob(" ".join(p for p in parts if p))
+        if blob.strip():
+            out.append(blob)
+    return out
+
+
+def _merge_texts(
+    work_items: WorkItemBundle,
+    evidence: EvidenceBundle,
+    perception_rows: list[PerceptionRow],
+) -> list[str]:
     rows: list[str] = []
     for w in work_items.items:
         rows.append(_blob(w.title, w.summary))
     for e in [*evidence.action_items, *evidence.blockers, *evidence.decisions]:
         rows.append(_blob(e.statement, e.evidence))
+    rows.extend(_perception_text_blobs(perception_rows))
     return rows
 
 
@@ -202,15 +327,24 @@ def _coordination_role(
 
 def compute_signals(
     work_items: WorkItemBundle,
-    evidence: EvidenceBundle,
     links: LinkBundle,
     gaps: GapBundle,
     key_achievements: KeyAchievementsBundleDebug,
     raw_highlights: RawHighlightsBundleDebug,
+    *,
+    coordination_input: CoordinationLinkInputBundle,
 ) -> SignalsV0Debug:
-    """Build deterministic SignalsV0-like values + explain strings from Steps 2–5.6."""
+    """Build deterministic SignalsV0-like values + explain strings from Steps 2–5.6.
+
+    §6 Step 14: ``coordination_input`` must be the same bundle passed to ``link_work_items`` and
+    ``compute_gaps`` for this run.
+    """
+    evidence = coordination_input.evidence
     by_id = {w.id: w for w in work_items.items}
-    adj = _adjacency(links)
+    adj = _merge_adjacency(
+        _adjacency(links),
+        _perception_mention_adjacency(coordination_input.perception_rows, by_id),
+    )
     exec_items = [w for w in work_items.items if w.type in _EXEC_TYPES]
     done_exec = [w for w in exec_items if _is_done(w)]
     open_exec = [w for w in exec_items if _is_open(w)]
@@ -293,7 +427,7 @@ def compute_signals(
     focus, explain_focus = _focus(exec_items)
     collaboration_intensity, explain_collab = _collaboration_intensity(discussion_items)
 
-    merged_rows = _merge_texts(work_items, evidence)
+    merged_rows = _merge_texts(work_items, evidence, coordination_input.perception_rows)
     support_pattern, explain_support = _support_pattern(merged_rows)
     feedback_reception, explain_feedback = _feedback_reception(exec_items, merged_rows)
     coordination_role, explain_coordination = _coordination_role(
@@ -311,6 +445,21 @@ def compute_signals(
         f"friction markers={friction_markers}, blocker_not_tracked gaps={gap_counts.get('blocker_not_tracked', 0)}"
     )
 
+    scope_ambiguity, explain_scope = _scope_ambiguity_signal(
+        coordination_input.perception_rows,
+        merged_rows,
+    )
+    discussion_churn, explain_churn = _discussion_churn_signal(
+        coordination_input.perception_rows,
+        merged_rows,
+        gap_counts,
+        raw_highlights,
+    )
+    contradiction_density, explain_contra = _contradiction_density_signal(
+        coordination_input.perception_rows,
+        merged_rows,
+    )
+
     return SignalsV0Debug(
         delivery_strength=delivery_strength,
         urgent_pressure=urgent_pressure,
@@ -326,6 +475,9 @@ def compute_signals(
         feedback_reception=feedback_reception,
         coordination_role=coordination_role,
         interaction_friction=interaction_friction,
+        scope_ambiguity=scope_ambiguity,
+        discussion_churn=discussion_churn,
+        contradiction_density=contradiction_density,
         explain={
             "delivery_strength": explain_delivery,
             "urgent_pressure": explain_urgent,
@@ -341,5 +493,8 @@ def compute_signals(
             "feedback_reception": explain_feedback,
             "coordination_role": explain_coordination,
             "interaction_friction": explain_friction,
+            "scope_ambiguity": explain_scope,
+            "discussion_churn": explain_churn,
+            "contradiction_density": explain_contra,
         },
     )

@@ -532,3 +532,190 @@ class AdminHardDeleteOrphanUserResponse(BaseModel):
 
     deleted_user_id: uuid.UUID
     deleted_email: str
+
+
+class ManagerInsightDecisionRow(BaseModel):
+    """One row from ``manager_insight_decisions`` (§6 Step 33 list API)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    run_id: uuid.UUID
+    gap_id: str
+    gap_type: str
+    decision_type: str
+    title: str
+    rationale: str
+    default_action: dict[str, Any]
+    required_inputs: dict[str, Any]
+    evidence_refs: list[str]
+    signal_refs: list[str]
+    status: str
+    rank: int | None = None
+    slack_channel_id: str | None = None
+    slack_message_ts: str | None = None
+    idempotency_key: str | None = None
+    receipt: dict[str, Any] | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ManagerInsightDecisionsListResponse(BaseModel):
+    """§6 Step 33 — paginated persisted decisions for admin QA."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    items: list[ManagerInsightDecisionRow] = Field(default_factory=list)
+
+
+class ManagerInsightOutcomeRow(BaseModel):
+    """One row from ``manager_insight_outcomes`` (§6 Step 39 list API)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    decision_id: uuid.UUID
+    tenant_id: uuid.UUID
+    observed_at: datetime
+    outcome_type: str
+    false_positive: bool | None = None
+    ground_truth: dict[str, Any]
+    user_attribution: str | None = None
+
+
+class ManagerInsightOutcomesListResponse(BaseModel):
+    """§6 Step 39 — paginated outcomes for admin QA."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    items: list[ManagerInsightOutcomeRow] = Field(default_factory=list)
+
+
+class ManagerInsightDismissDecisionRequest(BaseModel):
+    """§6 Step 40 — optional fields stored on the ``dismissed`` outcome row."""
+
+    model_config = ConfigDict(from_attributes=False, extra="forbid")
+
+    user_attribution: str | None = None
+    false_positive: bool | None = None
+    ground_truth: dict[str, Any] | None = None
+
+
+class ManagerInsightDismissDecisionResponse(BaseModel):
+    """§6 Step 40 — outcome row + decision lifecycle after dismiss."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    decision_id: uuid.UUID
+    decision_status: str
+    idempotent: bool = Field(
+        default=False,
+        description="True when already dismissed and an existing outcome row was returned.",
+    )
+    outcome: ManagerInsightOutcomeRow
+
+
+class ManagerInsightEvaluateOutcomesRequest(BaseModel):
+    """§6 Step 41 — batch deterministic ``ground_truth`` merge (no ML)."""
+
+    model_config = ConfigDict(from_attributes=False, extra="forbid")
+
+    limit: int = Field(default=50, ge=1, le=200, description="Max outcome rows to update this call.")
+    reset: bool = Field(
+        default=False,
+        description="When true, re-apply rules even if ``rule_version`` is already ``step41_v0``.",
+    )
+
+
+class ManagerInsightEvaluateOutcomeItemResult(BaseModel):
+    """One outcome row updated by ``evaluate-outcomes``."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    outcome_id: uuid.UUID
+    decision_id: uuid.UUID
+    rules_applied: list[str] = Field(default_factory=list)
+    ground_truth_before: dict[str, Any] = Field(default_factory=dict)
+    ground_truth_after: dict[str, Any] = Field(default_factory=dict)
+
+
+class ManagerInsightEvaluateOutcomesResponse(BaseModel):
+    """§6 Step 41 — evaluation batch summary."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    processed: int = Field(ge=0, description="Rows written.")
+    skipped: int = Field(ge=0, description="Rows already stamped with ``rule_version`` (no ``reset``).")
+    scanned: int = Field(
+        ge=0,
+        description="Rows visited while attempting up to ``limit`` writes (chronological scan).",
+    )
+    items: list[ManagerInsightEvaluateOutcomeItemResult] = Field(default_factory=list)
+
+
+class ManagerInsightApplyDecisionRequest(BaseModel):
+    """§6 Steps 37–38 — apply endpoint body."""
+
+    model_config = ConfigDict(from_attributes=False, extra="forbid")
+
+    dry_run: bool = Field(
+        default=True,
+        description=(
+            "§6 Step 37: true = plan only. §6 Step 38: false = live apply when "
+            "VECTOR_MANAGER_INSIGHTS_LIVE_APPLY_ENABLED=1 on the API."
+        ),
+    )
+
+
+class ManagerInsightApplyDryRunResponse(BaseModel):
+    """§6 Step 37 — planned apply payload; no connector invocation."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    dry_run: Literal[True] = True
+    tenant_id: uuid.UUID
+    decision_id: uuid.UUID
+    run_id: uuid.UUID
+    gap_id: str
+    decision_type: str
+    title: str
+    decision_status: str = Field(description="Lifecycle status from persisted row (`status`).")
+    default_action: dict[str, Any]
+    planned_payload: dict[str, Any]
+    note: str = Field(
+        default="No external I/O performed (§6 Step 37).",
+        description="QA hint that connectors were not invoked.",
+    )
+
+
+class ManagerInsightApplyLiveResponse(BaseModel):
+    """§6 Step 38 — live apply result; ``receipt`` persisted on the row."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    dry_run: Literal[False] = False
+    tenant_id: uuid.UUID
+    decision_id: uuid.UUID
+    run_id: uuid.UUID
+    gap_id: str
+    decision_type: str
+    title: str
+    decision_status: str = Field(description="Lifecycle status after apply attempt.")
+    default_action: dict[str, Any]
+    planned_payload: dict[str, Any]
+    receipt: dict[str, Any]
+    note: str = Field(
+        default="§6 Step 38 live apply; receipt written to manager_insight_decisions.receipt.",
+        description="QA hint for staging — confirm Slack / noop path before broad use.",
+    )

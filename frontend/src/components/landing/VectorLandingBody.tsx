@@ -11,136 +11,100 @@ const DEMO_CAL_URL = "https://calendar.app.google/GcS9iPFBuL9XFzhc8";
 const HERO_CHAT_DELAYS_MS = [420, 580, 560, 1350, 920] as const;
 const HERO_CHAT_STEP_COUNT = 6;
 
-const EMPOWER_ORDER = [
-  "managerInsights",
-  "reportingAutomation",
-  "peerReview",
-  "staleThreadsEscalation",
-  "driftDetection",
+const PERCEPTION_CAPABILITIES = [
+  {
+    title: "Understands real work",
+    sub: "Pulls signals from GitHub, Linear, Slack, and docs, including what people say, not just what they log.",
+  },
+  {
+    title: "Captures human signals",
+    sub: "Detects commitments, blockers, ownership gaps, and ambiguity, even when implicit.",
+  },
+  {
+    title: "Reconstructs execution state",
+    sub: "Knows what's moving, stuck, unclear, or drifting across threads and tools.",
+  },
+  {
+    title: "Connects everything together",
+    sub: "Automatically links discussions to execution and outcomes. No manual stitching.",
+  },
 ] as const;
 
-type EmpowerKey = (typeof EMPOWER_ORDER)[number];
+const ACTION_CAPABILITIES = [
+  {
+    title: "Surfaces what's actually broken",
+    sub: "Highlights real execution gaps (not noise, not reports).",
+  },
+  {
+    title: "Tells you what to do next",
+    sub: "Every issue comes with a concrete action: assign, clarify, link, or escalate.",
+  },
+  {
+    title: "Handles coordination for you",
+    sub: "Follows up, nudges, connects people, and closes loops automatically.",
+  },
+  {
+    title: "Escalates only when needed",
+    sub: "You step in for decisions. Vector handles the rest.",
+  },
+] as const;
 
-const EMPOWER_META: Record<
-  EmpowerKey,
-  { tabId: string; title: string; sub: string; bubbles: string[]; ariaLabel: string; time: string }
-> = {
-  managerInsights: {
-    tabId: "empower-tab-manager-insights",
-    title: "Manager insights",
-    sub: "Delivery signal and how your people work together",
-    ariaLabel: "Manager insights: pulse, signals, collaboration, insights, one priority",
-    time: "",
-    bubbles: [],
+const IMPACT_BLOCKS = [
+  {
+    accent: true,
+    stat: "30%",
+    copy: "Of your week back for leading, not stitching updates across tools.",
   },
-  reportingAutomation: {
-    tabId: "empower-tab-reporting-automation",
-    title: "Reporting automation",
-    sub: "Rollups on your rhythm, weekly, daily, or on milestones",
-    ariaLabel: "Automated Notion weekly report with delivery, KPI, project, and drift updates",
-    time: "7:01 AM",
-    bubbles: [
-      "Your weekly rollup is ready, with the same sections as last time.",
-      "Shipped / slipped / next commitments, pulled from Linear + Slack with links back to source.",
-      "Cadence is Mondays 7:00 your time. Want a second digest on Thursdays? I can add it.",
-    ],
+  {
+    accent: false,
+    stat: "Runs for you",
+    copy: "Follow-ups, owners, and links keep moving so work doesn't die in the thread.",
   },
-  peerReview: {
-    tabId: "empower-tab-peer-review",
-    title: "Peer review",
-    sub: "Reviews and approvals routed before work stalls",
-    ariaLabel: "Peer review overview with strongest extracted signal per teammate pair",
-    time: "11:08 AM",
-    bubbles: [
-      "Peer review nudge for the API gateway change.",
-      "Two approvals still out: Francesco and Jordan. I sent each the diff + the two questions reviewers usually ask here.",
-      "If neither lands by EOD, I’ll escalate to the EM with a one-line risk note.",
-    ],
+  {
+    accent: true,
+    stat: "Always-on",
+    copy: "Stalls and gaps surface while you can still change the outcome.",
   },
-  staleThreadsEscalation: {
-    tabId: "empower-tab-stale-threads",
-    title: "Stale threads & escalation",
-    sub: "Quiet Slack, stuck threads summarized, then acted on",
-    ariaLabel: "Stale thread in Slack: Vector summarizes #eng-checkout and offers to assign and clarify the date",
-    time: "2:26 PM",
-    bubbles: [],
-  },
-  driftDetection: {
-    tabId: "empower-tab-drift-detection",
-    title: "Drift detection",
-    sub: "Scope and ownership shifts before they hit the date",
-    ariaLabel: "Drift detection: Vector nudges manager on a stale checkout ticket",
-    time: "2:14 PM",
-    bubbles: [],
-  },
-};
+] as const;
 
-function StaleThreadsEscalationChatShowcase() {
-  const meta = EMPOWER_META.staleThreadsEscalation;
+function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string; sub: string }[] }) {
   return (
-    <div className="chat-card chat-card--compact chat-card--escalation" role="region" aria-label={meta.ariaLabel}>
-      <div className="chat-shell">
-        <div className="chat-head">
-          <strong>#eng-checkout</strong>
-          <span className="muted">·</span>
-          <span className="muted">Stale thread</span>
-        </div>
-        <div className="chat-thread">
-          <div className="chat-block chat-row is-visible">
-            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-            <div className="flex-1">
-              <div className="bubble-meta">
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>{meta.time}</span>
-              </div>
-              <div className="bubble bubble--escalation-brief">
-                <p className="bubble--escalation-brief__lead">
-                  Sam, quick heads up - thread in <strong>#eng-checkout</strong> has been open 26 hours, no owner
-                  assigned.
-                </p>
-                <div className="bubble--escalation-brief__section">
-                  <p className="bubble--escalation-brief__kicker">What’s happening:</p>
-                  <p className="bubble--escalation-brief__support">
-                    payment webhook failing in staging, 500 errors confirmed by 2 engineers.
-                  </p>
-                </div>
-                <div className="bubble--escalation-brief__section">
-                  <p className="bubble--escalation-brief__kicker">What’s unclear:</p>
-                  <ol className="bubble--escalation-brief__ol">
-                    <li>ownership (Alex raised it, Sam pushed back, no one else claimed it)</li>
-                    <li>release date (Linear says Monday, team thinks Friday)</li>
-                  </ol>
-                </div>
-                <div className="bubble--escalation-brief__section">
-                  <p className="bubble--escalation-brief__kicker">Risk:</p>
-                  <p className="bubble--escalation-brief__support">
-                    if it’s the Stripe webhook and release is actually Friday, checkout ships broken.
-                  </p>
-                </div>
-                <p className="bubble--escalation-brief__cta">
-                  Want me to assign and clarify the date ? 🙏🏻
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ul className="empower-cap-list empower-cap-list--grid" aria-label="Capabilities">
+      {items.map((item) => (
+        <li key={item.title} className="empower-cap-item">
+          <span className="empower-nav-title">{item.title}</span>
+          <span className="empower-nav-sub">{item.sub}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function DriftDetectionChatShowcase() {
+function ValuePillarCapabilityList({ items }: { items: readonly { title: string; sub: string }[] }) {
+  return (
+    <ul className="empowers-nav empower-cap-list" aria-label="Capabilities">
+      {items.map((item) => (
+        <li key={item.title} className="empower-cap-item">
+          <span className="empower-nav-title">{item.title}</span>
+          <span className="empower-nav-sub">{item.sub}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ActionProductPreview() {
   return (
     <div
       className="chat-card chat-card--compact"
       role="region"
-      aria-label={EMPOWER_META.driftDetection.ariaLabel}
+      aria-label="Vector detects stalled checkout work, assigns Alex, links PR, and follows up"
     >
       <div className="chat-shell">
         <div className="chat-head">
           <strong>Checkout</strong>
           <span className="muted">·</span>
-          <span className="muted">Stale ticket</span>
+          <span className="muted">Coordination</span>
         </div>
         <div className="chat-thread">
           <div className="chat-block chat-row is-visible">
@@ -148,244 +112,47 @@ function DriftDetectionChatShowcase() {
             <div className="flex-1">
               <div className="bubble-meta">
                 <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:14 PM</span>
+                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:08 PM</span>
               </div>
               <div className="bubble">
-                Hey Sam, noticed that ticket on check-out has been sitting in &quot;in progress&quot; for 7 days now.
-                Should we assign to someone else?
+                Checkout ticket has been in progress for 7 days with no updates. Likely stalled.
               </div>
             </div>
           </div>
           <div className="chat-block chat-row--alex is-visible">
             <div className="bubble-meta bubble-meta--alex">
               <img className="avatar" src={heroOrgMichelleUrl} alt="" />
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Sam</span>
-              <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:15 PM</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Manager</span>
+              <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:09 PM</span>
             </div>
-            <div className="bubble bubble--alex">yes, who&apos;s on call?</div>
+            <div className="bubble bubble--alex">Yeah</div>
           </div>
           <div className="chat-block chat-row is-visible">
             <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
             <div className="flex-1">
               <div className="bubble-meta">
                 <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:15 PM</span>
-              </div>
-              <div className="bubble">Alex is, want me to hand over?</div>
-            </div>
-          </div>
-          <div className="chat-block chat-row--alex is-visible">
-            <div className="bubble-meta bubble-meta--alex">
-              <img className="avatar" src={heroOrgMichelleUrl} alt="" />
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Sam</span>
-              <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:16 PM</span>
-            </div>
-            <div className="bubble bubble--alex">👍🏻</div>
-          </div>
-          <div className="chat-block chat-row is-visible">
-            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-            <div className="flex-1">
-              <div className="bubble-meta">
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:16 PM</span>
+                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:09 PM</span>
               </div>
               <div className="bubble">
-                Done, pinged Alex with context. I&apos;ll follow up if it stalls!
+                Assigning to Alex and linking related PR. I&apos;ll follow up if no progress in 24h.
               </div>
+            </div>
+          </div>
+          <div className="chat-block chat-row is-visible">
+            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
+            <div className="flex-1">
+              <div className="bubble-meta">
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
+                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:09 PM</span>
+              </div>
+              <div className="bubble">Done. I&apos;ll keep an eye on it.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
-
-function ReportingAutomationShowcase() {
-  return (
-    <div className="ra-showcase" role="region" aria-label={EMPOWER_META.reportingAutomation.ariaLabel}>
-      <div className="ra-page">
-        <header className="ra-head">
-          <p className="ra-head__eyebrow">Notion weekly report</p>
-          <h3 className="ra-head__title">Core Product delivery digest - last 7 days</h3>
-          <p className="ra-head__meta">Teams: Checkout + Core Platform + Auth | Manager: Sam</p>
-        </header>
-
-        <div className="ra-kpi-row" aria-label="Weekly KPI summary">
-          <div className="ra-kpi">
-            <p className="ra-kpi__label">Delivery</p>
-            <p className="ra-kpi__value">9 shipped / 2 at risk</p>
-          </div>
-          <div className="ra-kpi">
-            <p className="ra-kpi__label">PR quality</p>
-            <p className="ra-kpi__value">31% need rework</p>
-          </div>
-          <div className="ra-kpi">
-            <p className="ra-kpi__label">Escalations</p>
-            <p className="ra-kpi__value">3 stale threads flagged</p>
-          </div>
-        </div>
-
-        <div className="ra-grid">
-          <article className="ra-card">
-            <p className="ra-card__label">Projects</p>
-            <p className="ra-card__text">
-              <strong>Payments architecture</strong> design docs approved, implementation starts Monday.
-            </p>
-            <p className="ra-card__text">
-              <strong>Auth migration</strong> still unowned after Alex shifted to payments design.
-            </p>
-          </article>
-
-          <article className="ra-card">
-            <p className="ra-card__label">Delivery and risk</p>
-            <p className="ra-card__text">
-              Checkout and Core are queueing on Sam for fixes and deployment coordination.
-            </p>
-            <p className="ra-card__text">If this dependency holds, Friday release confidence drops from 82% to 61%.</p>
-          </article>
-
-          <article className="ra-card">
-            <p className="ra-card__label">Drift signals</p>
-            <p className="ra-card__text">
-              Rebecca&apos;s PRs regularly require multiple reworks before merge, slowing review throughput.
-            </p>
-            <p className="ra-card__text">Vector detected repeat spec gaps across 3 PRs in checkout webhook logic.</p>
-          </article>
-
-          <article className="ra-card">
-            <p className="ra-card__label">Recommended manager actions</p>
-            <p className="ra-card__text">Assign auth migration owner this week and rebalance deploy handoffs from Sam.</p>
-            <p className="ra-card__text">Schedule a 20-min design-review checkpoint with Rebecca before implementation.</p>
-          </article>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PeerReviewShowcase() {
-  const reviews = [
-    {
-      reviewer: "Sam",
-      reviewee: "Rebecca",
-      signal: "Most common thread: handoffs to Rebecca keep missing a clear done bar, seen in 4 of 5 recent reviews of her work.",
-    },
-    {
-      reviewer: "Alex",
-      reviewee: "Sam",
-      signal: "Strongest positive signal: Sam’s diffs ship with context, test plan, and rollout in one place, fewer review round trips.",
-    },
-    {
-      reviewer: "Rebecca",
-      reviewee: "Tereza",
-      signal: "Pattern in answers: after a plan change, Tereza posts a same day update in writing, and duplicate work shows up less in follow on reviews.",
-    },
-    {
-      reviewer: "Tereza",
-      reviewee: "Alex",
-      signal: "Top risk called out: reviews keep asking for edge case QA, not just happy path, on Alex’s core path changes.",
-    },
-  ] as const;
-
-  return (
-    <div className="pr-showcase" role="region" aria-label={EMPOWER_META.peerReview.ariaLabel}>
-      <header className="pr-head">
-        <p className="pr-head__eyebrow">Peer review map</p>
-        <h3 className="pr-head__title">This month&apos;s peer reviews (4 teammates)</h3>
-      </header>
-      <div className="pr-grid">
-        {reviews.map((row) => (
-          <article key={`${row.reviewer}-${row.reviewee}`} className="pr-row">
-            <p className="pr-row__pair">
-              <span className="pr-row__name">{row.reviewer}</span>
-              <span className="pr-row__arrow" aria-hidden="true">
-                →
-              </span>
-              <span className="pr-row__name">{row.reviewee}</span>
-            </p>
-            <PeerReviewSignalLine text={row.signal} />
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PeerReviewSignalLine({ text }: { text: string }) {
-  const i = text.indexOf(":");
-  if (i === -1) {
-    return <p className="pr-row__signal">{text}</p>;
-  }
-  const lead = text.slice(0, i + 1).trimEnd();
-  const body = text.slice(i + 1).trimStart();
-  return (
-    <p className="pr-row__signal">
-      <strong className="pr-row__signal-lead">{lead}</strong> {body}
-    </p>
-  );
-}
-
-function ManagerInsightsShowcase() {
-  const sections = [
-    {
-      label: "Pulse",
-      body: "9 PRs shipped, 2 stuck on review.",
-    },
-    {
-      label: "Signal",
-      body: "Rebecca’s PRs often require multiple reworks before getting merged.",
-    },
-    {
-      label: "Collaboration",
-      body: "Checkout and Core are waiting on Sam for fixes and deployments. Work is queueing up.",
-    },
-    {
-      label: "Insight",
-      body: "Alex is focusing on system design for the new payments architecture, leaving the auth migration without a clear owner.",
-    },
-    {
-      label: "Close",
-      body: "One priority needs your call this week: auth migration ownership.",
-    },
-  ] as const;
-
-  return (
-    <div
-      className="mis-showcase"
-      role="region"
-      aria-label={EMPOWER_META.managerInsights.ariaLabel}
-    >
-      <div className="mis-showcase__top">
-        <p className="mis-showcase__eyebrow">Manager insights</p>
-        <h3 className="mis-showcase__title">This week, Vector surfaced...</h3>
-      </div>
-      <div className="mis-stack">
-        {sections.map((section) => (
-          <article key={section.label} className="mis-section">
-            <p className="mis-section__label">{section.label}</p>
-            <p className="mis-section__body">{section.body}</p>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function EmpowerPanel({ feature }: { feature: EmpowerKey }) {
-  switch (feature) {
-    case "managerInsights":
-      return <ManagerInsightsShowcase />;
-    case "reportingAutomation":
-      return <ReportingAutomationShowcase />;
-    case "peerReview":
-      return <PeerReviewShowcase />;
-    case "staleThreadsEscalation":
-      return <StaleThreadsEscalationChatShowcase />;
-    case "driftDetection":
-      return <DriftDetectionChatShowcase />;
-    default:
-      return null;
-  }
 }
 
 function useHeroChatReveal() {
@@ -414,7 +181,7 @@ function useHeroChatReveal() {
   return visibleSteps;
 }
 
-function useProblemBannerInView() {
+function useRevealInViewRef() {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -449,8 +216,7 @@ type VectorLandingBodyProps = {
 
 export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyProps) {
   const visibleSteps = useHeroChatReveal();
-  const problemBannerRef = useProblemBannerInView();
-  const [empower, setEmpower] = useState<EmpowerKey>("managerInsights");
+  const problemBannerRef = useRevealInViewRef();
 
   const timelineSlots = [
     {
@@ -644,71 +410,54 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
           </div>
         </section>
 
-        <section className="section" id="core-features">
-          <div className="section-inner">
-            <header className="text-center">
-              <h2>
-                How <span className="accent">Vector</span> shows up for you
-              </h2>
-            </header>
-            <div className="empowers-split">
-              <div className="empowers-nav" role="tablist" aria-label="Vector capabilities">
-                {EMPOWER_ORDER.map((key) => {
-                  const m = EMPOWER_META[key];
-                  const selected = empower === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={`empower-nav-item${selected ? " is-selected" : ""}`}
-                      role="tab"
-                      id={m.tabId}
-                      aria-selected={selected}
-                      aria-controls="empower-panel"
-                      data-feature={key}
-                      onClick={() => setEmpower(key)}
-                    >
-                      <span className="empower-nav-title">{m.title}</span>
-                      <span className="empower-nav-sub">{m.sub}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div
-                className="empowers-panel-wrap"
-                role="tabpanel"
-                id="empower-panel"
-                aria-labelledby={EMPOWER_META[empower].tabId}
-              >
-                <div id="empower-detail-content" className="empower-detail">
-                  <EmpowerPanel feature={empower} />
+        <div id="core-features" className="core-features-group">
+          <section className="section" aria-labelledby="value-pillar-perception-heading">
+            <div className="section-inner value-pillars">
+              <div className="value-pillar">
+                <header className="value-pillar__header text-center">
+                  <h2 id="value-pillar-perception-heading">
+                    Vector <span className="accent">sees</span> what your team is really doing
+                  </h2>
+                </header>
+                <div className="value-pillar-features">
+                  <ValuePillarCapabilityGrid items={PERCEPTION_CAPABILITIES} />
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="impact-strip" id="impact" aria-label="What Vector changes for managers">
+          <section className="section" aria-labelledby="value-pillar-action-heading">
+            <div className="section-inner value-pillars">
+              <div className="value-pillar">
+                <header className="value-pillar__header text-center">
+                  <h2 id="value-pillar-action-heading">
+                    Vector <span className="accent">moves work forward</span> for you
+                  </h2>
+                </header>
+                <div className="empowers-split">
+                  <ValuePillarCapabilityList items={ACTION_CAPABILITIES} />
+                  <div className="empowers-panel-wrap">
+                    <div className="empower-detail">
+                      <ActionProductPreview />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="impact-strip" id="impact" aria-label="What changes when Vector runs coordination">
           <div className="impact-strip__inner">
             <div className="impact-strip__row">
-              <article className="impact-strip__col">
-                <p className="impact-strip__stat impact-strip__stat--accent">30%</p>
-                <p className="impact-strip__copy">
-                  Of your week back, spent leading, not chasing updates.
-                </p>
-              </article>
-              <article className="impact-strip__col">
-                <p className="impact-strip__stat">100%</p>
-                <p className="impact-strip__copy">
-                  Automated reporting. No more digging into dashboards.
-                </p>
-              </article>
-              <article className="impact-strip__col">
-                <p className="impact-strip__stat impact-strip__stat--accent">Always-on</p>
-                <p className="impact-strip__copy">
-                  Project radar, blind spots surface before they cost you.
-                </p>
-              </article>
+              {IMPACT_BLOCKS.map((block) => (
+                <article key={block.stat} className="impact-strip__col">
+                  <p className={`impact-strip__stat${block.accent ? " impact-strip__stat--accent" : ""}`}>
+                    {block.stat}
+                  </p>
+                  <p className="impact-strip__copy">{block.copy}</p>
+                </article>
+              ))}
             </div>
           </div>
         </section>

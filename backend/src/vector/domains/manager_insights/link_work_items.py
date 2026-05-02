@@ -6,10 +6,12 @@ import hashlib
 import re
 
 from vector.contracts.manager_insights_activity import (
+    CoordinationLinkInputBundle,
     EvidenceBundle,
     LinkBundle,
     LinkConfidence,
     LinkType,
+    PerceptionRow,
     WorkItem,
     WorkItemBundle,
     WorkItemLink,
@@ -72,6 +74,34 @@ def _build_evidence_extra_by_work_item(evidence: EvidenceBundle) -> dict[str, st
                 f"{e.statement} {e.evidence}"
             )
     return {k: " ".join(v) for k, v in by_id.items()}
+
+
+def _build_perception_extra_by_work_item(rows: list[PerceptionRow]) -> dict[str, str]:
+    """Fold validated perception text into the same cross-item token surface as Step-3 evidence."""
+    by_id: dict[str, list[str]] = {}
+    for row in rows:
+        parts = [row.statement, row.quote]
+        if row.ambiguity_quote and row.ambiguity_quote.strip():
+            parts.append(row.ambiguity_quote)
+        if row.state_transition is not None:
+            parts.append(row.state_transition.quote)
+        if row.waits_on:
+            parts.extend(row.waits_on)
+        if row.blocked_by:
+            parts.extend(row.blocked_by)
+        chunk = " ".join(p for p in parts if p)
+        by_id.setdefault(row.work_item_id, []).append(chunk)
+    return {k: " ".join(v) for k, v in by_id.items()}
+
+
+def _merge_extra_by_work_item(a: dict[str, str], b: dict[str, str]) -> dict[str, str]:
+    keys = set(a) | set(b)
+    out: dict[str, str] = {}
+    for k in keys:
+        merged = " ".join(p.strip() for p in (a.get(k, ""), b.get(k, "")) if p and p.strip()).strip()
+        if merged:
+            out[k] = merged
+    return out
 
 
 def _text_for(
@@ -149,16 +179,23 @@ def _short(t: str, m: int = 100) -> str:
 
 def link_work_items(
     bundle: WorkItemBundle,
-    evidence: EvidenceBundle | None = None,
+    *,
+    link_input: CoordinationLinkInputBundle | None = None,
 ) -> LinkBundle:
-    """Propose work-item links: token Jaccard, cross-source nudge, shared NEX-KEY detection."""
+    """Propose work-item links: token Jaccard, cross-source nudge, shared NEX-KEY detection.
+
+    §6 Step 12: pass ``CoordinationLinkInputBundle(evidence=…, perception_rows=…)`` so validated
+    ``PerceptionRow`` text is merged with Step-3 evidence for cross-item token hits (never raw LLM JSON).
+    """
     ex_extra: dict[str, str] = {}
-    if (
-        evidence is not None
-        and evidence.run_id == bundle.run_id
-        and evidence.tenant_id == bundle.tenant_id
-    ):
-        ex_extra = _build_evidence_extra_by_work_item(evidence)
+    perception_used_count = 0
+    if link_input is not None:
+        ev = link_input.evidence
+        if ev.run_id == bundle.run_id and ev.tenant_id == bundle.tenant_id:
+            evidence_extra = _build_evidence_extra_by_work_item(ev)
+            perception_extra = _build_perception_extra_by_work_item(link_input.perception_rows)
+            ex_extra = _merge_extra_by_work_item(evidence_extra, perception_extra)
+            perception_used_count = len(link_input.perception_rows)
 
     items = sorted(bundle.items, key=lambda x: x.id)
     work_items_capped = 0
@@ -194,6 +231,11 @@ def link_work_items(
             else:
                 sh_lbl = ""
             ev = _evidence_prose(w_lo, w_hi, t_lo, t_hi, jacc, sh_lbl)
+            method_parts = ["token_jaccard", "cross_source", "ticket_keys"]
+            if hit:
+                method_parts.append("cross_item_text_hits")
+            if perception_used_count:
+                method_parts.append("perception_rows")
             rec = WorkItemLink(
                 id=_link_id(a, b),
                 from_work_item_id=a,
@@ -201,9 +243,7 @@ def link_work_items(
                 link_type=ltype,
                 confidence=conf,
                 similarity=round(min(1.0, score), 4),
-                method="token_jaccard+cross_source+ticket_keys+evidence_hits"
-                if hit
-                else "token_jaccard+cross_source+ticket_keys",
+                method="+".join(method_parts),
                 evidence=ev,
             )
             k2 = (a, b)
@@ -219,4 +259,5 @@ def link_work_items(
         window_days=bundle.window_days,
         links=links,
         work_items_capped=work_items_capped,
+        perception_rows_used_for_linking=perception_used_count,
     )

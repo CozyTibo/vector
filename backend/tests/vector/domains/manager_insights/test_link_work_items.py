@@ -5,8 +5,10 @@ from __future__ import annotations
 import uuid
 
 from vector.contracts.manager_insights_activity import (
+    CoordinationLinkInputBundle,
     EvidenceBundle,
     EvidenceItem,
+    PerceptionRow,
     WorkItem,
     WorkItemBundle,
 )
@@ -127,6 +129,50 @@ def test_step3_snippet_hits_extra_tokens_on_other_work_item() -> None:
         blockers=[],
         decisions=[],
     )
-    with_ev = link_work_items(bundle, ev)
+    with_ev = link_work_items(
+        bundle,
+        link_input=CoordinationLinkInputBundle(evidence=ev, perception_rows=[]),
+    )
     assert with_ev.links
-    assert any("evidence_hits" in L.method for L in with_ev.links)
+    assert any("cross_item_text_hits" in L.method for L in with_ev.links)
+    assert with_ev.perception_rows_used_for_linking == 0
+
+
+def test_step12_perception_rows_merge_for_cross_item_text_hits() -> None:
+    """Validated PerceptionRow text feeds the same cross-item boost surface as Step-3 evidence."""
+    a = WorkItem(
+        id="a1",
+        source="linear",
+        type="issue",
+        title="Retry loop in billing",
+    )
+    b = WorkItem(
+        id="b1",
+        source="notion",
+        type="document",
+        title="Meeting: reliability pilot notes",
+    )
+    bundle = _b([a, b])
+    ev = EvidenceBundle(
+        run_id=bundle.run_id,
+        tenant_id=bundle.tenant_id,
+        window_days=bundle.window_days,
+        action_items=[],
+        blockers=[],
+        decisions=[],
+        discarded_without_evidence=0,
+    )
+    rows = [
+        PerceptionRow(
+            id="p1",
+            work_item_id="a1",
+            kind="action_item",
+            statement="pilot and reliability are blocked until we ship the fix",
+            quote="pilot and reliability for meeting notes on monday",
+        )
+    ]
+    out = link_work_items(bundle, link_input=CoordinationLinkInputBundle(evidence=ev, perception_rows=rows))
+    assert out.links
+    assert any("cross_item_text_hits" in L.method for L in out.links)
+    assert any("perception_rows" in L.method for L in out.links)
+    assert out.perception_rows_used_for_linking == 1

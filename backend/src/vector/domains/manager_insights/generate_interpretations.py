@@ -757,8 +757,12 @@ def generate_interpretations(
     key_achievements: KeyAchievementsBundleDebug,
     raw_highlights: RawHighlightsBundleDebug,
     work_items: WorkItemBundle,
+    skip_llm: bool = False,
 ) -> InterpretationBundleDebug:
-    """Generate Step 7 interpretations with strict validation and deterministic fallback."""
+    """Generate Step 7 interpretations with strict validation and deterministic fallback.
+
+    When ``skip_llm`` is True (admin fetch-debug), OpenAI is not called and deterministic fallbacks run.
+    """
     corpus = _execution_artifact_corpus(evidence, gaps, raw_highlights, key_achievements, work_items)
     llm_items: list[InterpretationItemDebug] = []
     rejected: list[RejectedInterpretationDebug] = []
@@ -775,7 +779,9 @@ def generate_interpretations(
         total_tokens=None,
     )
 
-    if settings.openai_api_key.strip():
+    if skip_llm:
+        fallback_reason = "skip_llm_fetch_debug"
+    elif settings.openai_api_key.strip():
         prompt_json = _serialize_prompt_context(
             signals, evidence, links, gaps, raw_highlights, work_items
         )
