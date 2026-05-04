@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import vectorPortraitUrl from "../../assets/vector-white-bg.png";
+import vectorPortraitUrl from "../../assets/logo.jpeg";
 
 /** Signed-in marketing pages: logo + session actions (no Sign in / Join the list). */
 export type MarketingLayoutSignedSession =

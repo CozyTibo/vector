@@ -227,14 +227,11 @@
 #vector-landing .wrap.hero .hero-sub.sub {
   font-size: 1.25rem;
   line-height: 1.55;
-  color: #6b7280;
+  color: #475569;
+  font-weight: 500;
   margin: 0;
   text-align: left;
   white-space: normal;
-}
-#vector-landing .wrap.hero .hero-sub.sub strong {
-  font-weight: 700;
-  color: #0f172a;
 }
 @media (min-width: 640px) {
   #vector-landing .wrap.hero .hero-sub.sub {
@@ -306,7 +303,7 @@
 
 /* Hero product panel */
 #vector-landing .hero-product {
-  width: min(100%, 34rem);
+  width: min(100%, 38rem);
   margin-top: 0;
   padding: 0;
   box-sizing: border-box;
@@ -320,12 +317,249 @@
   max-width: 33rem;
   margin: 0 auto;
 }
+#vector-landing .hero-product__slack-wrap {
+  max-width: 38rem;
+  margin: 0 auto;
+}
 #vector-landing .hero-product .chat-card {
   width: 100%;
   max-width: none;
   margin: 0;
 }
 
+/* Hero Slack insight preview (simplified app messages) */
+#vector-landing .hero-slack-mock {
+  user-select: none;
+  pointer-events: none;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(228, 228, 231, 0.85);
+  background: #fff;
+  box-shadow: 0 14px 34px -20px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  text-align: left;
+}
+#vector-landing .hero-slack-mock__topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.65rem 1rem;
+  background: linear-gradient(180deg, #fafafa 0%, #f4f4f5 100%);
+  border-bottom: 1px solid rgba(228, 228, 231, 0.95);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #3f3f46;
+}
+#vector-landing .hero-slack-mock__hash {
+  color: #a1a1aa;
+  font-weight: 700;
+}
+#vector-landing .hero-slack-mock__channel {
+  letter-spacing: -0.01em;
+}
+#vector-landing .hero-slack-mock__thread {
+  padding: 0.85rem 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #fcfcfc;
+}
+@media (min-width: 640px) {
+  #vector-landing .hero-slack-mock__thread {
+    padding: 1rem 0.9rem 1.1rem;
+    gap: 0.85rem;
+  }
+}
+#vector-landing .hero-slack-msg {
+  border-radius: 12px;
+  border: 1px solid rgba(228, 228, 231, 0.9);
+  background: #fff;
+  padding: 0.65rem 0.72rem 0.72rem;
+  box-shadow: 0 2px 10px -4px rgba(15, 23, 42, 0.08);
+}
+@media (min-width: 640px) {
+  #vector-landing .hero-slack-msg {
+    padding: 0.72rem 0.85rem 0.8rem;
+  }
+}
+#vector-landing .hero-slack-msg__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+#vector-landing .hero-slack-app-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid rgba(228, 228, 231, 0.95);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+#vector-landing .hero-slack-app-icon__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#vector-landing .hero-slack-msg__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+#vector-landing .hero-slack-msg__app {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #18181b;
+}
+#vector-landing .hero-slack-msg__time {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #a1a1aa;
+}
+#vector-landing .hero-slack-msg__body {
+  padding-left: 0.15rem;
+}
+#vector-landing .hero-slack-msg__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #18181b;
+}
+@media (min-width: 640px) {
+  #vector-landing .hero-slack-msg__title {
+    font-size: 0.875rem;
+  }
+}
+#vector-landing .hero-slack-msg__badge {
+  color: var(--accent);
+  font-weight: 700;
+}
+#vector-landing .hero-slack-msg__badge--block {
+  color: #c2410c;
+}
+#vector-landing .hero-slack-msg__dash {
+  font-weight: 600;
+  color: #71717a;
+}
+#vector-landing .hero-slack-msg__summary {
+  margin: 0 0 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #52525b;
+}
+@media (min-width: 640px) {
+  #vector-landing .hero-slack-msg__summary {
+    font-size: 0.8125rem;
+  }
+}
+#vector-landing .hero-slack-msg__label {
+  margin: 0 0 0.2rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+}
+#vector-landing .hero-slack-msg__list {
+  margin: 0 0 0.45rem;
+  padding-left: 1rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #3f3f46;
+}
+@media (min-width: 640px) {
+  #vector-landing .hero-slack-msg__list {
+    font-size: 0.8125rem;
+    line-height: 1.42;
+  }
+}
+#vector-landing .hero-slack-msg__list li {
+  margin-bottom: 0.12rem;
+}
+#vector-landing .hero-slack-msg__list strong {
+  font-weight: 700;
+  color: #27272a;
+}
+#vector-landing .hero-slack-msg__action {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  font-weight: 600;
+  color: #18181b;
+}
+@media (min-width: 640px) {
+  #vector-landing .hero-slack-msg__action {
+    font-size: 0.8125rem;
+  }
+}
+#vector-landing .hero-slack-msg__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+#vector-landing .hero-slack-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.38rem 0.62rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  max-width: 100%;
+}
+@media (min-width: 640px) {
+  #vector-landing .hero-slack-cta {
+    font-size: 0.75rem;
+    padding: 0.42rem 0.72rem;
+  }
+}
+#vector-landing .hero-slack-cta--primary {
+  background: #007a5a;
+  color: #fff;
+  border-color: #006344;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+#vector-landing .hero-slack-cta--secondary {
+  background: #fff;
+  color: #1f2937;
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+#vector-landing .hero-slack-mock__thread--single {
+  gap: 0;
+  padding-bottom: 0.9rem;
+}
+#vector-landing .hero-slack-mention {
+  display: inline;
+  padding: 0.06em 0.32em 0.08em;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.96em;
+  background: rgba(221, 243, 255, 0.95);
+  color: #0b4f6c;
+  white-space: nowrap;
+}
+#vector-landing .hero-slack-mention--alt {
+  background: rgba(254, 243, 199, 0.95);
+  color: #92400e;
+}
+#vector-landing .empower-action-slack {
+  width: 100%;
+  min-width: 0;
+  user-select: none;
+  pointer-events: none;
+}
 /* Chat */
 #vector-landing .chat-card {
   user-select: none;
@@ -673,14 +907,14 @@
   }
 }
 #vector-landing .impact-strip__inner {
-  max-width: min(68rem, 100%);
+  max-width: min(75rem, 100%);
   margin: 0 auto;
-  padding: clamp(0.6rem, 1.1vw, 1.2rem) clamp(0.6rem, 1.2vw, 1rem);
+  padding: clamp(0.65rem, 1.15vw, 1.25rem) 0;
 }
 #vector-landing .impact-strip__row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(1.25rem, 3vw, 2.25rem);
+  gap: clamp(1.5rem, 3.4vw, 2.75rem);
   align-items: start;
 }
 @media (max-width: 767px) {
@@ -697,7 +931,7 @@
 #vector-landing .impact-strip__stat {
   margin: 0;
   font-family: var(--font);
-  font-size: clamp(1.55rem, 1.35vw + 1.05rem, 2.35rem);
+  font-size: clamp(1.65rem, 1.5vw + 1.08rem, 2.5rem);
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.02em;
@@ -708,21 +942,21 @@
   color: var(--accent);
 }
 #vector-landing .impact-strip__copy {
-  margin: 0.42em 0 0;
+  margin: 0.45em 0 0;
   font-family: var(--font);
-  font-size: clamp(0.875rem, 0.28vw + 0.78rem, 1.0625rem);
+  font-size: clamp(0.9rem, 0.32vw + 0.8rem, 1.1rem);
   font-weight: 500;
-  line-height: 1.45;
+  line-height: 1.48;
   letter-spacing: -0.01em;
   color: rgba(15, 15, 18, 0.68);
   text-wrap: balance;
-  max-width: 28rem;
+  max-width: none;
   margin-left: auto;
   margin-right: auto;
 }
 @media (min-width: 640px) {
   #vector-landing .impact-strip__copy {
-    font-size: clamp(0.9rem, 0.22vw + 0.82rem, 1.125rem);
+    font-size: clamp(0.9375rem, 0.28vw + 0.84rem, 1.15rem);
   }
 }
 
@@ -740,7 +974,7 @@
   }
 }
 #vector-landing .timeline-contrast__inner {
-  max-width: min(68rem, 100%);
+  max-width: min(75rem, 100%);
   margin: 0 auto;
 }
 #vector-landing .timeline-contrast__header h2 {
@@ -754,7 +988,7 @@
 }
 #vector-landing .timeline-contrast__sync {
   margin-top: clamp(1.6rem, 2.8vw, 2.6rem);
-  max-width: min(68rem, 100%);
+  max-width: min(75rem, 100%);
   margin-left: auto;
   margin-right: auto;
 }
@@ -809,36 +1043,13 @@
 #vector-landing .timeline-contrast__side {
   position: relative;
   display: grid;
-  grid-template-columns: 0.75rem 0.85rem minmax(0, 1fr);
+  grid-template-columns: 0.85rem minmax(0, 1fr);
   column-gap: 0.55rem;
   align-items: start;
   min-width: 0;
 }
-#vector-landing .timeline-contrast__track {
-  grid-column: 1;
-  grid-row: 1;
-  position: relative;
-  width: 100%;
-  min-height: 100%;
-}
-#vector-landing .timeline-contrast__track::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0.55rem;
-  bottom: -0.55rem;
-  width: 1.5px;
-  transform: translateX(-50%);
-  background: rgba(228, 228, 231, 0.75);
-}
-#vector-landing .timeline-contrast__side--with .timeline-contrast__track::after {
-  background: rgba(232, 120, 190, 0.28);
-}
-#vector-landing .timeline-contrast__slot:last-child .timeline-contrast__track::after {
-  display: none;
-}
 #vector-landing .timeline-contrast__dot {
-  grid-column: 2;
+  grid-column: 1;
   grid-row: 1;
   margin-top: 0.38rem;
   width: 0.7rem;
@@ -867,7 +1078,7 @@
   line-height: 1;
 }
 #vector-landing .timeline-contrast__text {
-  grid-column: 3;
+  grid-column: 2;
   grid-row: 1;
   margin: 0;
   padding: 0.12rem 0 0.1rem;
@@ -969,16 +1180,17 @@
 }
 #vector-landing #meet-vector .meet-vector-hub {
   width: 100%;
-  max-width: min(22rem, 100%);
+  max-width: min(24rem, 100%);
   margin: 0 auto;
 }
-/* Organic orbit: marks hug the portrait (tight ring + uneven angles) */
+/* Even circular orbit: equal angle steps, equal radius from hub center */
 #vector-landing #meet-vector .meet-vector-hub__orbit {
   position: relative;
-  width: 100%;
-  max-width: min(20rem, 100%);
-  height: clamp(11.5rem, 32vw, 14.75rem);
+  width: min(100%, 20.5rem);
+  aspect-ratio: 1;
   margin: 0 auto;
+  --orbit-count: 7;
+  --orbit-r: clamp(5.35rem, 21vw, 6.65rem);
 }
 #vector-landing #meet-vector .meet-vector-hub__center {
   position: absolute;
@@ -1000,12 +1212,19 @@
 }
 #vector-landing #meet-vector .meet-vector-hub__mark {
   position: absolute;
+  left: 50%;
+  top: 50%;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: clamp(2rem, 5.5vw, 2.4rem);
+  height: clamp(2rem, 5.5vw, 2.4rem);
+  margin: 0;
   line-height: 0;
   filter: drop-shadow(0 2px 8px rgba(15, 23, 42, 0.07));
+  transform: translate(-50%, -50%) rotate(calc(var(--orbit-index) * 1turn / var(--orbit-count)))
+    translateY(calc(-1 * var(--orbit-r))) rotate(calc(-1 * var(--orbit-index) * 1turn / var(--orbit-count)));
 }
 #vector-landing #meet-vector .meet-vector-hub__tool-icon {
   display: block;
@@ -1014,47 +1233,9 @@
   max-height: 2.1rem;
   object-fit: contain;
 }
-#vector-landing #meet-vector .meet-vector-hub__mark[data-pos="1"] {
-  top: 18%;
-  left: 20%;
-  transform: translate(-2px, 3px) rotate(-11deg);
-}
-#vector-landing #meet-vector .meet-vector-hub__mark[data-pos="2"] {
-  top: 48%;
-  left: 10%;
-  transform: translate(4px, -4px) rotate(8deg);
-}
-#vector-landing #meet-vector .meet-vector-hub__mark[data-pos="3"] {
-  top: 16%;
-  right: 20%;
-  left: auto;
-  transform: translate(3px, 5px) rotate(10deg);
-}
-#vector-landing #meet-vector .meet-vector-hub__mark[data-pos="4"] {
-  top: 67%;
-  left: 16%;
-  transform: translate(-3px, 2px) rotate(-6deg);
-}
-#vector-landing #meet-vector .meet-vector-hub__mark[data-pos="5"] {
-  top: 38%;
-  right: 14%;
-  left: auto;
-  transform: translate(5px, 6px) rotate(5deg);
-}
-#vector-landing #meet-vector .meet-vector-hub__mark[data-pos="6"] {
-  top: 6%;
-  left: 54%;
-  transform: translate(calc(-50% + 2px), 0) rotate(-5deg);
-}
-#vector-landing #meet-vector .meet-vector-hub__mark[data-pos="7"] {
-  top: 62%;
-  right: 18%;
-  left: auto;
-  transform: translate(2px, -2px) rotate(9deg);
-}
 @media (max-width: 767px) {
   #vector-landing #meet-vector .meet-vector-layout {
-    gap: 1.6rem;
+    gap: 0;
   }
   #vector-landing #meet-vector .meet-vector-copy {
     max-width: 100%;
@@ -1063,28 +1244,9 @@
   #vector-landing #meet-vector .meet-vector__support {
     max-width: 100%;
   }
+  /* Orbit + center logo are decorative on small screens; keep copy only */
   #vector-landing #meet-vector .meet-vector-hub {
-    max-width: min(20rem, 100%);
-  }
-  #vector-landing #meet-vector .meet-vector-hub__orbit {
-    height: clamp(11rem, 52vw, 14rem);
-  }
-  #vector-landing #meet-vector .meet-vector-hub__vector {
-    width: clamp(6.75rem, 36vw, 9.25rem);
-  }
-  #vector-landing #meet-vector .meet-vector-hub__mark[data-pos="2"] {
-    left: 8%;
-  }
-  #vector-landing #meet-vector .meet-vector-hub__mark[data-pos="4"] {
-    top: 65%;
-    left: 12%;
-  }
-  #vector-landing #meet-vector .meet-vector-hub__mark[data-pos="5"] {
-    top: 36%;
-  }
-  #vector-landing #meet-vector .meet-vector-hub__mark[data-pos="7"] {
-    top: 58%;
-    right: 12%;
+    display: none;
   }
 }
 
@@ -1396,6 +1558,183 @@
   border: none;
   background: transparent;
   box-shadow: none;
+}
+#vector-landing .empower-detail:has(> .empower-action-slack) {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+#vector-landing .empower-detail > .empower-action-slack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-mock {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Pillar Slack mock: use panel space — larger type, tighter chrome, card grows with column */
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-mock__topbar {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+}
+@media (min-width: 768px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-mock__topbar {
+    padding: 0.6rem 0.95rem;
+    font-size: 0.9375rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-mock__thread--single {
+  padding: 0.45rem 0.45rem 0.55rem;
+  gap: 0;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-mock__thread--single {
+    padding: 0.55rem 0.65rem 0.65rem;
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-mock__thread--single {
+    padding: 0.65rem 0.85rem 0.75rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg {
+  width: 100%;
+  padding: 0.85rem 0.8rem 0.95rem;
+  border-radius: 14px;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg {
+    padding: 1rem 0.95rem 1.05rem;
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg {
+    padding: 1.1rem 1.1rem 1.15rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__head {
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-app-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 7px;
+}
+@media (min-width: 768px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-app-icon {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__app {
+  font-size: 0.9375rem;
+}
+@media (min-width: 768px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__app {
+    font-size: 1rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__time {
+  font-size: 0.8125rem;
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__body {
+  padding-left: 0.05rem;
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__title {
+  font-size: 0.9375rem;
+  line-height: 1.32;
+  margin-bottom: 0.45rem;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__title {
+    font-size: 1rem;
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__title {
+    font-size: 1.0625rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__summary {
+  font-size: 0.875rem;
+  line-height: 1.52;
+  margin-bottom: 0.65rem;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__summary {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__summary {
+    font-size: 1rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__label {
+  font-size: 0.6875rem;
+  margin-bottom: 0.28rem;
+  letter-spacing: 0.07em;
+}
+@media (min-width: 768px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__label {
+    font-size: 0.71875rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__list {
+  font-size: 0.875rem;
+  line-height: 1.48;
+  padding-left: 1.15rem;
+  margin-bottom: 0.55rem;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__list {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__list {
+    font-size: 1rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__list li {
+  margin-bottom: 0.22rem;
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__action {
+  font-size: 0.875rem;
+  line-height: 1.52;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__action {
+    font-size: 0.9375rem;
+  }
+}
+@media (min-width: 1024px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__action {
+    font-size: 1rem;
+  }
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-msg__ctas {
+  margin-top: 0.65rem;
+  gap: 0.45rem;
+}
+#vector-landing .empower-detail > .empower-action-slack .hero-slack-cta {
+  padding: 0.45rem 0.95rem;
+  font-size: 0.78125rem;
+  border-radius: 7px;
+}
+@media (min-width: 640px) {
+  #vector-landing .empower-detail > .empower-action-slack .hero-slack-cta {
+    font-size: 0.8125rem;
+    padding: 0.48rem 1.05rem;
+  }
 }
 #vector-landing .empower-detail > .chat-card {
   max-width: 100%;

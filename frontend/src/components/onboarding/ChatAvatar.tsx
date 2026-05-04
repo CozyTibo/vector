@@ -1,4 +1,4 @@
-import vectorHeroAvatarUrl from "../../assets/vector-white-bg.png";
+import vectorHeroAvatarUrl from "../../assets/logo.jpeg";
 
 type ChatAvatarProps = {
   variant: "vector" | "user";

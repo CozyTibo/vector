@@ -1,15 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
-import heroOrgMichelleUrl from "../../assets/hero-org-michelle.png";
-import vectorHeroAvatarUrl from "../../assets/vector-white-bg.png";
+import vectorHeroAvatarUrl from "../../assets/logo.jpeg";
 import "../../styles/vector-landing-scoped.css";
 import { MeetVectorIntegrationsHub } from "./MeetVectorIntegrationsHub.tsx";
 
 const DEMO_CAL_URL = "https://calendar.app.google/GcS9iPFBuL9XFzhc8";
-
-const HERO_CHAT_DELAYS_MS = [420, 580, 560, 1350, 920] as const;
-const HERO_CHAT_STEP_COUNT = 6;
 
 const PERCEPTION_CAPABILITIES = [
   {
@@ -93,92 +89,181 @@ function ValuePillarCapabilityList({ items }: { items: readonly { title: string;
   );
 }
 
-function ActionProductPreview() {
+function HeroSlackVectorAppIcon() {
+  return (
+    <div className="hero-slack-app-icon" aria-hidden="true">
+      <img className="hero-slack-app-icon__img" src={vectorHeroAvatarUrl} alt="" />
+    </div>
+  );
+}
+
+/** Slack-style insight for the “moves work forward” pillar (hero-adjacent visual language). */
+function MovesWorkForwardSlackPreview() {
   return (
     <div
-      className="chat-card chat-card--compact"
+      className="empower-action-slack"
       role="region"
-      aria-label="Vector detects stalled checkout work, assigns Alex, links PR, and follows up"
+      aria-label="Example: Vector posts a coordination gap with evidence and suggested next steps in Slack"
     >
-      <div className="chat-shell">
-        <div className="chat-head">
-          <strong>Checkout</strong>
-          <span className="muted">·</span>
-          <span className="muted">Coordination</span>
+      <div className="hero-slack-mock">
+        <div className="hero-slack-mock__topbar">
+          <span className="hero-slack-mock__hash" aria-hidden="true">
+            #
+          </span>
+          <span className="hero-slack-mock__channel">product</span>
         </div>
-        <div className="chat-thread">
-          <div className="chat-block chat-row is-visible">
-            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-            <div className="flex-1">
-              <div className="bubble-meta">
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:08 PM</span>
-              </div>
-              <div className="bubble">
-                Checkout ticket has been in progress for 7 days with no updates. Likely stalled.
+        <div className="hero-slack-mock__thread hero-slack-mock__thread--single">
+          <article className="hero-slack-msg" aria-label="Coordination gap: agreement never became a ticket">
+            <div className="hero-slack-msg__head">
+              <HeroSlackVectorAppIcon />
+              <div className="hero-slack-msg__meta">
+                <span className="hero-slack-msg__app">Vector</span>
+                <span className="hero-slack-msg__time">5:55 PM</span>
               </div>
             </div>
-          </div>
-          <div className="chat-block chat-row--alex is-visible">
-            <div className="bubble-meta bubble-meta--alex">
-              <img className="avatar" src={heroOrgMichelleUrl} alt="" />
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Manager</span>
-              <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:09 PM</span>
-            </div>
-            <div className="bubble bubble--alex">Yeah</div>
-          </div>
-          <div className="chat-block chat-row is-visible">
-            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-            <div className="flex-1">
-              <div className="bubble-meta">
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:09 PM</span>
+            <div className="hero-slack-msg__body">
+              <p className="hero-slack-msg__title">
+                <span className="hero-slack-msg__badge">Coordination gap</span>
+                <span className="hero-slack-msg__dash"> — </span>
+                <span>agreement never became a ticket</span>
+              </p>
+              <p className="hero-slack-msg__summary">
+                <span className="hero-slack-mention">@Alex</span> and{" "}
+                <span className="hero-slack-mention hero-slack-mention--alt">@Sam</span> joined the design review;
+                everyone aligned on shipping <strong>the analytics cut this week</strong>—but{" "}
+                <strong>no Linear issue</strong> was filed and <strong>no owner</strong> was set.
+              </p>
+              <p className="hero-slack-msg__label">Evidence</p>
+              <ul className="hero-slack-msg__list">
+                <li>
+                  <strong>Slack</strong> — thread ends with “will track in Linear” · <strong>no link posted</strong>
+                </li>
+                <li>
+                  <strong>Linear</strong> — <strong>0 issues</strong> tied to that decision ·{" "}
+                  <strong>no assignment</strong> to <span className="hero-slack-mention">@Alex</span>
+                </li>
+                <li>
+                  <strong>GitHub</strong> — draft PR open <strong>4 days</strong> · still <strong>unassigned</strong>
+                </li>
+              </ul>
+              <p className="hero-slack-msg__label">
+                Suggested action <span aria-hidden="true">💡</span>
+              </p>
+              <p className="hero-slack-msg__action">
+                👉 Open a Linear issue for the <strong>analytics cut</strong>, assign{" "}
+                <span className="hero-slack-mention">@Alex</span>, and paste the link in{" "}
+                <strong>#product</strong>.
+              </p>
+              <div className="hero-slack-msg__ctas" aria-hidden="true">
+                <span className="hero-slack-cta hero-slack-cta--primary">Execute</span>
+                <span className="hero-slack-cta hero-slack-cta--secondary">{"I'll handle it myself"}</span>
               </div>
-              <div className="bubble">
-                Assigning to Alex and linking related PR. I&apos;ll follow up if no progress in 24h.
-              </div>
             </div>
-          </div>
-          <div className="chat-block chat-row is-visible">
-            <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-            <div className="flex-1">
-              <div className="bubble-meta">
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                <span style={{ fontSize: 13, color: "#a1a1aa" }}>2:09 PM</span>
-              </div>
-              <div className="bubble">Done. I&apos;ll keep an eye on it.</div>
-            </div>
-          </div>
+          </article>
         </div>
       </div>
     </div>
   );
 }
 
-function useHeroChatReveal() {
-  const [visibleSteps, setVisibleSteps] = useState<Set<number>>(() => new Set());
+function LandingHeroSlackPreview() {
+  return (
+    <div
+      className="hero-slack-mock"
+      role="region"
+      aria-label="Slack preview: Vector posts execution risks with evidence and suggested actions in channel"
+    >
+      <div className="hero-slack-mock__topbar">
+        <span className="hero-slack-mock__hash" aria-hidden="true">
+          #
+        </span>
+        <span className="hero-slack-mock__channel">management</span>
+      </div>
+      <div className="hero-slack-mock__thread">
+        <article className="hero-slack-msg" aria-label="Execution gap: decision not tracked">
+          <div className="hero-slack-msg__head">
+            <HeroSlackVectorAppIcon />
+            <div className="hero-slack-msg__meta">
+              <span className="hero-slack-msg__app">Vector</span>
+              <span className="hero-slack-msg__time">10:14 AM</span>
+            </div>
+          </div>
+          <div className="hero-slack-msg__body">
+            <p className="hero-slack-msg__title">
+              <span className="hero-slack-msg__badge">Execution gap</span>
+              <span className="hero-slack-msg__dash"> — </span>
+              <span>decision not tracked</span>
+            </p>
+            <p className="hero-slack-msg__summary">
+              The team aligned on a payment retry fix on the call, but nothing was filed in Linear.
+            </p>
+            <p className="hero-slack-msg__label">Evidence</p>
+            <ul className="hero-slack-msg__list">
+              <li>
+                <strong>Slack</strong> — recap notes “no ticket filed.”
+              </li>
+              <li>
+                <strong>Linear</strong> — 0 issues linked to that call.
+              </li>
+              <li>
+                <strong>#payments</strong> — summary posted, no linked issue.
+              </li>
+            </ul>
+            <p className="hero-slack-msg__label">
+              Suggested action <span aria-hidden="true">💡</span>
+            </p>
+            <p className="hero-slack-msg__action">👉 Open a Linear issue, assign an owner, paste the link in #payments.</p>
+            <div className="hero-slack-msg__ctas" aria-hidden="true">
+              <span className="hero-slack-cta hero-slack-cta--primary">Execute</span>
+              <span className="hero-slack-cta hero-slack-cta--secondary">I&apos;ll handle it myself</span>
+            </div>
+          </div>
+        </article>
 
-  useEffect(() => {
-    const prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReduce) {
-      setVisibleSteps(new Set([0, 1, 2, 3, 4, 5]));
-      return;
-    }
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
-    let t = 0;
-    for (let i = 0; i < HERO_CHAT_STEP_COUNT; i++) {
-      const step = i;
-      timeouts.push(
-        setTimeout(() => {
-          setVisibleSteps((prev) => new Set(prev).add(step));
-        }, t),
-      );
-      if (i < HERO_CHAT_DELAYS_MS.length) t += HERO_CHAT_DELAYS_MS[i]!;
-    }
-    return () => timeouts.forEach(clearTimeout);
-  }, []);
-
-  return visibleSteps;
+        <article className="hero-slack-msg" aria-label="Execution block: cross-team dependency">
+          <div className="hero-slack-msg__head">
+            <HeroSlackVectorAppIcon />
+            <div className="hero-slack-msg__meta">
+              <span className="hero-slack-msg__app">Vector</span>
+              <span className="hero-slack-msg__time">3:48 PM</span>
+            </div>
+          </div>
+          <div className="hero-slack-msg__body">
+            <p className="hero-slack-msg__title">
+              <span className="hero-slack-msg__badge hero-slack-msg__badge--block">Execution block</span>
+              <span className="hero-slack-msg__dash"> — </span>
+              <span>cross-team dependency stuck</span>
+            </p>
+            <p className="hero-slack-msg__summary">
+              An API refactor is blocked on Infra approval, and there has been no reply in #infra-asks.
+            </p>
+            <p className="hero-slack-msg__label">Evidence</p>
+            <ul className="hero-slack-msg__list">
+              <li>
+                <strong>Slack</strong> — ping in #infra-asks 2 days ago, no reply.
+              </li>
+              <li>
+                <strong>GitHub</strong> — PR #512 blocked until approval lands.
+              </li>
+              <li>
+                <strong>Linear</strong> — PAY-640 blocked on review, no named reviewer.
+              </li>
+            </ul>
+            <p className="hero-slack-msg__label">
+              Suggested action <span aria-hidden="true">💡</span>
+            </p>
+            <p className="hero-slack-msg__action">
+              👉 Escalate with a named owner in #infra-asks and pin an unblock date.
+            </p>
+            <div className="hero-slack-msg__ctas" aria-hidden="true">
+              <span className="hero-slack-cta hero-slack-cta--primary">Escalate in #infra-asks</span>
+              <span className="hero-slack-cta hero-slack-cta--secondary">I&apos;ll handle it myself</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  );
 }
 
 function useRevealInViewRef() {
@@ -215,7 +300,6 @@ type VectorLandingBodyProps = {
 };
 
 export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyProps) {
-  const visibleSteps = useHeroChatReveal();
   const problemBannerRef = useRevealInViewRef();
 
   const timelineSlots = [
@@ -245,8 +329,6 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
     },
   ] as const;
 
-  const stepClass = (n: number) => (visibleSteps.has(n) ? "is-visible" : "");
-
   return (
     <div id="vector-landing">
       <div className="page-bg" aria-hidden="true">
@@ -268,7 +350,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               </div>
               <div className="hero-sub-row">
                 <p className="sub hero-sub">
-                  <strong>Vector surfaces risks and guides your next steps based on live data from your team.</strong>
+                  Vector surfaces risks and guides your next steps based on live data from your team.
                 </p>
                 <div className="hero-cta-row">
                   <a className="btn-light" href={DEMO_CAL_URL} target="_blank" rel="noopener noreferrer">
@@ -278,79 +360,8 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               </div>
             </div>
             <div className="hero-product">
-              <div className="hero-product__chat-wrap">
-                <div className="chat-card">
-                  <div className="chat-shell">
-                    <div className="chat-head">
-                      <strong># checkout</strong>
-                      <span className="muted">·</span>
-                      <span className="muted">Engineering</span>
-                    </div>
-                    <div className="chat-thread">
-                      <div className={`chat-block chat-row ${stepClass(0)}`} data-seq={0}>
-                        <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-                        <div className="flex-1">
-                          <div className="bubble-meta">
-                            <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                            <span style={{ fontSize: 13, color: "#a1a1aa" }}>9:41 AM</span>
-                          </div>
-                          <div className="bubble">Hey, quick heads up.</div>
-                        </div>
-                      </div>
-                      <div className={`chat-block chat-row ${stepClass(1)}`} data-seq={1}>
-                        <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-                        <div className="flex-1">
-                          <div className="bubble-meta">
-                            <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                            <span style={{ fontSize: 13, color: "#a1a1aa" }}>9:41 AM</span>
-                          </div>
-                          <div className="bubble">
-                            The auth PR is still in review. I’ve aligned with Sam to pick it up this morning 🤓
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`chat-block chat-row--alex ${stepClass(2)}`} data-seq={2}>
-                        <div className="bubble-meta bubble-meta--alex">
-                          <img className="avatar" src={heroOrgMichelleUrl} alt="" />
-                          <span style={{ fontSize: 14, fontWeight: 600 }}>Alex</span>
-                          <span style={{ fontSize: 13, color: "#a1a1aa" }}>9:42 AM</span>
-                        </div>
-                        <div className="bubble bubble--alex">Got it. Any risk for checkout?</div>
-                      </div>
-                      <div className={`chat-block chat-row ${stepClass(3)}`} data-seq={3}>
-                        <img className="avatar" src={vectorHeroAvatarUrl} alt="" />
-                        <div className="flex-1">
-                          <div className="bubble-meta">
-                            <span style={{ fontSize: 14, fontWeight: 600 }}>Vector</span>
-                            <span style={{ fontSize: 13, color: "#a1a1aa" }}>9:41 AM</span>
-                          </div>
-                          <div className="bubble">All good.</div>
-                          <div className="bubble">
-                            I pushed for a quick review and adjusted scope slightly so checkout can ship today without
-                            delay.
-                          </div>
-                          <div className="bubble">Full version lands tomorrow.</div>
-                        </div>
-                      </div>
-                      <div className={`chat-block chat-row--alex ${stepClass(4)}`} data-seq={4}>
-                        <div className="bubble-meta bubble-meta--alex">
-                          <img className="avatar" src={heroOrgMichelleUrl} alt="" />
-                          <span style={{ fontSize: 14, fontWeight: 600 }}>Alex</span>
-                          <span style={{ fontSize: 13, color: "#a1a1aa" }}>9:42 AM</span>
-                        </div>
-                        <div className="bubble bubble--alex">Perfect 👍</div>
-                      </div>
-                      <div className={`chat-typing ${stepClass(5)}`} data-seq={5}>
-                        <span>Vector is typing</span>
-                        <span className="typing-dots" aria-hidden="true">
-                          <span />
-                          <span />
-                          <span />
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div className="hero-product__slack-wrap">
+                <LandingHeroSlackPreview />
               </div>
             </div>
           </div>
@@ -438,7 +449,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                   <ValuePillarCapabilityList items={ACTION_CAPABILITIES} />
                   <div className="empowers-panel-wrap">
                     <div className="empower-detail">
-                      <ActionProductPreview />
+                      <MovesWorkForwardSlackPreview />
                     </div>
                   </div>
                 </div>
@@ -477,14 +488,12 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 {timelineSlots.map((slot) => (
                   <div key={slot.time} className="timeline-contrast__slot" role="listitem">
                     <div className="timeline-contrast__side timeline-contrast__side--without">
-                      <span className="timeline-contrast__track" aria-hidden="true" />
                       <span className="timeline-contrast__dot" aria-hidden="true" />
                       <p className="timeline-contrast__text">
                         {slot.time}. {slot.without}
                       </p>
                     </div>
                     <div className="timeline-contrast__side timeline-contrast__side--with">
-                      <span className="timeline-contrast__track" aria-hidden="true" />
                       <span className="timeline-contrast__dot" aria-hidden="true" />
                       <p className="timeline-contrast__text">
                         <span className="timeline-contrast__stamp">{slot.time}.</span> {slot.with}

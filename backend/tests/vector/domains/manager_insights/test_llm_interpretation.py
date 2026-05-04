@@ -116,7 +116,7 @@ def test_interpretation_payload_includes_causal_structure() -> None:
 
 
 def test_finalize_trims_headline_and_rejects_banned_wording() -> None:
-    long_headline = " ".join([f"w{i}" for i in range(20)])
+    long_headline = "Assign " + " ".join([f"w{i}" for i in range(20)])
     ok = _finalize_llm_interpretation_output(
         {
             "llm_headline": long_headline,
@@ -159,6 +159,30 @@ def test_finalize_trims_headline_and_rejects_banned_wording() -> None:
     assert no_artifact is None
 
 
+def test_finalize_rejects_people_when_actor_tokens_present() -> None:
+    bad = _finalize_llm_interpretation_output(
+        {
+            "llm_headline": "Resolve the debate in #eng-core",
+            "llm_explanation": "People are stuck debating scope without a ticket.",
+            "llm_next_step": "👉 Post a decision in #eng-core.",
+        },
+        artifact_labels=["#eng-core"],
+        actor_display_tokens=["Alex", "Jordan"],
+    )
+    assert bad is None
+
+    good = _finalize_llm_interpretation_output(
+        {
+            "llm_headline": "Resolve the debate in #eng-core",
+            "llm_explanation": "Alex and Jordan exchanged six updates in #eng-core without a recorded decision.",
+            "llm_next_step": "👉 Post a decision in #eng-core.",
+        },
+        artifact_labels=["#eng-core"],
+        actor_display_tokens=["Alex", "Jordan"],
+    )
+    assert good is not None
+
+
 def test_llm_interpretation_does_not_modify_decision_type(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENV", "development")
     rid = uuid.uuid4()
@@ -177,7 +201,7 @@ def test_llm_interpretation_does_not_modify_decision_type(monkeypatch: pytest.Mo
     monkeypatch.setattr(
         "vector.domains.manager_insights.llm_interpretation._call_openai_interpretation",
         lambda settings, user_json: {
-            "llm_headline": "Short headline here NEX-1",
+            "llm_headline": "Assign an owner to NEX-1",
             "llm_explanation": "NEX-1 is the anchor issue. It blocks downstream work until ownership is explicit.",
             "llm_next_step": "Schedule a thirty-minute ownership sync on NEX-1 with the DRIs.",
         },

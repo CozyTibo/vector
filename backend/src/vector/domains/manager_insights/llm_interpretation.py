@@ -19,6 +19,8 @@ from vector.contracts.manager_insights_activity import (
 )
 from vector.domains.manager_insights.artifact_decision_context import (
     artifact_action_targets_payload,
+    contains_product_banned_phrasing,
+    is_valid_action_title,
     select_primary_work_items,
 )
 from vector.openai_chat_params import (
@@ -42,6 +44,13 @@ _ABSTRACT_NOUNS_RE = re.compile(
     r"\b(coordination|alignment|synerg(?:y|ies)|stakeholders?)\b",
     re.IGNORECASE,
 )
+
+_GENERIC_MANAGER_CONTEXT_RE = re.compile(
+    r"juggling many threads?|coordination is complex|execution is slowing|alignment issues",
+    re.IGNORECASE,
+)
+
+_PEOPLE_OR_TEAM_RE = re.compile(r"\b(people|team)\b", re.IGNORECASE)
 
 _HEADLINE_MAX_WORDS = 14
 _EXPLANATION_MAX_SENTENCES = 2
@@ -151,6 +160,14 @@ def _interpretation_payload(
             if isinstance(x, dict) and isinstance(x.get("label"), str) and str(x.get("label")).strip()
         ]
         payload["artifact_labels_for_citation"] = labels[:6]
+        actor_tokens: list[str] = []
+        for x in raw_targets:
+            if not isinstance(x, dict):
+                continue
+            raw_names = x.get("actor_display_names")
+            if isinstance(raw_names, list):
+                actor_tokens.extend(str(z).strip() for z in raw_names if str(z).strip())
+        payload["actor_display_names_for_citation"] = list(dict.fromkeys(actor_tokens))[:10]
     elif work_items is not None:
         primary = select_primary_work_items(
             item,
@@ -163,6 +180,12 @@ def _interpretation_payload(
         if targets:
             payload["artifact_action_targets"] = targets
             payload["artifact_labels_for_citation"] = [str(t["label"]) for t in targets][:6]
+            actor_tokens_fb: list[str] = []
+            for t in targets:
+                raw_names = t.get("actor_display_names")
+                if isinstance(raw_names, list):
+                    actor_tokens_fb.extend(str(z).strip() for z in raw_names if str(z).strip())
+            payload["actor_display_names_for_citation"] = list(dict.fromkeys(actor_tokens_fb))[:10]
     return payload
 
 
@@ -230,6 +253,7 @@ def _finalize_llm_interpretation_output(
     raw: dict[str, str],
     *,
     artifact_labels: list[str] | None = None,
+    actor_display_tokens: list[str] | None = None,
 ) -> dict[str, str] | None:
     """Trim to caps; reject banned / abstract wording or missing artifact citations."""
     h = _trim_headline_words(raw["llm_headline"], _HEADLINE_MAX_WORDS)
@@ -237,11 +261,24 @@ def _finalize_llm_interpretation_output(
     n = _trim_next_step(raw["llm_next_step"], _NEXT_STEP_MAX_CHARS)
     if not h or not e or not n:
         return None
+    if not is_valid_action_title(h):
+        return None
     for field in (h, e, n):
         if _contains_banned_wording(field):
             return None
-    if _contains_abstract_nouns(h) or _contains_abstract_nouns(n):
+        if contains_product_banned_phrasing(field):
+            return None
+    if _contains_abstract_nouns(h) or _contains_abstract_nouns(n) or _contains_abstract_nouns(e):
         return None
+    if _GENERIC_MANAGER_CONTEXT_RE.search(e):
+        return None
+    tokens = [t for t in (actor_display_tokens or []) if t.strip()]
+    if tokens:
+        el = e.lower()
+        if _PEOPLE_OR_TEAM_RE.search(e):
+            return None
+        if not any(tok.lower() in el for tok in tokens):
+            return None
     if artifact_labels:
         combined = f"{h} {n}"
         if not _mentions_any_artifact(combined, artifact_labels):
@@ -255,27 +292,31 @@ def _call_openai_interpretation(settings: Settings, user_json: str) -> dict[str,
     system = (
         "You are a senior engineering manager writing execution directives tied to real tools.\n\n"
         "Hard rules:\n"
-        "* Every headline and next step MUST name at least one concrete artifact from "
-        "artifact_action_targets (thread, issue key, PR number, Notion doc title, or calendar event).\n"
+        "* llm_headline MUST be pure imperative action: [Verb] + [concrete artifact from "
+        "artifact_action_targets] (+ optional location). No diagnosis, no 'because', no 'this is', "
+        "no failure-mode vocabulary (ownership failure, consequence, system state, execution alignment).\n"
+        "* llm_explanation MUST be factual (counts, missing owner, blockers, unresolved thread) "
+        "grounded in artifact_action_targets and actor_display_names when present. "
+        "Never write generic filler like 'juggling many threads', 'coordination is complex', "
+        "'execution is slowing', 'alignment issues'. "
+        "When actor_display_names_for_citation is non-empty, use those names (first name / handle); "
+        "never substitute 'people' or 'team'.\n"
+        "* llm_next_step — expanded instruction (may start with 👉); must still cite artifact labels verbatim.\n"
         "* Copy artifact labels verbatim when possible (e.g. NEX-112, PR #89, #eng-payments).\n"
-        "* Use imperative verbs (Assign, Close, Link, Resolve, Post, Track, Confirm).\n"
         "* Do NOT use abstract nouns: coordination, alignment, synergy, stakeholder(s).\n"
-        "* Do NOT invent Slack channels, ticket keys, or PR numbers not present in artifact_action_targets.\n"
-        "* Mention a person by first name/handle only if artifact_action_targets.owner is non-null "
-        "for that row AND you use Ask … to … framing.\n\n"
-        "Tone: control-room brevity, not consultant prose."
+        "* Do NOT invent Slack channels, ticket keys, or PR numbers not present in artifact_action_targets.\n\n"
+        "Tone: execution driver, not analytics commentary."
     )
     user = (
         "Structured input (JSON):\n"
         f"{user_json}\n\n"
         "Produce JSON only (no markdown), keys exactly:\n"
         '{"llm_headline": str, "llm_explanation": str, "llm_next_step": str}\n\n'
-        "1) llm_headline — imperative + specific artifact + em dash + compressed issue "
-        f"(max {_HEADLINE_MAX_WORDS} words). Example shape: Close #eng-payments — no decision recorded.\n"
-        "2) llm_explanation — exactly two short sentences; both must cite the same artifact label "
-        "and describe delivery consequence (slips, rework, blocked merge), not abstract risk.\n"
-        "3) llm_next_step — same intent as llm_headline but may add one concrete clause; "
-        "must still include the artifact label verbatim.\n"
+        f"1) llm_headline — verb-led action only, max {_HEADLINE_MAX_WORDS} words. "
+        "Examples: Resolve the debate in #incident-review ; Assign an owner to NEX-105 ; Unblock PR #89 .\n"
+        "2) llm_explanation — one or two short sentences citing real artifacts; "
+        "use actor_display_names_for_citation when provided.\n"
+        "3) llm_next_step — concrete combined instruction; include 👉 at the start when natural.\n"
     )
     model = settings.openai_model
     kwargs: dict[str, Any] = {
@@ -302,11 +343,19 @@ def _call_openai_interpretation(settings: Settings, user_json: str) -> dict[str,
                 return None
             parsed_payload = _extract_json_object(user_json)
             labels: list[str] = []
+            actors: list[str] = []
             if isinstance(parsed_payload, dict):
                 raw_labs = parsed_payload.get("artifact_labels_for_citation")
                 if isinstance(raw_labs, list):
                     labels = [str(x).strip() for x in raw_labs if str(x).strip()][:8]
-            finalized = _finalize_llm_interpretation_output(out, artifact_labels=labels or None)
+                raw_act = parsed_payload.get("actor_display_names_for_citation")
+                if isinstance(raw_act, list):
+                    actors = [str(x).strip() for x in raw_act if str(x).strip()][:12]
+            finalized = _finalize_llm_interpretation_output(
+                out,
+                artifact_labels=labels or None,
+                actor_display_tokens=actors or None,
+            )
             return finalized
         except (APIError, OSError, TimeoutError):
             if attempt < 2:

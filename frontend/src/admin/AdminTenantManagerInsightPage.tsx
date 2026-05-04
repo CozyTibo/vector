@@ -1186,28 +1186,20 @@ function humanGapKindLabel(gapType: GapType): string {
   return m[gapType];
 }
 
-/** Consequence-focused fallback when `llm_explanation` is absent (max ~2 short sentences worth). */
-function whyItMattersConsequenceFallback(gapType: GapType): string {
-  const m: Record<GapType, string> = {
-    aggregated_situation:
-      "Parallel threads keep pulling attention away from a clear finish line, so delays compound before anyone resets scope.",
-    expected_not_executed:
-      "Stakeholders read motion in chat as delivery, while tracking stays empty — rework and missed dates follow.",
-    discussed_not_linked_to_work:
-      "Decisions stay in threads instead of owned tickets, so accountability and sequencing stay fuzzy under pressure.",
-    blocker_not_tracked:
-      "Hidden blockers stall work without an escalation path, so teams burn time re-litigating the same stall.",
-    doc_not_connected_to_execution:
-      "Documentation moves without tied execution tasks, so engineering ships against a moving or invisible spec.",
-  };
-  return m[gapType];
-}
-
 const PRODUCT_COPY_SCRUB_PATTERNS: RegExp[] = [
   /this reflects\b/gi,
   /several gaps share\b[^.!?]*[.!?]?\s*/gi,
   /several gaps share\b/gi,
+  /\*\*system state:\*\*/gi,
+  /\bsystem state\b[:\s]*/gi,
+  /coordination failures?\b/gi,
+  /\bcoordination\b/gi,
+  /\balignment\b/gi,
+  /\bstructure\b/gi,
 ];
+
+/** Extra scrub for titles / one-liners (word-boundary abstract jargon). */
+const ABSTRACT_JARGON_RE = /\b(synergy|stakeholders?|operationalize|leverage|paradigm)\b/gi;
 
 function scrubProductCopyNoise(s: string): string {
   let t = s.replace(/\*\*/g, "").replace(/\s+/g, " ").trim();
@@ -1217,7 +1209,10 @@ function scrubProductCopyNoise(s: string): string {
   return t.replace(/^[,;:\s—–-]+/, "").trim();
 }
 
-const WEAK_TITLE_VERBS = new Set(["improve", "optimize", "enhance", "better", "increase", "decrease"]);
+function scrubHumanLine(s: string): string {
+  let t = scrubProductCopyNoise(s).replace(ABSTRACT_JARGON_RE, "").replace(/\s+/g, " ").trim();
+  return t.replace(/^[,;:\s—–-]+/, "").trim();
+}
 
 const STRONG_ACTION_VERBS = new Set(
   [
@@ -1234,7 +1229,6 @@ const STRONG_ACTION_VERBS = new Set(
     "make",
     "unblock",
     "realign",
-    "structure",
     "block",
     "verify",
     "connect",
@@ -1330,7 +1324,7 @@ function preferActionClauseFromHeadline(headline: string): string {
 }
 
 function shortReasonTailForDeterministicTitle(gapType: GapType, rationale: string): string {
-  const one = scrubProductCopyNoise(firstSentenceFromRationale(rationale));
+  const one = scrubHumanLine(firstSentenceFromRationale(rationale));
   const compact = truncateToMaxWords(one, 8);
   if (compact && compact.length >= 12 && !/^several\b/i.test(compact) && !/\bseveral gaps\b/i.test(compact)) {
     return compact.charAt(0).toLowerCase() + compact.slice(1);
@@ -1345,39 +1339,458 @@ function shortReasonTailForDeterministicTitle(gapType: GapType, rationale: strin
   return byGap[gapType];
 }
 
-function buildDeterministicActionTitle(
-  decisionType: CoordinationDecisionType,
-  gapType: GapType,
-  rationale: string,
-): string {
-  const base = humanDecisionTypeLabel(decisionType);
-  const tail = shortReasonTailForDeterministicTitle(gapType, rationale);
-  const combined = tail ? `${base} — ${tail}` : base;
-  const cleaned = scrubProductCopyNoise(combined);
-  return truncateToMaxWords(cleaned, 12);
+/** Allowed first word for manager-facing action titles (strict). */
+const HUMAN_EXECUTABLE_TITLE_VERBS = new Set(
+  [
+    "talk",
+    "ask",
+    "resolve",
+    "assign",
+    "stop",
+    "clarify",
+    "decide",
+    "link",
+    "track",
+    "close",
+    "post",
+    "confirm",
+    "open",
+    "file",
+    "pause",
+    "cut",
+    "name",
+    "verify",
+    "unblock",
+    "ship",
+    "complete",
+    "escalate",
+    "document",
+    "merge",
+    "review",
+    "schedule",
+    "move",
+    "fix",
+  ].map((v) => v.toLowerCase()),
+);
+
+function hasConcretePersonOrArtifact(title: string, hints: { labels: string[]; people: string[] }): boolean {
+  const t = title.toLowerCase();
+  for (const p of hints.people) {
+    if (p && t.includes(p.toLowerCase())) {
+      return true;
+    }
+  }
+  for (const lab of hints.labels) {
+    const s = lab.trim().toLowerCase();
+    if (s.length >= 2 && t.includes(s)) {
+      return true;
+    }
+  }
+  return (
+    /\bpr\s*#\d+/i.test(title) ||
+    /\b#[\w.-]{2,}\b/.test(title) ||
+    /[A-Z]{2,}-\d+/.test(title) ||
+    /\bissue\b/i.test(title) ||
+    /\bnotion\b/i.test(title) ||
+    /\bslack\b/i.test(title)
+  );
 }
 
-function buildCardActionTitle(row: CoordinationDecisionBundleExample["items"][number], gapType: GapType): string {
-  const llmNext = typeof row.decision.llm_next_step === "string" ? scrubProductCopyNoise(row.decision.llm_next_step.trim()) : "";
-  if (llmNext) {
-    const w = firstWordLower(llmNext);
-    if (!WEAK_TITLE_VERBS.has(w)) {
-      return truncateToMaxWords(llmNext, 12);
+function passesHumanExecutableTitle(title: string, hints: { labels: string[]; people: string[] }): boolean {
+  const s = scrubHumanLine(title);
+  if (!s || s.length < 12) {
+    return false;
+  }
+  const w = firstWordLower(s);
+  if (!HUMAN_EXECUTABLE_TITLE_VERBS.has(w)) {
+    return false;
+  }
+  if (/\b(system state|coordination|alignment|structure)\b/i.test(s)) {
+    return false;
+  }
+  if (!hasConcretePersonOrArtifact(s, hints)) {
+    return false;
+  }
+  return true;
+}
+
+const PRODUCT_COPY_BANNED_SUBSTRINGS = [
+  "this is",
+  "because",
+  "system state",
+  "execution is slowing",
+  "execution is stuck",
+  "ownership is broken",
+  "ownership failure",
+  "broken ownership",
+  "stop ownership",
+  "consequence",
+  "execution alignment",
+  "alignment failure",
+] as const;
+
+function containsProductBannedCopy(text: string): boolean {
+  const low = text.toLowerCase();
+  return PRODUCT_COPY_BANNED_SUBSTRINGS.some((b) => low.includes(b));
+}
+
+function isValidPureActionTitle(title: string, hints: { labels: string[]; people: string[] }): boolean {
+  if (!passesHumanExecutableTitle(title, hints)) {
+    return false;
+  }
+  const s = scrubHumanLine(title);
+  if (containsProductBannedCopy(s)) {
+    return false;
+  }
+  if (/\bownership\s+is\b|\bfailure\s+mode\b|\bexecution\s+alignment\b/i.test(s)) {
+    return false;
+  }
+  return true;
+}
+
+function formatPeoplePhrase(names: string[]): string {
+  const u = [...new Set(names.map((x) => x.trim()).filter(Boolean))].slice(0, 4);
+  if (u.length === 0) {
+    return "";
+  }
+  if (u.length === 1) {
+    return u[0];
+  }
+  if (u.length === 2) {
+    return `${u[0]} and ${u[1]}`;
+  }
+  return `${u[0]}, ${u[1]} and others`;
+}
+
+function aggregateActorDisplayNamesForRow(
+  targets: ArtifactActionTargetRow[],
+  primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null,
+): string[] {
+  const out: string[] = [];
+  for (const t of targets) {
+    for (const n of t.actor_display_names ?? []) {
+      const tok = ownerFirstToken(n);
+      if (tok) {
+        out.push(tok);
+      }
     }
   }
-  const llmHead = typeof row.decision.llm_headline === "string" ? scrubProductCopyNoise(row.decision.llm_headline.trim()) : "";
-  if (llmHead) {
-    const candidate = truncateToMaxWords(preferActionClauseFromHeadline(llmHead), 12);
-    const w = firstWordLower(candidate);
-    if (!WEAK_TITLE_VERBS.has(w) && startsWithStrongActionVerb(candidate)) {
+  if (primaryWi?.owner_actor_id && primaryWi.owner?.trim()) {
+    const n = ownerFirstToken(primaryWi.owner);
+    if (n) {
+      out.push(n);
+    }
+  }
+  return [...new Set(out)];
+}
+
+function contextSoundsGenericPlatitude(text: string): boolean {
+  return /\bjuggling many threads?|coordination is complex|execution is slowing|alignment issues\b/i.test(text);
+}
+
+type EvidenceRow = ManagerInsightFetchDebugResponse["evidence"]["action_items"][number];
+
+function evidenceRowsTouchingRefs(
+  data: ManagerInsightFetchDebugResponse,
+  refs: string[],
+  evById: Map<string, EvidenceRow>,
+): EvidenceRow[] {
+  const wiIds = new Set<string>();
+  for (const r of refs) {
+    wiIds.add(r);
+    const ev = evById.get(r);
+    if (ev) {
+      wiIds.add(ev.source_work_item_id);
+    }
+  }
+  const all = [...data.evidence.action_items, ...data.evidence.blockers, ...data.evidence.decisions];
+  return all.filter((e) => wiIds.has(e.source_work_item_id));
+}
+
+function deriveContextFromRealSignalsUi(
+  targets: ArtifactActionTargetRow[],
+  primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null,
+  wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+  actorNames: string[],
+  evidenceRows: EvidenceRow[],
+): string {
+  const namePhrase = formatPeoplePhrase(actorNames);
+  const nEv = evidenceRows.length;
+  const nBlockers = evidenceRows.filter((e) => e.kind === "blocker").length;
+  const t0 = targets[0];
+  const wi = t0 ? (wiMap.get(t0.work_item_id) ?? primaryWi) : primaryWi;
+  const lab = (
+    t0?.label?.trim() ||
+    (wi ? artifactLabel(wi) : "") ||
+    (t0?.work_item_id ?? "") ||
+    ""
+  ).trim();
+  const parts: string[] = [];
+
+  if (wi?.type === "message_thread") {
+    if (nEv >= 2) {
+      parts.push(
+        namePhrase
+          ? `${namePhrase} exchanged ${nEv} tracked updates in ${lab} without a recorded decision.`
+          : `${nEv} tracked updates in ${lab} without a recorded decision.`,
+      );
+    } else if (namePhrase) {
+      parts.push(`${namePhrase} discussed ${lab} without closing the loop in tracking.`);
+    } else {
+      parts.push(`Discussion in ${lab} has no recorded decision in tracking.`);
+    }
+  }
+  if (wi?.type === "issue" && !(wi.owner ?? "").trim()) {
+    parts.push(`No owner assigned to ${lab}.`);
+  }
+  if (wi?.type === "pull_request") {
+    if (nBlockers > 0) {
+      parts.push(
+        namePhrase
+          ? `${lab} is blocked in tracking and ${namePhrase} have not posted a resolution.`
+          : `${lab} is blocked in tracking without a posted resolution.`,
+      );
+    } else if (nEv >= 2) {
+      parts.push(`${lab} has multiple tracking updates without closure.`);
+    }
+  }
+  if (targets[1]?.label?.trim()) {
+    parts.push(`${targets[1].label.trim()} remains tied to the same execution thread.`);
+  }
+  if (parts.length === 0) {
+    parts.push(`Signals for this decision resolve to ${lab || "this thread"}; tie chat to tickets so the next step is explicit.`);
+  }
+  return scrubHumanLine(parts.slice(0, 2).join(" "));
+}
+
+function buildPureArtifactTitleFromTargets(
+  row: CoordinationDecisionBundleExample["items"][number],
+  targets: ArtifactActionTargetRow[],
+  wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+): string | null {
+  const t0 = targets[0];
+  if (!t0?.label && !t0?.work_item_id) {
+    return null;
+  }
+  const wi = wiMap.get(t0.work_item_id);
+  const label = (t0.label || (wi ? artifactLabel(wi) : "") || "").trim();
+  if (!label) {
+    return null;
+  }
+  const dt = row.decision.decision_type;
+  const typ = wi?.type ?? t0.type;
+  if (typ === "message_thread") {
+    return `Resolve the debate in ${label}`;
+  }
+  if (typ === "pull_request") {
+    if (
+      dt === "UNBLOCK_REVIEW" ||
+      dt === "TRACK_BLOCKER" ||
+      dt === "BLOCKER_ESCALATION" ||
+      dt === "MAKE_BLOCKERS_EXPLICIT"
+    ) {
+      return `Unblock ${label}`;
+    }
+    return `Review ${label}`;
+  }
+  if (typ === "issue") {
+    if (dt === "TRACK_BLOCKER" || dt === "BLOCKER_ESCALATION" || dt === "MAKE_BLOCKERS_EXPLICIT") {
+      return `Resolve the blocker on ${label}`;
+    }
+    const noOwner = !(wi?.owner ?? "").trim();
+    if (noOwner || dt === "ASSIGN_OWNER" || dt === "RESOLVE_OWNERSHIP") {
+      return `Assign an owner to ${label}`;
+    }
+    return `Verify status on ${label}`;
+  }
+  if (typ === "document") {
+    return `Link ${label} to execution`;
+  }
+  if (typ === "call") {
+    return `Confirm outcomes from ${label}`;
+  }
+  return `Track progress on ${label}`;
+}
+
+function humanTitleHints(
+  targets: ArtifactActionTargetRow[],
+  primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null,
+  wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+): { labels: string[]; people: string[] } {
+  const labels: string[] = [];
+  for (const t of targets) {
+    const wi = wiMap.get(t.work_item_id);
+    labels.push(t.label);
+    if (wi) {
+      labels.push(artifactLabel(wi));
+    }
+  }
+  const people: string[] = [];
+  for (const t of targets) {
+    if (t.owner_actor_id && t.owner?.trim()) {
+      const n = ownerFirstToken(t.owner);
+      if (n) {
+        people.push(n);
+      }
+    }
+    for (const an of t.actor_display_names ?? []) {
+      const n = ownerFirstToken(an);
+      if (n && !people.includes(n)) {
+        people.push(n);
+      }
+    }
+  }
+  if (primaryWi?.owner_actor_id && primaryWi.owner?.trim()) {
+    const n = ownerFirstToken(primaryWi.owner);
+    if (n && !people.includes(n)) {
+      people.push(n);
+    }
+  }
+  return { labels: [...new Set(labels.map((x) => x.trim()).filter(Boolean))], people: [...new Set(people)] };
+}
+
+function formatArtifactsInlineForTitle(
+  targets: ArtifactActionTargetRow[],
+  wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+): string {
+  const parts: string[] = [];
+  for (const t of targets.slice(0, 2)) {
+    const wi = wiMap.get(t.work_item_id);
+    if (wi?.type === "message_thread") {
+      const h = slackThreadHint(wi);
+      if (h) {
+        parts.push(h.startsWith("#") ? h : `#${h.replace(/^#/, "")}`);
+        continue;
+      }
+    }
+    parts.push(t.label || (wi ? artifactLabel(wi) : t.work_item_id));
+  }
+  return parts.filter(Boolean).join(" and ");
+}
+
+function shortTopicForHumanTitle(
+  row: CoordinationDecisionBundleExample["items"][number],
+  gap: ManagerInsightFetchDebugResponse["gaps"]["gaps"][number] | undefined,
+  gapType: GapType,
+): string {
+  const fromGap = gap?.description?.trim() ? scrubHumanLine(firstSentenceFromRationale(gap.description)) : "";
+  if (fromGap && fromGap.length >= 8) {
+    return truncateToMaxWords(fromGap, 7);
+  }
+  const t = scrubHumanLine(row.decision.title);
+  if (t && t.length >= 8) {
+    return truncateToMaxWords(t, 7);
+  }
+  return truncateToMaxWords(shortReasonTailForDeterministicTitle(gapType, row.decision.rationale), 6);
+}
+
+function askVerbForDecisionType(dt: CoordinationDecisionType): "clarify" | "resolve" | "fix" | "decide" {
+  if (dt === "FORCE_DECISION" || dt === "LINK_OR_CLOSE_COMMITMENT") {
+    return "decide";
+  }
+  if (
+    dt === "TRACK_BLOCKER" ||
+    dt === "BLOCKER_ESCALATION" ||
+    dt === "MAKE_BLOCKERS_EXPLICIT" ||
+    dt === "UNBLOCK_REVIEW"
+  ) {
+    return "resolve";
+  }
+  if (dt === "CLARIFY_SPEC" || dt === "VERIFY_STATUS" || dt === "RESOLVE_STATE_MISMATCH") {
+    return "clarify";
+  }
+  return "fix";
+}
+
+function leadVerbForDeterministicTitle(
+  dt: CoordinationDecisionType,
+  hasPerson: boolean,
+  hasArtifact: boolean,
+): string {
+  if (hasPerson) {
+    return "Ask";
+  }
+  if (dt === "FORCE_DECISION") {
+    return "Decide";
+  }
+  if (dt === "HOLD_START" || dt === "PAUSE_INVESTMENT" || dt === "REDUCE_WIP") {
+    return "Stop";
+  }
+  if (dt === "ASSIGN_OWNER" || dt === "RESOLVE_OWNERSHIP") {
+    return "Assign";
+  }
+  if (hasArtifact) {
+    return "Resolve";
+  }
+  return "Clarify";
+}
+
+function buildDeterministicInlinedManagerTitle(
+  row: CoordinationDecisionBundleExample["items"][number],
+  gapType: GapType,
+  gap: ManagerInsightFetchDebugResponse["gaps"]["gaps"][number] | undefined,
+  targets: ArtifactActionTargetRow[],
+  primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null,
+  wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+): string {
+  const topic = shortTopicForHumanTitle(row, gap, gapType);
+  const artifacts = formatArtifactsInlineForTitle(targets, wiMap);
+  const hints = humanTitleHints(targets, primaryWi, wiMap);
+  const person = hints.people[0] ?? null;
+  const mid = askVerbForDecisionType(row.decision.decision_type);
+  const hasArt = Boolean(artifacts);
+  const hasPer = Boolean(person);
+
+  let out: string;
+  if (hasPer && hasArt) {
+    out = `Ask ${person} to ${mid} ${topic} in ${artifacts}`;
+  } else if (hasArt) {
+    const lv = leadVerbForDeterministicTitle(row.decision.decision_type, false, true);
+    out = `${lv} ${topic} in ${artifacts}`;
+  } else if (hasPer) {
+    out = `Talk to ${person} about ${topic}`;
+  } else {
+    out = `Clarify ${topic} with the owners named in chat`;
+  }
+  return truncateToMaxWords(scrubHumanLine(out), 22);
+}
+
+function buildHumanExecutableActionTitle(
+  row: CoordinationDecisionBundleExample["items"][number],
+  gapType: GapType,
+  gap: ManagerInsightFetchDebugResponse["gaps"]["gaps"][number] | undefined,
+  targets: ArtifactActionTargetRow[],
+  primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null,
+  wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+): string {
+  const hints = humanTitleHints(targets, primaryWi, wiMap);
+  const tryHeadline = (raw: string | null | undefined): string | null => {
+    if (typeof raw !== "string") {
+      return null;
+    }
+    const s = scrubHumanLine(raw.trim());
+    if (!s || /^👉/.test(s)) {
+      return null;
+    }
+    const candidate = truncateToMaxWords(preferActionClauseFromHeadline(s), 22);
+    if (isValidPureActionTitle(candidate, hints)) {
       return candidate;
     }
+    return null;
+  };
+  const fromHead = tryHeadline(row.decision.llm_headline);
+  if (fromHead) {
+    return fromHead;
   }
-  return buildDeterministicActionTitle(row.decision.decision_type, gapType, row.decision.rationale);
+  const pure = buildPureArtifactTitleFromTargets(row, targets, wiMap);
+  if (pure) {
+    return truncateToMaxWords(pure, 22);
+  }
+  return buildDeterministicInlinedManagerTitle(row, gapType, gap, targets, primaryWi, wiMap);
 }
 
 function firstSentencesMax(text: string, maxSentences: number, maxChars: number): string {
-  const t = scrubProductCopyNoise(text);
+  const t = scrubHumanLine(text);
   if (!t) {
     return "";
   }
@@ -1400,39 +1813,68 @@ function firstSentencesMax(text: string, maxSentences: number, maxChars: number)
   return out;
 }
 
-function buildWhyItMattersText(
+/** One or two short sentences grounded in artifacts and evidence (no generic gap prose). */
+function buildContextOneLine(
   row: CoordinationDecisionBundleExample["items"][number],
-  gapType: GapType,
   perceptionForGap: Array<{ statement?: string; quote?: string }>,
-  gap: ManagerInsightFetchDebugResponse["gaps"]["gaps"][number] | undefined,
+  ctx: {
+    data: ManagerInsightFetchDebugResponse;
+    targets: ArtifactActionTargetRow[];
+    refs: string[];
+    evById: Map<string, EvidenceRow>;
+    primaryWi: ManagerInsightFetchDebugResponse["work_items"]["items"][number] | null;
+    wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>;
+  },
 ): string {
-  const llmExpl = typeof row.decision.llm_explanation === "string" ? row.decision.llm_explanation.trim() : "";
-  if (llmExpl) {
-    return firstSentencesMax(llmExpl, 2, 360);
+  const actorNames = aggregateActorDisplayNamesForRow(ctx.targets, ctx.primaryWi);
+  const llmExpl =
+    typeof row.decision.llm_explanation === "string" ? scrubHumanLine(row.decision.llm_explanation.trim()) : "";
+  if (
+    llmExpl.length > 20 &&
+    !/\b(system state|coordination|alignment|structure)\b/i.test(llmExpl) &&
+    !contextSoundsGenericPlatitude(llmExpl) &&
+    !containsProductBannedCopy(llmExpl) &&
+    !(actorNames.length > 0 && /\b(people|team)\b/i.test(llmExpl))
+  ) {
+    return firstSentencesMax(llmExpl, 2, 220);
   }
-  const rat = scrubProductCopyNoise(row.decision.rationale);
-  const fromRat = firstSentencesMax(rat, 2, 360);
-  if (fromRat && !/\bseveral gaps\b/i.test(fromRat) && !/^this reflects\b/i.test(fromRat)) {
-    return fromRat;
-  }
-  if (gap?.description?.trim()) {
-    const g = firstSentencesMax(scrubProductCopyNoise(gap.description.trim()), 2, 360);
-    if (g) {
-      return g;
+  const evRows = evidenceRowsTouchingRefs(ctx.data, ctx.refs, ctx.evById);
+  const derived = deriveContextFromRealSignalsUi(ctx.targets, ctx.primaryWi, ctx.wiMap, actorNames, evRows);
+  if (perceptionForGap.length > 0 && derived.length < 24) {
+    const q = scrubHumanLine((perceptionForGap[0].statement ?? perceptionForGap[0].quote ?? "").trim());
+    if (q.length > 20 && q.length < 200) {
+      const lab = ctx.targets[0]?.label ?? (ctx.primaryWi ? artifactLabel(ctx.primaryWi) : "");
+      return scrubHumanLine(`${truncateToMaxWords(q, 18)} — tie it to ${lab || "a tracked artifact"}.`);
     }
   }
-  if (perceptionForGap.length > 0) {
-    const p = perceptionForGap[0];
-    const q = scrubProductCopyNoise((p.statement ?? p.quote ?? "").trim());
-    const pq = firstSentencesMax(q, 2, 320);
-    if (pq) {
-      return pq;
-    }
-  }
-  return whyItMattersConsequenceFallback(gapType);
+  return derived;
 }
 
-type EvidenceRow = ManagerInsightFetchDebugResponse["evidence"]["action_items"][number];
+/** Single imperative line; distinct from title when possible. */
+function buildWhatToDoOneLine(
+  row: CoordinationDecisionBundleExample["items"][number],
+  actionTitle: string,
+  targets: ArtifactActionTargetRow[],
+  wiMap: Map<string, ManagerInsightFetchDebugResponse["work_items"]["items"][number]>,
+): string {
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  const raw = typeof row.decision.llm_next_step === "string" ? scrubHumanLine(row.decision.llm_next_step.trim()) : "";
+  if (
+    raw &&
+    norm(raw) !== norm(actionTitle) &&
+    raw.length > 12 &&
+    !containsProductBannedCopy(raw) &&
+    !/\b(system state|coordination|alignment|structure)\b/i.test(raw)
+  ) {
+    const line = raw.startsWith("👉") ? raw : `👉 ${raw}`;
+    return truncateToMaxWords(firstSentencesMax(line, 1, 280), 28);
+  }
+  const art = formatArtifactsInlineForTitle(targets, wiMap);
+  if (art) {
+    return scrubHumanLine(`👉 Post the next concrete step in ${art} today.`);
+  }
+  return scrubHumanLine("👉 Link this decision to a tracked issue, PR, or thread.");
+}
 
 function buildEvidenceById(data: ManagerInsightFetchDebugResponse): Map<string, EvidenceRow> {
   const m = new Map<string, EvidenceRow>();
@@ -1845,15 +2287,16 @@ type EvidencePreviewEntry = {
 };
 
 type PrioritizedDecisionPresentation = {
-  /** Imperative action line (verb-first, ≤12 words); primary surface for the card. */
+  /** Action-first title; people + artifacts inlined when available. */
   actionTitle: string;
-  /** Consequence / stakes; up to two sentences, never duplicate of `actionTitle`. */
-  whyItMatters: string;
+  /** One sentence: behavior → impact. */
+  contextLine: string;
+  /** Single line: what to do today (may echo LLM next step). */
+  whatToDoLine: string;
   impactSummary: string | null;
   supportingContributorsLine: string | null;
-  /** Backend `artifact_action_targets` — same anchors referenced in the action title. */
-  artifactAnchors: Array<{ key: string; emoji: string; label: string; href: string | null }>;
-  chips: Array<{ key: string; emoji: string; label: string; href?: string | null }>;
+  /** Grounded artifact anchors (always visible; avoids burying links under evidence). */
+  artifactStrip: Array<{ key: string; label: string; href?: string | null }>;
   evidencePreview: EvidencePreviewEntry[];
 };
 
@@ -1862,6 +2305,9 @@ type ArtifactActionTargetRow = {
   label: string;
   url?: string | null;
   type?: string;
+  owner?: string | null;
+  owner_actor_id?: string | null;
+  actor_display_names?: string[];
 };
 
 function parseArtifactActionTargets(ri: Record<string, unknown>): ArtifactActionTargetRow[] {
@@ -1881,29 +2327,31 @@ function parseArtifactActionTargets(ri: Record<string, unknown>): ArtifactAction
     }
     const url = typeof x.url === "string" && x.url.trim() ? x.url.trim() : null;
     const typ = typeof x.type === "string" ? x.type : undefined;
+    const owner = typeof x.owner === "string" && x.owner.trim() ? x.owner.trim() : null;
+    const owner_actor_id =
+      typeof x.owner_actor_id === "string" && x.owner_actor_id.trim() ? x.owner_actor_id.trim() : undefined;
+    let actor_display_names: string[] | undefined;
+    const rawNames = x.actor_display_names;
+    if (Array.isArray(rawNames)) {
+      actor_display_names = rawNames
+        .map((z) => (typeof z === "string" ? z.trim() : ""))
+        .filter(Boolean)
+        .slice(0, 8);
+      if (actor_display_names.length === 0) {
+        actor_display_names = undefined;
+      }
+    }
     out.push({
       work_item_id: work_item_id || label,
       label: label || work_item_id,
       url,
       type: typ,
+      owner,
+      owner_actor_id,
+      actor_display_names,
     });
   }
   return out.slice(0, 4);
-}
-
-function emojiForWorkItemType(t: string | undefined): string {
-  switch (t) {
-    case "message_thread":
-      return "💬";
-    case "pull_request":
-      return "🔀";
-    case "document":
-      return "📄";
-    case "call":
-      return "📅";
-    default:
-      return "🔧";
-  }
 }
 
 /** Pure presentation mapping — uses perception, evidence, gaps, work items, signals, links, graph; never surfaces gap_id. */
@@ -1932,78 +2380,26 @@ function buildPrioritizedDecisionPresentation(
   }
   const perceptionForGap = accepted.filter((p) => p.work_item_id && expandedRefSet.has(p.work_item_id));
 
-  const ownerName = primaryWi ? ownerFirstToken(primaryWi.owner) : null;
-  const wisCluster = workItemsFromEvidenceRefs(refs, wiMap, evById);
-
-  const actionTitle = buildCardActionTitle(row, gapType);
-  let whyItMatters = buildWhyItMattersText(row, gapType, perceptionForGap, gap);
-  const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
-  if (whyItMatters && norm(whyItMatters) === norm(actionTitle)) {
-    whyItMatters = whyItMattersConsequenceFallback(gapType);
-  }
+  const actionTitle = buildHumanExecutableActionTitle(row, gapType, gap, targets, primaryWi, wiMap);
+  const contextLine = buildContextOneLine(row, perceptionForGap, {
+    data,
+    targets,
+    refs,
+    evById,
+    primaryWi,
+    wiMap,
+  });
+  const whatToDoLine = buildWhatToDoOneLine(row, actionTitle, targets, wiMap);
 
   const supportingContributorsLine = formatSupportingContributorsLine(row.decision.required_inputs);
 
-  const artifactAnchors: PrioritizedDecisionPresentation["artifactAnchors"] = targets.slice(0, 2).map((t, idx) => {
-    const wi = wiMap.get(t.work_item_id);
-    const href = (t.url && t.url.length > 0 ? t.url : null) ?? wi?.url ?? null;
-    return {
-      key: `artifact-anchor-${t.work_item_id}-${idx}`,
-      emoji: emojiForWorkItemType(t.type ?? wi?.type),
-      label: t.label,
-      href,
-    };
-  });
-
-  const chips: PrioritizedDecisionPresentation["chips"] = [];
-  const seenChip = new Set<string>();
-  const anchoredWorkItemIds = new Set(targets.map((t) => t.work_item_id).filter(Boolean));
-
-  const pushChip = (emoji: string, label: string, key: string, href?: string | null) => {
-    const k = `${emoji}:${label}`;
-    if (seenChip.has(k) || chips.length >= 8) {
-      return;
-    }
-    seenChip.add(k);
-    chips.push({ emoji, label, key, href: href ?? undefined });
-  };
-
-  for (const t of targets.slice(0, 3)) {
-    const wi = wiMap.get(t.work_item_id);
-    const href = (t.url && t.url.length > 0 ? t.url : null) ?? wi?.url ?? null;
-    pushChip(emojiForWorkItemType(t.type ?? wi?.type), t.label, `artifact-${t.work_item_id}`, href);
-  }
-
-  if (ownerName) {
-    pushChip("👤", ownerName, "owner");
-  }
-  for (const p of perceptionForGap) {
-    for (const w of p.waits_on ?? []) {
-      const label = w.replace(/^@/, "").trim();
-      if (label) {
-        pushChip("👤", label, `wait-${label}`);
-      }
-    }
-  }
-  if (primaryWi && !anchoredWorkItemIds.has(primaryWi.id)) {
-    pushChip("🔧", artifactLabel(primaryWi), `wi-${primaryWi.id}`, primaryWi.url ?? null);
-  }
-  const secondaryWis = wisCluster.filter((w) => w.id !== primaryWi?.id && !anchoredWorkItemIds.has(w.id));
-  for (const w of secondaryWis.slice(0, 2)) {
-    pushChip("🔧", artifactLabel(w), `ref-${w.id}`, w.url ?? null);
-  }
-  if (primaryWi) {
-    pushChip("📍", connectorPlaceLabel(primaryWi.source), `src-${primaryWi.source}`);
-    const th = slackThreadHint(primaryWi);
-    if (th) {
-      pushChip("💬", th, "thread-hint");
-    }
-  } else if (refs.length) {
-    const w = wiMap.get(refs[0]) ?? wisCluster[0];
-    if (w) {
-      pushChip("📍", connectorPlaceLabel(w.source), `src-${w.source}`);
-    }
-  }
+  const artifactStrip = targets
+    .filter((t) => t.label?.trim())
+    .map((t, i) => ({
+      key: `${t.work_item_id}-${i}`,
+      label: t.label.trim(),
+      href: t.url ?? null,
+    }));
 
   const evidencePreview: EvidencePreviewEntry[] = [];
   const seenSnip = new Set<string>();
@@ -2052,11 +2448,11 @@ function buildPrioritizedDecisionPresentation(
 
   return {
     actionTitle,
-    whyItMatters,
+    contextLine,
+    whatToDoLine,
     impactSummary,
     supportingContributorsLine,
-    artifactAnchors,
-    chips,
+    artifactStrip,
     evidencePreview,
   };
 }
@@ -2131,7 +2527,7 @@ function PrioritizedDecisionCard(props: {
       </div>
 
       <h3
-        className={`mt-3 font-extrabold leading-[1.2] tracking-tight text-slate-950 line-clamp-2 ${
+        className={`mt-3 font-extrabold leading-[1.2] tracking-tight text-slate-950 line-clamp-3 ${
           isTop ? headlineLoose : loose ? "text-xl sm:text-2xl" : "text-base sm:text-lg"
         }`}
         title={pres.actionTitle}
@@ -2139,37 +2535,10 @@ function PrioritizedDecisionCard(props: {
         {pres.actionTitle}
       </h3>
 
-      {pres.artifactAnchors.length > 0 ? (
-        <div className="mt-2.5 flex flex-wrap gap-2" aria-label="Action targets">
-          {pres.artifactAnchors.map((a) =>
-            a.href ? (
-              <a
-                key={a.key}
-                href={a.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-800 shadow-sm ring-1 ring-slate-100/80 transition hover:bg-indigo-50/60"
-              >
-                <span aria-hidden>{a.emoji}</span>
-                {a.label}
-              </a>
-            ) : (
-              <span
-                key={a.key}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-slate-50/90 px-2.5 py-1 text-[11px] font-medium text-slate-800 ring-1 ring-slate-100/80"
-              >
-                <span aria-hidden>{a.emoji}</span>
-                {a.label}
-              </span>
-            ),
-          )}
-        </div>
-      ) : null}
-
       <div className="mt-4">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Why this matters</p>
-        <p className={`mt-1.5 leading-snug text-slate-500 line-clamp-4 ${loose ? "text-sm" : "text-[13px]"}`}>
-          {pres.whyItMatters}
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Context</p>
+        <p className={`mt-1.5 leading-snug text-slate-500 line-clamp-2 ${loose ? "text-sm" : "text-[13px]"}`}>
+          {pres.contextLine}
         </p>
         {pres.supportingContributorsLine ? (
           <p className={`mt-2 text-slate-400 ${loose ? "text-[11px]" : "text-[10px]"}`}>
@@ -2178,10 +2547,43 @@ function PrioritizedDecisionCard(props: {
         ) : null}
       </div>
 
-      {pres.impactSummary ? (
-        <p className={`mt-2.5 text-slate-400/95 ${loose ? "text-[11px]" : "text-[10px]"}`}>
-          Affects {pres.impactSummary}
+      <div
+        className={`mt-4 rounded-xl border border-slate-200/90 bg-slate-50/80 shadow-inner ${
+          loose ? "px-4 py-3" : "px-3 py-2.5"
+        }`}
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">What to do</p>
+        <p className={`mt-1 font-semibold leading-snug text-slate-900 line-clamp-2 ${loose ? "text-sm" : "text-[13px]"}`}>
+          {pres.whatToDoLine}
         </p>
+      </div>
+
+      {pres.artifactStrip.length > 0 ? (
+        <div className={`mt-4 ${loose ? "" : "mt-3"}`} aria-label="Artifacts">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Artifacts</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {pres.artifactStrip.map((a) =>
+              a.href ? (
+                <a
+                  key={a.key}
+                  href={a.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-800 shadow-sm ring-1 ring-slate-100/80 transition hover:bg-indigo-50/60"
+                >
+                  {a.label}
+                </a>
+              ) : (
+                <span
+                  key={a.key}
+                  className="inline-flex items-center rounded-full border border-slate-200/90 bg-slate-50/90 px-2.5 py-1 text-[11px] font-medium text-slate-800"
+                >
+                  {a.label}
+                </span>
+              ),
+            )}
+          </div>
+        </div>
       ) : null}
 
       <details className="group/details mt-5 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/50 transition-[box-shadow] duration-200 open:shadow-md">
@@ -2189,34 +2591,10 @@ function PrioritizedDecisionCard(props: {
           Show evidence
         </summary>
         <div className="space-y-4 border-t border-slate-200/70 px-4 py-3 text-xs text-slate-600">
-          {pres.chips.length > 0 ? (
-            <div>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">People &amp; artifacts</p>
-              <div className="flex flex-wrap gap-2" aria-label="People and artifacts">
-                {pres.chips.map((c) =>
-                  c.href ? (
-                    <a
-                      key={c.key}
-                      href={c.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-800 shadow-sm ring-1 ring-slate-100/80 transition hover:bg-indigo-50/60"
-                    >
-                      <span aria-hidden>{c.emoji}</span>
-                      {c.label}
-                    </a>
-                  ) : (
-                    <span
-                      key={c.key}
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-800"
-                    >
-                      <span aria-hidden>{c.emoji}</span>
-                      {c.label}
-                    </span>
-                  ),
-                )}
-              </div>
-            </div>
+          {pres.impactSummary ? (
+            <p className="text-[11px] leading-snug text-slate-500">
+              <span className="font-medium text-slate-600">Scope ·</span> Affects {pres.impactSummary}
+            </p>
           ) : null}
           {pres.evidencePreview.length > 0 ? (
             <div className="space-y-3">
@@ -2245,7 +2623,7 @@ function PrioritizedDecisionCard(props: {
             <p className="mt-2">
               <span className="font-medium text-slate-600">Engine title</span> — {row.decision.title}
             </p>
-            <p className="mt-2 leading-relaxed text-slate-600">{row.decision.rationale}</p>
+            <p className="mt-2 leading-relaxed text-slate-600">{scrubHumanLine(row.decision.rationale)}</p>
             <pre className="mt-3 max-h-56 overflow-auto rounded-md border border-slate-200 bg-white p-3 text-[10px] leading-snug text-slate-800">
               {JSON.stringify(decisionBundleItemWithoutGapIds(row), null, 2)}
             </pre>
@@ -2565,7 +2943,7 @@ function PrioritizedDecisionsSpotlight(props: { data: ManagerInsightFetchDebugRe
       sectionIndex="4"
       kicker="What needs attention"
       title="Execution alerts"
-      description="Ranked by the engine for this run. Each card leads with an imperative action, then stakes and blast radius; quotes and engine rationale stay under Show evidence. #1 is the top priority row."
+      description="Ranked by the engine for this run. Each card is title (direct action) → one-line context → one-line what to do; quotes, scope, and engine rationale sit under Show evidence. #1 is the top priority row."
       data-testid="manager-insight-prioritized-spotlight"
     >
       {rows.length === 0 ? (

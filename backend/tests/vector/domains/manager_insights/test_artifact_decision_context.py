@@ -22,6 +22,7 @@ from vector.domains.manager_insights.artifact_decision_context import (
     artifact_label_for_work_item,
     build_deterministic_artifact_interpretation,
     expand_evidence_refs_to_work_item_ids,
+    is_valid_action_title,
     merge_required_inputs_artifact_targets,
     select_primary_work_items,
 )
@@ -174,6 +175,12 @@ def test_deterministic_copy_names_artifact() -> None:
     assert label in out["llm_explanation"] or "PR #89" in out["llm_explanation"]
 
 
+def test_is_valid_action_title_rejects_diagnostic_headlines() -> None:
+    assert is_valid_action_title("Resolve the debate in #incident-review")
+    assert not is_valid_action_title("Stop Ownership is broken — this is the issue")
+    assert not is_valid_action_title("Execution is slowing across teams")
+
+
 def test_merge_required_inputs_adds_artifact_targets() -> None:
     rid = uuid.uuid4()
     wi = WorkItem(
@@ -201,6 +208,7 @@ def test_merge_required_inputs_adds_artifact_targets() -> None:
     )
     item = DecisionBundleItem(decision=d, decision_debug=None)
     targets = artifact_action_targets_payload([wi])
+    assert targets[0].get("actor_display_names") == []
     merged = merge_required_inputs_artifact_targets(item, targets)
     assert isinstance(merged.get("artifact_action_targets"), list)
     assert any(isinstance(t, dict) and t.get("label") == "NEX-5" for t in merged["artifact_action_targets"])

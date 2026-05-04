@@ -43,6 +43,7 @@ from pydantic import ValidationError
 from vector.domains.manager_insights.artifact_decision_context import (
     artifact_action_targets_payload,
     build_deterministic_artifact_interpretation,
+    is_valid_action_title,
     merge_required_inputs_artifact_targets,
     select_primary_work_items,
 )
@@ -691,6 +692,7 @@ def compute_decisions(
         settings_llm = None
 
     enriched: list[DecisionBundleItem] = []
+    used_primary_work_item_ids: set[str] = set()
     for it in items:
         primary = select_primary_work_items(
             it,
@@ -698,6 +700,9 @@ def compute_decisions(
             evidence=evidence,
             links=links,
             signals=sig_eff,
+            deprioritize_work_item_ids=(
+                frozenset(used_primary_work_item_ids) if used_primary_work_item_ids else None
+            ),
         )
         targets = artifact_action_targets_payload(primary)
         labels = [str(t["label"]) for t in targets if t.get("label")]
@@ -705,7 +710,7 @@ def compute_decisions(
         it_aug = it.model_copy(
             update={"decision": it.decision.model_copy(update={"required_inputs": req})},
         )
-        det = build_deterministic_artifact_interpretation(it_aug, primary, labels)
+        det = build_deterministic_artifact_interpretation(it_aug, primary, labels, evidence=evidence)
 
         llm_out: dict[str, str | None] | None = None
         if (
@@ -740,6 +745,10 @@ def compute_decisions(
             if use_llm
             else det
         )
+        if use_llm and not is_valid_action_title(str(chosen["llm_headline"])):
+            chosen = det
+        if primary:
+            used_primary_work_item_ids.add(primary[0].id)
         enriched.append(
             it_aug.model_copy(
                 update={

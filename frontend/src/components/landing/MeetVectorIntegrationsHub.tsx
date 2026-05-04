@@ -1,4 +1,6 @@
-import vectorWhiteBgUrl from "../../assets/vector-white-bg.png";
+import type { CSSProperties } from "react";
+
+import vectorWhiteBgUrl from "../../assets/logo.jpeg";
 
 /** Simple Icons v11.6.0 SVGs (MIT): https://github.com/simple-icons/simple-icons */
 const SI_ICON_BASE =
@@ -20,9 +22,14 @@ function toolIconUrl(slug: string) {
   return `${SI_ICON_BASE}/${slug}.svg`;
 }
 
-function IntegrationMark({ tool, pos }: { tool: Tool; pos: number }) {
+function IntegrationMark({ tool, orbitIndex }: { tool: Tool; orbitIndex: number }) {
   return (
-    <div className="meet-vector-hub__mark" data-pos={pos} role="img" aria-label={tool.label}>
+    <div
+      className="meet-vector-hub__mark"
+      style={{ "--orbit-index": orbitIndex } as CSSProperties}
+      role="img"
+      aria-label={tool.label}
+    >
       <img
         className="meet-vector-hub__tool-icon"
         src={toolIconUrl(tool.slug)}
@@ -42,7 +49,10 @@ export function MeetVectorIntegrationsHub() {
       className="meet-vector-hub"
       aria-label="Vector connects to the tools your team already uses"
     >
-      <div className="meet-vector-hub__orbit">
+      <div
+        className="meet-vector-hub__orbit"
+        style={{ "--orbit-count": INTEGRATION_TOOLS.length } as CSSProperties}
+      >
         <div className="meet-vector-hub__center">
           <img
             className="meet-vector-hub__vector"
@@ -53,7 +63,7 @@ export function MeetVectorIntegrationsHub() {
           />
         </div>
         {INTEGRATION_TOOLS.map((t, i) => (
-          <IntegrationMark key={t.slug} tool={t} pos={i + 1} />
+          <IntegrationMark key={t.slug} tool={t} orbitIndex={i} />
         ))}
       </div>
     </aside>

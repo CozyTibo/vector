@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import vectorHeroAvatarUrl from "../assets/vector-white-bg.png";
+import vectorHeroAvatarUrl from "../assets/logo.jpeg";
 import { workspaceAppShellMaxWidth } from "./marketing/marketingStyles";
 import { workspaceAuthGateLink, workspaceNavLinkCurrent, workspaceNavLinkRest } from "./workspace/workspaceUiTokens";
 
