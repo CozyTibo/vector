@@ -124,26 +124,26 @@ function MovesWorkForwardSlackPreview() {
             <div className="hero-slack-msg__body">
               <p className="hero-slack-msg__title">
                 <span className="hero-slack-msg__badge">Coordination gap</span>
-                <span className="hero-slack-msg__dash"> — </span>
+                <span className="hero-slack-msg__dash">: </span>
                 <span>agreement never became a ticket</span>
               </p>
               <p className="hero-slack-msg__summary">
                 <span className="hero-slack-mention">@Alex</span> and{" "}
                 <span className="hero-slack-mention hero-slack-mention--alt">@Sam</span> joined the design review;
-                everyone aligned on shipping <strong>the analytics cut this week</strong>—but{" "}
+                everyone aligned on shipping <strong>the analytics cut this week</strong>, but{" "}
                 <strong>no Linear issue</strong> was filed and <strong>no owner</strong> was set.
               </p>
               <p className="hero-slack-msg__label">Evidence</p>
               <ul className="hero-slack-msg__list">
                 <li>
-                  <strong>Slack</strong> — thread ends with “will track in Linear” · <strong>no link posted</strong>
+                  <strong>Slack</strong>: thread ends with “will track in Linear” · <strong>no link posted</strong>
                 </li>
                 <li>
-                  <strong>Linear</strong> — <strong>0 issues</strong> tied to that decision ·{" "}
+                  <strong>Linear</strong>: <strong>0 issues</strong> tied to that decision ·{" "}
                   <strong>no assignment</strong> to <span className="hero-slack-mention">@Alex</span>
                 </li>
                 <li>
-                  <strong>GitHub</strong> — draft PR open <strong>4 days</strong> · still <strong>unassigned</strong>
+                  <strong>GitHub</strong>: draft PR open <strong>4 days</strong> · still <strong>unassigned</strong>
                 </li>
               </ul>
               <p className="hero-slack-msg__label">
@@ -191,7 +191,7 @@ function LandingHeroSlackPreview() {
           <div className="hero-slack-msg__body">
             <p className="hero-slack-msg__title">
               <span className="hero-slack-msg__badge">Execution gap</span>
-              <span className="hero-slack-msg__dash"> — </span>
+              <span className="hero-slack-msg__dash">: </span>
               <span>decision not tracked</span>
             </p>
             <p className="hero-slack-msg__summary">
@@ -200,13 +200,13 @@ function LandingHeroSlackPreview() {
             <p className="hero-slack-msg__label">Evidence</p>
             <ul className="hero-slack-msg__list">
               <li>
-                <strong>Slack</strong> — recap notes “no ticket filed.”
+                <strong>Slack</strong>: recap notes “no ticket filed.”
               </li>
               <li>
-                <strong>Linear</strong> — 0 issues linked to that call.
+                <strong>Linear</strong>: 0 issues linked to that call.
               </li>
               <li>
-                <strong>#payments</strong> — summary posted, no linked issue.
+                <strong>#payments</strong>: summary posted, no linked issue.
               </li>
             </ul>
             <p className="hero-slack-msg__label">
@@ -231,7 +231,7 @@ function LandingHeroSlackPreview() {
           <div className="hero-slack-msg__body">
             <p className="hero-slack-msg__title">
               <span className="hero-slack-msg__badge hero-slack-msg__badge--block">Execution block</span>
-              <span className="hero-slack-msg__dash"> — </span>
+              <span className="hero-slack-msg__dash">: </span>
               <span>cross-team dependency stuck</span>
             </p>
             <p className="hero-slack-msg__summary">
@@ -240,13 +240,13 @@ function LandingHeroSlackPreview() {
             <p className="hero-slack-msg__label">Evidence</p>
             <ul className="hero-slack-msg__list">
               <li>
-                <strong>Slack</strong> — ping in #infra-asks 2 days ago, no reply.
+                <strong>Slack</strong>: ping in #infra-asks 2 days ago, no reply.
               </li>
               <li>
-                <strong>GitHub</strong> — PR #512 blocked until approval lands.
+                <strong>GitHub</strong>: PR #512 blocked until approval lands.
               </li>
               <li>
-                <strong>Linear</strong> — PAY-640 blocked on review, no named reviewer.
+                <strong>Linear</strong>: PAY-640 blocked on review, no named reviewer.
               </li>
             </ul>
             <p className="hero-slack-msg__label">
@@ -385,13 +385,13 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 </h2>
                 <p className="sub meet-vector__sub">Your new AI team member</p>
                 <p className="sub meet-vector__support">
-                  Vector integrates with the tools your team already uses, giving you a real-time view of your
-                  team’s execution. He spots risks early, highlights where progress is slowing down, and helps you
-                  see what needs attention next.
+                  Vector connects to the tools your team already uses and pushes risks, slowdowns, and concrete actions
+                  to you in real time. You can approve each move in one go, without untangling every thread first.
                 </p>
                 <p className="sub meet-vector__support">
                   Instead of chasing updates across different sources and stakeholders, Vector brings everything
-                  together so you can focus on delivery.
+                  together so you can focus on delivery: you make the call on the next step, and it runs the
+                  follow-through in your tools.
                 </p>
               </div>
               <MeetVectorIntegrationsHub />

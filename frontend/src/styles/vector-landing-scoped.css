@@ -1577,7 +1577,7 @@
   flex-direction: column;
   min-height: 0;
 }
-/* Pillar Slack mock: use panel space — larger type, tighter chrome, card grows with column */
+/* Pillar Slack mock: use panel space; larger type, tighter chrome, card grows with column */
 #vector-landing .empower-detail > .empower-action-slack .hero-slack-mock__topbar {
   padding: 0.55rem 0.75rem;
   font-size: 0.875rem;
