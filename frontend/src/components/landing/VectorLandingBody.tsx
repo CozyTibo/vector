@@ -48,18 +48,20 @@ const ACTION_CAPABILITIES = [
 const IMPACT_BLOCKS = [
   {
     accent: true,
-    stat: "30%",
-    copy: "Of your week back for leading, not stitching updates across tools.",
+    stat: "Focus",
+    copy: "30% of your time back leading, not chasing updates.",
   },
   {
     accent: false,
-    stat: "Runs for you",
-    copy: "Follow-ups, owners, and links keep moving so work doesn't die in the thread.",
+    stat: "Act fast",
+    copy: `The next best action, surfaced instantly.
+No digging. No guessing. Just move.`,
   },
   {
     accent: true,
-    stat: "Always-on",
-    copy: "Stalls and gaps surface while you can still change the outcome.",
+    stat: "Control",
+    copy: `Fix how work flows, not just what's stuck.
+Fewer escalations. Cleaner execution.`,
   },
 ] as const;
 
