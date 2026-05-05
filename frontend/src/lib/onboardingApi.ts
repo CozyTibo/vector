@@ -62,6 +62,7 @@ export type OnboardingStatePayload = {
   github_connected: boolean;
   linear_connected: boolean;
   slack_connected: boolean;
+  notion_connected: boolean;
 };
 
 export async function fetchOnboarding(base: string): Promise<OnboardingStatePayload> {

@@ -143,7 +143,7 @@ def _connect_queue_communication_only(tools: dict[str, list[str]]) -> list[str]:
 
 
 def _connect_queue_full_from_tools(tools: dict[str, list[str]]) -> list[str]:
-    """Onboarding OAuth queue: communication (Slack) → PM (Linear) → engineering (GitHub)."""
+    """Onboarding OAuth queue: communication (Slack) → PM (Linear and/or Notion) → engineering (GitHub)."""
     q: list[str] = []
     comm = tools.get("communication") or []
     if "slack" in comm:
@@ -153,6 +153,8 @@ def _connect_queue_full_from_tools(tools: dict[str, list[str]]) -> list[str]:
     pm = tools.get("pm") or []
     if "linear" in pm:
         q.append("linear")
+    if "notion" in pm:
+        q.append("notion")
     eng = tools.get("engineering") or []
     if "github" in eng:
         q.append("github")
@@ -166,7 +168,8 @@ def _unsupported_mandatory_sections(tools: dict[str, list[str]]) -> list[str]:
     if isinstance(comm, list) and len(comm) > 0 and "slack" not in comm:
         out.append("communication")
     pm = tools.get("pm") or []
-    if isinstance(pm, list) and len(pm) > 0 and "linear" not in pm:
+    pm_supported = isinstance(pm, list) and ("linear" in pm or "notion" in pm)
+    if isinstance(pm, list) and len(pm) > 0 and not pm_supported:
         out.append("pm")
     eng = tools.get("engineering") or []
     if isinstance(eng, list) and len(eng) > 0 and "github" not in eng:
@@ -177,7 +180,7 @@ def _unsupported_mandatory_sections(tools: dict[str, list[str]]) -> list[str]:
 def _unsupported_mandatory_labels_for_instruction(sections: list[str]) -> str:
     mapping = {
         "communication": "Communication (Microsoft Teams / Discord)",
-        "pm": "Project management (outside Linear)",
+        "pm": "Project management (outside Linear and Notion)",
         "engineering": "Engineering (outside GitHub)",
     }
     return ", ".join(mapping.get(s, s) for s in sections)
@@ -189,6 +192,7 @@ def _queue_skip_connected(
     slack_connected: bool,
     linear_connected: bool,
     github_connected: bool,
+    notion_connected: bool,
 ) -> list[str]:
     """Drop connectors from the queue when already linked (e.g. after edit tools)."""
     out: list[str] = []
@@ -199,6 +203,8 @@ def _queue_skip_connected(
             continue
         if item == "github" and github_connected:
             continue
+        if item == "notion" and notion_connected:
+            continue
         out.append(item)
     return out
 
@@ -208,6 +214,8 @@ def _first_connect_step(connect_queue: list[str]) -> str:
         return STEP_SCANNING
     head = connect_queue[0]
     if head == "linear":
+        return STEP_CONNECT_PROJECT_MANAGEMENT
+    if head == "notion":
         return STEP_CONNECT_PROJECT_MANAGEMENT
     if head == "github":
         return STEP_CONNECT_ENGINEERING
@@ -232,6 +240,7 @@ def _next_step_after_tool_connect_queue(
 def _oauth_connector_labels_in_order(connect_queue: list[str]) -> list[str]:
     mapping = {
         "linear": "Linear",
+        "notion": "Notion",
         "github": "GitHub",
         "slack": "Slack",
         "comm_placeholder": "Microsoft Teams or Discord",
@@ -243,7 +252,7 @@ def _tools_post_pick_instruction(*, prior: bool, oauth_labels: list[str]) -> str
     """LLM instructions grounded in actual OAuth queue."""
     slack_line = (
         "During onboarding we connect tools in the product in this order when they are selected: "
-        "Linear (project management), then GitHub (engineering), then Slack for communication. "
+        "Linear and/or Notion (project management), then GitHub (engineering), then Slack for communication. "
         "Microsoft Teams or Discord as communication uses a short in-product placeholder until OAuth is available."
     )
     if oauth_labels:
@@ -272,7 +281,7 @@ def _tools_post_pick_instruction(*, prior: bool, oauth_labels: list[str]) -> str
     )
 
 
-_ALLOWED_CONNECT_QUEUE_ITEM = frozenset({"linear", "github", "slack", "comm_placeholder"})
+_ALLOWED_CONNECT_QUEUE_ITEM = frozenset({"linear", "notion", "github", "slack", "comm_placeholder"})
 
 
 def _coalesce_connect_queue(answers: dict[str, Any], tools: dict[str, list[str]]) -> list[str]:
@@ -387,6 +396,7 @@ def handle_turn(
     slack_connected: bool = False,
     linear_connected: bool = False,
     github_connected: bool = False,
+    notion_connected: bool = False,
 ) -> OnboardingTurnResult:
     """Pure deterministic transition for one chat turn."""
     msg = _norm_str(user_message or "")
@@ -551,6 +561,12 @@ def handle_turn(
                     "the workspace is linked."
                 )
                 ctx_pm["connector"] = "linear"
+            elif head_idle == "notion":
+                ctx_pm["instruction"] = (
+                    "Ask them to connect Notion using the in-app OAuth button, then continue once "
+                    "the workspace is linked."
+                )
+                ctx_pm["connector"] = "notion"
             else:
                 ctx_pm["instruction"] = (
                     "Guide them through the project management connector step using the in-app UI."
@@ -713,7 +729,7 @@ def handle_turn(
                         "profile_phase": PROFILE_PHASE_TOOLS,
                         "instruction": (
                             "They confirmed without picking any project management tool "
-                            "(Linear, Jira, ClickUp, or Notion). Ask them to pick at least one, then confirm again."
+                            "(Linear, Notion, Jira, or ClickUp). Ask them to pick at least one, then confirm again."
                         ),
                     },
                 )
@@ -742,6 +758,7 @@ def handle_turn(
                 slack_connected=slack_connected,
                 linear_connected=linear_connected,
                 github_connected=github_connected,
+                notion_connected=notion_connected,
             )
             oauth_labels = _oauth_connector_labels_in_order(cq)
             instr = _tools_post_pick_instruction(prior=prior, oauth_labels=oauth_labels)

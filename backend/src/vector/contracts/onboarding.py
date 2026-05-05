@@ -49,6 +49,10 @@ class OnboardingGetResponse(BaseModel):
         default=False,
         description="Derived from Slack OAuth connection for tenant.",
     )
+    notion_connected: bool = Field(
+        default=False,
+        description="Derived from Notion OAuth connection for tenant.",
+    )
 
 
 class OnboardingPatchBody(BaseModel):

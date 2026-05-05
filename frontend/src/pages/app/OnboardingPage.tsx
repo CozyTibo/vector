@@ -101,12 +101,12 @@ function mapServerMessageToChatMessage(m: OnboardingMessagePayload): ChatMessage
   };
 }
 
-type LiveConnectorId = "github" | "linear" | "slack";
+type LiveConnectorId = "github" | "linear" | "notion" | "slack";
 
 type ConnectorQueueId = LiveConnectorId | "comm_placeholder";
 
 function NextConnectStep(next: ConnectorQueueId): OnboardingStep {
-  if (next === "linear") {
+  if (next === "linear" || next === "notion") {
     return "CONNECT_PROJECT_MANAGEMENT";
   }
   if (next === "github") {
@@ -135,6 +135,9 @@ function connectQueueFromTools(answers: Record<string, unknown>): ConnectorQueue
   if (pm.includes("linear")) {
     order.push("linear");
   }
+  if (pm.includes("notion")) {
+    order.push("notion");
+  }
   const eng = t.engineering ?? [];
   if (eng.includes("github")) {
     order.push("github");
@@ -148,6 +151,9 @@ function liveProviderConnected(provider: LiveConnectorId, server: OnboardingStat
   }
   if (provider === "linear") {
     return server.linear_connected;
+  }
+  if (provider === "notion") {
+    return Boolean(server.notion_connected);
   }
   return server.github_connected;
 }
@@ -193,7 +199,7 @@ function unsupportedMandatorySectionsFromAnswers(answers: Record<string, unknown
 function unsupportedMandatoryScopeDescription(sections: string[]): string {
   const labels: Record<string, string> = {
     communication: "communication tools such as Microsoft Teams or Discord",
-    pm: "project management tools outside Linear (for example Jira, ClickUp, or Notion)",
+    pm: "project management tools outside Linear and Notion (for example Jira or ClickUp)",
     engineering: "engineering tools outside GitHub (for example GitLab or Bitbucket)",
   };
   const parts = sections.map((s) => labels[s] ?? s);
@@ -308,7 +314,10 @@ function normalizeQueueAfterOAuth(
     (currentStep === "CONNECT_COMMUNICATION" ||
       currentStep === "CONNECT_PROJECT_MANAGEMENT" ||
       currentStep === "CONNECT_ENGINEERING") &&
-    (provider === "slack" || provider === "linear" || provider === "github")
+    (provider === "slack" ||
+      provider === "linear" ||
+      provider === "github" ||
+      provider === "notion")
   ) {
     queue = [provider];
   }
@@ -1291,20 +1300,21 @@ export default function OnboardingPage() {
     });
   }, []);
 
-  /** Advance OAuth return for Linear, GitHub, or Slack during onboarding. */
+  /** Advance OAuth return for Linear, GitHub, Notion, or Slack during onboarding. */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const gh = params.get("github_connected");
     const lin = params.get("linear_connected");
     const sl = params.get("slack_connected");
-    if (gh !== "1" && lin !== "1" && sl !== "1") {
+    const nt = params.get("notion_connected");
+    if (gh !== "1" && lin !== "1" && sl !== "1" && nt !== "1") {
       oauthAdvanceLockRef.current = null;
       return;
     }
     if (!tenantId) {
       return;
     }
-    const lockKey = `${tenantId}:${gh ?? ""}:${lin ?? ""}:${sl ?? ""}`;
+    const lockKey = `${tenantId}:${gh ?? ""}:${lin ?? ""}:${sl ?? ""}:${nt ?? ""}`;
     if (oauthAdvanceLockRef.current === lockKey) {
       return;
     }
@@ -1319,13 +1329,28 @@ export default function OnboardingPage() {
         setOauthReturnError(null);
         const fresh = await fetchOnboarding(apiBase);
         const provider: LiveConnectorId | null =
-          gh === "1" ? "github" : lin === "1" ? "linear" : sl === "1" ? "slack" : null;
+          gh === "1"
+            ? "github"
+            : lin === "1"
+              ? "linear"
+              : sl === "1"
+                ? "slack"
+                : nt === "1"
+                  ? "notion"
+                  : null;
         if (!provider) {
           stripOauthParams();
           return;
         }
         if (!liveProviderConnected(provider, fresh)) {
-          const label = provider === "slack" ? "Slack" : provider === "github" ? "GitHub" : "Linear";
+          const label =
+            provider === "slack"
+              ? "Slack"
+              : provider === "github"
+                ? "GitHub"
+                : provider === "notion"
+                  ? "Notion"
+                  : "Linear";
           const msg =
             `${label} authorization may have finished in the browser, but this workspace is not linked yet. ` +
             (provider === "slack"
@@ -1953,6 +1978,39 @@ export default function OnboardingPage() {
   }
 
   if (displayStep === "CONNECT_PROJECT_MANAGEMENT" && server) {
+    const persistedQ = server.answers.connect_queue;
+    const fullQueue =
+      Array.isArray(persistedQ) && persistedQ.length > 0
+        ? [...(persistedQ as string[])]
+        : connectQueueFromTools(server.answers);
+    const pmHead: "linear" | "notion" =
+      fullQueue[0] === "notion"
+        ? "notion"
+        : fullQueue[0] === "linear"
+          ? "linear"
+          : fullQueue.includes("linear")
+            ? "linear"
+            : fullQueue.includes("notion")
+              ? "notion"
+              : "linear";
+    const pmConnected =
+      pmHead === "notion" ? server.notion_connected : server.linear_connected;
+    const pmTitle = pmHead === "notion" ? "Connect Notion" : "Connect Linear";
+    const pmBody =
+      pmHead === "notion"
+        ? "Link Notion so Vector can read pages and databases you use for planning and execution."
+        : "Link your Linear workspace so Vector can read lightweight project activity.";
+    const pmConnectedLabel =
+      pmHead === "notion"
+        ? "Notion is connected to this workspace."
+        : "Linear is connected to this workspace.";
+    const pmContinueHint =
+      pmHead === "notion"
+        ? "When you're ready, continue—we'll connect your engineering tool next (or Slack if you're done with GitHub)."
+        : "When you're ready, continue—we'll connect your engineering tool next (or Slack if you're done with Linear and GitHub).";
+    const pmInstallHref = `${apiBase}/connectors/${pmHead}/install?return_to=${encodeURIComponent("/app/onboarding")}`;
+    const pmConnectLabel = pmHead === "notion" ? "Connect Notion" : "Connect Linear";
+
     return (
       <>
         <OnboardingChatLayout headerTrailing={onboardingHeaderTrailing}>
@@ -1970,35 +2028,27 @@ export default function OnboardingPage() {
                     {finishOnboardingError}
                   </p>
                 ) : null}
-                <h2 className="text-lg font-semibold text-zinc-900">Connect Linear</h2>
-                {!server.linear_connected ? (
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                    Link your Linear workspace so Vector can read lightweight project activity.
-                  </p>
+                <h2 className="text-lg font-semibold text-zinc-900">{pmTitle}</h2>
+                {!pmConnected ? (
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">{pmBody}</p>
                 ) : null}
-                {server.linear_connected ? (
+                {pmConnected ? (
                   <div className="mt-3 space-y-1">
-                    <p className="text-sm font-medium text-emerald-700">Linear is connected to this workspace.</p>
-                    <p className="text-sm text-zinc-600">
-                      When you&apos;re ready, continue—we&apos;ll connect your engineering tool next (or Slack if
-                      you&apos;re done with Linear and GitHub).
-                    </p>
+                    <p className="text-sm font-medium text-emerald-700">{pmConnectedLabel}</p>
+                    <p className="text-sm text-zinc-600">{pmContinueHint}</p>
                   </div>
                 ) : null}
                 <div className="mt-6 flex flex-col items-center gap-3">
-                  {!server.linear_connected ? (
-                    <a
-                      className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
-                      href={`${apiBase}/connectors/linear/install?return_to=${encodeURIComponent("/app/onboarding")}`}
-                    >
-                      Connect Linear
+                  {!pmConnected ? (
+                    <a className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS} href={pmInstallHref}>
+                      {pmConnectLabel}
                     </a>
                   ) : (
                     <button
                       type="button"
                       disabled={finishOnboardingMut.isPending}
                       className={`${ONBOARDING_PRIMARY_CTA_GRADIENT_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
-                      onClick={() => continueAfterManualConnect("linear")}
+                      onClick={() => continueAfterManualConnect(pmHead)}
                     >
                       {finishOnboardingMut.isPending ? "Finishing…" : "Continue"}
                     </button>

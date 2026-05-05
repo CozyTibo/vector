@@ -46,6 +46,7 @@ from vector.domains.onboarding.onboarding_service import apply_patch_answers_to_
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import linear_connection as linear_repo
+from vector.infrastructure.db.repositories import notion_connection as notion_repo
 from vector.infrastructure.db.repositories import onboarding as ob_repo
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
@@ -199,6 +200,7 @@ def _row_to_response(
     github_connected: bool,
     linear_connected: bool,
     slack_connected: bool,
+    notion_connected: bool,
     messages: list[OnboardingMessageItem],
 ) -> OnboardingGetResponse:
     return OnboardingGetResponse(
@@ -214,6 +216,7 @@ def _row_to_response(
         github_connected=github_connected,
         linear_connected=linear_connected,
         slack_connected=slack_connected,
+        notion_connected=notion_connected,
     )
 
 
@@ -267,12 +270,14 @@ def _get_response_bundle(
     gh = gh_repo.get_github_connection_for_tenant(db, tenant_id)
     lin = linear_repo.get_linear_connection_for_tenant(db, tenant_id)
     sl = slack_repo.get_slack_connection_for_tenant(db, tenant_id)
+    nt = notion_repo.get_notion_connection_for_tenant(db, tenant_id)
     msgs = _load_onboarding_messages(db, tenant_id)
     return _row_to_response(
         row,
         github_connected=gh is not None,
         linear_connected=lin is not None,
         slack_connected=sl is not None,
+        notion_connected=nt is not None,
         messages=msgs,
     )
 

@@ -323,6 +323,68 @@ def test_tools_selected_teams_jira_gitlab_all_three_mandatory_unsupported() -> N
     assert r.answers_updates["connect_queue"] == []
 
 
+def test_tools_selected_notion_satisfies_pm_mandatory_with_jira_also_picked() -> None:
+    """Picking Jira with Notion still satisfies mandatory PM (Notion is onboardable)."""
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["notion", "jira"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert "pm" not in (r.answers_updates.get("unsupported_mandatory_sections") or [])
+    assert r.answers_updates["connect_queue"] == ["slack", "notion", "github"]
+
+
+def test_tools_selected_slack_notion_github_queues_notion_for_pm() -> None:
+    """Notion as PM tool is supported: OAuth queue includes Notion after Slack."""
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["notion"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.next_step == STEP_CONNECT_COMMUNICATION
+    assert r.answers_updates["connect_queue"] == ["slack", "notion", "github"]
+    assert r.answers_updates.get("unsupported_mandatory_sections") == []
+
+
+def test_tools_selected_linear_and_notion_pm_includes_both_in_queue() -> None:
+    a = {
+        "profile_phase": PROFILE_PHASE_TOOLS,
+        "profile": {"name": "Ada", "role": "Founder"},
+        "company": {"name": "Acme", "size": "5-15"},
+    }
+    action = {
+        "type": "tools_selected",
+        "tools": {
+            "engineering": ["github"],
+            "pm": ["linear", "notion"],
+            "communication": ["slack"],
+            "docs": [],
+        },
+    }
+    r = handle_turn(STEP_CHAT_PROFILE, None, action, a)
+    assert r.answers_updates["connect_queue"] == ["slack", "linear", "notion", "github"]
+
+
 def test_tools_selected_moves_to_connect_pm_with_tools_merged() -> None:
     a = {
         "profile_phase": PROFILE_PHASE_TOOLS,

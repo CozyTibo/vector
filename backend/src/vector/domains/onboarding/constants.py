@@ -13,7 +13,7 @@ STEP_CONNECT_ENGINEERING = "CONNECT_ENGINEERING"
 STEP_CONNECT_COMMUNICATION = "CONNECT_COMMUNICATION"
 
 # Mandatory tool picks include categories Vector does not connect in onboarding yet (e.g. Teams-only,
-# or PM/engineering outside Linear/GitHub). In-product apology + finish or edit tools.
+# or PM outside Linear+Notion / engineering outside GitHub). In-product apology + finish or edit tools.
 STEP_UNSUPPORTED_MANDATORY_TOOLS = "UNSUPPORTED_MANDATORY_TOOLS"
 
 # After Slack OAuth: pick managers/people with @-mention autocomplete (Slack workspace roster).
