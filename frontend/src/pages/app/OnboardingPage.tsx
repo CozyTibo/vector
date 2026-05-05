@@ -467,8 +467,10 @@ export default function OnboardingPage() {
   }, [tenantId]);
 
   /**
-   * Restore persisted chat from GET /onboarding. Always apply when the API returns messages (same row
-   * can gain messages after tool picks / step changes; do not skip just because bootstrap already ran).
+   * Restore persisted chat from GET /onboarding when that payload changes (refetch / new rows).
+   * Do **not** depend on ``server.version``: ``mergeOnboardingFromChat`` bumps version after each
+   * POST /onboarding/chat but leaves ``messages`` stale in the cache; re-running this effect on
+   * every version tick would overwrite local bubbles with an outdated shorter transcript until refresh.
    */
   useEffect(() => {
     if (!server) {
@@ -480,7 +482,7 @@ export default function OnboardingPage() {
     }
     setMessages(apiMsgs.map(mapServerMessageToChatMessage));
     bootstrapCompletedForServerIdRef.current = server.id;
-  }, [server?.id, server?.version, server?.messages?.length]);
+  }, [server?.id, server?.messages?.length]);
 
   const displayStep: OnboardingStep | null = useMemo(() => {
     if (!server) {
