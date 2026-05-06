@@ -23,6 +23,13 @@ export type SlackDetails = {
   last_sync_at?: string | null;
 };
 
+export type NotionDetails = {
+  connection_id: string | null;
+  workspace_id: string | null;
+  workspace_name: string | null;
+  last_sync_at?: string | null;
+};
+
 export type ConnectorRow =
   | {
       provider: "github";
@@ -37,6 +44,13 @@ export type ConnectorRow =
       connector_configured: boolean;
       connected: boolean;
       details: LinearDetails | null;
+    }
+  | {
+      provider: "notion";
+      display_name: string;
+      connector_configured: boolean;
+      connected: boolean;
+      details: NotionDetails | null;
     }
   | {
       provider: "slack";

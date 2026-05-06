@@ -25,7 +25,7 @@ export const CONNECTOR_CATALOG: { category: string; items: CatalogItem[] }[] = [
   },
   {
     category: "Documentation",
-    items: [{ id: "notion", name: "Notion", live: false }],
+    items: [{ id: "notion", name: "Notion", live: true }],
   },
 ];
 

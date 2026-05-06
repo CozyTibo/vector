@@ -212,9 +212,11 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
     const ghErr = params.get("github_error");
     const lin = params.get("linear_connected");
     const linErr = params.get("linear_error");
+    const nt = params.get("notion_connected");
+    const ntErr = params.get("notion_error");
     const sl = params.get("slack_connected");
     const slErr = params.get("slack_error");
-    if (gh === "1" || lin === "1" || sl === "1") {
+    if (gh === "1" || lin === "1" || sl === "1" || nt === "1") {
       setBanner(null);
       void qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
       void qc.invalidateQueries({ queryKey: ["me", apiBase] });
@@ -237,6 +239,12 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
       setBanner("Slack connection was cancelled or denied.");
     } else if (slErr === "workspace_taken") {
       setBanner("This Slack workspace is already linked to another Vector workspace.");
+    } else if (ntErr === "state") {
+      setBanner("Notion connect failed (invalid or expired state).");
+    } else if (ntErr === "oauth") {
+      setBanner("Notion OAuth failed. Check NOTION_* and redirect URI.");
+    } else if (ntErr === "config") {
+      setBanner("Notion OAuth is not configured on the API.");
     }
     if (
       oauthErr ||
@@ -244,11 +252,15 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
       ghErr ||
       lin ||
       linErr ||
+      nt ||
+      ntErr ||
       params.get("oauth_ok") ||
       params.get("github_connected") ||
       params.get("linear_connected") ||
       params.get("slack_connected") ||
-      params.get("slack_error")
+      params.get("slack_error") ||
+      params.get("notion_connected") ||
+      params.get("notion_error")
     ) {
       window.history.replaceState({}, "", `${window.location.pathname}${window.location.hash}`);
     }
@@ -280,6 +292,14 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
   });
   const slackDisconnect = useMutation({
     mutationFn: () => disconnectConnector(apiBase, "slack"),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
+      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
+    },
+    onError: (e: Error) => setBanner(e.message),
+  });
+  const notionDisconnect = useMutation({
+    mutationFn: () => disconnectConnector(apiBase, "notion"),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
       await qc.invalidateQueries({ queryKey: ["me", apiBase] });
@@ -392,6 +412,7 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
                         <p className="mt-2 text-xs text-amber-900">
                           {action.provider === "github" && "GitHub isn’t configured on the API yet."}
                           {action.provider === "linear" && "Linear OAuth isn’t configured on the API yet."}
+                          {action.provider === "notion" && "Notion OAuth isn’t configured on the API yet."}
                           {action.provider === "slack" && "Slack OAuth isn’t configured on the API yet."}
                         </p>
                       ) : null}
@@ -497,6 +518,7 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
                       slotById={slotById}
                       ghDisconnect={ghDisconnect}
                       linDisconnect={linDisconnect}
+                      notionDisconnect={notionDisconnect}
                       slackDisconnect={slackDisconnect}
                     />
                   ))}
@@ -597,6 +619,7 @@ function StackToolCard({
   slotById,
   ghDisconnect,
   linDisconnect,
+  notionDisconnect,
   slackDisconnect,
 }: {
   groupKeys: (keyof ToolPickState)[];
@@ -607,10 +630,55 @@ function StackToolCard({
   slotById: Map<string, SignalSlot>;
   ghDisconnect: UseMutationResult<void, Error, void, unknown>;
   linDisconnect: UseMutationResult<void, Error, void, unknown>;
+  notionDisconnect: UseMutationResult<void, Error, void, unknown>;
   slackDisconnect: UseMutationResult<void, Error, void, unknown>;
 }) {
   const name = toolLabelFromOnboarding(toolId);
   const categoryLabel = categoryLabelsForStackRow(groupKeys);
+
+  if (toolId === "notion") {
+    const pmSlot = slotById.get("pm");
+    const docsSlot = slotById.get("docs");
+    const description =
+      groupKeys.includes("docs") && !groupKeys.includes("pm")
+        ? docsSlot?.description ??
+          "Specs and write-ups where decisions live—Notion can cover this alongside PM when linked."
+        : groupKeys.includes("pm") && !groupKeys.includes("docs")
+          ? pmSlot?.description ??
+            "Pages and databases from Notion so execution lines up with how your team plans work."
+          : [pmSlot?.description, docsSlot?.description].filter(Boolean).join(" ") ||
+            "Link Notion for planning and documentation your team already maintains in one workspace.";
+
+    return (
+      <div className={cardClass}>
+        <div className="flex items-start gap-3">
+          <ToolLogo toolId={toolId} name={name} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-zinc-900">{name}</p>
+            <p className="mt-0.5 text-xs text-zinc-500">{categoryLabel}</p>
+            <p
+              className={`mt-1 text-xs font-medium ${
+                connected.has("notion") ? "text-emerald-700" : "text-amber-700"
+              }`}
+            >
+              {connected.has("notion") ? "On" : "Off"}
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-zinc-600">{description}</p>
+        <div className="mt-auto pt-4">
+          <LiveConnectorActions
+            provider="notion"
+            apiBase={apiBase}
+            statusById={statusById}
+            connected={connected}
+            disconnect={notionDisconnect}
+            connectLabel="Connect Notion"
+          />
+        </div>
+      </div>
+    );
+  }
 
   const liveSlot: SignalSlot | undefined =
     toolId === "slack"
@@ -705,7 +773,7 @@ function LiveConnectorActions({
   disconnect,
   connectLabel,
 }: {
-  provider: "github" | "linear" | "slack";
+  provider: "github" | "linear" | "notion" | "slack";
   apiBase: string;
   statusById: Map<string, ConnectorRow>;
   connected: Set<string>;
@@ -734,6 +802,7 @@ function LiveConnectorActions({
       <p className="text-xs leading-snug text-amber-900">
         {provider === "github" && "GitHub is not configured on the API."}
         {provider === "linear" && "Linear OAuth is not configured on the API."}
+        {provider === "notion" && "Notion OAuth is not configured on the API."}
         {provider === "slack" && "Slack OAuth is not configured on the API."}
       </p>
     );

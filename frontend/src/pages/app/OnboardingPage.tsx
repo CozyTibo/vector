@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import ChatInputBar from "../../components/onboarding/ChatInputBar";
 import ChatMessageList from "../../components/onboarding/ChatMessageList";
@@ -102,6 +102,15 @@ function mapServerMessageToChatMessage(m: OnboardingMessagePayload): ChatMessage
   };
 }
 
+function transcriptHasBootstrapOpening(prev: ChatMessage[]): boolean {
+  return prev.some(
+    (m) =>
+      m.role === "vector" &&
+      (m.content.trim() === ONBOARDING_OPENING_MESSAGE.trim() ||
+        m.content.includes("What should I call you?")),
+  );
+}
+
 type LiveConnectorId = "github" | "linear" | "notion" | "slack";
 
 type ConnectorQueueId = LiveConnectorId | "comm_placeholder";
@@ -119,7 +128,7 @@ function NextConnectStep(next: ConnectorQueueId): OnboardingStep {
   return "SCANNING";
 }
 
-/** Order matches backend `onboarding_flow._connect_queue_full_from_tools` (comm → Linear → GitHub). */
+/** Order matches backend `onboarding_flow._connect_queue_full_from_tools` (Slack → PM → GitHub). */
 function connectQueueFromTools(answers: Record<string, unknown>): ConnectorQueueId[] {
   const t = answers.tools as Record<string, string[]> | undefined;
   if (!t) {
@@ -284,48 +293,40 @@ function buildAdminAccessStakeholderBase(
   return [...before, ...synth, stakeMsg, ...msgs.slice(idx + 1)];
 }
 
-function effectiveConnectQueue(answers: Record<string, unknown>, currentStep: string): string[] {
-  const q = answers.connect_queue;
-  if (Array.isArray(q) && q.length > 0) {
-    return [...(q as string[])];
-  }
-  if (
-    currentStep === "CONNECT_COMMUNICATION" ||
-    currentStep === "CONNECT_PROJECT_MANAGEMENT" ||
-    currentStep === "CONNECT_ENGINEERING"
-  ) {
-    const order = connectQueueFromTools(answers);
-    return order.length ? [order[0]!] : [];
-  }
-  return [];
+/**
+ * Remaining OAuth queue after a connector redirect: always derive from `tools` (same order as
+ * backend `_connect_queue_full_from_tools`), then drop connectors already linked on the server.
+ *
+ * Do **not** trust persisted `connect_queue` alone: it can be stale or incomplete (e.g. missing
+ * Notion after Slack/GitHub), which would skip PM OAuth and jump straight to Slack stakeholders.
+ */
+function remainingConnectorQueueAfterOAuth(
+  answers: Record<string, unknown>,
+  server: OnboardingStatePayload,
+): string[] {
+  const queue = connectQueueFromTools(answers);
+  return queue.filter((id) => {
+    if (id === "slack") return !server.slack_connected;
+    if (id === "linear") return !server.linear_connected;
+    if (id === "notion") return !server.notion_connected;
+    if (id === "github") return !server.github_connected;
+    if (id === "comm_placeholder") return true;
+    return false;
+  });
 }
 
-function normalizeQueueAfterOAuth(
+/** Next PM OAuth card: first of Linear/Notion in tool order that is still outstanding (ignores stale connect_queue). */
+function nextPmConnectorHead(
   answers: Record<string, unknown>,
-  currentStep: string,
-  provider: LiveConnectorId,
-): string[] {
-  let queue: string[] = [];
-  const q = answers.connect_queue;
-  if (Array.isArray(q) && q.length > 0) {
-    queue = [...(q as string[])];
+  server: OnboardingStatePayload,
+): "linear" | "notion" {
+  const remaining = remainingConnectorQueueAfterOAuth(answers, server);
+  for (const id of remaining) {
+    if (id === "linear" || id === "notion") {
+      return id;
+    }
   }
-  if (
-    queue.length === 0 &&
-    (currentStep === "CONNECT_COMMUNICATION" ||
-      currentStep === "CONNECT_PROJECT_MANAGEMENT" ||
-      currentStep === "CONNECT_ENGINEERING") &&
-    (provider === "slack" ||
-      provider === "linear" ||
-      provider === "github" ||
-      provider === "notion")
-  ) {
-    queue = [provider];
-  }
-  if (queue[0] === provider) {
-    return queue.slice(1);
-  }
-  return queue.filter((p) => p !== provider);
+  return "linear";
 }
 
 function onboardingQueryKey(apiBase: string, tenantId: string): [string, string, string] {
@@ -360,6 +361,7 @@ export default function OnboardingPage() {
   const apiBase = productApiBase();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const me = useProductMeQuery(apiBase);
   const tenantId = me.data?.tenant_id;
@@ -481,6 +483,10 @@ export default function OnboardingPage() {
    * Do **not** depend on ``server.version``: ``mergeOnboardingFromChat`` bumps version after each
    * POST /onboarding/chat but leaves ``messages`` stale in the cache; re-running this effect on
    * every version tick would overwrite local bubbles with an outdated shorter transcript until refresh.
+   *
+   * Never replace local state with a **shorter** API transcript: window-focus refetch or Strict Mode
+   * can run while POST /onboarding/chat is still committing, returning stale rows and wiping the
+   * user's bubble (still persisted — visible in admin).
    */
   useEffect(() => {
     if (!server) {
@@ -490,7 +496,13 @@ export default function OnboardingPage() {
     if (!apiMsgs.length) {
       return;
     }
-    setMessages(apiMsgs.map(mapServerMessageToChatMessage));
+    const mapped = apiMsgs.map(mapServerMessageToChatMessage);
+    setMessages((prev) => {
+      if (mapped.length >= prev.length) {
+        return mapped;
+      }
+      return prev.length > 0 ? prev : mapped;
+    });
     bootstrapCompletedForServerIdRef.current = server.id;
   }, [server?.id, server?.messages?.length]);
 
@@ -558,6 +570,26 @@ export default function OnboardingPage() {
       setConnectorsIntroChipMode("both");
     }
   }, [profilePhase]);
+
+  /** Slack OAuth redirect errors (?slack_error=); backend sends users back to /app/onboarding when state allows. */
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const slErr = params.get("slack_error");
+    if (!slErr) {
+      return;
+    }
+    const messages: Record<string, string> = {
+      state: "Slack connect failed (invalid or expired state). Try again.",
+      oauth: "Slack OAuth failed. Check SLACK_* and redirect URI.",
+      denied: "Slack connection was cancelled or denied.",
+      workspace_taken: "This Slack workspace is already linked to another Vector workspace.",
+      forbidden: "Slack connect failed (membership or permission issue).",
+      config: "Slack OAuth is not configured on the API.",
+      server: "Slack connect failed (server error). Try again.",
+    };
+    setOauthReturnError(messages[slErr] ?? `Slack connect failed (${slErr}).`);
+    window.history.replaceState({}, "", location.pathname || "/app/onboarding");
+  }, [location.search, location.pathname]);
 
   /** After Vector finishes typing or the chat request completes, keep focus in the message field. */
   useEffect(() => {
@@ -737,7 +769,7 @@ export default function OnboardingPage() {
       if (!server) {
         return;
       }
-      let queue = [...effectiveConnectQueue(server.answers, server.current_step)];
+      let queue = [...remainingConnectorQueueAfterOAuth(server.answers, server)];
       if (liveProviderConnected(provider, server)) {
         if (queue[0] === provider) {
           queue = queue.slice(1);
@@ -1077,7 +1109,7 @@ export default function OnboardingPage() {
     if (!server) {
       return;
     }
-    const queue = effectiveConnectQueue(server.answers, server.current_step);
+    const queue = remainingConnectorQueueAfterOAuth(server.answers, server);
     if (queue[0] !== "comm_placeholder") {
       return;
     }
@@ -1131,14 +1163,24 @@ export default function OnboardingPage() {
           return;
         }
         mergeOnboardingFromChat(qc, apiBase, tenantId, { step: res.step, answers: res.answers });
-        setMessages([
-          {
-            id: crypto.randomUUID(),
-            role: "vector",
-            content: ONBOARDING_OPENING_MESSAGE,
-            timestamp: Date.now(),
-          },
-        ]);
+        if (tenantId) {
+          void qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        }
+        const openingBubble: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "vector",
+          content: ONBOARDING_OPENING_MESSAGE,
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => {
+          if (prev.length === 0) {
+            return [openingBubble];
+          }
+          if (transcriptHasBootstrapOpening(prev)) {
+            return prev;
+          }
+          return [openingBubble, ...prev];
+        });
         bootstrapCompletedForServerIdRef.current = serverId;
       } catch (e) {
         if (!cancelled && generation === openingBootstrapGenerationRef.current) {
@@ -1200,6 +1242,9 @@ export default function OnboardingPage() {
         }
 
         mergeOnboardingFromChat(qc, apiBase, tenantId, { step: res.step, answers: res.answers });
+        if (tenantId) {
+          void qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
+        }
       } catch (e) {
         setMessages((prev) => [
           ...prev,
@@ -1364,7 +1409,7 @@ export default function OnboardingPage() {
           return;
         }
 
-        const nextQueue = normalizeQueueAfterOAuth(fresh.answers, fresh.current_step, provider);
+        const nextQueue = remainingConnectorQueueAfterOAuth(fresh.answers, fresh);
         const tools = fresh.answers.tools as Record<string, string[]> | undefined;
         const comm = tools?.communication ?? [];
 
@@ -1979,21 +2024,7 @@ export default function OnboardingPage() {
   }
 
   if (displayStep === "CONNECT_PROJECT_MANAGEMENT" && server) {
-    const persistedQ = server.answers.connect_queue;
-    const fullQueue =
-      Array.isArray(persistedQ) && persistedQ.length > 0
-        ? [...(persistedQ as string[])]
-        : connectQueueFromTools(server.answers);
-    const pmHead: "linear" | "notion" =
-      fullQueue[0] === "notion"
-        ? "notion"
-        : fullQueue[0] === "linear"
-          ? "linear"
-          : fullQueue.includes("linear")
-            ? "linear"
-            : fullQueue.includes("notion")
-              ? "notion"
-              : "linear";
+    const pmHead = nextPmConnectorHead(server.answers, server);
     const pmConnected =
       pmHead === "notion" ? server.notion_connected : server.linear_connected;
     const pmTitle = pmHead === "notion" ? "Connect Notion" : "Connect Linear";
@@ -2170,7 +2201,7 @@ export default function OnboardingPage() {
   }
 
   if (displayStep === "CONNECT_COMMUNICATION") {
-    const commHead = (effectiveConnectQueue(server.answers, "CONNECT_COMMUNICATION")[0] ??
+    const commHead = (remainingConnectorQueueAfterOAuth(server.answers, server)[0] ??
       connectQueueFromTools(server.answers)[0]) as ConnectorQueueId | undefined;
 
     if (commHead === "comm_placeholder") {

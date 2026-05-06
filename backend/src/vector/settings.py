@@ -235,7 +235,19 @@ class Settings(BaseSettings):
         ),
     )
     openai_api_key: str = Field(default="", validation_alias="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4o-mini", validation_alias="OPENAI_MODEL")
+    openai_model: str = Field(
+        default="gpt-5-mini",
+        validation_alias="OPENAI_MODEL",
+        description="Default Chat Completions model for manager insights and non-onboarding features.",
+    )
+    openai_model_onboarding: str = Field(
+        default="gpt-4o-mini",
+        validation_alias="OPENAI_MODEL_ONBOARDING",
+        description=(
+            "Chat Completions model for product onboarding chat only (fast path). "
+            "When empty, OPENAI_MODEL is used."
+        ),
+    )
     smtp_host: str = Field(
         default="",
         validation_alias="SMTP_HOST",

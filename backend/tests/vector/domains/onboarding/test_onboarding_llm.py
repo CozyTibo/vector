@@ -94,6 +94,35 @@ def test_connectors_intro_after_size_fallback_is_two_bubbles_without_openai() ->
     assert "okay" in out[1].lower() or "quick" in out[1].lower()
 
 
+def test_onboarding_uses_openai_model_onboarding_when_set() -> None:
+    """OPENAI_MODEL_ONBOARDING routes onboarding Chat Completions without changing global model."""
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock(message=MagicMock(content="Hello there."))]
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_resp
+
+    cfg = MagicMock()
+    cfg.openai_api_key = "sk-test"
+    cfg.openai_model = "gpt-5-mini"
+    cfg.openai_model_onboarding = "gpt-4o-mini"
+
+    with patch("vector.domains.onboarding.onboarding_llm.OpenAI", return_value=mock_client):
+        out = generate_onboarding_reply(
+            step=STEP_CHAT_PROFILE,
+            answers_json={"profile_phase": PROFILE_PHASE_NAME},
+            last_user_message="Ada",
+            assistant_prompt_context={
+                "profile_phase": PROFILE_PHASE_NAME,
+                "instruction": "Acknowledge the name in one short line.",
+            },
+            settings=cfg,
+        )
+
+    assert out == ["Hello there."]
+    call_kw = mock_client.chat.completions.create.call_args.kwargs
+    assert call_kw["model"] == "gpt-4o-mini"
+
+
 def test_generate_onboarding_reply_falls_back_when_openai_request_fails() -> None:
     """Network / API failures must not bubble; product returns deterministic copy."""
     mock_client = MagicMock()

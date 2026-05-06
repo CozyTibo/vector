@@ -12,7 +12,7 @@ export type ExpandStackAction = {
 export type ConnectToolAction = {
   kind: "connect";
   id: string;
-  provider: "slack" | "linear" | "github";
+  provider: "slack" | "linear" | "notion" | "github";
   title: string;
   body: string;
   configured: boolean;
@@ -57,12 +57,15 @@ const EXPAND_ROWS: {
   },
 ];
 
-function connectMeta(provider: "slack" | "linear" | "github"): { brand: string } {
+function connectMeta(provider: "slack" | "linear" | "notion" | "github"): { brand: string } {
   if (provider === "slack") {
     return { brand: "Slack" };
   }
   if (provider === "linear") {
     return { brand: "Linear" };
+  }
+  if (provider === "notion") {
+    return { brand: "Notion" };
   }
   return { brand: "GitHub" };
 }
@@ -84,10 +87,19 @@ export function buildSignalWorkspaceActions(
     if (row.groupKey === "communication" && arr.length === 0 && connected.has("slack")) {
       continue;
     }
-    if (row.groupKey === "pm" && arr.length === 0 && connected.has("linear")) {
+    if (row.groupKey === "pm" && arr.length === 0 && (connected.has("linear") || connected.has("notion"))) {
       continue;
     }
     if (row.groupKey === "engineering" && arr.length === 0 && connected.has("github")) {
+      continue;
+    }
+    if (
+      row.groupKey === "docs" &&
+      arr.length === 0 &&
+      ((pick.pm ?? []).includes("notion") ||
+        (pick.docs ?? []).includes("notion") ||
+        connected.has("notion"))
+    ) {
       continue;
     }
     if (arr.length === 0) {
@@ -107,16 +119,17 @@ export function buildSignalWorkspaceActions(
 
   const connectActions: SignalWorkspaceAction[] = [];
   const connectCandidates: {
-    provider: "slack" | "linear" | "github";
+    provider: "slack" | "linear" | "notion" | "github";
     selected: boolean;
   }[] = [
     { provider: "slack", selected: pick.communication?.includes("slack") ?? false },
     { provider: "linear", selected: pick.pm?.includes("linear") ?? false },
+    { provider: "notion", selected: pick.pm?.includes("notion") ?? false },
     { provider: "github", selected: pick.engineering?.includes("github") ?? false },
   ];
 
   /** Prefer higher signal weight first when multiple connects apply. */
-  const order = { slack: 0, linear: 1, github: 2 };
+  const order = { slack: 0, linear: 1, notion: 2, github: 3 };
   connectCandidates.sort((a, b) => order[a.provider] - order[b.provider]);
 
   for (const c of connectCandidates) {

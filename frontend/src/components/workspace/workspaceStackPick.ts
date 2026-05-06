@@ -76,6 +76,10 @@ export function mergeConnectedProvidersIntoPick(
   if (connected.has("github")) {
     next.engineering = uniq([...(next.engineering ?? []), "github"]);
   }
+  if (connected.has("notion")) {
+    next.pm = uniq([...(next.pm ?? []), "notion"]);
+    next.docs = uniq([...(next.docs ?? []), "notion"]);
+  }
   return next;
 }
 
@@ -91,7 +95,7 @@ export function toolLabelFromOnboarding(toolId: string): string {
 
 /** Live OAuth products we can lock in the edit modal while connected. */
 export function isLiveConnectorToolId(toolId: string): boolean {
-  return toolId === "slack" || toolId === "linear" || toolId === "github";
+  return toolId === "slack" || toolId === "linear" || toolId === "notion" || toolId === "github";
 }
 
 export function isToolLockedByConnection(toolId: string, connected: Set<string>): boolean {
@@ -103,6 +107,9 @@ export function isToolLockedByConnection(toolId: string, connected: Set<string>)
   }
   if (toolId === "github") {
     return connected.has("github");
+  }
+  if (toolId === "notion") {
+    return connected.has("notion");
   }
   return false;
 }

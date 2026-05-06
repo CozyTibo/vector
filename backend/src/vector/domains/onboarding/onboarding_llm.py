@@ -39,6 +39,16 @@ def _finalize_assistant_segments(segments: list[str]) -> list[str]:
     return [_strip_em_dash(s) for s in segments]
 
 
+def _onboarding_chat_model(cfg: Settings) -> str:
+    """Use OPENAI_MODEL_ONBOARDING when set; otherwise the global OPENAI_MODEL."""
+    raw = getattr(cfg, "openai_model_onboarding", "")
+    if isinstance(raw, str):
+        s = raw.strip()
+        if s:
+            return s
+    return cfg.openai_model
+
+
 # Logged server-side; client may show richer static copy. No LLM on bootstrap (instant response).
 BOOTSTRAP_OPENING_REPLY_TEXT = (
     "Hey! I'm Vector, your execution manager. "
@@ -384,22 +394,23 @@ Readable summary:
     temp = 0.7 if assistant_prompt_context.get("tools_selection_revision") else 0.58
 
     has_kb = isinstance(kb, str) and bool(kb.strip())
+    chat_model = _onboarding_chat_model(cfg)
     max_out = onboarding_chat_max_completion_tokens(
-        cfg.openai_model,
+        chat_model,
         intro_kind=intro_kind if isinstance(intro_kind, str) else None,
         has_connectors_privacy_kb=has_kb,
     )
 
     client = OpenAI(api_key=cfg.openai_api_key)
     kwargs = {
-        "model": cfg.openai_model,
+        "model": chat_model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ],
         "max_completion_tokens": max_out,
     }
-    t = temperature_for_chat_model(cfg.openai_model, temp)
+    t = temperature_for_chat_model(chat_model, temp)
     if t is not None:
         kwargs["temperature"] = t
     try:
@@ -421,7 +432,7 @@ Readable summary:
         logger.warning(
             "onboarding_llm: empty OpenAI message.content (model=%s intro_kind=%r max_out=%s); "
             "using deterministic fallback (user may see internal instruction copy)",
-            cfg.openai_model,
+            chat_model,
             intro_kind,
             max_out,
         )

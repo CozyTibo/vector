@@ -95,6 +95,12 @@ function sortSlotsByThermometerOrder(slots: SignalSlot[]): SignalSlot[] {
 }
 
 export function isSlotActive(slot: SignalSlot, connected: Set<string>): boolean {
+  if (slot.id === "pm") {
+    return connected.has("linear") || connected.has("notion");
+  }
+  if (slot.id === "docs") {
+    return connected.has("notion");
+  }
   if (slot.liveConnector) {
     return connected.has(slot.liveConnector);
   }

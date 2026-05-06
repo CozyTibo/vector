@@ -75,7 +75,8 @@ export default function RequireAuth() {
   const mustFinishOnboarding =
     "onboarding_completed" in me.data && me.data.onboarding_completed !== true;
   if (mustFinishOnboarding && !onboardingRoute) {
-    return <Navigate to="/app/onboarding" replace />;
+    // Preserve OAuth error query params (e.g. slack_error=) when Slack redirects to `/` before this guard runs.
+    return <Navigate to={`/app/onboarding${loc.search}`} replace />;
   }
 
   const showConnectorsNav =

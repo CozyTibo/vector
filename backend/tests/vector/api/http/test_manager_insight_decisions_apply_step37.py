@@ -88,7 +88,12 @@ def test_manager_insight_apply_dry_run_returns_planned_payload(
     planned = body["planned_payload"]
     assert planned["external_io"] is False
     assert planned["connector"] == "slack"
-    assert planned["merged_arguments"] == {"channel": "C1", "text": "override"}
+    # Persist maps DecisionItem.dominant into required_inputs as narrative_dominant (see manager_insight_decision_from_item).
+    assert planned["merged_arguments"] == {
+        "channel": "C1",
+        "text": "override",
+        "narrative_dominant": False,
+    }
     assert isinstance(body["note"], str) and len(body["note"]) > 0
 
 

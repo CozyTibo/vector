@@ -252,7 +252,8 @@ def _tools_post_pick_instruction(*, prior: bool, oauth_labels: list[str]) -> str
     """LLM instructions grounded in actual OAuth queue."""
     slack_line = (
         "During onboarding we connect tools in the product in this order when they are selected: "
-        "Linear and/or Notion (project management), then GitHub (engineering), then Slack for communication. "
+        "Slack first when it is chosen for communication, then Linear and/or Notion for project management, "
+        "then GitHub for engineering. "
         "Microsoft Teams or Discord as communication uses a short in-product placeholder until OAuth is available."
     )
     if oauth_labels:

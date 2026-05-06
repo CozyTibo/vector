@@ -20,6 +20,7 @@ from vector.domains.connectors.slack.errors import (
 )
 from vector.domains.connectors.slack.oauth_flow import (
     complete_slack_oauth,
+    slack_oauth_error_frontend_redirect_url,
     start_slack_oauth_url,
 )
 from vector.domains.identity_access.errors import NoMembershipError
@@ -104,13 +105,13 @@ def build_slack_callback_router() -> APIRouter:
             )
             err_q = "denied" if error == "access_denied" else "oauth"
             return RedirectResponse(
-                url=f"{front}/?slack_error={err_q}",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, err_q),
                 status_code=status.HTTP_302_FOUND,
             )
         if not code or not state:
             _logger.warning("Slack callback missing code or state")
             return RedirectResponse(
-                url=f"{front}/?slack_error=oauth",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, "oauth"),
                 status_code=status.HTTP_302_FOUND,
             )
         return_to: str | None = None
@@ -118,34 +119,34 @@ def build_slack_callback_router() -> APIRouter:
             _link, return_to = complete_slack_oauth(db, settings, code=code, state=state)
         except SlackInstallStateMembershipError:
             return RedirectResponse(
-                url=f"{front}/?slack_error=forbidden",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, "forbidden"),
                 status_code=status.HTTP_302_FOUND,
             )
         except InvalidSlackOAuthStateError:
             return RedirectResponse(
-                url=f"{front}/?slack_error=state",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, "state"),
                 status_code=status.HTTP_302_FOUND,
             )
         except SlackOAuthError as exc:
             _logger.warning("Slack OAuth failed: %s", exc)
             return RedirectResponse(
-                url=f"{front}/?slack_error=oauth",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, "oauth"),
                 status_code=status.HTTP_302_FOUND,
             )
         except SlackConnectorNotConfiguredError:
             return RedirectResponse(
-                url=f"{front}/?slack_error=config",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, "config"),
                 status_code=status.HTTP_302_FOUND,
             )
         except SlackWorkspaceConflictError:
             return RedirectResponse(
-                url=f"{front}/?slack_error=workspace_taken",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, "workspace_taken"),
                 status_code=status.HTTP_302_FOUND,
             )
         except Exception:
             _logger.exception("Slack OAuth callback failed")
             return RedirectResponse(
-                url=f"{front}/?slack_error=server",
+                url=slack_oauth_error_frontend_redirect_url(settings, state, "server"),
                 status_code=status.HTTP_302_FOUND,
             )
         append_connector_connected_user_line(

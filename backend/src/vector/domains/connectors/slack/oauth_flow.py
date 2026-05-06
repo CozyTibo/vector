@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_SLACK
 from vector.domains.connectors.slack.errors import (
+    InvalidSlackOAuthStateError,
     SlackConnectorNotConfiguredError,
     SlackInstallStateMembershipError,
     SlackOAuthError,
@@ -34,6 +35,26 @@ from vector.settings import Settings
 
 def slack_connector_configured(settings: Settings) -> bool:
     return bool(settings.slack_client_id.strip() and settings.slack_client_secret.strip())
+
+
+def slack_oauth_error_frontend_redirect_url(
+    settings: Settings,
+    state: str | None,
+    error_token: str,
+) -> str:
+    """Build `…?slack_error=…` (or `&`) on the same path the user started OAuth from (e.g. /app/onboarding)."""
+    front = settings.frontend_url.rstrip("/")
+    base = f"{front}/"
+    if state:
+        try:
+            claims = parse_slack_oauth_state_token(settings, state)
+        except InvalidSlackOAuthStateError:
+            pass
+        else:
+            if claims.return_to:
+                base = f"{front}{claims.return_to}"
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}slack_error={error_token}"
 
 
 def start_slack_oauth_url(
