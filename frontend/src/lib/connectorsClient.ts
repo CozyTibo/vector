@@ -66,11 +66,37 @@ export async function disconnectConnector(base: string, provider: string): Promi
 /** Post-OAuth redirect; must satisfy backend `sanitize_*_return_to` (path under `/app/`). */
 export const CONNECTOR_OAUTH_RETURN_PATH = "/app/";
 
+export type ConnectorOAuthProvider = "github" | "linear" | "notion" | "slack";
+
 export function connectorInstallUrl(
   base: string,
-  provider: "github" | "linear" | "slack",
+  provider: ConnectorOAuthProvider,
   returnPath: string = CONNECTOR_OAUTH_RETURN_PATH,
 ): string {
   const q = new URLSearchParams({ return_to: returnPath });
   return `${base}/connectors/${provider}/install?${q.toString()}`;
+}
+
+/**
+ * Start connector OAuth from the SPA using the same auth as API ``fetch`` (cookie + optional Bearer
+ * from localStorage). Plain ``<a href={api}/install>`` does not send ``Authorization``, so users who
+ * only have a bearer token (e.g. Google sign-in / ITP) get 401 on install links.
+ */
+export async function startConnectorOAuthRedirect(
+  base: string,
+  provider: ConnectorOAuthProvider,
+  returnPath: string = CONNECTOR_OAUTH_RETURN_PATH,
+): Promise<void> {
+  const url = connectorInstallUrl(base, provider, returnPath);
+  const res = await fetch(url, mergeProductSessionAuth({ method: "GET", redirect: "manual" }));
+  if (res.status >= 300 && res.status < 400) {
+    const loc = res.headers.get("Location");
+    if (loc) {
+      window.location.assign(new URL(loc, url).href);
+      return;
+    }
+  }
+  if (!res.ok) {
+    throw new Error(await readErrorDetail(res));
+  }
 }

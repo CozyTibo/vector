@@ -72,6 +72,8 @@ _cors_kw: dict = {
     "allow_credentials": True,
     "allow_methods": ["*"],
     "allow_headers": ["*"],
+    # Lets the SPA read ``Location`` after credentialed ``fetch(..., redirect: "manual")`` to OAuth URLs.
+    "expose_headers": ["Location"],
 }
 _cors_rx = _cors_origin_regex()
 if _cors_rx:

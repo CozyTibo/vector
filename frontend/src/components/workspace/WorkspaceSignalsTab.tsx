@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   type ConnectorRow,
-  connectorInstallUrl,
+  CONNECTOR_OAUTH_RETURN_PATH,
   disconnectConnector,
   fetchConnectors,
+  startConnectorOAuthRedirect,
 } from "../../lib/connectorsClient";
 import { fetchOnboarding } from "../../lib/onboardingApi";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
@@ -317,21 +318,8 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
     if (!stackPrefsReady) {
       return [];
     }
-    return buildSignalWorkspaceActions(
-      effectiveStackPick,
-      connected,
-      statusById,
-      apiBase,
-      connectorsQ.isFetched,
-    );
-  }, [
-    stackPrefsReady,
-    effectiveStackPick,
-    connected,
-    statusById,
-    apiBase,
-    connectorsQ.isFetched,
-  ]);
+    return buildSignalWorkspaceActions(effectiveStackPick, connected, statusById, connectorsQ.isFetched);
+  }, [stackPrefsReady, effectiveStackPick, connected, statusById, connectorsQ.isFetched]);
 
   return (
     <div className="space-y-6 lg:space-y-8">
@@ -409,9 +397,25 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
                       ) : null}
                     </div>
                     {action.configured ? (
-                      <a className={`${btnConnectSmall} shrink-0 sm:px-5`} href={action.installUrl}>
+                      <button
+                        type="button"
+                        className={`${btnConnectSmall} shrink-0 sm:px-5`}
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              await startConnectorOAuthRedirect(
+                                apiBase,
+                                action.provider,
+                                CONNECTOR_OAUTH_RETURN_PATH,
+                              );
+                            } catch (e) {
+                              window.alert(e instanceof Error ? e.message : "Could not start connect.");
+                            }
+                          })();
+                        }}
+                      >
                         {action.title}
-                      </a>
+                      </button>
                     ) : null}
                   </>
                 )}
@@ -735,8 +739,20 @@ function LiveConnectorActions({
     );
   }
   return (
-    <a className={btnConnect} href={connectorInstallUrl(apiBase, provider)}>
+    <button
+      type="button"
+      className={btnConnect}
+      onClick={() => {
+        void (async () => {
+          try {
+            await startConnectorOAuthRedirect(apiBase, provider, CONNECTOR_OAUTH_RETURN_PATH);
+          } catch (e) {
+            window.alert(e instanceof Error ? e.message : "Could not start connect.");
+          }
+        })();
+      }}
+    >
       {connectLabel}
-    </a>
+    </button>
   );
 }

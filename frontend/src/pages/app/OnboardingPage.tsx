@@ -72,6 +72,7 @@ import {
   type OnboardingStep,
   type SlackCollaboratorMember,
 } from "../../lib/onboardingApi";
+import { startConnectorOAuthRedirect } from "../../lib/connectorsClient";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
 
 /** Branded opening copy (display only; FSM still driven by the bootstrap chat response). */
@@ -2008,8 +2009,8 @@ export default function OnboardingPage() {
       pmHead === "notion"
         ? "When you're ready, continue—we'll connect your engineering tool next (or Slack if you're done with GitHub)."
         : "When you're ready, continue—we'll connect your engineering tool next (or Slack if you're done with Linear and GitHub).";
-    const pmInstallHref = `${apiBase}/connectors/${pmHead}/install?return_to=${encodeURIComponent("/app/onboarding")}`;
     const pmConnectLabel = pmHead === "notion" ? "Connect Notion" : "Connect Linear";
+    const onboardingOauthReturn = "/app/onboarding";
 
     return (
       <>
@@ -2040,9 +2041,24 @@ export default function OnboardingPage() {
                 ) : null}
                 <div className="mt-6 flex flex-col items-center gap-3">
                   {!pmConnected ? (
-                    <a className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS} href={pmInstallHref}>
+                    <button
+                      type="button"
+                      className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            setOauthReturnError(null);
+                            await startConnectorOAuthRedirect(apiBase, pmHead, onboardingOauthReturn);
+                          } catch (e) {
+                            setOauthReturnError(
+                              e instanceof Error ? e.message : "Could not start project management connect.",
+                            );
+                          }
+                        })();
+                      }}
+                    >
                       {pmConnectLabel}
-                    </a>
+                    </button>
                   ) : (
                     <button
                       type="button"
@@ -2106,12 +2122,24 @@ export default function OnboardingPage() {
                 ) : null}
                 <div className="mt-6 flex flex-col items-center gap-3">
                   {!server.github_connected ? (
-                    <a
+                    <button
+                      type="button"
                       className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
-                      href={`${apiBase}/connectors/github/install?return_to=${encodeURIComponent("/app/onboarding")}`}
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            setOauthReturnError(null);
+                            await startConnectorOAuthRedirect(apiBase, "github", "/app/onboarding");
+                          } catch (e) {
+                            setOauthReturnError(
+                              e instanceof Error ? e.message : "Could not start GitHub connect.",
+                            );
+                          }
+                        })();
+                      }}
                     >
                       Connect GitHub
-                    </a>
+                    </button>
                   ) : (
                     <button
                       type="button"
@@ -2229,14 +2257,26 @@ export default function OnboardingPage() {
                 </div>
               ) : null}
               <div className="mt-6 flex flex-col items-center gap-3">
-                {!server.slack_connected ? (
-                  <a
-                    className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
-                    href={`${apiBase}/connectors/slack/install?return_to=${encodeURIComponent("/app/onboarding")}`}
-                  >
-                    Connect Slack
-                  </a>
-                ) : (
+                  {!server.slack_connected ? (
+                    <button
+                      type="button"
+                      className={ONBOARDING_PRIMARY_CTA_GRADIENT_LINK_CLASS}
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            setOauthReturnError(null);
+                            await startConnectorOAuthRedirect(apiBase, "slack", "/app/onboarding");
+                          } catch (e) {
+                            setOauthReturnError(
+                              e instanceof Error ? e.message : "Could not start Slack connect.",
+                            );
+                          }
+                        })();
+                      }}
+                    >
+                      Connect Slack
+                    </button>
+                  ) : (
                   <button
                     type="button"
                     disabled={finishOnboardingMut.isPending}

@@ -1,5 +1,4 @@
 import type { ConnectorRow } from "../../lib/connectorsClient";
-import { connectorInstallUrl } from "../../lib/connectorsClient";
 import type { ToolPickState } from "../onboarding/onboardingToolGroups";
 
 export type ExpandStackAction = {
@@ -17,7 +16,6 @@ export type ConnectToolAction = {
   title: string;
   body: string;
   configured: boolean;
-  installUrl: string;
 };
 
 export type SignalWorkspaceAction = ExpandStackAction | ConnectToolAction;
@@ -77,7 +75,6 @@ export function buildSignalWorkspaceActions(
   pick: ToolPickState,
   connected: Set<string>,
   statusById: Map<string, ConnectorRow>,
-  apiBase: string,
   connectorsLoaded: boolean,
 ): SignalWorkspaceAction[] {
   const expandActions: SignalWorkspaceAction[] = [];
@@ -139,7 +136,6 @@ export function buildSignalWorkspaceActions(
       title: `Connect ${brand}`,
       body: `${brand} is in your stack but not connected yet. Connecting unlocks live signal for this lane.`,
       configured,
-      installUrl: connectorInstallUrl(apiBase, c.provider),
     });
   }
 
