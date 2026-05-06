@@ -44,6 +44,7 @@ def test_send_email_smtp_sends(mock_smtp: MagicMock, monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("SMTP_USE_TLS", "true")
     monkeypatch.setenv("EMAIL_FROM_ADDRESS", "vector@angelcorp.ai")
     monkeypatch.setenv("EMAIL_FROM_NAME", "Vector")
+    monkeypatch.setenv("SES_CONFIGURATION_SET", "vector-prod-events")
     get_settings.cache_clear()
     settings = Settings()
     env = EmailEnvelope(to=["t@example.com"], subject="Subj", body_text="Hi")
@@ -59,6 +60,7 @@ def test_send_email_smtp_sends(mock_smtp: MagicMock, monkeypatch: pytest.MonkeyP
     sent = instance.send_message.call_args[0][0]
     assert sent["Message-ID"]
     assert sent["Date"]
+    assert sent["X-SES-CONFIGURATION-SET"] == "vector-prod-events"
     assert "angelcorp.ai" in sent["Message-ID"]
 
 
@@ -75,6 +77,7 @@ def test_send_email_smtp_multipart_related_sends(
     monkeypatch.setenv("SMTP_USE_TLS", "true")
     monkeypatch.setenv("EMAIL_FROM_ADDRESS", "vector@angelcorp.ai")
     monkeypatch.setenv("EMAIL_FROM_NAME", "Vector")
+    monkeypatch.setenv("SES_CONFIGURATION_SET", "vector-prod-events")
     get_settings.cache_clear()
     settings = Settings()
     from vector.infrastructure.email.smtp_send import send_email_smtp_multipart_related
@@ -100,6 +103,7 @@ def test_send_email_smtp_multipart_related_sends(
     assert "image/png" in raw
     assert sent["Message-ID"]
     assert sent["Date"]
+    assert sent["X-SES-CONFIGURATION-SET"] == "vector-prod-events"
     assert "angelcorp.ai" in sent["Message-ID"]
 
 

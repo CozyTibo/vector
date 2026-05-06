@@ -248,6 +248,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SMTP_PASSWORD", "SMTP_PASS"),
     )
     smtp_use_tls: bool = Field(default=True, validation_alias="SMTP_USE_TLS")
+    ses_configuration_set: str = Field(
+        default="",
+        validation_alias="SES_CONFIGURATION_SET",
+        description=(
+            "Optional SES configuration set name. When set, SMTP sender adds "
+            "X-SES-CONFIGURATION-SET header for delivery/bounce event tracking."
+        ),
+    )
     email_from_address: str = Field(
         default="",
         validation_alias=AliasChoices("EMAIL_FROM_ADDRESS", "EMAIL_FROM"),

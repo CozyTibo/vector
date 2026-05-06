@@ -28,6 +28,9 @@ def _apply_standard_headers(root: Message, settings: Settings) -> None:
     """Set Date and Message-ID (many filters penalize if absent)."""
     root["Date"] = formatdate(localtime=True)
     root["Message-ID"] = make_msgid(domain=_message_id_domain(settings))
+    cfg_set = settings.ses_configuration_set.strip()
+    if cfg_set:
+        root["X-SES-CONFIGURATION-SET"] = cfg_set
 
 
 def send_email_smtp(settings: Settings, envelope: EmailEnvelope) -> None:
