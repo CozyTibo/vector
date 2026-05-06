@@ -72,8 +72,12 @@ export function connectorInstallUrl(
   base: string,
   provider: ConnectorOAuthProvider,
   returnPath: string = CONNECTOR_OAUTH_RETURN_PATH,
+  opts?: { installResponseJson?: boolean },
 ): string {
   const q = new URLSearchParams({ return_to: returnPath });
+  if (opts?.installResponseJson) {
+    q.set("install_response", "json");
+  }
   return `${base}/connectors/${provider}/install?${q.toString()}`;
 }
 
@@ -87,8 +91,18 @@ export async function startConnectorOAuthRedirect(
   provider: ConnectorOAuthProvider,
   returnPath: string = CONNECTOR_OAUTH_RETURN_PATH,
 ): Promise<void> {
-  const url = connectorInstallUrl(base, provider, returnPath);
+  const url = connectorInstallUrl(base, provider, returnPath, { installResponseJson: true });
   const res = await fetch(url, mergeProductSessionAuth({ method: "GET", redirect: "manual" }));
+  const ct = res.headers.get("content-type") ?? "";
+  if (res.ok && ct.includes("application/json")) {
+    const data = (await res.json()) as { url?: unknown };
+    const next = data.url;
+    if (typeof next !== "string" || !next.trim()) {
+      throw new Error("Could not start connector OAuth (missing redirect URL). Try again.");
+    }
+    window.location.assign(next);
+    return;
+  }
   if (res.status >= 300 && res.status < 400) {
     const loc = res.headers.get("Location");
     if (loc) {
@@ -99,4 +113,5 @@ export async function startConnectorOAuthRedirect(
   if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
+  throw new Error("Could not start connector OAuth. Try again.");
 }

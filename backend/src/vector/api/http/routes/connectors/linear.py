@@ -7,10 +7,11 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db, get_session_claims, settings_dep
+from vector.api.http.routes.connectors.install_response import install_redirect_or_json
 from vector.application.services import connector_sync
 from vector.contracts.connectors import (
     LinearIngestionRecordsPageResponse,
@@ -44,13 +45,22 @@ _logger = logging.getLogger("app")
 def build_linear_connector_router() -> APIRouter:
     r = APIRouter()
 
-    @r.get("/install")
+    @r.get("/install", response_model=None)
     def linear_oauth_start(
         db: Annotated[Session, Depends(get_db)],
         claims: Annotated[SessionClaims, Depends(get_session_claims)],
         settings: Annotated[Settings, Depends(settings_dep)],
         return_to: Annotated[str | None, Query(description="Post-OAuth redirect path")] = None,
-    ) -> RedirectResponse:
+        install_response: Annotated[
+            str | None,
+            Query(
+                description=(
+                    "When ``json``, return ``{\"url\": ...}`` instead of HTTP redirect "
+                    "(used by SPA fetch with Authorization)."
+                ),
+            ),
+        ] = None,
+    ) -> RedirectResponse | JSONResponse:
         try:
             assert_membership(db, claims)
         except NoMembershipError as e:
@@ -64,7 +74,7 @@ def build_linear_connector_router() -> APIRouter:
             )
         except LinearConnectorNotConfiguredError as e:
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
-        return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
+        return install_redirect_or_json(url, install_response=install_response)
 
     @r.get("/callback")
     def linear_oauth_callback(

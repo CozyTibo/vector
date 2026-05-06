@@ -147,6 +147,11 @@ def test_github_install_redirect_when_configured(
     assert "github.com/apps/vector-test-app/installations/new" in loc
     assert "state=" in loc
 
+    r_json = client.get("/connectors/github/install", params={"install_response": "json"})
+    assert r_json.status_code == 200
+    body = r_json.json()
+    assert body["url"] == loc
+
 
 def test_github_install_service_unavailable_when_unconfigured(
     monkeypatch: pytest.MonkeyPatch,
