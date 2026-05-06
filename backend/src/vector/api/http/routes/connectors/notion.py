@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from vector.api.http.deps import get_db, get_session_claims, settings_dep
+from vector.api.http.deps import connector_install_claims_dependency, get_db, settings_dep
 from vector.api.http.routes.connectors.install_response import install_redirect_or_json
 from vector.domains.connectors.notion.errors import (
     InvalidNotionOAuthStateError,
@@ -33,7 +33,7 @@ def build_notion_connector_router() -> APIRouter:
     @r.get("/install", response_model=None)
     def notion_oauth_start(
         db: Annotated[Session, Depends(get_db)],
-        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+        claims: Annotated[SessionClaims, Depends(connector_install_claims_dependency("notion"))],
         settings: Annotated[Settings, Depends(settings_dep)],
         return_to: Annotated[str | None, Query(description="Post-OAuth redirect path")] = None,
         install_response: Annotated[

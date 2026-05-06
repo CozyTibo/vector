@@ -66,7 +66,7 @@ export async function disconnectConnector(base: string, provider: string): Promi
 /** Post-OAuth redirect; must satisfy backend `sanitize_*_return_to` (path under `/app/`). */
 export const CONNECTOR_OAUTH_RETURN_PATH = "/app/";
 
-export type ConnectorOAuthProvider = "github" | "linear" | "notion" | "slack";
+export type ConnectorOAuthProvider = "calls" | "github" | "linear" | "notion" | "slack";
 
 export function connectorInstallUrl(
   base: string,
@@ -82,15 +82,32 @@ export function connectorInstallUrl(
 }
 
 /**
- * Start connector OAuth from the SPA using the same auth as API ``fetch`` (cookie + optional Bearer
- * from localStorage). Plain ``<a href={api}/install>`` does not send ``Authorization``, so users who
- * only have a bearer token (e.g. Google sign-in / ITP) get 401 on install links.
+ * Start connector OAuth: POST mints a short-lived ``install_ticket``, then full-page navigation to
+ * ``GET /connectors/.../install?install_ticket=…`` so Slack/GitHub OAuth works even when browsers
+ * omit ``Authorization`` on navigations (Safari / cross-site cookies). Falls back to legacy GET+json
+ * if ``POST /connectors/install/prepare`` is unavailable.
  */
 export async function startConnectorOAuthRedirect(
   base: string,
   provider: ConnectorOAuthProvider,
   returnPath: string = CONNECTOR_OAUTH_RETURN_PATH,
 ): Promise<void> {
+  const prepareRes = await fetch(`${base}/connectors/install/prepare`, mergeProductSessionAuth({
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ provider }),
+  }));
+  if (prepareRes.ok) {
+    const prepared = (await prepareRes.json()) as { install_ticket?: unknown; provider?: unknown };
+    const ticket = prepared.install_ticket;
+    const p = prepared.provider;
+    if (typeof ticket === "string" && ticket.trim() && typeof p === "string" && p) {
+      const q = new URLSearchParams({ install_ticket: ticket, return_to: returnPath });
+      window.location.assign(`${base}/connectors/${p}/install?${q.toString()}`);
+      return;
+    }
+  }
+
   const url = connectorInstallUrl(base, provider, returnPath, { installResponseJson: true });
   const res = await fetch(url, mergeProductSessionAuth({ method: "GET", redirect: "manual" }));
   const ct = res.headers.get("content-type") ?? "";

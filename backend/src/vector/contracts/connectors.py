@@ -319,6 +319,24 @@ ConnectorStatusItem: TypeAlias = (
 )
 
 
+ConnectorInstallPrepareProvider: TypeAlias = Literal["github", "linear", "notion", "slack", "calls"]
+
+
+class PrepareConnectorInstallBody(BaseModel):
+    """POST /connectors/install/prepare — mint short-lived ``install_ticket`` for OAuth navigation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: ConnectorInstallPrepareProvider
+
+
+class PrepareConnectorInstallResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    install_ticket: str = Field(description="JWT; pass as ``install_ticket`` query on GET …/install.")
+    provider: str
+
+
 class ConnectorsListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

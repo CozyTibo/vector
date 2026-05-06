@@ -13,8 +13,13 @@ from vector.api.http.routes.connectors import linear as linear_connect
 from vector.api.http.routes.connectors import notion as notion_connect
 from vector.api.http.routes.connectors import slack as slack_connect
 from vector.api.http.routes.connectors import calls as calls_connect
-from vector.contracts.connectors import ConnectorsListResponse
+from vector.contracts.connectors import (
+    ConnectorsListResponse,
+    PrepareConnectorInstallBody,
+    PrepareConnectorInstallResponse,
+)
 from vector.domains.connectors.runtime import all_runtimes_ordered, runtime_by_id
+from vector.domains.identity_access.services.connector_install_ticket import issue_connector_install_ticket
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
@@ -40,6 +45,31 @@ def build_connectors_router() -> APIRouter:
             for rt in all_runtimes_ordered()
         ]
         return ConnectorsListResponse(items=items)
+
+    @root.post("/install/prepare", response_model=PrepareConnectorInstallResponse)
+    def prepare_connector_install(
+        body: PrepareConnectorInstallBody,
+        db: Annotated[Session, Depends(get_db)],
+        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> PrepareConnectorInstallResponse:
+        """Mint a short-lived JWT so the SPA can ``window.location`` to …/install without Bearer headers."""
+        try:
+            assert_membership(db, claims)
+        except NoMembershipError as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+        if body.provider not in providers:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail="Unknown connector provider.",
+            ) from None
+        ticket = issue_connector_install_ticket(
+            settings,
+            claims.user_id,
+            claims.tenant_id,
+            body.provider,
+        )
+        return PrepareConnectorInstallResponse(install_ticket=ticket, provider=body.provider)
 
     @root.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
     def disconnect_connector(

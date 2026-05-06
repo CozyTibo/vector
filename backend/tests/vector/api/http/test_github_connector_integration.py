@@ -46,6 +46,11 @@ def test_connectors_unauthenticated(client: TestClient) -> None:
     assert client.get("/connectors").status_code == 401
 
 
+def test_prepare_connector_install_unauthenticated(client: TestClient) -> None:
+    r = client.post("/connectors/install/prepare", json={"provider": "slack"})
+    assert r.status_code == 401
+
+
 def test_github_disconnect_unauthenticated(client: TestClient) -> None:
     assert client.delete("/connectors/github").status_code == 401
 
@@ -151,6 +156,21 @@ def test_github_install_redirect_when_configured(
     assert r_json.status_code == 200
     body = r_json.json()
     assert body["url"] == loc
+
+    prep = client.post("/connectors/install/prepare", json={"provider": "github"})
+    assert prep.status_code == 200
+    ticket = prep.json()["install_ticket"]
+
+    client.cookies.clear()
+    r_ticket = client.get(
+        "/connectors/github/install",
+        params={"install_ticket": ticket, "return_to": "/app/onboarding"},
+        follow_redirects=False,
+    )
+    assert r_ticket.status_code == 302
+    loc_ticket = r_ticket.headers["location"]
+    assert "github.com/apps/vector-test-app/installations/new" in loc_ticket
+    assert "state=" in loc_ticket
 
 
 def test_github_install_service_unavailable_when_unconfigured(

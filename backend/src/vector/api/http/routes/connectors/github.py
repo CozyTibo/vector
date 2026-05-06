@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from vector.api.http.deps import get_db, get_session_claims, settings_dep
+from vector.api.http.deps import (
+    connector_install_claims_dependency,
+    get_db,
+    get_session_claims,
+    settings_dep,
+)
 from vector.api.http.routes.connectors.install_response import install_redirect_or_json
 from vector.application.services import connector_sync
 from vector.contracts.connectors import (
@@ -51,7 +56,7 @@ def build_github_connector_router() -> APIRouter:
     @r.get("/install", response_model=None)
     def github_install_start(
         db: Annotated[Session, Depends(get_db)],
-        claims: Annotated[SessionClaims, Depends(get_session_claims)],
+        claims: Annotated[SessionClaims, Depends(connector_install_claims_dependency("github"))],
         settings: Annotated[Settings, Depends(settings_dep)],
         return_to: Annotated[str | None, Query(description="Post-install redirect path")] = None,
         install_response: Annotated[
