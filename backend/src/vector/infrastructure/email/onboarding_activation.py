@@ -7,15 +7,13 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from vector.infrastructure.email.smtp_send import send_email_smtp_multipart_related
+from vector.infrastructure.email.envelope import EmailEnvelope
+from vector.infrastructure.email.smtp_send import send_email_smtp
 from vector.settings import Settings, get_settings
 
 _logger = logging.getLogger("app.email")
 
 _DIR = Path(__file__).resolve().parent
-_AVATAR_PATH = _DIR / "assets" / "vector-white-bg.png"
-_AVATAR_CID = "vector_avatar"
-
 # RFC 5322 Subject (no em dash); must match product copy.
 _SUBJECT = "Your Vector workspace is ready: Start onboarding!"
 
@@ -46,10 +44,16 @@ def _template_env(*, autoescape: bool) -> Environment:
     )
 
 
+def _logo_url(settings: Settings) -> str:
+    """Use the same public logo asset as the homepage branding."""
+    return f"{settings.frontend_url.rstrip('/')}/logo.jpeg"
+
+
 def render_onboarding_activation_email(
     *,
     onboarding_url: str,
     full_name: str | None,
+    logo_url: str,
 ) -> tuple[str, str]:
     """Return ``(body_text, body_html)``."""
     fn = _first_name(full_name)
@@ -57,7 +61,7 @@ def render_onboarding_activation_email(
         "first_name": fn,
         "personal_note": _PERSONAL_NOTE,
         "onboarding_url": onboarding_url,
-        "avatar_cid": _AVATAR_CID,
+        "logo_url": logo_url,
     }
     text = _template_env(autoescape=False).get_template("onboarding_activation.txt.j2").render(**ctx)
     html = _template_env(autoescape=True).get_template("onboarding_activation.html.j2").render(**ctx)
@@ -82,18 +86,19 @@ def send_onboarding_activation_email(
         )
         return
     _logger.debug("onboarding activation email to=%s", to[:120])
-    png = _AVATAR_PATH.read_bytes()
     body_text, body_html = render_onboarding_activation_email(
         onboarding_url=onboarding_url,
         full_name=full_name,
+        logo_url=_logo_url(settings),
     )
-    send_email_smtp_multipart_related(
+    send_email_smtp(
         settings,
-        to=[to],
-        subject=_SUBJECT,
-        body_text=body_text,
-        body_html=body_html,
-        inline_png=(_AVATAR_CID, png),
+        EmailEnvelope(
+            to=[to],
+            subject=_SUBJECT,
+            body_text=body_text,
+            body_html=body_html,
+        ),
     )
 
 

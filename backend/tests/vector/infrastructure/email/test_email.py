@@ -106,11 +106,11 @@ def test_send_email_smtp_multipart_related_sends(
 def test_waitlist_signup_email_render() -> None:
     from vector.infrastructure.email.waitlist_confirmation import render_waitlist_signup_email
 
-    text, html = render_waitlist_signup_email()
+    text, html = render_waitlist_signup_email(logo_url="https://vector.angelcorp.ai/logo.jpeg")
     assert "Hi 👋" in text
     assert "only takes five minutes" in text.lower()
     assert "onboarding companies in batches" in html
-    assert "cid:vector_avatar" in html
+    assert "https://vector.angelcorp.ai/logo.jpeg" in html
 
 
 def test_password_reset_email_render() -> None:
@@ -120,12 +120,13 @@ def test_password_reset_email_render() -> None:
         reset_url="https://app.example/login/reset-password?token=abc",
         email_hint="you@company.com",
         ttl_hours=1,
+        logo_url="https://vector.angelcorp.ai/logo.jpeg",
     )
     assert "reset" in text.lower()
     assert "https://app.example/login/reset-password?token=abc" in text
     assert "you@company.com" in html
     assert "Reset password" in html
-    assert "cid:vector_avatar" in html
+    assert "https://vector.angelcorp.ai/logo.jpeg" in html
 
 
 def test_onboarding_activation_subject_no_em_dash() -> None:
@@ -159,13 +160,14 @@ def test_onboarding_activation_email_render() -> None:
     text, html = render_onboarding_activation_email(
         onboarding_url="https://app.example.com/app/onboarding",
         full_name="Jane Doe",
+        logo_url="https://vector.angelcorp.ai/logo.jpeg",
     )
     assert "Hi Jane" in text
     assert "activated your workspace" in text.lower()
     assert "my onboarding" in text.lower()
     assert "https://app.example.com/app/onboarding" in text
     assert "Start onboarding" in html
-    assert "cid:vector_avatar" in html
+    assert "https://vector.angelcorp.ai/logo.jpeg" in html
 
 
 def test_email_envelope_rejects_empty_to() -> None:
