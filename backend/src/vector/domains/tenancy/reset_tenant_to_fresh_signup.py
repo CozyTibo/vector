@@ -8,11 +8,6 @@ from typing import Any
 from sqlalchemy import delete, func, inspect, select, text
 from sqlalchemy.orm import Session
 
-from vector.domains.ingestion.step1_reset import wipe_step1_raw_for_tenant
-from vector.domains.ingestion.step2_step3_reset import (
-    wipe_step2_projections_for_tenant,
-    wipe_step3_canonical_for_tenant,
-)
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.tenant import Tenant
@@ -27,7 +22,7 @@ RESET_TENANT_TO_SIGNUP_CONFIRMATION_PHRASE = "RESET WORKSPACE TO FRESH SIGNUP"
 def reset_tenant_to_fresh_signup(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
     """Wipe product data and integrations; keep tenant id, company profile fields, and memberships.
 
-    - Step 3 → 1 ingestion/canonical data (same wipes as hard delete, without removing the tenant).
+    - Legacy Step 1/2/3 ingestion data is already removed from this codebase.
     - All ``tenant_connections`` (OAuth tokens / connector links).
     - Website onboarding state + chat transcript rows.
     - Legacy manager-onboarding session rows when those tables still exist (no-op after they are dropped).
@@ -47,10 +42,6 @@ def reset_tenant_to_fresh_signup(session: Session, *, tenant_id: uuid.UUID) -> d
         )
         or 0,
     )
-
-    step3 = wipe_step3_canonical_for_tenant(session, tenant_id=tenant_id)
-    step2 = wipe_step2_projections_for_tenant(session, tenant_id=tenant_id)
-    step1 = wipe_step1_raw_for_tenant(session, tenant_id=tenant_id)
 
     session.execute(delete(TenantConnection).where(TenantConnection.tenant_id == tenant_id))
     session.execute(delete(OnboardingMessage).where(OnboardingMessage.tenant_id == tenant_id))
@@ -79,8 +70,25 @@ def reset_tenant_to_fresh_signup(session: Session, *, tenant_id: uuid.UUID) -> d
     return {
         "tenant_id": tenant_id,
         "company_name": tenant.company_name,
-        "step3": step3,
-        "step2": step2,
-        "step1": step1,
+        "step3": {
+            "deleted_relationships": 0,
+            "deleted_mapping_events": 0,
+            "deleted_current_mappings": 0,
+            "deleted_external_references": 0,
+            "deleted_actor_external_identities": 0,
+            "deleted_artifacts": 0,
+            "deleted_actors": 0,
+            "deleted_step3_canonical_cursors": 0,
+        },
+        "step2": {
+            "deleted_github_projection_rows": 0,
+            "deleted_linear_projection_rows": 0,
+            "deleted_connector_projection_progress_rows": 0,
+        },
+        "step1": {
+            "deleted_raw_records": 0,
+            "deleted_ingestion_runs": 0,
+            "deleted_sync_state_rows": 0,
+        },
         "deleted_tenant_connections": n_conn,
     }

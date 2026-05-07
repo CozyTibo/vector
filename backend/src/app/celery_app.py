@@ -60,7 +60,6 @@ celery_app = Celery(
     backend=_backend,
     # Loader imports these on worker startup (in addition to `imports` below).
     include=[
-        "app.tasks.ingestion",
         "app.tasks.email",
         "app.tasks.onboarding_activation_task",
     ],
@@ -72,7 +71,6 @@ celery_app.conf.accept_content = ["json"]
 celery_app.conf.result_serializer = "json"
 # Ensure task modules load on every worker process (avoids "unregistered task" if imports differ).
 celery_app.conf.imports = (
-    "app.tasks.ingestion",
     "app.tasks.email",
     "app.tasks.onboarding_activation_task",
 )
@@ -80,34 +78,15 @@ celery_app.conf.imports = (
 
 def _register_tasks() -> None:
     """Import task modules so they bind to ``celery_app``."""
-    importlib.import_module("app.tasks.ingestion")
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")
 
 
-def _configure_beat_schedule() -> None:
-    raw = os.environ.get("VECTOR_INGESTION_SWEEP_INTERVAL_SECONDS", "900").strip()
-    try:
-        interval = int(raw)
-    except ValueError:
-        interval = 900
-    if interval <= 0:
-        return
-    celery_app.conf.beat_schedule = {
-        "sweep-canonical-lag": {
-            "task": "vector.ingestion.sweep_canonical_lag",
-            "schedule": float(interval),
-        },
-    }
-
-
 _register_tasks()
-_configure_beat_schedule()
 
 
 @worker_process_init.connect
 def _import_task_modules_after_fork(**_kwargs: object) -> None:
     """Prefork children must bind task modules to the app (avoids unregistered-task KeyError)."""
-    importlib.import_module("app.tasks.ingestion")
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")

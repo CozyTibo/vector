@@ -11,9 +11,6 @@ from vector.domains.connectors.calls.oauth_flow import calls_connector_configure
 from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_CALLS
 from vector.domains.connectors.runtime import ConnectorRuntime
 from vector.infrastructure.db.repositories import calls_connection as calls_repo
-from vector.infrastructure.db.repositories.projection_debug_queries import (
-    last_raw_fetched_at_for_connection,
-)
 from vector.settings import Settings
 
 _CALLS_LABEL = "Calls"
@@ -40,7 +37,6 @@ def calls_status_item(
             details=None,
         )
     cid = link.connection.id
-    last_sync = last_raw_fetched_at_for_connection(session, cid)
     return CallsConnectorStatusItem(
         display_name=_CALLS_LABEL,
         connector_configured=True,
@@ -48,7 +44,7 @@ def calls_status_item(
         details=CallsConnectorDetails(
             connection_id=cid,
             provider_email=link.detail.provider_email,
-            last_sync_at=last_sync,
+            last_sync_at=None,
         ),
     )
 

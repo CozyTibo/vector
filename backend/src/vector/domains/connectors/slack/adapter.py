@@ -11,9 +11,6 @@ from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_SLACK
 from vector.domains.connectors.runtime import ConnectorRuntime
 from vector.domains.connectors.slack.oauth_flow import slack_connector_configured
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
-from vector.infrastructure.db.repositories.projection_debug_queries import (
-    last_raw_fetched_at_for_connection,
-)
 from vector.settings import Settings
 
 _SLACK_LABEL = "Slack"
@@ -41,7 +38,6 @@ def slack_status_item(
         )
     d = link.detail
     cid = link.connection.id
-    last_sync = last_raw_fetched_at_for_connection(session, cid)
     return SlackConnectorStatusItem(
         display_name=_SLACK_LABEL,
         connector_configured=True,
@@ -50,7 +46,7 @@ def slack_status_item(
             connection_id=cid,
             team_id=d.team_id,
             team_name=d.team_name,
-            last_sync_at=last_sync,
+            last_sync_at=None,
         ),
     )
 

@@ -62,19 +62,6 @@ class Settings(BaseSettings):
 
     database_url: str = Field(validation_alias="DATABASE_URL")
     redis_url: str = Field(default="", validation_alias="REDIS_URL")
-    post_connect_enqueue_ingestion: bool = Field(
-        default=False,
-        validation_alias="VECTOR_POST_CONNECT_INGESTION",
-        description=(
-            "If true, enqueue GitHub/Linear Step 1 ingestion immediately after OAuth callback. "
-            "Default false: use admin Integrations CTAs or POST …/ingestion/*-sync / POST …/connectors/*/sync."
-        ),
-    )
-    ingestion_sweep_interval_seconds: int = Field(
-        default=900,
-        validation_alias="VECTOR_INGESTION_SWEEP_INTERVAL_SECONDS",
-        description="Beat interval (seconds) for canonical lag sweep; 0 disables.",
-    )
     env: str = Field(default="development", validation_alias="ENV")
     secret_key: str = Field(
         default="dev-only-secret-key-min-32-chars-long!!",

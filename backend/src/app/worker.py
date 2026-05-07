@@ -10,7 +10,6 @@ import importlib
 
 from app.celery_app import celery_app
 
-importlib.import_module("app.tasks.ingestion")
 importlib.import_module("app.tasks.email")
 importlib.import_module("app.tasks.onboarding_activation_task")
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal, TypeAlias
+from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,124 +23,8 @@ class GithubConnectorDetails(BaseModel):
     account_type: str | None = None
     last_sync_at: datetime | None = Field(
         default=None,
-        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+        description="Legacy per-tool ingestion was removed; this value is always null.",
     )
-
-
-class GithubIngestionSyncResponse(BaseModel):
-    """Result of POST /connectors/github/sync (HTTP 202: run queued; poll ingestion runs)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    run_id: uuid.UUID
-    status: str
-    error_summary: str | None = None
-    stats: dict[str, Any] | None = None
-
-
-class GithubIngestionRunListItem(BaseModel):
-    """One persisted ingestion run for this tenant (GitHub poll/webhook/…)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: uuid.UUID
-    connection_id: uuid.UUID
-    status: str
-    source_trigger: str
-    started_at: datetime
-    finished_at: datetime | None
-    error_summary: str | None
-    stats: dict[str, Any] | None
-    records_written: int = Field(description="Rows in raw_ingestion_records for this run.")
-
-
-class GithubIngestionRunsListResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    items: list[GithubIngestionRunListItem]
-
-
-class GithubRawIngestionRecordItem(BaseModel):
-    """One append-only raw envelope (resource-level)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: int
-    replay_sequence: int
-    resource_type: str
-    external_id: str
-    api_endpoint: str
-    query_params: dict[str, Any]
-    payload_hash: str
-    http_status: int
-    fetched_at: datetime
-    payload_body: dict[str, Any]
-
-
-class GithubIngestionRecordsPageResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    run_id: uuid.UUID
-    total: int
-    limit: int
-    offset: int
-    items: list[GithubRawIngestionRecordItem]
-
-
-class LinearIngestionSyncResponse(BaseModel):
-    """Result of POST /connectors/linear/sync — run is queued (HTTP 202); Step 1 runs on the worker."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    run_id: uuid.UUID
-    status: str
-    error_summary: str | None = None
-    stats: dict[str, Any] | None = None
-
-
-class LinearIngestionRunListItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: uuid.UUID
-    connection_id: uuid.UUID
-    status: str
-    source_trigger: str
-    started_at: datetime
-    finished_at: datetime | None
-    error_summary: str | None
-    stats: dict[str, Any] | None
-    records_written: int = Field(description="Rows in raw_ingestion_records for this run.")
-
-
-class LinearIngestionRunsListResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    items: list[LinearIngestionRunListItem]
-
-
-class LinearRawIngestionRecordItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: int
-    replay_sequence: int
-    resource_type: str
-    external_id: str
-    api_endpoint: str
-    query_params: dict[str, Any]
-    payload_hash: str
-    http_status: int
-    fetched_at: datetime
-    payload_body: dict[str, Any]
-
-
-class LinearIngestionRecordsPageResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    run_id: uuid.UUID
-    total: int
-    limit: int
-    offset: int
-    items: list[LinearRawIngestionRecordItem]
 
 
 class GithubConnectorStatusItem(BaseModel):
@@ -176,7 +60,7 @@ class LinearConnectorDetails(BaseModel):
     organization_name: str | None = None
     last_sync_at: datetime | None = Field(
         default=None,
-        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+        description="Legacy per-tool ingestion was removed; this value is always null.",
     )
 
 
@@ -213,7 +97,7 @@ class SlackConnectorDetails(BaseModel):
     team_name: str | None = None
     last_sync_at: datetime | None = Field(
         default=None,
-        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+        description="Legacy per-tool ingestion was removed; this value is always null.",
     )
 
 
@@ -250,7 +134,7 @@ class NotionConnectorDetails(BaseModel):
     workspace_name: str | None = None
     last_sync_at: datetime | None = Field(
         default=None,
-        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+        description="Legacy per-tool ingestion was removed; this value is always null.",
     )
 
 
@@ -286,7 +170,7 @@ class CallsConnectorDetails(BaseModel):
     provider_email: str | None = None
     last_sync_at: datetime | None = Field(
         default=None,
-        description="Max fetched_at over raw_ingestion_records for this connection, if any.",
+        description="Legacy per-tool ingestion was removed; this value is always null.",
     )
 
 

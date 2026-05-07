@@ -11,9 +11,6 @@ from vector.domains.connectors.notion.oauth_flow import notion_connector_configu
 from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_NOTION
 from vector.domains.connectors.runtime import ConnectorRuntime
 from vector.infrastructure.db.repositories import notion_connection as notion_repo
-from vector.infrastructure.db.repositories.projection_debug_queries import (
-    last_raw_fetched_at_for_connection,
-)
 from vector.settings import Settings
 
 _NOTION_LABEL = "Notion"
@@ -40,7 +37,6 @@ def notion_status_item(
             details=None,
         )
     cid = link.connection.id
-    last_sync = last_raw_fetched_at_for_connection(session, cid)
     return NotionConnectorStatusItem(
         display_name=_NOTION_LABEL,
         connector_configured=True,
@@ -49,7 +45,7 @@ def notion_status_item(
             connection_id=cid,
             workspace_id=link.detail.workspace_id,
             workspace_name=link.detail.workspace_name,
-            last_sync_at=last_sync,
+            last_sync_at=None,
         ),
     )
 

@@ -11,9 +11,6 @@ from vector.domains.connectors.github.install_flow import github_connector_confi
 from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_GITHUB
 from vector.domains.connectors.runtime import ConnectorRuntime
 from vector.infrastructure.db.repositories import github_connection as gh_repo
-from vector.infrastructure.db.repositories.projection_debug_queries import (
-    last_raw_fetched_at_for_connection,
-)
 from vector.settings import Settings
 
 _GITHUB_LABEL = "GitHub"
@@ -40,7 +37,6 @@ def github_status_item(
             details=None,
         )
     cid = link.connection.id
-    last_sync = last_raw_fetched_at_for_connection(session, cid)
     return GithubConnectorStatusItem(
         display_name=_GITHUB_LABEL,
         connector_configured=True,
@@ -50,7 +46,7 @@ def github_status_item(
             installation_id=link.installation_id,
             account_login=link.account_login,
             account_type=link.account_type,
-            last_sync_at=last_sync,
+            last_sync_at=None,
         ),
     )
 

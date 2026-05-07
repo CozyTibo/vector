@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
@@ -15,11 +15,8 @@ type AdminConnectorConnectLinkResponse = {
   user_id: string;
 };
 
-type IngestEnqueueBody = { run_id: string; status: string; error_summary?: string | null };
-
 const CARD_ORDER = ["slack", "github", "linear", "notion", "calls"] as const;
 
-type IngestProvider = "github" | "linear";
 type OAuthProvider = "slack" | "github" | "linear" | "notion" | "calls";
 const OAUTH_PROVIDERS: readonly OAuthProvider[] = ["slack", "github", "linear", "notion", "calls"];
 
@@ -38,21 +35,6 @@ export default function AdminIntegrationsPage() {
     queryKey: ["admin-connections", tenantId],
     queryFn: () => adminJson<{ items: Conn[] }>(`/admin/tenants/${tenantId}/connections`),
     enabled: Boolean(tenantId),
-  });
-  const ingestEnqueueMut = useMutation({
-    mutationFn: async (provider: IngestProvider) => {
-      const path =
-        provider === "github"
-          ? `/admin/tenants/${tenantId}/ingestion/github-sync`
-          : `/admin/tenants/${tenantId}/ingestion/linear-sync`;
-      return adminJson<IngestEnqueueBody>(path, { method: "POST" });
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["admin-tenant", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["github-ingestion-runs"] });
-      void qc.invalidateQueries({ queryKey: ["linear-ingestion-runs"] });
-      void qc.invalidateQueries({ queryKey: ["admin-raw", tenantId] });
-    },
   });
 
   const disconnectMut = useMutation({
@@ -94,15 +76,7 @@ export default function AdminIntegrationsPage() {
   return (
     <div className="space-y-8">
       <OperatorIntro title="Integrations">
-        OAuth links let Vector read Slack, GitHub, Linear, Notion, or Calls on behalf of this workspace. Connecting a tool
-        does <strong>not</strong> start ingestion automatically. For GitHub and Linear, use{" "}
-        <strong>Queue ingestion sync</strong> on each connected card (or the product{" "}
-        <code className="rounded bg-stone-100 px-1 text-xs">POST /connectors/…/sync</code> endpoints). Track
-        runs from the{" "}
-        <Link to={`/admin/tenants/${tenantId}/data-pipeline`} className="text-blue-700 underline">
-          data pipeline
-        </Link>
-        .
+        OAuth links let Vector read Slack, GitHub, Linear, Notion, or Calls on behalf of this workspace.
       </OperatorIntro>
 
       <OperatorSection
@@ -111,9 +85,6 @@ export default function AdminIntegrationsPage() {
       >
         {disconnectMut.isError ? (
           <p className="mb-4 text-sm text-red-700">{(disconnectMut.error as Error).message}</p>
-        ) : null}
-        {ingestEnqueueMut.isError ? (
-          <p className="mb-4 text-sm text-red-700">{(ingestEnqueueMut.error as Error).message}</p>
         ) : null}
         {connectLinkMut.isError ? (
           <p className="mb-4 text-sm text-red-700">{(connectLinkMut.error as Error).message}</p>
@@ -179,32 +150,14 @@ export default function AdminIntegrationsPage() {
                           </button>
                         </>
                       )}
-                      {(provider === "github" || provider === "linear") && (
-                        <button
-                          type="button"
-                          className="w-full rounded-lg border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-50"
-                          disabled={ingestEnqueueMut.isPending || disconnectMut.isPending}
-                          onClick={() => ingestEnqueueMut.mutate(provider)}
-                        >
-                          {ingestEnqueueMut.isPending && ingestEnqueueMut.variables === provider
-                            ? "Queueing…"
-                            : "Queue ingestion sync"}
-                        </button>
-                      )}
-                      {ingestEnqueueMut.isSuccess && ingestEnqueueMut.data && ingestEnqueueMut.variables === provider ? (
-                        <p className="text-xs text-stone-600">
-                          Queued run <span className="font-mono">{ingestEnqueueMut.data.run_id}</span> (
-                          {ingestEnqueueMut.data.status})
-                        </p>
-                      ) : null}
                       <button
                         type="button"
                         className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-50"
-                        disabled={disconnectMut.isPending || ingestEnqueueMut.isPending}
+                        disabled={disconnectMut.isPending}
                         onClick={() => {
                           if (
                             !window.confirm(
-                              `Disconnect ${titleCaseProvider(provider)}? OAuth tokens are removed; ingestion data is not deleted.`,
+                              `Disconnect ${titleCaseProvider(provider)}? OAuth tokens are removed.`,
                             )
                           ) {
                             return;

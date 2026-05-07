@@ -87,11 +87,6 @@ ignore_missing_imports = true
 disable_error_code = ["import-untyped"]
 
 [[tool.mypy.overrides]]
-module = "app.tasks.ingestion"
-ignore_missing_imports = true
-disable_error_code = ["import-untyped", "untyped-decorator"]
-
-[[tool.mypy.overrides]]
 module = "app.tasks.email"
 ignore_missing_imports = true
 disable_error_code = ["import-untyped", "untyped-decorator"]

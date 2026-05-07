@@ -8,11 +8,6 @@ from typing import Any
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from vector.domains.ingestion.step1_reset import wipe_step1_raw_for_tenant
-from vector.domains.ingestion.step2_step3_reset import (
-    wipe_step2_projections_for_tenant,
-    wipe_step3_canonical_for_tenant,
-)
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 
@@ -21,7 +16,7 @@ HARD_DELETE_TENANT_CONFIRMATION_PHRASE = "DELETE TENANT AND ALL DATA"
 
 
 def hard_delete_tenant(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
-    """Wipe Step 3 → Step 1, then delete the tenant row.
+    """Delete tenant row and keep only non-legacy delete stats.
 
     CASCADE removes memberships, connector rows, onboarding, and messages.
     User rows are kept; only memberships for this tenant are removed.
@@ -32,16 +27,30 @@ def hard_delete_tenant(session: Session, *, tenant_id: uuid.UUID) -> dict[str, A
         raise ValueError(msg)
 
     company_name = tenant.company_name
-    step3 = wipe_step3_canonical_for_tenant(session, tenant_id=tenant_id)
-    step2 = wipe_step2_projections_for_tenant(session, tenant_id=tenant_id)
-    step1 = wipe_step1_raw_for_tenant(session, tenant_id=tenant_id)
-
     session.execute(delete(Tenant).where(Tenant.id == tenant_id))
 
     return {
         "deleted_tenant_id": str(tenant_id),
         "deleted_company_name": company_name,
-        "step3": step3,
-        "step2": step2,
-        "step1": step1,
+        # Legacy ingestion/projection/canonical stack was removed.
+        "step3": {
+            "deleted_relationships": 0,
+            "deleted_mapping_events": 0,
+            "deleted_current_mappings": 0,
+            "deleted_external_references": 0,
+            "deleted_actor_external_identities": 0,
+            "deleted_artifacts": 0,
+            "deleted_actors": 0,
+            "deleted_step3_canonical_cursors": 0,
+        },
+        "step2": {
+            "deleted_github_projection_rows": 0,
+            "deleted_linear_projection_rows": 0,
+            "deleted_connector_projection_progress_rows": 0,
+        },
+        "step1": {
+            "deleted_raw_records": 0,
+            "deleted_ingestion_runs": 0,
+            "deleted_sync_state_rows": 0,
+        },
     }
