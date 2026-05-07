@@ -46,8 +46,10 @@ def build_admin_router() -> APIRouter:
             "github": {
                 "repos": len(gh["repos"]),
                 "pull_requests": len(gh["pull_requests"]),
+                "pull_request_reviews": len(gh.get("pull_request_reviews", [])),
                 "commits": len(gh["commits"]),
                 "issues": len(gh["issues"]),
+                "issue_comments": len(gh.get("issue_comments", [])),
             },
             "linear": {
                 "organization": lin["organization"]["name"],
@@ -63,26 +65,42 @@ def build_admin_router() -> APIRouter:
                 "issue_relations": len(lin["issueRelations"]),
                 "workflow_states": len(lin["workflowStates"]),
             },
-            "slack": {"events": len(slack_events)},
+            "slack": {
+                "events": len(slack_events),
+                "threads": sum(1 for ev in slack_events if ev.get("event_type") == "thread_reply"),
+                "edits": sum(1 for ev in slack_events if ev.get("event_type") == "message_changed"),
+                "deletes": sum(1 for ev in slack_events if ev.get("event_type") == "message_deleted"),
+            },
             "notion": {
                 "pages": len(notion.get("sampled_pages", [])),
                 "databases": len((notion.get("databases") or {}).keys())
                 if isinstance(notion.get("databases"), dict)
                 else 0,
+                "database_rows": len(notion.get("database_rows", [])),
+                "comments": len(notion.get("comments", [])),
+                "relations": len(notion.get("relations", [])),
             },
-            "calls": {"events": len(calls.get("sampled_events", []))},
+            "calls": {
+                "events": len(calls.get("events", [])),
+                "transcripts": sum(
+                    1 for ev in calls.get("events", []) if isinstance(ev.get("transcript"), dict)
+                ),
+                "recordings": sum(
+                    1 for ev in calls.get("events", []) if isinstance(ev.get("recording"), dict)
+                ),
+            },
         }
 
     @r.get("/dataset/full")
     def dataset_full() -> dict[str, Any]:
-        # Local dev only; payload intentionally verbose for manager-insights mock runs.
+        # Local dev only; payload intentionally verbose for ingestion-depth validation.
         d = {"seed": state.seed, **state.data}
         meta = d.get("meta") if isinstance(d.get("meta"), dict) else {}
-        mi = meta.get("manager_insights_evidence")
-        if isinstance(mi, dict):
-            d["manager_insights"] = {
-                "scenarios": meta.get("manager_insight_scenarios"),
-                "evidence": mi,
+        cc = meta.get("cortex_capability_evidence")
+        if isinstance(cc, dict):
+            d["cortex_capability"] = {
+                "scenarios": meta.get("cortex_capability_scenarios"),
+                "evidence": cc,
             }
         return d
 

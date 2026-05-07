@@ -87,6 +87,48 @@ def build_github_router(get_gh: Callable[[], dict[str, Any]]) -> APIRouter:
         headers = github_link_header(request, page=page, per_page=per_page, total_items=total)
         return JSONResponse(payload, headers=headers)
 
+    @r.get("/repos/{owner}/{repo_name}/issues/{n}/comments")
+    def list_issue_comments(
+        request: Request,
+        owner: str,
+        repo_name: str,
+        n: int,
+        page: int = 1,
+        per_page: int = 100,
+    ) -> JSONResponse:
+        gh = get_gh()
+        payload, total = gh_gen.issue_comments_for_with_total(
+            gh,
+            owner,
+            repo_name,
+            n,
+            page=page,
+            per_page=per_page,
+        )
+        headers = github_link_header(request, page=page, per_page=per_page, total_items=total)
+        return JSONResponse(payload, headers=headers)
+
+    @r.get("/repos/{owner}/{repo_name}/pulls/{n}/reviews")
+    def list_pull_reviews(
+        request: Request,
+        owner: str,
+        repo_name: str,
+        n: int,
+        page: int = 1,
+        per_page: int = 100,
+    ) -> JSONResponse:
+        gh = get_gh()
+        payload, total = gh_gen.pull_reviews_for_with_total(
+            gh,
+            owner,
+            repo_name,
+            n,
+            page=page,
+            per_page=per_page,
+        )
+        headers = github_link_header(request, page=page, per_page=per_page, total_items=total)
+        return JSONResponse(payload, headers=headers)
+
     @r.get("/repos/{owner}/{repo_name}/commits")
     def list_commits(
         request: Request,

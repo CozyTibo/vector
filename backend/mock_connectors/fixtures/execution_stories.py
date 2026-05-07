@@ -564,7 +564,7 @@ def build_execution_bundle(
         multi_repo_extra=2,
     )
 
-    from mock_connectors.fixtures import manager_insights_scenarios as mis
+    from mock_connectors.fixtures import cortex_capability_scenarios as ccs
 
     bundle_out = ExecutionBundle(
         issue_plans=issue_plans,
@@ -572,7 +572,7 @@ def build_execution_bundle(
         extra_slack=extra_slack,
         epic_drift_epic_index=epic_drift_epic_index,
     )
-    mis.patch_execution_bundle_for_manager_insights(bundle_out)
+    ccs.patch_execution_bundle_for_cortex_capabilities(bundle_out)
     return bundle_out
 
 

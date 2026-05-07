@@ -112,3 +112,42 @@ def commits_for_repo_with_total(
     for c in rows[start : start + per_page]:
         out.append({k: v for k, v in c.items() if not str(k).startswith("_")})
     return out, total
+
+
+def issue_comments_for_with_total(
+    gh: dict[str, Any],
+    owner: str,
+    repo: str,
+    issue_number: int,
+    *,
+    page: int,
+    per_page: int,
+) -> tuple[list[dict[str, Any]], int]:
+    full = f"{owner}/{repo}"
+    issue_url = f"https://github.com/{full}/issues/{issue_number}"
+    rows = [c for c in gh.get("issue_comments", []) if c.get("issue_url") == issue_url]
+    rows.sort(key=lambda c: str(c.get("updated_at", "")), reverse=True)
+    total = len(rows)
+    start = (page - 1) * per_page
+    return rows[start : start + per_page], total
+
+
+def pull_reviews_for_with_total(
+    gh: dict[str, Any],
+    owner: str,
+    repo: str,
+    pr_number: int,
+    *,
+    page: int,
+    per_page: int,
+) -> tuple[list[dict[str, Any]], int]:
+    full = f"{owner}/{repo}"
+    rows = [
+        {k: v for k, v in r.items() if not str(k).startswith("_")}
+        for r in gh.get("pull_request_reviews", [])
+        if r.get("_repo_full") == full and int(r.get("_pr_num", -1)) == pr_number
+    ]
+    rows.sort(key=lambda r: str(r.get("submitted_at", "")), reverse=True)
+    total = len(rows)
+    start = (page - 1) * per_page
+    return rows[start : start + per_page], total

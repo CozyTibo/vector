@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from mock_connectors.fixtures import cortex_capability_scenarios as ccs
 from mock_connectors.fixtures import execution_chaos as ex_chaos
 from mock_connectors.fixtures import execution_stories as ex
-from mock_connectors.fixtures import manager_insights_scenarios as mis
 from mock_connectors.fixtures import nexora_content as nx
 from mock_connectors.fixtures import seed_config as sc
 
@@ -98,6 +98,19 @@ def _em_users(users: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _user_by_login(users: list[dict[str, Any]], login: str) -> dict[str, Any] | None:
     for u in users:
         if u["login"] == login:
+            return u
+    return None
+
+
+def _user_by_email(users: list[dict[str, Any]], email: str | None) -> dict[str, Any] | None:
+    if not isinstance(email, str):
+        return None
+    normalized = email.strip().lower()
+    if not normalized:
+        return None
+    for u in users:
+        raw = u.get("email")
+        if isinstance(raw, str) and raw.strip().lower() == normalized:
             return u
     return None
 
@@ -191,16 +204,20 @@ def generate_dataset(seed: int) -> MockDataset:
     linear_pkg = _build_linear(seed, rng, users, repos, t0, end)
     gh_pkg = _build_github(seed, rng, users, repos, linear_pkg, t0, end)
     _assert_no_github_activity_for_linear_only_users(users, gh_pkg)
-    slack_events = _build_slack(seed, linear_pkg, t0, end)
+    slack_events = _build_slack(seed, users, linear_pkg, t0, end)
     notion_pkg = _build_notion(seed, users, linear_pkg, slack_events, t0, end)
+    ccs.extend_notion_for_cortex_capabilities(notion_pkg, linear_pkg, seed=seed, t0=t0)
     calls_pkg = _build_calls(seed, users, linear_pkg, slack_events, t0, end)
     nex105_id = next(
         (x["id"] for x in linear_pkg.get("issues", []) if x.get("identifier") == "NEX-105"),
         None,
     )
-    mis.extend_slack_events(slack_events, seed=seed, t0=t0, linear_nex105_id=nex105_id)
-    mis.extend_slack_for_nex300_completion(slack_events, seed=seed, t0=t0)
-    mis.extend_calls_package(calls_pkg, seed=seed, t0=t0)
+    ccs.extend_slack_events(slack_events, seed=seed, t0=t0, linear_nex105_id=nex105_id)
+    ccs.extend_slack_cortex_capability_signals(
+        slack_events, seed=seed, t0=t0, linear_nex105_id=nex105_id
+    )
+    ccs.extend_slack_for_nex300_completion(slack_events, seed=seed, t0=t0)
+    ccs.extend_calls_package(calls_pkg, seed=seed, t0=t0)
     chaos_tags = ex_chaos.apply_execution_chaos(
         seed,
         t0,
@@ -212,13 +229,17 @@ def generate_dataset(seed: int) -> MockDataset:
         notion_pkg,
         calls_pkg,
     )
-    mi_errs = mis.validate_manager_insight_dataset_strength(linear_pkg, gh_pkg, slack_events, calls_pkg)
-    if mi_errs:
-        raise RuntimeError("manager_insights_mock_dataset: " + "; ".join(mi_errs))
+    cc_errs = ccs.validate_cortex_capability_dataset_strength(
+        linear_pkg, gh_pkg, slack_events, calls_pkg, notion_pkg
+    )
+    if cc_errs:
+        raise RuntimeError("cortex_capability_mock_dataset: " + "; ".join(cc_errs))
     edges = _build_edges(linear_pkg, gh_pkg, users)
     patterns = _verify_patterns(linear_pkg, gh_pkg, slack_events)
-    patterns = sorted(set(patterns) | set(mis.scenario_coverage_tags()) | set(chaos_tags))
-    mi_evidence = mis.manager_insights_evidence(linear_pkg, gh_pkg, slack_events, calls_pkg)
+    patterns = sorted(set(patterns) | set(ccs.cortex_capability_scenario_tags()) | set(chaos_tags))
+    cc_evidence = ccs.cortex_capability_evidence(
+        linear_pkg, gh_pkg, slack_events, calls_pkg, notion_pkg
+    )
 
     return MockDataset(
         seed=seed,
@@ -235,8 +256,8 @@ def generate_dataset(seed: int) -> MockDataset:
             "github_org": sc.GITHUB_ORG,
             "linear_org_id": linear_pkg["organization"]["id"],
             "product": nx.NEXORA_BLURB,
-            "manager_insight_scenarios": mis.scenario_coverage_tags(),
-            "manager_insights_evidence": mi_evidence,
+            "cortex_capability_scenarios": ccs.cortex_capability_scenario_tags(),
+            "cortex_capability_evidence": cc_evidence,
             "execution_chaos_tags": chaos_tags,
         },
     )
@@ -979,7 +1000,7 @@ def _build_linear(
             )
             c_seq += 1
 
-    mis.decorate_linear_issues_and_comments(issues, comments, seed=seed, users=users)
+    ccs.decorate_linear_issues_and_comments(issues, comments, seed=seed, users=users)
 
     # IssueLabel nodes (workspace defaults + per-issue labels)
     label_pool: list[dict[str, Any]] = [
@@ -1208,7 +1229,7 @@ def _build_github(
                 "number": pr_num,
                 "node_id": f"PR_kwDO{700000 + pr_num}",
                 "title": "fix: cache invalidation for session store",
-                "body": nx.enrich_github_pr_body_for_manager_insight(
+                "body": nx.enrich_github_pr_body_for_cortex_capability(
                     pr_num, "Shadow path — ticket backfill pending."
                 ),
                 "state": "closed" if merged else "open",
@@ -1267,7 +1288,7 @@ def _build_github(
         else:
             title = "drive-by rename internal helper"
             body = ""
-        body = nx.enrich_github_pr_body_for_manager_insight(i, body)
+        body = nx.enrich_github_pr_body_for_cortex_capability(i, body)
         merged = ps.merged_offset_h is not None and not ps.abandoned
         pr = {
             "id": 700000 + pr_num,
@@ -1446,11 +1467,73 @@ def _build_github(
             pr_commits_map[f"{repo['full_name']}#{n}"] = []
             pr_num += 1
 
+    issue_comments: list[dict[str, Any]] = []
+    for issue in issues_gh:
+        created = datetime.fromisoformat(str(issue["created_at"]).replace("Z", "+00:00"))
+        author = gh_users[(issue["number"] + 1) % len(gh_users)]
+        issue_comments.append(
+            {
+                "id": int(f"{issue['id']}1"),
+                "node_id": f"IC_{issue['id']}_1",
+                "issue_url": issue["html_url"],
+                "body": f"Follow-up on {issue['title']}: owner confirmed, next update tomorrow.",
+                "user": gh_user_blob(author),
+                "created_at": _iso(created + timedelta(hours=5)),
+                "updated_at": _iso(created + timedelta(hours=5)),
+            }
+        )
+        if issue["number"] % 5 == 0:
+            issue_comments.append(
+                {
+                    "id": int(f"{issue['id']}2"),
+                    "node_id": f"IC_{issue['id']}_2",
+                    "issue_url": issue["html_url"],
+                    "body": "Posting closure criteria and acceptance checks.",
+                    "user": gh_user_blob(gh_users[(issue["number"] + 2) % len(gh_users)]),
+                    "created_at": _iso(created + timedelta(hours=12)),
+                    "updated_at": _iso(created + timedelta(hours=12)),
+                }
+            )
+
+    pr_reviews: list[dict[str, Any]] = []
+    for pr in prs:
+        pr_created = datetime.fromisoformat(str(pr["created_at"]).replace("Z", "+00:00"))
+        reviewer = gh_users[(int(pr["number"]) + 3) % len(gh_users)]
+        pr_reviews.append(
+            {
+                "id": int(f"{pr['id']}7"),
+                "node_id": f"PRR_{pr['id']}_1",
+                "user": gh_user_blob(reviewer),
+                "body": "Structured review: checked rollback path, data migration safety, and monitoring hooks.",
+                "state": "APPROVED" if pr.get("state") == "closed" else "COMMENTED",
+                "submitted_at": _iso(pr_created + timedelta(hours=9)),
+                "commit_id": (pr.get("head") or {}).get("sha"),
+                "_repo_full": pr.get("_repo_full"),
+                "_pr_num": pr.get("_pr_num"),
+            }
+        )
+        if pr.get("state") != "closed":
+            pr_reviews.append(
+                {
+                    "id": int(f"{pr['id']}8"),
+                    "node_id": f"PRR_{pr['id']}_2",
+                    "user": gh_user_blob(gh_users[(int(pr["number"]) + 4) % len(gh_users)]),
+                    "body": "Requesting owner assignment and explicit test evidence before merge.",
+                    "state": "CHANGES_REQUESTED",
+                    "submitted_at": _iso(pr_created + timedelta(hours=16)),
+                    "commit_id": (pr.get("head") or {}).get("sha"),
+                    "_repo_full": pr.get("_repo_full"),
+                    "_pr_num": pr.get("_pr_num"),
+                }
+            )
+
     return {
         "users": {u["login"]: u for u in gh_users},
         "repos": repos,
         "pull_requests": prs,
+        "pull_request_reviews": pr_reviews,
         "issues": issues_gh,
+        "issue_comments": issue_comments,
         "commits": commits_out,
         "pr_commits": pr_commits_map,
         "installation_token": "mock-gh-install-token-vector",
@@ -1459,36 +1542,64 @@ def _build_github(
 
 def _build_slack(
     seed: int,
+    users: list[dict[str, Any]],
     linear_pkg: dict[str, Any],
     t0: datetime,
     end: datetime,
 ) -> list[dict[str, Any]]:
-    """Synthetic Slack — eng drift + PM ping + execution-story extras."""
+    """Synthetic Slack event stream with message/thread/edit/delete depth."""
     del end
     bundle = linear_pkg.get("_execution_bundle")
+    workspace_id = f"T{seed % 10_000:04d}NEXORA"
+    channel_id_by_name = {
+        "#eng-random": "CENGRANDOM",
+        "#product-web": "CPRODWEB01",
+        "#eng-core": "CENGCORE01",
+        "#incidents": "CINCIDENTS",
+    }
     out: list[dict[str, Any]] = [
         {
             "id": _u(seed, "slack", "1"),
+            "workspace_id": workspace_id,
+            "event_type": "message",
+            "channel_id": channel_id_by_name["#eng-random"],
             "channel": "#eng-random",
+            "thread_ts": None,
+            "parent_ts": None,
             "text": "We should fix the cache invalidation thing ASAP",
             "ts": _iso(t0 + timedelta(days=4, hours=3)),
+            "created_at": _iso(t0 + timedelta(days=4, hours=3)),
+            "updated_at": _iso(t0 + timedelta(days=4, hours=3)),
+            "deleted_at": None,
             "user_email": "alex.kim@nexora.dev",
+            "user_id": "UAKIM001",
             "linear_issue_id": None,
             "pattern": "discussion_drift",
-            "metadata": {"scenario": "discussion_drift"},
+            "reactions": [{"name": "eyes", "count": 2}, {"name": "white_check_mark", "count": 1}],
+            "metadata": {"scenario": "discussion_drift", "source": "channel_message"},
         },
         {
             "id": _u(seed, "slack", "2"),
+            "workspace_id": workspace_id,
+            "event_type": "message",
+            "channel_id": channel_id_by_name["#product-web"],
             "channel": "#product-web",
+            "thread_ts": None,
+            "parent_ts": None,
             "text": (
                 "Can someone drop the NEX-* link for the rollout? "
                 "Victoire asked in the customer channel and I only have the GH PR."
             ),
             "ts": _iso(t0 + timedelta(days=5, hours=1)),
+            "created_at": _iso(t0 + timedelta(days=5, hours=1)),
+            "updated_at": _iso(t0 + timedelta(days=5, hours=1)),
+            "deleted_at": None,
             "user_email": "design@nexora.dev",
+            "user_id": "URDESIGN1",
             "linear_issue_id": None,
             "pattern": "cross_tool_ping",
-            "metadata": {"scenario": "cross_tool_ping"},
+            "reactions": [{"name": "thread", "count": 1}],
+            "metadata": {"scenario": "cross_tool_ping", "source": "channel_message"},
         },
     ]
     if bundle:
@@ -1498,18 +1609,111 @@ def _build_slack(
                 ts_dt = anchor + timedelta(days=float(raw.get("ts_offset_days", 0)))
             else:
                 ts_dt = t0 + timedelta(days=6 + si)
+            channel_name = str(raw["channel"])
+            channel_id = channel_id_by_name.get(channel_name, f"C{_u(seed, 'slack-chan', channel_name)[:8]}")
             row = {
                 "id": _u(seed, "slack", "story", str(si)),
-                "channel": raw["channel"],
+                "workspace_id": workspace_id,
+                "event_type": "message",
+                "channel_id": channel_id,
+                "channel": channel_name,
+                "thread_ts": None,
+                "parent_ts": None,
                 "text": raw["text"],
                 "ts": _iso(ts_dt),
+                "created_at": _iso(ts_dt),
+                "updated_at": _iso(ts_dt),
+                "deleted_at": None,
                 "user_email": raw.get("user_email", ""),
+                "user_id": f"U{_u(seed, 'slack-user', str(raw.get('user_email', 'unknown')))[:8]}",
                 "linear_issue_id": raw.get("linear_issue_id"),
                 "pattern": raw.get("pattern", "story"),
-                "metadata": raw.get("metadata", {}),
+                "reactions": [{"name": "eyes", "count": 1 + (si % 3)}],
+                "metadata": {**raw.get("metadata", {}), "source": "story_message"},
             }
             out.append(row)
-    return out
+
+    # Thread replies / edit events / delete tombstones for ingestion realism.
+    enriched: list[dict[str, Any]] = []
+    for i, ev in enumerate(out):
+        enriched.append(ev)
+        if ev["event_type"] != "message":
+            continue
+        root_ts = datetime.fromisoformat(str(ev["ts"]).replace("Z", "+00:00"))
+        if i % 2 == 0:
+            reply_ts = root_ts + timedelta(minutes=24 + (i % 10))
+            u = _user_by_email(users, ev.get("user_email")) or users[i % max(1, len(users))]
+            enriched.append(
+                {
+                    "id": _u(seed, "slack", "reply", str(i)),
+                    "workspace_id": workspace_id,
+                    "event_type": "thread_reply",
+                    "channel_id": ev["channel_id"],
+                    "channel": ev["channel"],
+                    "thread_ts": ev["ts"],
+                    "parent_ts": ev["ts"],
+                    "text": f"Thread follow-up on {ev.get('pattern', 'context')}: owner + ETA confirmed.",
+                    "ts": _iso(reply_ts),
+                    "created_at": _iso(reply_ts),
+                    "updated_at": _iso(reply_ts),
+                    "deleted_at": None,
+                    "user_email": u.get("email"),
+                    "user_id": f"U{str(u.get('linear_user_id', 'unknown'))[:8]}",
+                    "linear_issue_id": ev.get("linear_issue_id"),
+                    "pattern": ev.get("pattern"),
+                    "reactions": [{"name": "thumbsup", "count": 1}],
+                    "metadata": {"scenario": ev.get("metadata", {}).get("scenario"), "source": "thread_reply"},
+                }
+            )
+        if i % 3 == 0:
+            edit_ts = root_ts + timedelta(minutes=45)
+            enriched.append(
+                {
+                    "id": _u(seed, "slack", "edit", str(i)),
+                    "workspace_id": workspace_id,
+                    "event_type": "message_changed",
+                    "channel_id": ev["channel_id"],
+                    "channel": ev["channel"],
+                    "thread_ts": ev.get("thread_ts"),
+                    "parent_ts": ev["ts"],
+                    "text": f"{ev['text']} (edited with concrete owner + due date)",
+                    "ts": ev["ts"],
+                    "created_at": ev["created_at"],
+                    "updated_at": _iso(edit_ts),
+                    "deleted_at": None,
+                    "user_email": ev.get("user_email"),
+                    "user_id": ev.get("user_id"),
+                    "linear_issue_id": ev.get("linear_issue_id"),
+                    "pattern": ev.get("pattern"),
+                    "reactions": ev.get("reactions", []),
+                    "metadata": {"scenario": ev.get("metadata", {}).get("scenario"), "source": "message_changed"},
+                }
+            )
+        if i % 11 == 0:
+            delete_ts = root_ts + timedelta(hours=2)
+            enriched.append(
+                {
+                    "id": _u(seed, "slack", "delete", str(i)),
+                    "workspace_id": workspace_id,
+                    "event_type": "message_deleted",
+                    "channel_id": ev["channel_id"],
+                    "channel": ev["channel"],
+                    "thread_ts": ev.get("thread_ts"),
+                    "parent_ts": ev["ts"],
+                    "text": "",
+                    "ts": ev["ts"],
+                    "created_at": ev["created_at"],
+                    "updated_at": _iso(delete_ts),
+                    "deleted_at": _iso(delete_ts),
+                    "user_email": ev.get("user_email"),
+                    "user_id": ev.get("user_id"),
+                    "linear_issue_id": ev.get("linear_issue_id"),
+                    "pattern": ev.get("pattern"),
+                    "reactions": [],
+                    "metadata": {"scenario": ev.get("metadata", {}).get("scenario"), "source": "message_deleted"},
+                }
+            )
+    return sorted(enriched, key=lambda e: str(e.get("updated_at") or e.get("ts")))
 
 
 def _build_edges(
@@ -1545,8 +1749,12 @@ def _build_notion(
 ) -> dict[str, Any]:
     del t0, end
     pages: list[dict[str, Any]] = []
+    databases: dict[str, dict[str, Any]] = {}
+    database_rows: list[dict[str, Any]] = []
+    notion_comments: list[dict[str, Any]] = []
+    relations: list[dict[str, Any]] = []
     issues = linear_pkg.get("issues", [])
-    comments = linear_pkg.get("comments", [])
+    linear_comments = linear_pkg.get("comments", [])
     for i, issue in enumerate(issues[:24]):
         owner = users[i % len(users)]
         title = f"{issue.get('identifier', 'NEX')} - {issue.get('title', 'Execution note')}"
@@ -1567,6 +1775,89 @@ def _build_notion(
                 "snippet": snippet,
             }
         )
+    for db_idx, project in enumerate(linear_pkg.get("projects", [])[:6]):
+        db_id = _u(seed, "notion", "database", str(db_idx))
+        db_created = project.get("startDate") or _iso(datetime.now(tz=UTC))
+        db_edited = project.get("targetDate") or _iso(datetime.now(tz=UTC))
+        databases[db_id] = {
+            "id": db_id,
+            "title": project.get("name"),
+            "description": f"Operational tracking DB for {project.get('name')}.",
+            "url": f"https://www.notion.so/nexora/{db_id.replace('-', '')}",
+            "created_time": db_created,
+            "last_edited_time": db_edited,
+            "archived": False,
+            "source_project_id": project.get("id"),
+            "properties": {
+                "Name": {"type": "title"},
+                "Status": {"type": "select", "options": ["Backlog", "In Progress", "Done", "Blocked"]},
+                "Owner": {"type": "people"},
+                "Linear Issue": {"type": "rich_text"},
+                "Updated At": {"type": "last_edited_time"},
+                "Priority": {"type": "select", "options": ["P0", "P1", "P2", "P3"]},
+                "Related Rows": {"type": "relation", "target": "self"},
+                "Rollup Open Items": {"type": "rollup", "relation": "Related Rows"},
+            },
+        }
+        project_issues = [x for x in issues if (x.get("project") or {}).get("id") == project.get("id")]
+        for row_idx, issue in enumerate(project_issues[:12]):
+            row_id = _u(seed, "notion", "row", str(db_idx), str(row_idx))
+            created_at = issue.get("createdAt") or _iso(datetime.now(tz=UTC))
+            edited_at = issue.get("updatedAt") or created_at
+            owner = issue.get("assignee") or issue.get("creator") or {}
+            status_name = ((issue.get("state") or {}).get("name") or "Backlog").strip()
+            priority_num = issue.get("priority")
+            if isinstance(priority_num, int):
+                priority = "P0" if priority_num <= 0 else f"P{min(priority_num, 3)}"
+            else:
+                priority = "P2"
+            database_rows.append(
+                {
+                    "id": row_id,
+                    "database_id": db_id,
+                    "url": f"https://www.notion.so/nexora/{row_id.replace('-', '')}",
+                    "created_time": created_at,
+                    "last_edited_time": edited_at,
+                    "archived": False,
+                    "properties": {
+                        "Name": issue.get("title"),
+                        "Status": status_name,
+                        "Owner": owner.get("name"),
+                        "Linear Issue": issue.get("identifier"),
+                        "Priority": priority,
+                    },
+                    "source_refs": {
+                        "linear_issue_id": issue.get("id"),
+                        "linear_issue_identifier": issue.get("identifier"),
+                        "project_id": project.get("id"),
+                    },
+                }
+            )
+    for i, row in enumerate(database_rows):
+        if i % 4 == 0 and i + 1 < len(database_rows):
+            relations.append(
+                {
+                    "id": _u(seed, "notion", "relation", str(i)),
+                    "from_row_id": row["id"],
+                    "to_row_id": database_rows[i + 1]["id"],
+                    "kind": "dependency",
+                    "created_time": row["created_time"],
+                }
+            )
+    for i, row in enumerate(database_rows[:40]):
+        author = users[(i + 3) % len(users)]
+        notion_comments.append(
+            {
+                "id": _u(seed, "notion", "comment", str(i)),
+                "row_id": row["id"],
+                "database_id": row["database_id"],
+                "created_time": row["last_edited_time"],
+                "last_edited_time": row["last_edited_time"],
+                "author_email": author.get("email"),
+                "author_name": author.get("name"),
+                "text": f"Update check: {row['properties'].get('Status')} with owner {row['properties'].get('Owner')}.",
+            }
+        )
     for j, ev in enumerate(slack_events[:8]):
         title = f"Slack follow-up {j + 1}: {ev.get('channel', '#channel')}"
         pages.append(
@@ -1581,11 +1872,28 @@ def _build_notion(
             }
         )
     return {
+        "workspace": {
+            "id": _u(seed, "notion", "workspace"),
+            "name": "Nexora",
+            "timezone": "UTC",
+        },
+        "databases": databases,
+        "database_rows": database_rows,
+        "comments": notion_comments,
+        "relations": relations,
         "search_result_count": len(pages),
         "has_more": len(pages) > 20,
         "users_me_ok": True,
         "sampled_pages": pages[:30],
-        "source_counts": {"issues": min(len(issues), 24), "slack": min(len(slack_events), 8), "comments": len(comments)},
+        "source_counts": {
+            "issues": min(len(issues), 24),
+            "slack": min(len(slack_events), 8),
+            "comments": len(notion_comments),
+            "linear_comment_inputs": len(linear_comments),
+            "databases": len(databases),
+            "database_rows": len(database_rows),
+            "relations": len(relations),
+        },
     }
 
 
@@ -1610,6 +1918,24 @@ def _build_calls(
         owner = users[(i + 2) % len(users)]
         start = datetime.fromisoformat(str(issue.get("createdAt", _iso(t0))).replace("Z", "+00:00")) + timedelta(days=1)
         end_dt = start + timedelta(minutes=45 + (i % 3) * 15)
+        attendee_pool = [users[(i + off) % len(users)] for off in (0, 1, 2)]
+        transcript_segments = [
+            {
+                "offset_seconds": 0,
+                "speaker_email": attendee_pool[0].get("email"),
+                "text": f"Context on {issue.get('identifier', 'NEX')} current execution state.",
+            },
+            {
+                "offset_seconds": 95,
+                "speaker_email": attendee_pool[1].get("email"),
+                "text": "Main blocker is ownership ambiguity and review queue pressure.",
+            },
+            {
+                "offset_seconds": 220,
+                "speaker_email": attendee_pool[2].get("email"),
+                "text": "Action items captured with owners and ETA before next sync.",
+            },
+        ]
         events.append(
             {
                 "calendar_id": cal["id"],
@@ -1627,10 +1953,34 @@ def _build_calls(
                 "updated": _iso(start - timedelta(hours=2)),
                 "start": _iso(start),
                 "end": _iso(end_dt),
+                "status_history": [
+                    {"status": "scheduled", "at": _iso(start - timedelta(hours=12))},
+                    {"status": "started", "at": _iso(start)},
+                    {"status": "ended", "at": _iso(end_dt)},
+                ],
+                "attendees": [
+                    {
+                        "email": p.get("email"),
+                        "display_name": p.get("name"),
+                        "response_status": "accepted" if idx != 2 else "tentative",
+                    }
+                    for idx, p in enumerate(attendee_pool)
+                ],
+                "transcript": {
+                    "provider": "mock",
+                    "generated_at": _iso(end_dt + timedelta(minutes=8)),
+                    "segments": transcript_segments,
+                },
+                "recording": {
+                    "recording_id": _u(seed, "calls", "recording", str(i)),
+                    "url": f"https://recordings.nexora.dev/{_u(seed, 'calls-rec-url', str(i))}",
+                    "duration_seconds": int((end_dt - start).total_seconds()),
+                },
             }
         )
     for j, ev in enumerate(slack_events[:6]):
         start = datetime.fromisoformat(str(ev.get("ts", _iso(t0))).replace("Z", "+00:00")) + timedelta(hours=4)
+        attendees = [users[(j + off) % len(users)] for off in (0, 2)]
         events.append(
             {
                 "calendar_id": calendars[j % len(calendars)]["id"],
@@ -1645,6 +1995,40 @@ def _build_calls(
                 "updated": _iso(start - timedelta(hours=1)),
                 "start": _iso(start),
                 "end": _iso(start + timedelta(minutes=30)),
+                "status_history": [
+                    {"status": "scheduled", "at": _iso(start - timedelta(hours=6))},
+                    {"status": "started", "at": _iso(start)},
+                    {"status": "ended", "at": _iso(start + timedelta(minutes=30))},
+                ],
+                "attendees": [
+                    {
+                        "email": p.get("email"),
+                        "display_name": p.get("name"),
+                        "response_status": "accepted",
+                    }
+                    for p in attendees
+                ],
+                "transcript": {
+                    "provider": "mock",
+                    "generated_at": _iso(start + timedelta(minutes=42)),
+                    "segments": [
+                        {
+                            "offset_seconds": 0,
+                            "speaker_email": attendees[0].get("email"),
+                            "text": f"Slack thread context: {str(ev.get('text', ''))[:120]}",
+                        },
+                        {
+                            "offset_seconds": 88,
+                            "speaker_email": attendees[1].get("email"),
+                            "text": "Documented owner + tracking artifact after discussion.",
+                        },
+                    ],
+                },
+                "recording": {
+                    "recording_id": _u(seed, "calls", "recording-slack", str(j)),
+                    "url": f"https://recordings.nexora.dev/{_u(seed, 'calls-rec-slack-url', str(j))}",
+                    "duration_seconds": 1800,
+                },
             }
         )
     sampled_calendar_events: list[dict[str, Any]] = []
@@ -1656,6 +2040,8 @@ def _build_calls(
     return {
         "calendar_count": len(calendars),
         "has_more": False,
+        "calendars": calendars,
+        "events": events,
         "sampled_calendar_events": sampled_calendar_events,
         "sampled_events": events[:30],
     }

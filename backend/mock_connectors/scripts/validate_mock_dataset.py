@@ -14,7 +14,7 @@ _BACKEND = Path(__file__).resolve().parents[2]
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-from mock_connectors.fixtures import manager_insights_scenarios as mis  # noqa: E402
+from mock_connectors.fixtures import cortex_capability_scenarios as ccs  # noqa: E402
 from mock_connectors.fixtures import seed_config as sc  # noqa: E402
 from mock_connectors.fixtures.company_generator import (  # noqa: E402
     dataset_to_json_dict,
@@ -173,6 +173,53 @@ def _check_execution_stories(linear: dict[str, Any], gh: dict[str, Any]) -> list
     return errs
 
 
+def _check_connector_depth(data: dict[str, Any]) -> list[str]:
+    errs: list[str] = []
+    gh = data.get("github") if isinstance(data.get("github"), dict) else {}
+    slack_events = data.get("slack_events") if isinstance(data.get("slack_events"), list) else []
+    notion = data.get("notion") if isinstance(data.get("notion"), dict) else {}
+    calls = data.get("calls") if isinstance(data.get("calls"), dict) else {}
+
+    if len(gh.get("pull_request_reviews", [])) < 20:
+        errs.append("github pull_request_reviews depth too low (<20)")
+    if len(gh.get("issue_comments", [])) < 30:
+        errs.append("github issue_comments depth too low (<30)")
+
+    if not slack_events:
+        errs.append("slack_events missing")
+    else:
+        kinds = Counter(str(ev.get("event_type")) for ev in slack_events if isinstance(ev, dict))
+        for required in ("message", "thread_reply", "message_changed", "message_deleted"):
+            if kinds.get(required, 0) == 0:
+                errs.append(f"slack event_type {required!r} missing")
+
+    databases = notion.get("databases")
+    if not isinstance(databases, dict) or len(databases) < 3:
+        errs.append("notion databases depth too low (<3)")
+    if len(notion.get("database_rows", [])) < 20:
+        errs.append("notion database_rows depth too low (<20)")
+    if len(notion.get("comments", [])) < 20:
+        errs.append("notion comments depth too low (<20)")
+    if len(notion.get("relations", [])) < 5:
+        errs.append("notion relations depth too low (<5)")
+
+    call_events = calls.get("events", [])
+    if not isinstance(call_events, list) or len(call_events) < 15:
+        errs.append("calls events depth too low (<15)")
+    else:
+        transcript_count = sum(
+            1
+            for ev in call_events
+            if isinstance(ev, dict)
+            and isinstance(ev.get("transcript"), dict)
+            and isinstance(ev.get("transcript", {}).get("segments"), list)
+            and len(ev.get("transcript", {}).get("segments", [])) >= 2
+        )
+        if transcript_count < 10:
+            errs.append("calls transcript depth too low (<10 events with 2+ segments)")
+    return errs
+
+
 def main() -> int:
     data = _load_or_generate()
     gh = data["github"]
@@ -183,9 +230,15 @@ def main() -> int:
     errs.extend(_check_commits(gh))
     errs.extend(_check_chrono(linear))
     errs.extend(_check_execution_stories(linear, gh))
+    errs.extend(_check_connector_depth(data))
     slack_events = data.get("slack_events") if isinstance(data.get("slack_events"), list) else []
     calls = data.get("calls") if isinstance(data.get("calls"), dict) else {}
-    errs.extend(mis.validate_manager_insight_dataset_strength(linear, gh, slack_events, calls))
+    notion = data.get("notion") if isinstance(data.get("notion"), dict) else {}
+    errs.extend(
+        ccs.validate_cortex_capability_dataset_strength(
+            linear, gh, slack_events, calls, notion
+        )
+    )
 
     if len(gh["repos"]) < sc.TARGET_REPOSITORIES // 2:
         errs.append(f"repo count low: {len(gh['repos'])}")
