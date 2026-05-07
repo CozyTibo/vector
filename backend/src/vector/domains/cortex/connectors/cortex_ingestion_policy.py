@@ -23,8 +23,7 @@ def should_route_ingestion_to_cortex(
 ) -> bool:
     """Return True when flags select Cortex path for this connector and tenant.
 
-    When True and no executor exists yet, callers should raise ``NotImplementedError`` with a
-    clear message (admin stubs) or enqueue Cortex work (future).
+    Admin enqueue and workers use this to route onto :mod:`vector.domains.cortex.ingestion`.
     """
     if connector_id not in SUPPORTED_CONNECTOR_IDS:
         return False

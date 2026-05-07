@@ -137,3 +137,53 @@ def create_github_installation_access_token(
     if not isinstance(token, str) or not token:
         raise GitHubApiError("github installation token missing token field")
     return token
+
+
+def list_installation_repositories_first_page(
+    settings: Settings,
+    installation_id: int,
+    *,
+    per_page: int = 50,
+) -> tuple[list[dict[str, Any]], int | None]:
+    """GET /installation/repositories (first page) using an installation access token.
+
+    Returns repository dicts from the GitHub API (``repositories`` array) and ``total_count`` when
+    present.
+    """
+    token = create_github_installation_access_token(settings, installation_id)
+    base = settings.github_rest_api_base_url().rstrip("/")
+    url = f"{base}/installation/repositories"
+    try:
+        resp = httpx.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params={"per_page": min(per_page, 100)},
+            timeout=60.0,
+        )
+    except httpx.RequestError as e:
+        raise GitHubApiError(f"github installation repositories request failed: {e}") from e
+    if resp.is_error:
+        snippet = (resp.text or "").replace("\n", " ")[:400]
+        raise GitHubApiError(
+            f"github installation repositories http {resp.status_code}"
+            + (f" — {snippet}" if snippet else ""),
+        ) from None
+    try:
+        data = resp.json()
+    except ValueError:
+        raise GitHubApiError(
+            f"github installation repositories not json (http {resp.status_code})",
+        ) from None
+    if not isinstance(data, dict):
+        raise GitHubApiError("invalid github installation repositories json")
+    repos_raw = data.get("repositories")
+    if not isinstance(repos_raw, list):
+        raise GitHubApiError("github installation repositories missing repositories array")
+    repos: list[dict[str, Any]] = [x for x in repos_raw if isinstance(x, dict)]
+    total = data.get("total_count")
+    total_int = int(total) if isinstance(total, int) else None
+    return repos, total_int

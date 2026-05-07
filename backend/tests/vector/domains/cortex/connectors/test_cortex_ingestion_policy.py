@@ -111,7 +111,7 @@ def test_extract_tenant_positional() -> None:
     assert policy.extract_tenant_id_from_enqueue_args((tid,), {}) == tid
 
 
-def test_admin_github_enqueue_raises_runtime_when_no_migration(
+def test_admin_github_enqueue_requires_tenant_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/vector_test")
@@ -123,13 +123,32 @@ def test_admin_github_enqueue_raises_runtime_when_no_migration(
 
     get_settings.cache_clear()
     try:
-        with pytest.raises(RuntimeError, match="poll ingestion is unavailable"):
+        with pytest.raises(RuntimeError, match="tenant_id is required"):
             connector_sync.enqueue_github_poll_sync()
     finally:
         get_settings.cache_clear()
 
 
-def test_admin_github_enqueue_raises_notimplemented_when_cortex_flagged(
+def test_admin_github_enqueue_raises_when_not_cortex_routed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = uuid.uuid4()
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/vector_test")
+    monkeypatch.delenv("CORTEX_CONNECTOR_MIGRATION_ENABLED", raising=False)
+    monkeypatch.delenv("CORTEX_CONNECTOR_MIGRATION_GITHUB", raising=False)
+
+    from vector.api.http.routes.admin import connector_sync
+    from vector.settings import get_settings
+
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="not routed to Cortex"):
+            connector_sync.enqueue_github_poll_sync(tenant_id=tid)
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_github_enqueue_dispatches_celery_when_cortex_flagged(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tid = uuid.uuid4()
@@ -138,12 +157,16 @@ def test_admin_github_enqueue_raises_notimplemented_when_cortex_flagged(
     monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_ENABLED", "true")
     monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_GITHUB", "true")
 
+    from unittest.mock import MagicMock, patch
+
     from vector.api.http.routes.admin import connector_sync
     from vector.settings import get_settings
 
     get_settings.cache_clear()
     try:
-        with pytest.raises(NotImplementedError, match="Cortex ingestion executor"):
+        with patch("app.tasks.cortex_ingestion_sync.run_cortex_connector_sync_task") as task_mod:
+            task_mod.delay = MagicMock()
             connector_sync.enqueue_github_poll_sync(tenant_id=tid)
+            task_mod.delay.assert_called_once_with(str(tid), "github", "manual")
     finally:
         get_settings.cache_clear()

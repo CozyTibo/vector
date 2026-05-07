@@ -26,3 +26,4 @@
 - Raw envelope frozen-core doctrine not yet implemented in runtime validation.
 - ~~Step 0 migration inventory~~ **Done** — Appendix A in `phase-01-step-0-connector-migration-safety-spec.md` (2026-05-07).
 - ~~Step 0 migration flags (settings + routing policy)~~ **Done** — `CORTEX_CONNECTOR_MIGRATION_*`, `cortex_ingestion_policy`, admin enqueue stubs (2026-05-07). **Shadow/active dual execution and parity automation** still **Phase 01 Step 6+**.
+- ~~Phase 01 Step 1 ingestion lifecycle (minimal runtime)~~ **Done** — tables `ingestion_runs` / `raw_ingestion_records` / `connector_sync_state` (migration `20260508_0030`), domain `vector.domains.cortex.ingestion.sync_executor`, Celery `vector.cortex.ingestion.run_sync`, admin enqueue dispatches task when migration flags route the tenant. **Follow-on:** Step 2 scheduler/orchestration, Step 3+ replay enforcement.

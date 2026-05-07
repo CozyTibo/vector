@@ -214,7 +214,7 @@ function safeDateTimeIso(ts: number): string | undefined {
   }
 }
 
-/** Persisted OAuth log lines use ``Linear connected``; timeline UI matches synthetic ``Connected to …`` events. */
+/** Persisted OAuth log lines use ``{ToolLabel} connected``; timeline UI matches synthetic ``Connected to …`` events. */
 function connectorConnectedDisplayLabel(content: string): string | null {
   const t = content.trim().toLowerCase();
   if (t === "linear connected") {
@@ -225,6 +225,9 @@ function connectorConnectedDisplayLabel(content: string): string | null {
   }
   if (t === "slack connected") {
     return "Connected to Slack";
+  }
+  if (t === "notion connected") {
+    return "Connected to Notion";
   }
   return null;
 }

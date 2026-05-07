@@ -62,6 +62,7 @@ celery_app = Celery(
     include=[
         "app.tasks.email",
         "app.tasks.onboarding_activation_task",
+        "app.tasks.cortex_ingestion_sync",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -73,6 +74,7 @@ celery_app.conf.result_serializer = "json"
 celery_app.conf.imports = (
     "app.tasks.email",
     "app.tasks.onboarding_activation_task",
+    "app.tasks.cortex_ingestion_sync",
 )
 
 
@@ -80,6 +82,7 @@ def _register_tasks() -> None:
     """Import task modules so they bind to ``celery_app``."""
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")
+    importlib.import_module("app.tasks.cortex_ingestion_sync")
 
 
 _register_tasks()
@@ -90,3 +93,4 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     """Prefork children must bind task modules to the app (avoids unregistered-task KeyError)."""
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")
+    importlib.import_module("app.tasks.cortex_ingestion_sync")

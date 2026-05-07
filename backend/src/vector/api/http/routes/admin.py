@@ -98,23 +98,25 @@ from vector.settings import Settings, get_settings
 _logger = logging.getLogger("app")
 
 
-def _connector_poll_sync_placeholder(connector_id: str):
-    """Legacy enqueue removed; Cortex path gated by migration flags (Phase 01 Step 0+)."""
+def _enqueue_cortex_poll_sync(connector_id: str):
+    """Enqueue Phase 01 Celery sync when flags route this connector×tenant to Cortex."""
 
     def _fn(*args: object, **kwargs: object) -> None:
         settings = get_settings()
         tenant_id = extract_tenant_id_from_enqueue_args(args, kwargs)
-        if tenant_id is not None and should_route_ingestion_to_cortex(
-            settings, connector_id, tenant_id
-        ):
-            raise NotImplementedError(
-                "Cortex ingestion executor is not wired yet (Phase 01 runtime). "
-                "Migration flags select the Cortex path; disable CORTEX_CONNECTOR_MIGRATION_* "
-                "if unintentional."
+        if tenant_id is None:
+            raise RuntimeError(
+                "tenant_id is required to enqueue connector poll sync "
+                "(pass a positional UUID or tenant_id= keyword).",
             )
+        if should_route_ingestion_to_cortex(settings, connector_id, tenant_id):
+            from app.tasks.cortex_ingestion_sync import run_cortex_connector_sync_task
+
+            run_cortex_connector_sync_task.delay(str(tenant_id), connector_id, "manual")
+            return
         raise RuntimeError(
-            "Connector poll ingestion is unavailable: legacy enqueue was removed. "
-            "After the Cortex executor exists, use CORTEX_CONNECTOR_MIGRATION_* for routed tenants."
+            "Connector poll ingestion is unavailable for tenants not routed to Cortex "
+            "(enable CORTEX_CONNECTOR_MIGRATION_* for this connector×tenant).",
         )
 
     return _fn
@@ -123,8 +125,8 @@ def _connector_poll_sync_placeholder(connector_id: str):
 # Backward-compat shim for tests/patch targets that still reference
 # `vector.api.http.routes.admin.connector_sync`.
 connector_sync = SimpleNamespace(
-    enqueue_github_poll_sync=_connector_poll_sync_placeholder("github"),
-    enqueue_linear_poll_sync=_connector_poll_sync_placeholder("linear"),
+    enqueue_github_poll_sync=_enqueue_cortex_poll_sync("github"),
+    enqueue_linear_poll_sync=_enqueue_cortex_poll_sync("linear"),
 )
 
 
