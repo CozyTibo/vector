@@ -2,11 +2,11 @@
 
 ## 1) Project Snapshot
 - **Architecture maturity:** Core foundation defined across Phases 01-04 and 10; storage/queryability challenge pass added.
-- **Implementation stage:** Phase 01 Step 0 **complete** (connector package + migration flags/policy). **Step 1 complete:** ingestion tables + `vector.domains.cortex.ingestion.sync_executor`, Celery `vector.cortex.ingestion.run_sync`, admin enqueue when `CORTEX_CONNECTOR_MIGRATION_*` routes the tenant. **Still open:** scheduled/orchestrated polling (**Step 2**), replay semantics (**Step 3**), envelope validation hardening (**Steps 4–5**), shadow/active parity + production rollout (**Step 6**).
-- **Current focus:** Phase 01 **Step 2** — polling cadence, queue lanes, scheduler wiring on top of the Step 1 executor.
+- **Implementation stage:** Phase 01 Step 0 **complete** (connector package + migration flags/policy). **Step 1 complete:** ingestion tables + `vector.domains.cortex.ingestion.sync_executor`, Celery `vector.cortex.ingestion.run_sync`, admin enqueue when `CORTEX_CONNECTOR_MIGRATION_*` routes the tenant. **Step 2 complete:** Celery Beat `vector.cortex.ingestion.scheduler_tick`, `cortex_live` queue routing, `vector.domains.cortex.ingestion.scheduler` (routed connections + min-gap), settings `CORTEX_INGESTION_*`. **Still open:** replay semantics (**Step 3**), envelope validation hardening (**Steps 4–5**), shadow/active parity + production rollout (**Step 6**).
+- **Current focus:** Phase 01 **Step 3** — replay-safe ingestion semantics and runtime boundaries.
 - **Total phases:** 10.
 - **Current blockers:** Cross-phase replay/query scaling validation; deploy must set **`CORTEX_CONNECTOR_MIGRATION_*`** when enabling routed sync; later-phase verification depth.
-- **Next major milestone:** Phase 01 Step 2 orchestration (scheduler + queue semantics), then replay/idempotency hardening (Steps 3–5).
+- **Next major milestone:** Phase 01 Step 3 replay-safe ingestion semantics, then persistence contract enforcement (Steps 4–5).
 
 ## 2) Phase Overview
 | Phase | Name | Goal | Architecture Status | Spec Completeness | Ready For Coding |
@@ -33,7 +33,7 @@
 | ------ | ---- | ----------- | ------------- | ----------- |
 | 0 | Connector migration safety plan | Legacy-to-Cortex connector cutover safety and rollback strategy | Strong | Yes (spec appendices + `vector.domains.cortex.connectors` + migration flags/policy; executor Step 6+) |
 | 1 | Connector ingestion lifecycle | Run → fetch → raw append-only rows → checkpoint (`ingestion_runs`, `raw_ingestion_records`, `connector_sync_state`) + Celery executor | Strong | Yes (`vector.domains.cortex.ingestion`, `app.tasks.cortex_ingestion_sync`, migration `20260508_0030`) |
-| 2 | Polling and orchestration model | Sync cadence, queueing, orchestration defined | Strong | No |
+| 2 | Polling and orchestration model | Sync cadence, queueing, orchestration defined | Strong | Yes (Beat tick + `cortex_live` lane + `iter_routed_live_sync_jobs`; env `CORTEX_INGESTION_SCHEDULER_*`, `CORTEX_INGESTION_MIN_GAP_SECONDS`) |
 | 3 | Replay-safe ingestion semantics | Ingestion replay behavior and boundaries defined | Strong | No |
 | 4 | Ingestion persistence contracts | Raw envelope, runs, checkpoints contracts defined | Strong | No |
 | 5 | Ingestion verification model | Invariant, failure-probe, chaos verification defined | Strong | No |
@@ -238,9 +238,9 @@
 **Confidence:** Medium Confidence
 
 ## 4) Current Implementation Priority
-- **Completed (Step 0–1):** Step 0 safety spec + `vector.domains.cortex.connectors` + migration policy. **Step 1:** Alembic `20260508_0030_cortex_phase01_ingestion_tables`, ORM `IngestionRun` / `RawIngestionRecord` / `ConnectorSyncState`, `vector.domains.cortex.ingestion.sync_executor`, Celery task `vector.cortex.ingestion.run_sync`, admin `connector_sync.enqueue_*` → task when flags route to Cortex; tests under `tests/vector/domains/cortex/`.
-- **Current goal:** Phase 01 **Step 2** — polling/orchestration (cadence, queue lanes, scheduler) documented in `01-ingestion/orchestration-model.md` and wired to enqueue **`run_sync`** on a schedule.
-- **Next planned implementation entry:** Step 2 scheduler + lane queues, then Step 3 replay semantics and Step 4 persistence contract enforcement in runtime.
+- **Completed (Step 0–2):** Step 0 safety spec + `vector.domains.cortex.connectors` + migration policy. **Step 1:** Alembic `20260508_0030_cortex_phase01_ingestion_tables`, ORM `IngestionRun` / `RawIngestionRecord` / `ConnectorSyncState`, `vector.domains.cortex.ingestion.sync_executor`, Celery task `vector.cortex.ingestion.run_sync`, admin `connector_sync.enqueue_*` → task when flags route to Cortex. **Step 2:** Beat schedule `vector.cortex.ingestion.scheduler_tick`, worker queue `cortex_live`, `app.tasks.cortex_ingestion_scheduler` + `vector.domains.cortex.ingestion.scheduler`; tests under `tests/vector/domains/cortex/`.
+- **Current goal:** Phase 01 **Step 3** — replay-safe ingestion semantics (`01-ingestion` replay docs) and runtime enforcement where specified.
+- **Next planned implementation entry:** Step 3 replay semantics, then Step 4 persistence contract enforcement in runtime.
 
 ## 5) Implementation Readiness
 | Phase | Architecture | Verification | Ready For Coding |

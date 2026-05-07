@@ -12,7 +12,7 @@ from vector.settings import get_settings
 _TASK_RUN_SYNC = "vector.cortex.ingestion.run_sync"
 
 
-@celery_app.task(name=_TASK_RUN_SYNC)
+@celery_app.task(name=_TASK_RUN_SYNC, queue="cortex_live")
 def run_cortex_connector_sync_task(
     tenant_id: str,
     connector_id: str,

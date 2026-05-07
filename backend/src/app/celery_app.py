@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import os
+from datetime import timedelta
 
 from celery import Celery
 from celery.signals import worker_process_init
@@ -63,6 +64,7 @@ celery_app = Celery(
         "app.tasks.email",
         "app.tasks.onboarding_activation_task",
         "app.tasks.cortex_ingestion_sync",
+        "app.tasks.cortex_ingestion_scheduler",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -75,7 +77,22 @@ celery_app.conf.imports = (
     "app.tasks.email",
     "app.tasks.onboarding_activation_task",
     "app.tasks.cortex_ingestion_sync",
+    "app.tasks.cortex_ingestion_scheduler",
 )
+
+# Phase 01 Step 2: live incremental sync lane (orchestration-model.md).
+celery_app.conf.task_routes = {
+    "vector.cortex.ingestion.run_sync": {"queue": "cortex_live"},
+}
+
+_tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "300"))
+_tick_seconds = max(60, _tick_seconds)
+celery_app.conf.beat_schedule = {
+    "cortex-ingestion-scheduler-tick": {
+        "task": "vector.cortex.ingestion.scheduler_tick",
+        "schedule": timedelta(seconds=_tick_seconds),
+    },
+}
 
 
 def _register_tasks() -> None:
@@ -83,6 +100,7 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")
     importlib.import_module("app.tasks.cortex_ingestion_sync")
+    importlib.import_module("app.tasks.cortex_ingestion_scheduler")
 
 
 _register_tasks()
@@ -94,3 +112,4 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")
     importlib.import_module("app.tasks.cortex_ingestion_sync")
+    importlib.import_module("app.tasks.cortex_ingestion_scheduler")
