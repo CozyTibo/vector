@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_GITHUB
+from vector.domains.cortex.connectors.provider_keys import CONNECTION_PROVIDER_GITHUB
 from vector.infrastructure.db.models.github_connection_detail import GithubConnectionDetail
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 

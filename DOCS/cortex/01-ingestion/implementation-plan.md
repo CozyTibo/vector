@@ -22,6 +22,7 @@
 - Boundary violations have explicit guard checks.
 
 ## Phase-Specific Implementation Blockers
-- Connector auth model not finalized
-- Raw envelope frozen-core doctrine not yet implemented in runtime validation
-- Step 0 migration inventory and compatibility gates not yet executed
+- Connector auth model not finalized (OAuth secrets + install flows exist; ingestion-scoped auth semantics still tied to Phase 01 runtime).
+- Raw envelope frozen-core doctrine not yet implemented in runtime validation.
+- ~~Step 0 migration inventory~~ **Done** — Appendix A in `phase-01-step-0-connector-migration-safety-spec.md` (2026-05-07).
+- ~~Step 0 migration flags (settings + routing policy)~~ **Done** — `CORTEX_CONNECTOR_MIGRATION_*`, `cortex_ingestion_policy`, admin enqueue stubs (2026-05-07). **Shadow/active dual execution and parity automation** still **Phase 01 Step 6+**.

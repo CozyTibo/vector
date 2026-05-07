@@ -2,11 +2,11 @@
 
 ## 1) Project Snapshot
 - **Architecture maturity:** Core foundation defined across Phases 01-04 and 10; storage/queryability challenge pass added.
-- **Implementation stage:** Architecture/spec phase (runtime coding for Cortex phases not started).
-- **Current focus:** Phase 01 implementation entry + Phase 02 implementation with caveat tracking.
+- **Implementation stage:** Phase 01 Step 0 **documentation + connector package under `domains/cortex/connectors/` + migration routing scaffolding** complete (`CORTEX_CONNECTOR_MIGRATION_*` settings, `cortex_ingestion_policy`, admin enqueue stubs); **Cortex ingestion executor** (workers, envelopes, dual-path shadow) still **not shipped**.
+- **Current focus:** Phase 01 Step 1+ toward runtime ingestion (lifecycle, orchestration, persistence wiring); Step 0 baseline is **§Appendix A** in `phase-01-step-0-connector-migration-safety-spec.md`.
 - **Total phases:** 10.
-- **Current blockers:** Cross-phase replay/query scaling validation and later-phase verification depth.
-- **Next major milestone:** Architecture-to-implementation readiness gate for initial phase coding sequence.
+- **Current blockers:** Cross-phase replay/query scaling validation; Cortex migration **feature flags not implemented** in `settings`/deploy yet; later-phase verification depth.
+- **Next major milestone:** Phase 01 runtime slice (ingestion executor + validation gates); first shadow rollout plan approval after executor exists.
 
 ## 2) Phase Overview
 | Phase | Name | Goal | Architecture Status | Spec Completeness | Ready For Coding |
@@ -31,7 +31,7 @@
 ### Phase 01 — Ingestion
 | Step # | Step | Description | Spec Accuracy | Implemented |
 | ------ | ---- | ----------- | ------------- | ----------- |
-| 0 | Connector migration safety plan | Legacy-to-Cortex connector cutover safety and rollback strategy | Defined | No |
+| 0 | Connector migration safety plan | Legacy-to-Cortex connector cutover safety and rollback strategy | Strong | Yes (spec appendices + `vector.domains.cortex.connectors` + migration flags/policy; executor Step 6+) |
 | 1 | Connector ingestion lifecycle | Source pull/push ingestion flow defined | Strong | No |
 | 2 | Polling and orchestration model | Sync cadence, queueing, orchestration defined | Strong | No |
 | 3 | Replay-safe ingestion semantics | Ingestion replay behavior and boundaries defined | Strong | No |
@@ -42,12 +42,13 @@
 ### Missing / Incomplete
 - Large-scale ingest + replay contention behavior still unvalidated in production.
 - Throughput limits and SLO envelopes remain theoretical until runtime testing.
-- Connector migration parity benchmarks (legacy vs Cortex path) not yet executed.
+- Connector migration parity benchmarks (legacy vs Cortex path): **legacy poll worker removed** — parity applies to **mock vs real API** and **future Cortex path vs prior behavior**, once executor exists.
 - Frozen-core contract doctrine is defined; runtime contract enforcement checks still to be implemented.
+- Step 0 **shadow rollout plan approval** blocked until **Phase 01 ingestion executor** + migration flags exist.
 
 ### Implementation Blockers
 - Storage/queryability threshold baselines must be finalized for replay-heavy windows.
-- Step 0 rollout gates must be executed in runtime rollout sequence before connector cutover.
+- ~~Step 0 documentation (single spec file + appendices)~~ **cleared** (2026-05-07). Production cutover still needs **executor** + soak behind flags.
 - Envelope stability policy must be wired into schema validation tests before rollout.
 
 **Confidence:** High Confidence
@@ -237,9 +238,9 @@
 **Confidence:** Medium Confidence
 
 ## 4) Current Implementation Priority
-- **Current focus:** Storage scalability and queryability hardening across phases.
-- **Current goal:** Convert architecture-defined phases into coding-ready slices with explicit readiness gates.
-- **Next planned implementation entry:** Phase 01 runtime implementation, then Phase 02 foundation wiring.
+- **Completed (Step 0):** `phase-01-step-0-connector-migration-safety-spec.md` (with appendices) + **code:** `vector/settings.py`, `vector/domains/cortex/connectors/` (including `cortex_ingestion_policy.py`), admin `connector_sync` stubs; tests under `tests/vector/domains/cortex/connectors/`.
+- **Current goal:** Implement Phase 01 **connector ingestion lifecycle and orchestration** (Steps 1–2) against frozen contracts; wire persistence (Step 4) and verification hooks (Step 5); **Step 6** adds migration flags + shadow/active execution per safety spec.
+- **Next planned implementation entry:** Phase 01 Steps 1–2 runtime (domain + worker boundaries), then raw-store handoff toward Phase 02.
 
 ## 5) Implementation Readiness
 | Phase | Architecture | Verification | Ready For Coding |

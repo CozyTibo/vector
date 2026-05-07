@@ -20,12 +20,12 @@ from vector.contracts.onboarding import (
     SlackMembersResponse,
     SlackWorkspaceMemberItem,
 )
-from vector.domains.connectors.slack.onboarding_dm import (
+from vector.domains.cortex.connectors.slack.onboarding_dm import (
     SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY,
     send_slack_handoff_welcome_dm,
 )
-from vector.domains.connectors.slack.workspace_channels import list_slack_workspace_public_channels
-from vector.domains.connectors.slack.workspace_members import list_slack_workspace_members
+from vector.domains.cortex.connectors.slack.workspace_channels import list_slack_workspace_public_channels
+from vector.domains.cortex.connectors.slack.workspace_members import list_slack_workspace_members
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.domains.onboarding.constants import (
     ONBOARDING_STEPS,

@@ -3,6 +3,8 @@
 ## Objective
 Migrate existing connector logic to Cortex-owned ingestion boundaries safely, without breaking current app behavior (frontend, HTTP routes, backend jobs, or tenant connector operations).
 
+**What “move to Cortex” means at Step 0:** put connector adapter/runtime code in **one** canonical package — `vector.domains.cortex.connectors` (filesystem `domains/cortex/connectors/`) — so Step 1 does not repeat a package shuffle or maintain two connector trees. That consolidation sits alongside **Cortex ingestion routing** (env flags, policy module, future worker dispatch hooks).
+
 ## Non-Negotiable Outcomes
 - Existing connector-facing product behavior remains stable during migration.
 - Existing API routes and response contracts remain backward-compatible during cutover.
@@ -41,6 +43,8 @@ Migrate existing connector logic to Cortex-owned ingestion boundaries safely, wi
 - `cortex_connector_migration_<connector>` (connector-level control).
 - `cortex_connector_migration_<connector>_tenants` (tenant cohort allowlist).
 - Emergency kill switch routes traffic to legacy path immediately.
+
+**Runtime (Vector codebase):** Environment variables `CORTEX_CONNECTOR_MIGRATION_*` map to `Settings` fields; routing uses `vector.domains.cortex.connectors.cortex_ingestion_policy` and `Settings.cortex_migration_route_active`. Admin enqueue shims (`connector_sync.enqueue_*`) raise `NotImplementedError` when the Cortex path is selected for a tenant but the executor is not wired yet.
 
 ## Backward-Compatibility Requirements
 ### API / Routes
@@ -90,10 +94,87 @@ Migrate existing connector logic to Cortex-owned ingestion boundaries safely, wi
 4. Expand connector-by-connector with rollout gates.
 5. Complete legacy path decommission and cleanup.
 
+## Repository baseline (Vector, 2026-05-07)
+
+- **Connector OAuth/install/disconnect** for `calls`, `github`, `linear`, `notion`, `slack` is implemented and forms the **primary external contract** to preserve during Phase 01.
+- **Scheduled ingestion poll workers** that previously enqueued from admin **were removed**; admin exposes **stub** enqueue functions that raise. Phase 01 therefore introduces ingestion **execution** largely as **net-new** wiring into existing connections and persistence contracts—not a live “shadow vs legacy worker” dual path until a replacement worker ships.
+- **Mock connectors** (`VECTOR_USE_MOCK_CONNECTORS` in `development` only) remain the local parity surface; production uses real provider APIs.
+
+When dual-path (shadow/active) is implemented, apply **Migration Strategy** below; until then, **rollback** means **disable migration flags**, **stop enqueueing ingestion**, and **stabilize**—there is **no legacy poll worker** to fall back to until the replacement executor ships (connectors can stay OAuth-connected while freshness stalls).
+
+## Appendix A — Codebase inventory (Step 0 snapshot)
+
+**Purpose:** What exists today, what must stay stable, where Phase 01 runtime attaches.
+
+### Executive baseline
+
+| Fact | Implication |
+| --- | --- |
+| OAuth / install / disconnect live for five providers | Routes and response shapes are compatibility-critical. |
+| Legacy Celery poll-sync enqueue **removed** (admin shims raise) | No parallel legacy worker to dual-run; Phase 01 adds **net-new** execution. |
+| DB migrations include ingestion tables (`ingestion_runs`, `raw_ingestion_records`, …) | Align writers with frozen contracts in `01-ingestion/*schema*.md`. |
+| Mock connectors dev-only (`VECTOR_USE_MOCK_CONNECTORS`, `ENV=development`) | Parity gates cover mock + real APIs where applicable. |
+
+### HTTP surface (preserve)
+
+| Method | Path | Role |
+| --- | --- | --- |
+| GET | `/connectors` | List connector status |
+| POST | `/connectors/install/prepare` | Install ticket for SPA OAuth |
+| DELETE | `/connectors/{provider_id}` | Disconnect |
+
+Provider mounts: `/connectors/github|linear|notion|calls|slack`. **Slack:** `GET /slack/callback` at app root (`SLACK_CALLBACK_URL`). Contracts: `vector.contracts.connectors`.
+
+### Domain
+
+- Registry: `vector.domains.cortex.connectors.runtime` → adapters `calls`, `github`, `linear`, `notion`, `slack`.
+- Ingestion workers should resolve connector type through this registry (or a successor facade).
+
+### Admin / workers
+
+- Admin: `vector.api.http.routes.admin` (lifecycle, OAuth starts, reset/delete).
+- `connector_sync.enqueue_*`: stubs; when Cortex path selected → `NotImplementedError` until executor exists.
+- Celery: email/onboarding today; future ingestion tasks register per `orchestration-model.md`.
+- Logs: `vector.infrastructure.observability.ingestion_tasks.log_ingestion_event` when tasks exist.
+
+### Env: migration flags (implemented)
+
+| Variable | Role |
+| --- | --- |
+| `CORTEX_CONNECTOR_MIGRATION_ENABLED` | Master switch |
+| `CORTEX_CONNECTOR_MIGRATION_CALLS` / `_GITHUB` / `_LINEAR` / `_NOTION` / `_SLACK` | Per-connector path |
+| `CORTEX_CONNECTOR_MIGRATION_<CONNECTOR>_TENANTS` | Optional comma-separated tenant UUIDs; empty = all |
+
+Routing: `vector.domains.cortex.connectors.cortex_ingestion_policy` + `Settings.cortex_migration_route_active`.
+
+### Other
+
+- DB / alembic: Step 1 ingestion migrations; tenant data via `tenant_connections`.
+- Frontend: preserve list / install / OAuth / disconnect flows.
+- Mock stack: `backend/mock_connectors/` (local dev).
+
+Update this appendix when routes, providers, or queue wiring change.
+
+## Appendix B — Rollback drill procedure
+
+**Objectives:** Disabling Cortex routing restores safe behavior quickly; observability shows path when dual-path exists; rolled-back runs stop **new** bad writes (append-only raw history retained).
+
+**Immediate rollback (minutes):** Turn off migration flags for affected scope; drain/cancel in-flight Cortex tasks for that scope; do not delete DB rows; alert if production impact.
+
+**Controlled recovery (hours):** Parity delta → root cause → patch → shadow mode (when implemented) → active only after gates pass.
+
+**Codebase caveat:** Until a **production ingestion executor** exists, rollback is **stop tasks + stop enqueueing**—not “flip to legacy worker.” Connectors may stay connected; **freshness** may stall until restored.
+
+**Staging drill (when executor exists):** One low-risk connector + internal tenant → bounded sync → simulate failure (flag off or crash) → confirm no retry storm; document times.
+
+**Drill approved when:** Kill switch exercised in staging post-executor; owner assigned.
+
 ## Implementation Readiness Exit For Step 0
 Step 0 is complete only when:
-- inventory is complete and reviewed,
-- compatibility gates are codified,
-- feature flags and kill switch strategy are documented,
-- rollback drill procedure is defined,
-- first shadow rollout plan is approved.
+- connector runtime/adapters live only under **`vector.domains.cortex.connectors`** (no parallel `vector.domains.connectors` tree),
+- inventory and rollback procedure are captured (**this document — Appendix A/B**),
+- compatibility gates are codified (gates table + Appendix A contract scope),
+- feature flags and kill-switch behavior are documented (**§ Feature Flags** + env table in Appendix A),
+- first shadow rollout plan is approved (**pending** — requires ingestion executor).
+
+**Step 0 runtime scaffolding (flags + policy + package location):** `vector/settings.py`, `vector/domains/cortex/connectors/` (including `cortex_ingestion_policy.py`), admin `connector_sync` stubs. **Ingestion executor / shadow-active dual path:** Phase 01 Step 6+.

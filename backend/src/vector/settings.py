@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from pathlib import Path
 from typing import Self
 
@@ -213,6 +214,64 @@ class Settings(BaseSettings):
             "Set false in pytest (or CI) to avoid enqueueing SMTP when admin tests toggle access."
         ),
     )
+    cortex_connector_migration_enabled: bool = Field(
+        default=False,
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_ENABLED",
+        description=(
+            "Phase 01: master switch for Cortex-owned ingestion. When false, poll/enqueue sites "
+            "stay disabled (legacy removed)."
+        ),
+    )
+    cortex_connector_migration_calls: bool = Field(
+        default=False,
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_CALLS",
+        description="Enable Cortex ingestion path for calls connector (requires master switch).",
+    )
+    cortex_connector_migration_github: bool = Field(
+        default=False,
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_GITHUB",
+        description="Enable Cortex ingestion path for GitHub connector (requires master switch).",
+    )
+    cortex_connector_migration_linear: bool = Field(
+        default=False,
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_LINEAR",
+        description="Enable Cortex ingestion path for Linear connector (requires master switch).",
+    )
+    cortex_connector_migration_notion: bool = Field(
+        default=False,
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_NOTION",
+        description="Enable Cortex ingestion path for Notion connector (requires master switch).",
+    )
+    cortex_connector_migration_slack: bool = Field(
+        default=False,
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_SLACK",
+        description="Enable Cortex ingestion path for Slack connector (requires master switch).",
+    )
+    cortex_connector_migration_calls_tenants: str = Field(
+        default="",
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_CALLS_TENANTS",
+        description="Optional comma-separated tenant UUID allowlist; empty = all tenants.",
+    )
+    cortex_connector_migration_github_tenants: str = Field(
+        default="",
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_GITHUB_TENANTS",
+        description="Optional comma-separated tenant UUID allowlist; empty = all tenants.",
+    )
+    cortex_connector_migration_linear_tenants: str = Field(
+        default="",
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_LINEAR_TENANTS",
+        description="Optional comma-separated tenant UUID allowlist; empty = all tenants.",
+    )
+    cortex_connector_migration_notion_tenants: str = Field(
+        default="",
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_NOTION_TENANTS",
+        description="Optional comma-separated tenant UUID allowlist; empty = all tenants.",
+    )
+    cortex_connector_migration_slack_tenants: str = Field(
+        default="",
+        validation_alias="CORTEX_CONNECTOR_MIGRATION_SLACK_TENANTS",
+        description="Optional comma-separated tenant UUID allowlist; empty = all tenants.",
+    )
 
     @field_validator("github_app_private_key", mode="before")
     @classmethod
@@ -305,6 +364,48 @@ class Settings(BaseSettings):
 
     def notion_api_base_url(self) -> str:
         return "https://api.notion.com/v1"
+
+    def cortex_migration_route_active(self, connector_id: str, tenant_id: uuid.UUID) -> bool:
+        """True when migration flags route this connector×tenant onto the Cortex ingestion path."""
+        if not self.cortex_connector_migration_enabled:
+            return False
+        flag_by_id = {
+            "calls": self.cortex_connector_migration_calls,
+            "github": self.cortex_connector_migration_github,
+            "linear": self.cortex_connector_migration_linear,
+            "notion": self.cortex_connector_migration_notion,
+            "slack": self.cortex_connector_migration_slack,
+        }
+        if not flag_by_id.get(connector_id):
+            return False
+        allow = self._cortex_migration_tenant_allowlist(connector_id)
+        if allow is None:
+            return True
+        return tenant_id in allow
+
+    def _cortex_migration_tenant_allowlist(self, connector_id: str) -> frozenset[uuid.UUID] | None:
+        raw_by_id = {
+            "calls": self.cortex_connector_migration_calls_tenants,
+            "github": self.cortex_connector_migration_github_tenants,
+            "linear": self.cortex_connector_migration_linear_tenants,
+            "notion": self.cortex_connector_migration_notion_tenants,
+            "slack": self.cortex_connector_migration_slack_tenants,
+        }
+        raw = (raw_by_id.get(connector_id) or "").strip()
+        if not raw:
+            return None
+        parsed: set[uuid.UUID] = set()
+        for part in raw.split(","):
+            p = part.strip()
+            if not p:
+                continue
+            try:
+                parsed.add(uuid.UUID(p))
+            except ValueError:
+                continue
+        if not parsed:
+            return None
+        return frozenset(parsed)
 
     def calls_google_oauth_authorize_url(self) -> str:
         return "https://accounts.google.com/o/oauth2/v2/auth"

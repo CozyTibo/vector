@@ -46,17 +46,21 @@ from vector.contracts.admin import (
     TenantListResponse,
 )
 from vector.contracts.onboarding import OnboardingCompleteResponse
-from vector.domains.connectors.calls.errors import CallsConnectorNotConfiguredError
-from vector.domains.connectors.calls.oauth_flow import start_calls_oauth_url
-from vector.domains.connectors.github.errors import GitHubConnectorNotConfiguredError
-from vector.domains.connectors.github.install_flow import start_github_install_url
-from vector.domains.connectors.linear.errors import LinearConnectorNotConfiguredError
-from vector.domains.connectors.linear.oauth_flow import start_linear_oauth_url
-from vector.domains.connectors.notion.errors import NotionConnectorNotConfiguredError
-from vector.domains.connectors.notion.oauth_flow import start_notion_oauth_url
-from vector.domains.connectors.runtime import runtime_by_id
-from vector.domains.connectors.slack.errors import SlackConnectorNotConfiguredError
-from vector.domains.connectors.slack.oauth_flow import start_slack_oauth_url
+from vector.domains.cortex.connectors.calls.errors import CallsConnectorNotConfiguredError
+from vector.domains.cortex.connectors.calls.oauth_flow import start_calls_oauth_url
+from vector.domains.cortex.connectors.cortex_ingestion_policy import (
+    extract_tenant_id_from_enqueue_args,
+    should_route_ingestion_to_cortex,
+)
+from vector.domains.cortex.connectors.github.errors import GitHubConnectorNotConfiguredError
+from vector.domains.cortex.connectors.github.install_flow import start_github_install_url
+from vector.domains.cortex.connectors.linear.errors import LinearConnectorNotConfiguredError
+from vector.domains.cortex.connectors.linear.oauth_flow import start_linear_oauth_url
+from vector.domains.cortex.connectors.notion.errors import NotionConnectorNotConfiguredError
+from vector.domains.cortex.connectors.notion.oauth_flow import start_notion_oauth_url
+from vector.domains.cortex.connectors.runtime import runtime_by_id
+from vector.domains.cortex.connectors.slack.errors import SlackConnectorNotConfiguredError
+from vector.domains.cortex.connectors.slack.oauth_flow import start_slack_oauth_url
 from vector.domains.onboarding.constants import (
     ONBOARDING_ALL_TOOL_IDS,
     ONBOARDING_PROFILE_ROLE_CANONICAL,
@@ -94,15 +98,33 @@ from vector.settings import Settings, get_settings
 _logger = logging.getLogger("app")
 
 
-def _legacy_connector_sync_removed(*_a: object, **_k: object) -> None:
-    raise RuntimeError("Legacy connector ingestion was removed.")
+def _connector_poll_sync_placeholder(connector_id: str):
+    """Legacy enqueue removed; Cortex path gated by migration flags (Phase 01 Step 0+)."""
+
+    def _fn(*args: object, **kwargs: object) -> None:
+        settings = get_settings()
+        tenant_id = extract_tenant_id_from_enqueue_args(args, kwargs)
+        if tenant_id is not None and should_route_ingestion_to_cortex(
+            settings, connector_id, tenant_id
+        ):
+            raise NotImplementedError(
+                "Cortex ingestion executor is not wired yet (Phase 01 runtime). "
+                "Migration flags select the Cortex path; disable CORTEX_CONNECTOR_MIGRATION_* "
+                "if unintentional."
+            )
+        raise RuntimeError(
+            "Connector poll ingestion is unavailable: legacy enqueue was removed. "
+            "After the Cortex executor exists, use CORTEX_CONNECTOR_MIGRATION_* for routed tenants."
+        )
+
+    return _fn
 
 
 # Backward-compat shim for tests/patch targets that still reference
 # `vector.api.http.routes.admin.connector_sync`.
 connector_sync = SimpleNamespace(
-    enqueue_github_poll_sync=_legacy_connector_sync_removed,
-    enqueue_linear_poll_sync=_legacy_connector_sync_removed,
+    enqueue_github_poll_sync=_connector_poll_sync_placeholder("github"),
+    enqueue_linear_poll_sync=_connector_poll_sync_placeholder("linear"),
 )
 
 

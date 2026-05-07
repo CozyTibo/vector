@@ -4,7 +4,7 @@ This directory is the architecture source of truth for Cortex: an organizational
 
 ## Core Sections
 - `00-overview/`: architecture constraints, invariants, terminology policy, traceability matrices, governance, lifecycle, and failure stance.
-- `01-10*/`: phase-specific contracts, ownership boundaries, and readiness gates.
+- `01-10*/`: phase-specific contracts, ownership boundaries, and readiness gates (Phase 01 Step 0 migration safety + inventory appendices live in `01-ingestion/phase-01-step-0-connector-migration-safety-spec.md`).
 - `schemas/`: ontology, contracts, dependency matrices, field semantics, provenance/confidence, temporal and memory model semantics.
 - `connectors/`: connector depth and adapter-only strategy (no intelligence leakage).
 - `adr/`: architecture decisions constraining implementation.

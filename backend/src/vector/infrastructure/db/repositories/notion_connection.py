@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_NOTION
+from vector.domains.cortex.connectors.provider_keys import CONNECTION_PROVIDER_NOTION
 from vector.infrastructure.db.models.notion_connection_detail import NotionConnectionDetail
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 

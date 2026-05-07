@@ -16,13 +16,13 @@ from vector.api.http.deps import (
     settings_dep,
 )
 from vector.api.http.routes.connectors.install_response import install_redirect_or_json
-from vector.domains.connectors.linear.errors import (
+from vector.domains.cortex.connectors.linear.errors import (
     InvalidLinearOAuthStateError,
     LinearConnectorNotConfiguredError,
     LinearInstallStateMembershipError,
     LinearOAuthError,
 )
-from vector.domains.connectors.linear.oauth_flow import (
+from vector.domains.cortex.connectors.linear.oauth_flow import (
     complete_linear_oauth,
     start_linear_oauth_url,
 )

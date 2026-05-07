@@ -11,14 +11,14 @@ from sqlalchemy.orm import Session
 
 from vector.api.http.deps import connector_install_claims_dependency, get_db, settings_dep
 from vector.api.http.routes.connectors.install_response import install_redirect_or_json
-from vector.domains.connectors.slack.errors import (
+from vector.domains.cortex.connectors.slack.errors import (
     InvalidSlackOAuthStateError,
     SlackConnectorNotConfiguredError,
     SlackInstallStateMembershipError,
     SlackOAuthError,
     SlackWorkspaceConflictError,
 )
-from vector.domains.connectors.slack.oauth_flow import (
+from vector.domains.cortex.connectors.slack.oauth_flow import (
     complete_slack_oauth,
     slack_oauth_error_frontend_redirect_url,
     start_slack_oauth_url,
