@@ -1,0 +1,46 @@
+# Ingestion State Machine
+
+## Connector State Machine
+States:
+- `PENDING`
+- `READY`
+- `RUNNING`
+- `THROTTLED`
+- `RETRYING`
+- `PARTIAL_FAILURE`
+- `FAILED`
+- `DISABLED`
+- `MAINTENANCE`
+- `REPLAYING`
+- `COMPLETED`
+
+Allowed transitions:
+- `PENDING -> READY`
+- `READY -> RUNNING`
+- `RUNNING -> CHECKPOINTING` (substate)
+- `RUNNING -> THROTTLED`
+- `THROTTLED -> RUNNING`
+- `RUNNING -> PARTIAL_FAILURE`
+- `PARTIAL_FAILURE -> RETRYING`
+- `RETRYING -> RUNNING`
+- `RETRYING -> FAILED`
+- `RUNNING -> COMPLETED`
+- `READY -> DISABLED`
+- `DISABLED -> READY`
+- `READY -> MAINTENANCE`
+- `MAINTENANCE -> READY`
+- `READY -> REPLAYING`
+- `REPLAYING -> COMPLETED | FAILED`
+
+Forbidden transitions:
+- `FAILED -> RUNNING` (must pass `RETRYING` or operator reset).
+- `DISABLED -> RUNNING` (must go through `READY`).
+- `MAINTENANCE -> RUNNING` (must go through `READY`).
+
+## Sync Run State Machine
+- `REGISTERED -> SCHEDULED -> RUNNING -> CHECKPOINTING -> COMPLETED`
+- failure branches:
+  - `RUNNING -> PARTIAL_FAILURE -> RETRYING -> RUNNING`
+  - `RUNNING -> FAILED`
+- replay branch:
+  - `REGISTERED -> REPLAYING -> CHECKPOINTING -> COMPLETED|FAILED`
