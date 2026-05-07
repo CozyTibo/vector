@@ -9,7 +9,6 @@ from types import SimpleNamespace
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -34,18 +33,6 @@ from vector.contracts.admin import (
     AdminToolOptionItem,
     AdminUserListItem,
     AdminUserListResponse,
-    ManagerInsightApplyDecisionRequest,
-    ManagerInsightApplyDryRunResponse,
-    ManagerInsightApplyLiveResponse,
-    ManagerInsightDecisionRow,
-    ManagerInsightDecisionsListResponse,
-    ManagerInsightDismissDecisionRequest,
-    ManagerInsightDismissDecisionResponse,
-    ManagerInsightEvaluateOutcomeItemResult,
-    ManagerInsightEvaluateOutcomesRequest,
-    ManagerInsightEvaluateOutcomesResponse,
-    ManagerInsightOutcomeRow,
-    ManagerInsightOutcomesListResponse,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
     SlackCollaboratorMemberSnapshot,
@@ -58,7 +45,6 @@ from vector.contracts.admin import (
     TenantListItem,
     TenantListResponse,
 )
-from vector.contracts.manager_insights_activity import ManagerInsightFetchDebugResponse
 from vector.contracts.onboarding import OnboardingCompleteResponse
 from vector.domains.connectors.calls.errors import CallsConnectorNotConfiguredError
 from vector.domains.connectors.calls.oauth_flow import start_calls_oauth_url
@@ -71,20 +57,6 @@ from vector.domains.connectors.notion.oauth_flow import start_notion_oauth_url
 from vector.domains.connectors.runtime import runtime_by_id
 from vector.domains.connectors.slack.errors import SlackConnectorNotConfiguredError
 from vector.domains.connectors.slack.oauth_flow import start_slack_oauth_url
-from vector.domains.manager_insights import run_manager_insights_fetch_debug
-from vector.domains.manager_insights.apply_decision_dry_run import (
-    plan_manager_insight_apply_dry_run,
-)
-from vector.domains.manager_insights.apply_decision_live import (
-    LiveApplyUnsupportedError,
-    execute_manager_insight_live_apply,
-)
-from vector.domains.manager_insights.dismiss_decision import (
-    ManagerInsightDismissNotFoundError,
-    ManagerInsightDismissTerminalError,
-    persist_manager_insight_dismiss,
-)
-from vector.domains.manager_insights.evaluate_outcomes import run_evaluate_outcomes_for_tenant
 from vector.domains.onboarding.constants import (
     ONBOARDING_ALL_TOOL_IDS,
     ONBOARDING_PROFILE_ROLE_CANONICAL,
@@ -113,13 +85,6 @@ from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.repositories import onboarding as onboarding_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
-from vector.infrastructure.db.repositories.manager_insight_decisions import (
-    get_manager_insight_decision_for_tenant,
-    list_manager_insight_decisions_for_tenant,
-)
-from vector.infrastructure.db.repositories.manager_insight_outcomes import (
-    list_manager_insight_outcomes_for_tenant,
-)
 from vector.infrastructure.email.onboarding_activation import (
     enqueue_onboarding_activation_email,
     onboarding_entry_url,
@@ -1128,301 +1093,6 @@ def build_admin_router() -> APIRouter:
             connect_url=connect_url,
             tenant_id=tenant_id,
             user_id=member.id,
-        )
-
-    @r.get(
-        "/tenants/{tenant_id}/manager-insight/decisions",
-        response_model=ManagerInsightDecisionsListResponse,
-    )
-    def manager_insight_list_persisted_decisions(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        limit: Annotated[int, Query(ge=1, le=200)] = 50,
-        offset: Annotated[int, Query(ge=0)] = 0,
-        status: Annotated[
-            str | None,
-            Query(description="Exact match on persisted row `status` (e.g. proposed, accepted)."),
-        ] = None,
-        decision_type: Annotated[
-            str | None,
-            Query(description="Exact match on coordination `decision_type`."),
-        ] = None,
-        gap_type: Annotated[
-            str | None,
-            Query(description="Exact match on `gap_type`."),
-        ] = None,
-        gap_id: Annotated[
-            str | None,
-            Query(description="§6 Step 34: exact match on coordination `gap_id`."),
-        ] = None,
-        run_id: Annotated[
-            uuid.UUID | None,
-            Query(description="Filter to decisions from one manager-insight run (`run_id`)."),
-        ] = None,
-    ) -> ManagerInsightDecisionsListResponse:
-        """List persisted coordination decisions from PostgreSQL (§6 Steps 33–34: pagination + filters)."""
-        _assert_tenant(db, tenant_id)
-        page = list_manager_insight_decisions_for_tenant(
-            db,
-            tenant_id=tenant_id,
-            limit=limit,
-            offset=offset,
-            status=status,
-            decision_type=decision_type,
-            gap_type=gap_type,
-            gap_id=gap_id,
-            run_id=run_id,
-        )
-        return ManagerInsightDecisionsListResponse(
-            tenant_id=tenant_id,
-            total=page.total,
-            limit=limit,
-            offset=offset,
-            items=[ManagerInsightDecisionRow.model_validate(r) for r in page.items],
-        )
-
-    @r.get(
-        "/tenants/{tenant_id}/manager-insight/outcomes",
-        response_model=ManagerInsightOutcomesListResponse,
-    )
-    def manager_insight_list_outcomes(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        limit: Annotated[int, Query(ge=1, le=200)] = 50,
-        offset: Annotated[int, Query(ge=0)] = 0,
-    ) -> ManagerInsightOutcomesListResponse:
-        """List persisted coordination outcomes from PostgreSQL (§6 Step 39)."""
-        _assert_tenant(db, tenant_id)
-        page = list_manager_insight_outcomes_for_tenant(
-            db,
-            tenant_id=tenant_id,
-            limit=limit,
-            offset=offset,
-        )
-        return ManagerInsightOutcomesListResponse(
-            tenant_id=tenant_id,
-            total=page.total,
-            limit=limit,
-            offset=offset,
-            items=[ManagerInsightOutcomeRow.model_validate(r) for r in page.items],
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/manager-insight/evaluate-outcomes",
-        response_model=ManagerInsightEvaluateOutcomesResponse,
-    )
-    def manager_insight_evaluate_outcomes(
-        tenant_id: uuid.UUID,
-        body: ManagerInsightEvaluateOutcomesRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> ManagerInsightEvaluateOutcomesResponse:
-        """§6 Step 41 — deterministic ``ground_truth`` rules on persisted outcomes (no ML)."""
-        _assert_tenant(db, tenant_id)
-        processed, skipped, scanned, rows = run_evaluate_outcomes_for_tenant(
-            db,
-            tenant_id=tenant_id,
-            limit=body.limit,
-            reset=body.reset,
-        )
-        return ManagerInsightEvaluateOutcomesResponse(
-            tenant_id=tenant_id,
-            processed=processed,
-            skipped=skipped,
-            scanned=scanned,
-            items=[
-                ManagerInsightEvaluateOutcomeItemResult(
-                    outcome_id=r.outcome_id,
-                    decision_id=r.decision_id,
-                    rules_applied=r.rules_applied,
-                    ground_truth_before=r.ground_truth_before,
-                    ground_truth_after=r.ground_truth_after,
-                )
-                for r in rows
-            ],
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/manager-insight/decisions/{decision_id}/dismiss",
-        response_model=ManagerInsightDismissDecisionResponse,
-    )
-    def manager_insight_dismiss_decision(
-        tenant_id: uuid.UUID,
-        decision_id: uuid.UUID,
-        body: ManagerInsightDismissDecisionRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> ManagerInsightDismissDecisionResponse:
-        """§6 Step 40 — insert ``dismissed`` outcome and set decision ``status``."""
-        _assert_tenant(db, tenant_id)
-        try:
-            outcome, decision, idempotent = persist_manager_insight_dismiss(
-                db,
-                tenant_id=tenant_id,
-                decision_id=decision_id,
-                user_attribution=body.user_attribution,
-                false_positive=body.false_positive,
-                ground_truth=body.ground_truth,
-            )
-        except ManagerInsightDismissNotFoundError:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Decision not found.") from None
-        except ManagerInsightDismissTerminalError as exc:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
-                detail={
-                    "message": "Decision is in a terminal state; cannot dismiss (§6 Step 40).",
-                    "status": exc.status,
-                },
-            ) from None
-        return ManagerInsightDismissDecisionResponse(
-            tenant_id=tenant_id,
-            decision_id=decision_id,
-            decision_status=decision.status,
-            idempotent=idempotent,
-            outcome=ManagerInsightOutcomeRow.model_validate(outcome),
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/manager-insight/decisions/{decision_id}/apply",
-        response_model=ManagerInsightApplyDryRunResponse | ManagerInsightApplyLiveResponse,
-    )
-    def manager_insight_apply_decision(
-        tenant_id: uuid.UUID,
-        decision_id: uuid.UUID,
-        body: ManagerInsightApplyDecisionRequest,
-        db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> ManagerInsightApplyDryRunResponse | ManagerInsightApplyLiveResponse:
-        """§6 Steps 37–38 — dry-run plan or gated live apply with ``receipt`` persistence."""
-        _assert_tenant(db, tenant_id)
-        row = get_manager_insight_decision_for_tenant(
-            db,
-            tenant_id=tenant_id,
-            decision_id=decision_id,
-        )
-        if row is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Decision not found.") from None
-
-        if body.dry_run:
-            try:
-                default_action, planned_payload = plan_manager_insight_apply_dry_run(row)
-            except ValidationError as exc:
-                raise HTTPException(
-                    status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=exc.errors(include_url=False),
-                ) from exc
-            return ManagerInsightApplyDryRunResponse(
-                tenant_id=tenant_id,
-                decision_id=row.id,
-                run_id=row.run_id,
-                gap_id=row.gap_id,
-                decision_type=row.decision_type,
-                title=row.title,
-                decision_status=row.status,
-                default_action=default_action.model_dump(mode="json"),
-                planned_payload=planned_payload,
-            )
-
-        if not settings.vector_manager_insights_live_apply_enabled:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                detail=(
-                    "Live apply disabled (§6 Step 38). "
-                    "Set VECTOR_MANAGER_INSIGHTS_LIVE_APPLY_ENABLED=1 on the API."
-                ),
-            ) from None
-
-        try:
-            receipt, decision_status, default_action_dump, planned_payload = (
-                execute_manager_insight_live_apply(db, tenant_id=tenant_id, row=row)
-            )
-        except ValidationError as exc:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=exc.errors(include_url=False),
-            ) from exc
-        except LiveApplyUnsupportedError as exc:
-            raise HTTPException(
-                status.HTTP_501_NOT_IMPLEMENTED,
-                detail={
-                    "message": "Live apply is not implemented for this default_action.",
-                    "kind": exc.kind,
-                    "connector": exc.connector,
-                },
-            ) from exc
-
-        return ManagerInsightApplyLiveResponse(
-            tenant_id=tenant_id,
-            decision_id=row.id,
-            run_id=row.run_id,
-            gap_id=row.gap_id,
-            decision_type=row.decision_type,
-            title=row.title,
-            decision_status=decision_status,
-            default_action=default_action_dump,
-            planned_payload=planned_payload,
-            receipt=receipt,
-        )
-
-    @r.get(
-        "/tenants/{tenant_id}/manager-insight/fetch-debug",
-        response_model=ManagerInsightFetchDebugResponse,
-    )
-    def manager_insight_fetch_debug(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
-        window_days: Annotated[int, Query(ge=1, le=366)] = 30,
-        perception: Annotated[
-            Literal["regex"] | None,
-            Query(description="§6 Step 11 QA: echo regex-path hint on perception_qa (does not change pipeline)."),
-        ] = None,
-        include_execution_graph: Annotated[
-            int,
-            Query(
-                ge=0,
-                le=1,
-                description="§6 Step 16: when 1, attach execution_graph JSON (also see VECTOR_MANAGER_INSIGHTS_INCLUDE_EXECUTION_GRAPH).",
-            ),
-        ] = 0,
-        master_plan_debug: Annotated[
-            int,
-            Query(
-                ge=0,
-                le=1,
-                description=(
-                    "When 1: request-scoped coordination debug — perception LLM on, execution_graph attached, "
-                    "gaps_use_graph for this run. Admin UI often defaults this on."
-                ),
-            ),
-        ] = 0,
-        max_decisions: Annotated[
-            int | None,
-            Query(
-                ge=1,
-                le=50,
-                description="§6 Step 28: cap `decisions_prioritized` length (overrides VECTOR_MANAGER_INSIGHTS_MAX_DECISIONS_SURFACED).",
-            ),
-        ] = None,
-        persist_decisions: Annotated[
-            int,
-            Query(
-                ge=0,
-                le=1,
-                description="§6 Step 32: when 1, upsert capped `decisions_prioritized` into manager_insight_decisions; response lists `persisted_decision_ids`.",
-            ),
-        ] = 0,
-    ) -> ManagerInsightFetchDebugResponse:
-        """Run Manager insights coordination fetch-debug (perceive → detect → decide; narrative bundles omitted)."""
-        _assert_tenant(db, tenant_id)
-        return run_manager_insights_fetch_debug(
-            db,
-            settings,
-            tenant_id=tenant_id,
-            window_days=window_days,
-            perception_query_regex=perception == "regex",
-            include_execution_graph=bool(include_execution_graph),
-            master_plan_debug=bool(master_plan_debug),
-            max_decisions=max_decisions,
-            persist_decisions=bool(persist_decisions),
         )
 
     return r

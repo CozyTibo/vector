@@ -159,7 +159,7 @@ export default function AdminWorkspacePage() {
       <header className="shrink-0 border-b border-stone-200/80 pb-2">
         <h1 className="text-lg font-semibold tracking-tight text-stone-900">{t.company_name}</h1>
         <p className="text-[11px] leading-snug text-stone-500">
-          Company snapshot — open tabs above for workspace controls, website onboarding, integrations, and manager insight.
+          Company snapshot — open tabs above for workspace controls, website onboarding, and integrations.
         </p>
       </header>
 

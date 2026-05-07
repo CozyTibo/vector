@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useMemo } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import {
@@ -72,21 +72,6 @@ function SettingsColumnGroup({ title, children }: { title: string; children: Rea
   );
 }
 
-/** Compact label — value rows (no rigid grid) */
-function ConfigRows({ rows }: { rows: { label: string; value: string }[] }) {
-  return (
-    <ul className="space-y-2.5">
-      {rows.map((row) => (
-        <li key={row.label} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm leading-snug">
-          <span className="text-zinc-500">{row.label}</span>
-          <span className="select-none text-zinc-300">·</span>
-          <span className="font-medium text-zinc-900">{row.value}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function SettingBlock({
   title,
   description,
@@ -143,8 +128,6 @@ export default function AppTeamSpacePage() {
   const apiBase = productApiBase();
   const me = useProductMeQuery(apiBase);
   const tenantId = me.data?.tenant_id;
-
-  const [managerInsightsOn, setManagerInsightsOn] = useState(true);
 
   const ob = useQuery({
     queryKey: ["onboarding", apiBase, tenantId ?? ""],
@@ -238,20 +221,6 @@ export default function AppTeamSpacePage() {
         <div className="lg:col-span-7">
           <div className="flex flex-col gap-6 lg:gap-8">
             <SettingsColumnGroup title="Reporting">
-              <SettingBlock
-                title="Manager insights"
-                description="Focused digests for leads—signals and context without the full team report."
-                enabled={managerInsightsOn}
-                onToggle={setManagerInsightsOn}
-              >
-                <ConfigRows
-                  rows={[
-                    { label: "Where insights go", value: "Slack" },
-                    { label: "Frequency", value: "Weekly" },
-                  ]}
-                />
-              </SettingBlock>
-
               <SettingBlock
                 title="Reports"
                 description="Scheduled summaries to Slack so managers stay oriented without digging through threads."

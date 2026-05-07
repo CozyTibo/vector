@@ -7,7 +7,6 @@ import AdminLayout from "./admin/AdminLayout.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantOnboardingPage from "./admin/AdminTenantOnboardingPage.tsx";
 import AdminTenantLayout from "./admin/AdminTenantLayout.tsx";
-import AdminTenantManagerInsightPage from "./admin/AdminTenantManagerInsightPage.tsx";
 import AdminWorkspacePage from "./admin/AdminWorkspacePage.tsx";
 import AdminUsersPage from "./admin/AdminUsersPage.tsx";
 import AdminWorkspacesPage from "./admin/AdminWorkspacesPage.tsx";
@@ -71,7 +70,6 @@ createRoot(document.getElementById("root")!).render(
               <Route path="onboarding" element={<AdminTenantOnboardingPage />} />
               <Route path="overview" element={<RedirectTenantToWorkspace />} />
               <Route path="integrations" element={<AdminIntegrationsPage />} />
-              <Route path="manager-insight" element={<AdminTenantManagerInsightPage />} />
               <Route path="connections" element={<RedirectTenantToIntegrations />} />
               <Route path="slack-onboarding" element={<RedirectTenantToWorkspace />} />
               <Route path="manager-onboarding" element={<RedirectTenantToWorkspace />} />

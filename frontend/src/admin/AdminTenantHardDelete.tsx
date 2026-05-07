@@ -91,7 +91,7 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
         ) : (
           <>
             Permanently remove this workspace and <strong>all</strong> related data (connectors, onboarding,
-            Slack sessions, manager-insight state). User accounts are kept but lose
+            Slack sessions, Cortex memory state). User accounts are kept but lose
             membership here. This cannot be undone.
           </>
         )}
