@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import copy
+import threading
+import time
 import uuid
 from datetime import datetime
 from typing import Any
@@ -11,6 +14,17 @@ from sqlalchemy.orm import Session
 
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
+
+_RAW_STATS_CACHE_TTL_SECONDS = 8.0
+_RAW_STATS_CACHE_LOCK = threading.Lock()
+_RAW_STATS_CACHE: dict[tuple[Any, ...], tuple[float, list[dict[str, Any]]]] = {}
+_RECENT_RUNS_CACHE_TTL_SECONDS = 8.0
+_RECENT_RUNS_CACHE_LOCK = threading.Lock()
+_RECENT_RUNS_CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]]]] = {}
+
+
+def _dt_key(v: datetime | None) -> str | None:
+    return v.isoformat() if v is not None else None
 
 
 def aggregate_raw_ingestion_stats(
@@ -24,6 +38,22 @@ def aggregate_raw_ingestion_stats(
     include_health_rows: bool = False,
 ) -> list[dict[str, Any]]:
     """Per (connector, resource_type) counts and fetched_at bounds (observed raw store)."""
+    cache_key = (
+        str(tenant_id),
+        connector.strip() if connector else None,
+        resource_type.strip() if resource_type else None,
+        _dt_key(fetched_after),
+        _dt_key(fetched_before),
+        bool(include_health_rows),
+    )
+    now = time.monotonic()
+    with _RAW_STATS_CACHE_LOCK:
+        cached = _RAW_STATS_CACHE.get(cache_key)
+        if cached is not None:
+            ts, payload = cached
+            if now - ts <= _RAW_STATS_CACHE_TTL_SECONDS:
+                return copy.deepcopy(payload)
+
     filters = [RawIngestionRecord.tenant_id == tenant_id]
     if connector and connector.strip():
         filters.append(RawIngestionRecord.connector == connector.strip())
@@ -67,6 +97,8 @@ def aggregate_raw_ingestion_stats(
                 "newest_fetched_at": newest,
             },
         )
+    with _RAW_STATS_CACHE_LOCK:
+        _RAW_STATS_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(out))
     return out
 
 
@@ -76,6 +108,15 @@ def list_recent_ingestion_runs(
     *,
     limit: int = 30,
 ) -> list[dict[str, Any]]:
+    cache_key = (str(tenant_id), int(limit))
+    now = time.monotonic()
+    with _RECENT_RUNS_CACHE_LOCK:
+        cached = _RECENT_RUNS_CACHE.get(cache_key)
+        if cached is not None:
+            ts, payload = cached
+            if now - ts <= _RECENT_RUNS_CACHE_TTL_SECONDS:
+                return copy.deepcopy(payload)
+
     stmt = (
         select(IngestionRun)
         .where(IngestionRun.tenant_id == tenant_id)
@@ -108,6 +149,8 @@ def list_recent_ingestion_runs(
                 "raw_rows_written": raw_n,
             },
         )
+    with _RECENT_RUNS_CACHE_LOCK:
+        _RECENT_RUNS_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(out))
     return out
 
 

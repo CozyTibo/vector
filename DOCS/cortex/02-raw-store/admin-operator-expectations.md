@@ -53,12 +53,20 @@ Operators must be able to verify:
 - corruption/recovery status,
 - queryability availability status.
 
+Checklist outputs must expose proof quality:
+- measured,
+- inferred,
+- stale,
+- partially-validated,
+- unverifiable.
+
 ## What Operators Must Be Warned About
 - unverifiable evidence ranges,
 - continuity-broken scopes,
 - replay-diverged scopes,
 - reconstruction-limited windows,
 - lineage-incomplete slices.
+- simulated enforcement outcomes (`would_block`) versus active enforcement (`blocked`).
 
 ## What Operators Must Never Assume
 - that "healthy" implies semantic truth,
@@ -103,3 +111,8 @@ Phase 02 admin surfaces must not introduce:
 - graph/causal reasoning workflows,
 - organizational intelligence claims,
 - AI interpretation of raw evidence.
+
+## Step 11/14 Calibration Requirements
+- Enforcement readiness must be visible as policy state, not hidden behavior.
+- Operator actions must show trust risk and enforcement impact before execution.
+- Trust cards must include verification freshness and proof-quality annotations.

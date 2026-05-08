@@ -48,6 +48,12 @@ Phase 02 does not guarantee:
 4. Persist replay/index and integrity metadata.
 5. Emit durable-write acknowledgement for downstream eligibility.
 
+## Enforcement Posture (Stabilization Track)
+Phase 02 enforcement is progressive:
+- trust-aware runtime behavior with explicit risk signaling,
+- catastrophic-only hard blocking initially,
+- `would_block` semantics exposed before universal fail-closed rollout.
+
 ## Read Path
 - replay scan by tenant/connector/time window,
 - source-object forensic lookup,

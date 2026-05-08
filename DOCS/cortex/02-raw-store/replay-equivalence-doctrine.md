@@ -34,3 +34,10 @@ When drift is detected (provider mutation, API drift, pagination drift, schema/e
 - mark affected scope trust-state,
 - block trusted replay publication where policy requires,
 - retain diagnostics for operator inspection.
+
+## Step 13 Replay Proof Obligations
+Replay equivalence is not considered operationally trustworthy until:
+- D0-D5 classification matrix is runtime-tested,
+- forbidden divergence classes have explicit denial-path validation,
+- classifier output is reproducible for fixed snapshots,
+- replay trust-state degradation and recovery transitions are test-proven.

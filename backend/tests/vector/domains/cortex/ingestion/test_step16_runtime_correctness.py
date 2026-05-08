@@ -22,7 +22,7 @@ from vector.settings import get_settings
 pytestmark = pytest.mark.integration
 
 
-def _tenant_with_slack_connections(db_session: Session, *, active_connections: int = 1) -> tuple[uuid.UUID, list[uuid.UUID]]:
+def _tenant_with_slack_connection(db_session: Session) -> tuple[uuid.UUID, uuid.UUID]:
     user = User(email=f"step16-{uuid.uuid4().hex[:8]}@example.com", full_name="Step16 User")
     tenant = Tenant(
         company_name="Step16 Co",
@@ -35,48 +35,45 @@ def _tenant_with_slack_connections(db_session: Session, *, active_connections: i
     db_session.add_all([user, tenant])
     db_session.flush()
     db_session.add(TenantMembership(tenant_id=tenant.id, user_id=user.id, role="owner"))
-    conn_ids: list[uuid.UUID] = []
-    for _ in range(active_connections):
-        conn = TenantConnection(
-            tenant_id=tenant.id,
-            provider="slack",
-            status="active",
-            connected_by_user_id=user.id,
-        )
-        db_session.add(conn)
-        db_session.flush()
-        conn_ids.append(conn.id)
+    conn = TenantConnection(
+        tenant_id=tenant.id,
+        provider="slack",
+        status="active",
+        connected_by_user_id=user.id,
+    )
+    db_session.add(conn)
     db_session.flush()
-    return tenant.id, conn_ids
+    return tenant.id, conn.id
 
 
-def test_step16_live_uniqueness_is_connection_scoped(
+def test_step16_connection_scope_mismatch_is_rejected(
     monkeypatch: pytest.MonkeyPatch,
     db_session: Session,
 ) -> None:
     monkeypatch.setenv("SECRET_KEY", "unit-test-secret-key-min-32-characters-long!")
     get_settings.cache_clear()
     settings = get_settings()
-    tenant_id, conn_ids = _tenant_with_slack_connections(db_session, active_connections=2)
+    tenant_id, conn_id = _tenant_with_slack_connection(db_session)
 
-    out1 = execute_connector_sync(
+    out_wrong = execute_connector_sync(
         db_session,
         settings,
         tenant_id=tenant_id,
         connector_id="slack",
         source_trigger="manual_admin",
-        connection_id=conn_ids[0],
+        connection_id=uuid.uuid4(),
     )
-    out2 = execute_connector_sync(
+    out_ok = execute_connector_sync(
         db_session,
         settings,
         tenant_id=tenant_id,
         connector_id="slack",
         source_trigger="manual_admin",
-        connection_id=conn_ids[1],
+        connection_id=conn_id,
     )
-    assert out1["status"] == "completed"
-    assert out2["status"] == "completed"
+    assert out_wrong["status"] == "skipped"
+    assert out_wrong["reason"] == "no_connection"
+    assert out_ok["status"] == "completed"
 
     count_stmt = (
         select(func.count())
@@ -85,11 +82,11 @@ def test_step16_live_uniqueness_is_connection_scoped(
             RawIngestionRecord.tenant_id == tenant_id,
             RawIngestionRecord.connector == "slack",
             RawIngestionRecord.resource_type == "slack.scope_ping",
-            RawIngestionRecord.external_id == "missing-slack-detail",
+            RawIngestionRecord.external_id == str(conn_id),
             RawIngestionRecord.replay_job_id.is_(None),
         )
     )
-    assert int(db_session.scalar(count_stmt) or 0) == 2
+    assert int(db_session.scalar(count_stmt) or 0) == 1
 
     inv = verify_runtime_correctness_invariants(db_session, tenant_id)
     assert inv["passed"] is True
@@ -102,8 +99,7 @@ def test_step16_replay_live_overlap_isolation_and_retry_safe(
     monkeypatch.setenv("SECRET_KEY", "unit-test-secret-key-min-32-characters-long!")
     get_settings.cache_clear()
     settings = get_settings()
-    tenant_id, conn_ids = _tenant_with_slack_connections(db_session, active_connections=1)
-    conn_id = conn_ids[0]
+    tenant_id, conn_id = _tenant_with_slack_connection(db_session)
     replay_job = uuid.uuid4()
 
     live = execute_connector_sync(

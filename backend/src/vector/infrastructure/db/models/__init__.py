@@ -12,6 +12,14 @@ from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.password_reset_token import PasswordResetToken
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
+from vector.infrastructure.db.models.raw_memory_archive_catalog import RawMemoryArchiveCatalog
+from vector.infrastructure.db.models.raw_memory_failure_case import RawMemoryFailureCase
+from vector.infrastructure.db.models.raw_memory_lineage_index import RawMemoryLineageIndex
+from vector.infrastructure.db.models.raw_memory_retention_event import RawMemoryRetentionEvent
+from vector.infrastructure.db.models.raw_memory_recovery_validation import RawMemoryRecoveryValidation
+from vector.infrastructure.db.models.raw_memory_revision_index import RawMemoryRevisionIndex
+from vector.infrastructure.db.models.raw_memory_trust_state import RawMemoryTrustState
+from vector.infrastructure.db.models.raw_memory_trust_transition import RawMemoryTrustTransition
 from vector.infrastructure.db.models.slack_connection_detail import SlackConnectionDetail
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
@@ -25,6 +33,14 @@ __all__ = [
     "OnboardingState",
     "PasswordResetToken",
     "RawIngestionRecord",
+    "RawMemoryArchiveCatalog",
+    "RawMemoryFailureCase",
+    "RawMemoryLineageIndex",
+    "RawMemoryRetentionEvent",
+    "RawMemoryRecoveryValidation",
+    "RawMemoryRevisionIndex",
+    "RawMemoryTrustState",
+    "RawMemoryTrustTransition",
     "GithubConnectionDetail",
     "IngestionRun",
     "LinearConnectionDetail",

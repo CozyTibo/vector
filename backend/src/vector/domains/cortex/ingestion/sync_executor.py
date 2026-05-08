@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 import httpx
-from sqlalchemy import Table, select, text
+from sqlalchemy import Table, case, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -49,9 +49,16 @@ from vector.domains.cortex.ingestion.live_idempotency import (
     derive_source_revision_key,
 )
 from vector.domains.cortex.ingestion.sync_context import SCOPE_DEFAULT, IngestionSyncContext
+from vector.domains.cortex.ingestion.temporal_ordering import (
+    derive_deletion_observed,
+    derive_provider_event_timestamp,
+)
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
+from vector.infrastructure.db.models.raw_memory_archive_catalog import RawMemoryArchiveCatalog
+from vector.infrastructure.db.models.raw_memory_lineage_index import RawMemoryLineageIndex
+from vector.infrastructure.db.models.raw_memory_revision_index import RawMemoryRevisionIndex
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.repositories import calls_connection as calls_repo
 from vector.infrastructure.db.repositories import github_connection as gh_repo
@@ -101,6 +108,267 @@ def _tag_replay_payload(body: dict[str, Any], ctx: IngestionSyncContext) -> dict
 
 def _hash_payload(body: dict[str, Any]) -> str:
     return canonical_payload_hash(body)
+
+
+def _build_provenance_chain_id(
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    connector: str,
+    resource_type: str,
+    source_identity_key: str,
+) -> str:
+    return (
+        f"{tenant_id}:{connection_id}:{connector}:{resource_type}:{source_identity_key}"[:512]
+    )
+
+
+def _upsert_raw_memory_lineage(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    connector: str,
+    resource_type: str,
+    source_identity_key: str,
+    source_revision_key: str,
+    payload_hash: str,
+    run_id: uuid.UUID,
+    replay_job_id: uuid.UUID | None,
+    replay_version: int | None,
+    raw_id: int,
+    fetched_at: datetime,
+) -> None:
+    lineage_tbl = cast(Table, RawMemoryLineageIndex.__table__)
+    provenance_chain_id = _build_provenance_chain_id(
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+        resource_type=resource_type,
+        source_identity_key=source_identity_key,
+    )
+    ins = pg_insert(lineage_tbl).values(
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+        resource_type=resource_type,
+        source_identity_key=source_identity_key,
+        provenance_chain_id=provenance_chain_id,
+        first_seen_raw_id=raw_id,
+        latest_seen_raw_id=raw_id,
+        first_observed_at=fetched_at,
+        latest_observed_at=fetched_at,
+        latest_source_revision_key=source_revision_key,
+        latest_payload_hash=payload_hash,
+        latest_run_id=run_id,
+        latest_replay_job_id=replay_job_id,
+        latest_replay_version=replay_version,
+    )
+    excluded = ins.excluded
+    is_newer_or_equal = excluded.latest_observed_at >= lineage_tbl.c.latest_observed_at
+    upd = ins.on_conflict_do_update(
+        index_elements=[
+            "tenant_id",
+            "connection_id",
+            "connector",
+            "resource_type",
+            "source_identity_key",
+        ],
+        set_={
+            "provenance_chain_id": excluded.provenance_chain_id,
+            "first_seen_raw_id": case(
+                (excluded.first_observed_at <= lineage_tbl.c.first_observed_at, excluded.first_seen_raw_id),
+                else_=lineage_tbl.c.first_seen_raw_id,
+            ),
+            "latest_seen_raw_id": case(
+                (is_newer_or_equal, excluded.latest_seen_raw_id),
+                else_=lineage_tbl.c.latest_seen_raw_id,
+            ),
+            "first_observed_at": func.least(lineage_tbl.c.first_observed_at, excluded.first_observed_at),
+            "latest_observed_at": func.greatest(lineage_tbl.c.latest_observed_at, excluded.latest_observed_at),
+            "latest_source_revision_key": case(
+                (is_newer_or_equal, excluded.latest_source_revision_key),
+                else_=lineage_tbl.c.latest_source_revision_key,
+            ),
+            "latest_payload_hash": case(
+                (is_newer_or_equal, excluded.latest_payload_hash),
+                else_=lineage_tbl.c.latest_payload_hash,
+            ),
+            "latest_run_id": case(
+                (is_newer_or_equal, excluded.latest_run_id),
+                else_=lineage_tbl.c.latest_run_id,
+            ),
+            "latest_replay_job_id": case(
+                (is_newer_or_equal, excluded.latest_replay_job_id),
+                else_=lineage_tbl.c.latest_replay_job_id,
+            ),
+            "latest_replay_version": case(
+                (is_newer_or_equal, excluded.latest_replay_version),
+                else_=lineage_tbl.c.latest_replay_version,
+            ),
+        },
+    )
+    session.execute(upd)
+
+
+def _recompute_supersession_chain(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    connector: str,
+    resource_type: str,
+    source_identity_key: str,
+) -> None:
+    session.execute(
+        text(
+            """
+            WITH ordered AS (
+                SELECT
+                    source_revision_key,
+                    LAG(source_revision_key) OVER (
+                        PARTITION BY tenant_id, connection_id, connector, resource_type, source_identity_key
+                        ORDER BY
+                            COALESCE(provider_event_timestamp, fetched_at) ASC,
+                            source_revision_key ASC,
+                            fetched_at ASC,
+                            raw_id ASC
+                    ) AS prev_revision
+                FROM raw_memory_revision_index
+                WHERE tenant_id = :tenant_id
+                  AND connection_id = :connection_id
+                  AND connector = :connector
+                  AND resource_type = :resource_type
+                  AND source_identity_key = :source_identity_key
+            )
+            UPDATE raw_memory_revision_index r
+            SET supersedes_source_revision_key = o.prev_revision
+            FROM ordered o
+            WHERE r.tenant_id = :tenant_id
+              AND r.connection_id = :connection_id
+              AND r.connector = :connector
+              AND r.resource_type = :resource_type
+              AND r.source_identity_key = :source_identity_key
+              AND r.source_revision_key = o.source_revision_key
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "connection_id": connection_id,
+            "connector": connector,
+            "resource_type": resource_type,
+            "source_identity_key": source_identity_key,
+        },
+    )
+
+
+def _upsert_raw_memory_revision(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    connector: str,
+    resource_type: str,
+    source_identity_key: str,
+    source_revision_key: str,
+    run_id: uuid.UUID,
+    replay_job_id: uuid.UUID | None,
+    replay_version: int | None,
+    raw_id: int,
+    fetched_at: datetime,
+    payload_body: dict[str, Any],
+) -> None:
+    revision_tbl = cast(Table, RawMemoryRevisionIndex.__table__)
+    provider_event_timestamp = derive_provider_event_timestamp(payload_body)
+    is_deleted_observed = derive_deletion_observed(payload_body)
+    stmt = (
+        pg_insert(revision_tbl)
+        .values(
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+            connector=connector,
+            resource_type=resource_type,
+            source_identity_key=source_identity_key,
+            source_revision_key=source_revision_key,
+            raw_id=raw_id,
+            provider_event_timestamp=provider_event_timestamp,
+            fetched_at=fetched_at,
+            supersedes_source_revision_key=None,
+            is_deleted_observed=is_deleted_observed,
+            run_id=run_id,
+            replay_job_id=replay_job_id,
+            replay_version=replay_version,
+        )
+        .on_conflict_do_nothing(
+            index_elements=[
+                "tenant_id",
+                "connection_id",
+                "connector",
+                "resource_type",
+                "source_identity_key",
+                "source_revision_key",
+            ],
+        )
+    )
+    session.execute(stmt)
+    _recompute_supersession_chain(
+        session,
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+        resource_type=resource_type,
+        source_identity_key=source_identity_key,
+    )
+
+
+def _retention_class_for_resource(resource_type: str) -> str:
+    if resource_type in {"calls.transcript", "calls.transcript_segment"}:
+        return "audit_long_horizon"
+    if resource_type.endswith(".scope_ping") or resource_type in {"scope_ping", "viewer_ping", "linear.viewer_ping"}:
+        return "operational_replay"
+    return "operational_replay"
+
+
+def _upsert_raw_memory_archive_catalog(
+    session: Session,
+    *,
+    raw_id: int,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    connector: str,
+    resource_type: str,
+    source_identity_key: str,
+    source_revision_key: str,
+    payload_hash: str,
+) -> None:
+    cat_tbl = cast(Table, RawMemoryArchiveCatalog.__table__)
+    ins = pg_insert(cat_tbl).values(
+        raw_id=raw_id,
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+        resource_type=resource_type,
+        source_identity_key=source_identity_key,
+        source_revision_key=source_revision_key,
+        payload_hash=payload_hash,
+        storage_tier="hot",
+        archive_pointer=None,
+        archived_at=None,
+        retention_class=_retention_class_for_resource(resource_type),
+        retention_policy_version=1,
+        retain_until=None,
+        metadata_json={},
+    )
+    session.execute(
+        ins.on_conflict_do_update(
+            index_elements=["raw_id"],
+            set_={
+                "payload_hash": ins.excluded.payload_hash,
+                "source_revision_key": ins.excluded.source_revision_key,
+                "retention_class": ins.excluded.retention_class,
+            },
+        )
+    )
 
 
 def _resolve_connection(
@@ -237,6 +505,7 @@ def _append_raw(
     rv = ctx.replay_version if ctx.replay_mode else None
 
     raw_tbl = cast(Table, RawIngestionRecord.__table__)
+    observed_at = _utc_now()
     if ctx.replay_mode and rjid is not None:
         stmt = (
             pg_insert(raw_tbl)
@@ -251,6 +520,7 @@ def _append_raw(
                 payload_body=body,
                 payload_hash=ph,
                 http_status=http_status,
+                fetched_at=observed_at,
                 run_id=run_id,
                 source_trigger=source_trigger,
                 idempotency_key=key,
@@ -267,7 +537,50 @@ def _append_raw(
         )
         # rowcount is unreliable for INSERT … ON CONFLICT DO NOTHING under psycopg; use RETURNING.
         inserted_pk = session.execute(stmt).scalar_one_or_none()
-        return inserted_pk is not None
+        if inserted_pk is None:
+            return False
+        _upsert_raw_memory_lineage(
+            session,
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+            connector=connector,
+            resource_type=resource_type,
+            source_identity_key=source_identity_key,
+            source_revision_key=source_revision_key,
+            payload_hash=ph,
+            run_id=run_id,
+            replay_job_id=rjid,
+            replay_version=rv,
+            raw_id=int(inserted_pk),
+            fetched_at=observed_at,
+        )
+        _upsert_raw_memory_revision(
+            session,
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+            connector=connector,
+            resource_type=resource_type,
+            source_identity_key=source_identity_key,
+            source_revision_key=source_revision_key,
+            run_id=run_id,
+            replay_job_id=rjid,
+            replay_version=rv,
+            raw_id=int(inserted_pk),
+            fetched_at=observed_at,
+            payload_body=body,
+        )
+        _upsert_raw_memory_archive_catalog(
+            session,
+            raw_id=int(inserted_pk),
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+            connector=connector,
+            resource_type=resource_type,
+            source_identity_key=source_identity_key,
+            source_revision_key=source_revision_key,
+            payload_hash=ph,
+        )
+        return True
 
     live_stmt = (
         pg_insert(raw_tbl)
@@ -282,6 +595,7 @@ def _append_raw(
             payload_body=body,
             payload_hash=ph,
             http_status=http_status,
+            fetched_at=observed_at,
             run_id=run_id,
             source_trigger=source_trigger,
             idempotency_key=key,
@@ -304,7 +618,50 @@ def _append_raw(
         .returning(raw_tbl.c.id)
     )
     inserted_pk = session.execute(live_stmt).scalar_one_or_none()
-    return inserted_pk is not None
+    if inserted_pk is None:
+        return False
+    _upsert_raw_memory_lineage(
+        session,
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+        resource_type=resource_type,
+        source_identity_key=source_identity_key,
+        source_revision_key=source_revision_key,
+        payload_hash=ph,
+        run_id=run_id,
+        replay_job_id=None,
+        replay_version=None,
+        raw_id=int(inserted_pk),
+        fetched_at=observed_at,
+    )
+    _upsert_raw_memory_revision(
+        session,
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+        resource_type=resource_type,
+        source_identity_key=source_identity_key,
+        source_revision_key=source_revision_key,
+        run_id=run_id,
+        replay_job_id=None,
+        replay_version=None,
+        raw_id=int(inserted_pk),
+        fetched_at=observed_at,
+        payload_body=body,
+    )
+    _upsert_raw_memory_archive_catalog(
+        session,
+        raw_id=int(inserted_pk),
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        connector=connector,
+        resource_type=resource_type,
+        source_identity_key=source_identity_key,
+        source_revision_key=source_revision_key,
+        payload_hash=ph,
+    )
+    return True
 
 
 def _github_sync(

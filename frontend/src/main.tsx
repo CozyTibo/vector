@@ -5,8 +5,10 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AdminLayout from "./admin/AdminLayout.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
+import AdminCortexMemoryPage from "./admin/AdminCortexMemoryPage.tsx";
 import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
 import AdminCortexPlaceholderPage from "./admin/AdminCortexPlaceholderPage.tsx";
+import AdminCortexVerificationPage from "./admin/AdminCortexVerificationPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
 import AdminTenantOnboardingPage from "./admin/AdminTenantOnboardingPage.tsx";
@@ -85,11 +87,11 @@ createRoot(document.getElementById("root")!).render(
                   element={<AdminCortexPlaceholderPage title="Entity Resolution" />}
                 />
                 <Route path="graph" element={<AdminCortexPlaceholderPage title="Graph" />} />
-                <Route path="memory" element={<AdminCortexPlaceholderPage title="Memory" />} />
+                <Route path="memory" element={<AdminCortexMemoryPage />} />
                 <Route path="reasoning" element={<AdminCortexPlaceholderPage title="Reasoning" />} />
                 <Route path="retrieval" element={<AdminCortexPlaceholderPage title="Retrieval" />} />
                 <Route path="synthesis" element={<AdminCortexPlaceholderPage title="Synthesis" />} />
-                <Route path="verification" element={<AdminCortexPlaceholderPage title="Verification" />} />
+                <Route path="verification" element={<AdminCortexVerificationPage />} />
                 <Route path="settings-debug" element={<AdminCortexPlaceholderPage title="Settings / Debug" />} />
               </Route>
               <Route path="connections" element={<RedirectTenantToIntegrations />} />

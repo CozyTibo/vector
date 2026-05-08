@@ -15,6 +15,7 @@ from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRec
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.models.user import User
+from vector.domains.cortex.ingestion.live_idempotency import canonical_payload_hash
 from vector.settings import get_settings
 
 pytestmark = pytest.mark.integration
@@ -93,7 +94,7 @@ def _seed_raw_rows_for_stats_filters(db_session: Session, tenant_id: uuid.UUID, 
             api_endpoint="https://api.github.com/repos/acme/repo/pulls",
             query_params={"page": 1},
             payload_body={"title": "Add step 13 proof view"},
-            payload_hash="h-pr-1",
+            payload_hash=canonical_payload_hash({"title": "Add step 13 proof view"}),
             http_status=200,
             fetched_at=base_t - timedelta(hours=2),
             run_id=run.id,
@@ -111,7 +112,7 @@ def _seed_raw_rows_for_stats_filters(db_session: Session, tenant_id: uuid.UUID, 
             api_endpoint="internal://github/scope_ping",
             query_params={},
             payload_body={"ping": True},
-            payload_hash="h-ping",
+            payload_hash=canonical_payload_hash({"ping": True}),
             http_status=200,
             fetched_at=base_t - timedelta(hours=1),
             run_id=run.id,
@@ -129,7 +130,7 @@ def _seed_raw_rows_for_stats_filters(db_session: Session, tenant_id: uuid.UUID, 
             api_endpoint="https://api.github.com/repos/acme/repo/pulls",
             query_params={"page": 2},
             payload_body={"title": "Payload search token alpha-needle"},
-            payload_hash="h-pr-2",
+            payload_hash=canonical_payload_hash({"title": "Payload search token alpha-needle"}),
             http_status=200,
             fetched_at=base_t,
             run_id=run.id,
@@ -381,11 +382,252 @@ def test_admin_cortex_ingestion_verification_ok(
         assert body["tenant_id"] == str(tid)
         assert "passed" in body
         assert body["runs_examined"] == 0
+        assert "raw_memory_contracts" in body
+        assert "raw_memory_persistence" in body
+        assert "raw_memory_temporal" in body
+        assert "raw_memory_replay" in body
+        assert "raw_memory_query" in body
+        assert "raw_memory_storage" in body
+        assert "raw_memory_failure_recovery" in body
+        assert "raw_memory_trust" in body
+        assert "raw_memory_control_plane" in body
+        assert "raw_memory_phase_closure" in body
+        assert "raw_memory_enforcement" in body
+        assert "phase02_verification_truth" in body
+        assert body["phase02_verification_truth"]["canonical_path"] == "phase02_verification_unified_v1"
+        assert body["enforcement_mode"] in {"observe", "progressive", "strict"}
     finally:
         get_settings.cache_clear()
 
 
-def test_admin_trigger_sync_requires_connection_id_when_multiple_active_connections(
+def test_admin_cortex_memory_query_source_mode_ok(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        _seed_raw_rows_for_stats_filters(db_session, tid, uid)
+        db_session.commit()
+
+        r = client.post(
+            f"/admin/tenants/{tid}/cortex/memory/query",
+            auth=("admin", "integration-admin-password"),
+            json={
+                "mode": "source",
+                "intent": "evidence_retrieval",
+                "connector": "github",
+                "resource_type": "github.pull_request",
+                "source_identity_key": "github:github.pull_request:pr-2",
+                "limit": 10,
+                "offset": 0,
+            },
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["mode"] == "source"
+        assert body["total_count"] >= 1
+        assert body["items"][0]["source_identity_key"] == "github:github.pull_request:pr-2"
+        assert body["enforcement"]["operation"] == "memory_query"
+        assert body["enforcement"]["allowed"] is True
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_cortex_memory_query_blocks_semantic_query_text(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        _seed_raw_rows_for_stats_filters(db_session, tid, uid)
+        db_session.commit()
+
+        r = client.post(
+            f"/admin/tenants/{tid}/cortex/memory/query",
+            auth=("admin", "integration-admin-password"),
+            json={
+                "mode": "source",
+                "intent": "evidence_retrieval",
+                "query_text": "graph traversal of ownership",
+                "connector": "github",
+                "resource_type": "github.pull_request",
+                "source_identity_key": "github:github.pull_request:pr-2",
+            },
+        )
+        assert r.status_code == 400
+        assert "out of scope" in r.text.lower()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_cortex_memory_retention_apply_dry_run_ok(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        _seed_raw_rows_for_stats_filters(db_session, tid, uid)
+        db_session.commit()
+
+        r = client.post(
+            f"/admin/tenants/{tid}/cortex/memory/retention/apply",
+            auth=("admin", "integration-admin-password"),
+            json={
+                "dry_run": True,
+                "archive_after_days": 1,
+                "delete_after_days": 365,
+                "allow_delete": False,
+            },
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["tenant_id"] == str(tid)
+        assert body["dry_run"] is True
+        assert "archive_candidate_count" in body
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_cortex_memory_failures_and_recovery_validate(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        _seed_raw_rows_for_stats_filters(db_session, tid, uid)
+        db_session.commit()
+
+        r_fail = client.get(
+            f"/admin/tenants/{tid}/cortex/memory/failures",
+            auth=("admin", "integration-admin-password"),
+        )
+        assert r_fail.status_code == 200
+        body_fail = r_fail.json()
+        assert body_fail["tenant_id"] == str(tid)
+        assert "active_failure_count" in body_fail
+
+        r_recover = client.post(
+            f"/admin/tenants/{tid}/cortex/memory/recovery/validate",
+            auth=("admin", "integration-admin-password"),
+            json={"apply_repairs": True},
+        )
+        assert r_recover.status_code == 200
+        body_recover = r_recover.json()
+        assert body_recover["tenant_id"] == str(tid)
+        assert body_recover["status"] in {"validated", "failed"}
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_cortex_memory_trust_state_ok(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        _seed_raw_rows_for_stats_filters(db_session, tid, uid)
+        db_session.commit()
+
+        r = client.get(
+            f"/admin/tenants/{tid}/cortex/memory/trust-state",
+            auth=("admin", "integration-admin-password"),
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["tenant_id"] == str(tid)
+        assert body["trust_state"] in {
+            "healthy",
+            "replay-safe",
+            "reconstruction-safe",
+            "partial",
+            "degraded",
+            "unverifiable",
+            "replay-diverged",
+            "continuity-broken",
+            "corrupted",
+            "lineage-incomplete",
+        }
+        assert "verification" in body
+        assert "gate_results" in body["verification"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_cortex_memory_control_plane_ok(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        _seed_raw_rows_for_stats_filters(db_session, tid, uid)
+        db_session.commit()
+
+        r = client.get(
+            f"/admin/tenants/{tid}/cortex/memory/control-plane",
+            auth=("admin", "integration-admin-password"),
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["tenant_id"] == str(tid)
+        assert "health_overview" in body
+        assert "inspectors" in body
+        assert "verification_checklist" in body
+        assert "phase_closure" in body
+        assert "verification_truth" in body
+        assert "enforcement" in body
+        assert "actions" in body
+        assert "warnings" in body
+        assert "must_not_assume" in body["warnings"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_cortex_memory_phase_closure_ok(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        _seed_raw_rows_for_stats_filters(db_session, tid, uid)
+        db_session.commit()
+
+        r = client.get(
+            f"/admin/tenants/{tid}/cortex/memory/phase-closure",
+            auth=("admin", "integration-admin-password"),
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["tenant_id"] == str(tid)
+        assert body["phase_status"] in {"open", "closed"}
+        assert "gate_results" in body
+        assert "G10" in body["gate_results"]
+        assert "summary" in body
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_trigger_sync_rejects_unknown_connection_scope(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
@@ -395,7 +637,6 @@ def test_admin_trigger_sync_requires_connection_id_when_multiple_active_connecti
     try:
         tid, uid = _tenant_with_owner(db_session)
         _add_active_connection(db_session, tenant_id=tid, user_id=uid, provider="github")
-        _add_active_connection(db_session, tenant_id=tid, user_id=uid, provider="github")
         db_session.commit()
 
         r = client.post(
@@ -403,11 +644,12 @@ def test_admin_trigger_sync_requires_connection_id_when_multiple_active_connecti
             auth=("admin", "integration-admin-password"),
             json={
                 "connector": "github",
+                "connection_id": str(uuid.uuid4()),
                 "confirmation": "RUN MANUAL CORTEX INGESTION SYNC",
             },
         )
-        assert r.status_code == 409
-        assert "Multiple active github connections" in r.text
+        assert r.status_code == 400
+        assert "not found for this tenant" in r.text
     finally:
         get_settings.cache_clear()
 
@@ -443,5 +685,48 @@ def test_admin_trigger_sync_accepts_explicit_connection_scope(
         assert body["connection_id"] == str(conn_id)
         assert len(called) == 1
         assert called[0][-1] == str(conn_id)
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_trigger_replay_allows_but_flags_unverifiable_state(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    monkeypatch.setenv("CORTEX_RAW_MEMORY_ENFORCEMENT_MODE", "progressive")
+    get_settings.cache_clear()
+    try:
+        tid, uid = _tenant_with_owner(db_session)
+        conn_id = _add_active_connection(db_session, tenant_id=tid, user_id=uid, provider="github")
+        db_session.commit()
+
+        import app.tasks.cortex_ingestion_sync as sync_tasks
+
+        called: list[tuple[object, ...]] = []
+        monkeypatch.setattr(
+            sync_tasks.run_cortex_connector_replay_sync_task,
+            "delay",
+            lambda *args: called.append(args),
+        )
+
+        r = client.post(
+            f"/admin/tenants/{tid}/cortex/ingestion/actions/trigger-replay",
+            auth=("admin", "integration-admin-password"),
+            json={
+                "connector": "github",
+                "connection_id": str(conn_id),
+                "replay_version": 1,
+                "confirmation": "RUN CORTEX INGESTION REPLAY JOB",
+            },
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["connection_id"] == str(conn_id)
+        assert body["enforcement"]["operation"] == "replay_trigger"
+        assert body["enforcement"]["would_block"] is True
+        assert body["enforcement"]["blocked"] is False
+        assert len(called) == 1
     finally:
         get_settings.cache_clear()

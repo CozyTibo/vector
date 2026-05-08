@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.ingestion.verification import verify_ingestion_run, verify_tenant_ingestion_invariants
+from vector.domains.cortex.ingestion.raw_memory_contracts import verify_phase02_step1_runtime_contracts
 from vector.settings import get_settings
 
 pytestmark = pytest.mark.integration
@@ -18,6 +19,21 @@ def test_verify_ingestion_run_not_found(db_session: Session) -> None:
     out = verify_ingestion_run(db_session, uuid.uuid4())
     assert out["passed"] is False
     assert any(c["id"] == "run_exists" and c["passed"] is False for c in out["checks"])
+
+
+def test_phase02_step1_runtime_contracts_empty_scope(db_session: Session) -> None:
+    out = verify_phase02_step1_runtime_contracts(db_session, uuid.uuid4())
+    assert out["passed"] is True
+    assert out["state"] == "unverifiable"
+    ids = {c["id"] for c in out["checks"]}
+    assert {
+        "i1_raw_payload_immutability",
+        "i2_provenance_reconstructability",
+        "i3_source_identity_revision_preservation",
+        "i4_replay_lineage_durability",
+        "i5_deterministic_retrieval",
+        "i6_temporal_ordering_determinism",
+    }.issubset(ids)
 
 
 def test_verify_after_successful_slack_sync(
@@ -70,6 +86,28 @@ def test_verify_after_successful_slack_sync(
     sweep = verify_tenant_ingestion_invariants(db_session, tenant.id, run_limit=5)
     assert sweep["passed"] is True
     assert sweep["runs_examined"] >= 1
+    assert "raw_memory_contracts" in sweep
+    assert sweep["raw_memory_contracts"]["passed"] is True
+    assert "raw_memory_persistence" in sweep
+    assert sweep["raw_memory_persistence"]["passed"] is True
+    assert "raw_memory_temporal" in sweep
+    assert sweep["raw_memory_temporal"]["passed"] is True
+    assert "raw_memory_replay" in sweep
+    assert sweep["raw_memory_replay"]["passed"] is True
+    assert "raw_memory_query" in sweep
+    assert sweep["raw_memory_query"]["passed"] is True
+    assert "raw_memory_storage" in sweep
+    assert sweep["raw_memory_storage"]["passed"] is True
+    assert "raw_memory_failure_recovery" in sweep
+    assert sweep["raw_memory_failure_recovery"]["passed"] is True
+    assert "raw_memory_trust" in sweep
+    assert sweep["raw_memory_trust"]["passed"] is True
+    assert "raw_memory_control_plane" in sweep
+    assert sweep["raw_memory_control_plane"]["passed"] is True
+    assert "raw_memory_phase_closure" in sweep
+    assert sweep["raw_memory_phase_closure"]["phase_status"] in {"open", "closed"}
+    assert "raw_memory_enforcement" in sweep
+    assert sweep["raw_memory_enforcement"]["passed"] is True
 
 
 def test_admin_verify_uses_session_scope(

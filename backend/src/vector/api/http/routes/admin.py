@@ -33,6 +33,16 @@ from vector.contracts.admin import (
     CortexIngestionConnectorId,
     AdminCortexRawIngestionResourceStat,
     AdminCortexRawIngestionStatsResponse,
+    AdminCortexRawMemoryQueryRequest,
+    AdminCortexRawMemoryQueryResponse,
+    AdminCortexRawMemoryRetentionApplyRequest,
+    AdminCortexRawMemoryRetentionApplyResponse,
+    AdminCortexRawMemoryRecoveryValidateRequest,
+    AdminCortexRawMemoryRecoveryValidateResponse,
+    AdminCortexRawMemoryFailuresResponse,
+    AdminCortexRawMemoryTrustStateResponse,
+    AdminCortexRawMemoryControlPlaneResponse,
+    AdminCortexRawMemoryPhaseClosureResponse,
     AdminCortexSchedulerPauseRequest,
     AdminCortexSchedulerPauseResponse,
     AdminHardDeleteOrphanUserRequest,
@@ -86,6 +96,18 @@ from vector.domains.cortex.ingestion.admin_recent_raw import (
     list_raw_records_for_connector,
     list_recent_ingestion_runs,
 )
+from vector.domains.cortex.ingestion.raw_memory_query import execute_raw_memory_query
+from vector.domains.cortex.ingestion.raw_memory_storage import apply_raw_memory_retention_policy
+from vector.domains.cortex.ingestion.raw_memory_failure_recovery import (
+    run_raw_memory_recovery_validation,
+    sync_raw_memory_failure_cases,
+)
+from vector.domains.cortex.ingestion.raw_memory_trust import (
+    build_raw_memory_trust_annotation,
+    persist_raw_memory_trust_annotation,
+)
+from vector.domains.cortex.ingestion.raw_memory_control_plane import build_raw_memory_control_plane
+from vector.domains.cortex.ingestion.raw_memory_enforcement import evaluate_progressive_enforcement
 from vector.domains.onboarding.constants import (
     ONBOARDING_ALL_TOOL_IDS,
     ONBOARDING_PROFILE_ROLE_CANONICAL,
@@ -125,6 +147,7 @@ _logger = logging.getLogger("app")
 
 CORTEX_SCHEDULER_PAUSE_CONFIRM_PHRASE = "PAUSE ALL SCHEDULED CORTEX INGESTION"
 CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE = "RESUME ALL SCHEDULED CORTEX INGESTION"
+CORTEX_RAW_MEMORY_DELETE_CONFIRM_PHRASE = "APPLY RAW MEMORY RETENTION DELETION"
 CORTEX_MANUAL_SYNC_CONFIRM_PHRASE = "RUN MANUAL CORTEX INGESTION SYNC"
 CORTEX_REPLAY_CONFIRM_PHRASE = "RUN CORTEX INGESTION REPLAY JOB"
 
@@ -204,11 +227,17 @@ def _verify_cortex_ingestion_invariants() -> Callable[..., dict[str, Any]]:
             )
         from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
         from vector.infrastructure.db.session import session_scope
+        settings = get_settings()
 
         rl = kwargs.get("run_limit", 30)
         run_limit = rl if isinstance(rl, int) else 30
         with session_scope() as session:
-            return verify_tenant_ingestion_invariants(session, tenant_id, run_limit=run_limit)
+            return verify_tenant_ingestion_invariants(
+                session,
+                tenant_id,
+                run_limit=run_limit,
+                enforcement_mode=settings.cortex_raw_memory_enforcement_mode,
+            )
 
     return _fn
 
@@ -1344,6 +1373,7 @@ def build_admin_router() -> APIRouter:
     def admin_cortex_ingestion_verification(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
         run_limit: Annotated[int, Query(ge=1, le=200)] = 30,
     ) -> AdminCortexIngestionVerificationResponse:
         """Phase 01 Step 6 — operator checklist (read-only invariant sweep)."""
@@ -1355,6 +1385,7 @@ def build_admin_router() -> APIRouter:
             tenant_id,
             run_limit=run_limit,
             enforce_exhaust_gate=True,
+            enforcement_mode=settings.cortex_raw_memory_enforcement_mode,
         )
         log_ingestion_event(
             _logger,
@@ -1424,6 +1455,265 @@ def build_admin_router() -> APIRouter:
         )
 
     @r.post(
+        "/tenants/{tenant_id}/cortex/memory/query",
+        response_model=AdminCortexRawMemoryQueryResponse,
+    )
+    def admin_cortex_memory_query(
+        tenant_id: uuid.UUID,
+        body: AdminCortexRawMemoryQueryRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexRawMemoryQueryResponse:
+        """Phase 02 Step 5 — deterministic evidence retrieval with anti-goal guardrails."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
+
+        verification_payload = verify_tenant_ingestion_invariants(
+            db,
+            tenant_id,
+            run_limit=30,
+            enforce_exhaust_gate=True,
+            enforcement_mode=settings.cortex_raw_memory_enforcement_mode,
+        )
+        trust_annotation = (
+            verification_payload.get("raw_memory_trust", {}).get("annotation")
+            if isinstance(verification_payload.get("raw_memory_trust"), dict)
+            else None
+        )
+        enforcement = evaluate_progressive_enforcement(
+            trust_annotation=trust_annotation if isinstance(trust_annotation, dict) else None,
+            phase_closure=(
+                verification_payload.get("raw_memory_phase_closure")
+                if isinstance(verification_payload.get("raw_memory_phase_closure"), dict)
+                else None
+            ),
+            mode=(
+                settings.cortex_raw_memory_enforcement_mode
+                if settings.cortex_raw_memory_enforcement_mode in {"observe", "progressive", "strict"}
+                else "progressive"
+            ),
+            operation=("reconstruction_read" if body.mode == "temporal" else "memory_query"),
+        )
+        if enforcement["blocked"]:
+            raise HTTPException(
+                status.HTTP_423_LOCKED,
+                detail={
+                    "message": "Operation blocked by raw-memory enforcement policy.",
+                    "enforcement": enforcement,
+                },
+            ) from None
+        try:
+            out = execute_raw_memory_query(
+                db,
+                tenant_id=tenant_id,
+                mode=body.mode,
+                intent=body.intent,
+                query_text=body.query_text,
+                connector=body.connector,
+                resource_type=body.resource_type,
+                source_identity_key=body.source_identity_key,
+                source_revision_key=body.source_revision_key,
+                replay_job_id=body.replay_job_id,
+                run_id=body.run_id,
+                provenance_chain_id=body.provenance_chain_id,
+                fetched_after=body.fetched_after,
+                fetched_before=body.fetched_before,
+                temporal_submode=body.temporal_submode,
+                as_of=body.as_of,
+                limit=body.limit,
+                offset=body.offset,
+            )
+        except ValueError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        return AdminCortexRawMemoryQueryResponse(
+            tenant_id=tenant_id,
+            mode=out["mode"],
+            items=[AdminCortexConnectorRawRecordItem.model_validate(x) for x in out["items"]],
+            total_count=out["total_count"],
+            offset=out["offset"],
+            limit=out["limit"],
+            truncated=out["truncated"],
+            enforcement=enforcement,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/memory/retention/apply",
+        response_model=AdminCortexRawMemoryRetentionApplyResponse,
+    )
+    def admin_cortex_memory_retention_apply(
+        tenant_id: uuid.UUID,
+        body: AdminCortexRawMemoryRetentionApplyRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexRawMemoryRetentionApplyResponse:
+        """Phase 02 Step 6 — apply (or dry-run) raw memory storage retention policy."""
+        _assert_tenant(db, tenant_id)
+        if body.allow_delete and body.dry_run is False:
+            if body.confirmation != CORTEX_RAW_MEMORY_DELETE_CONFIRM_PHRASE:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="Confirmation phrase does not match raw-memory deletion phrase.",
+                ) from None
+        out = apply_raw_memory_retention_policy(
+            db,
+            tenant_id=tenant_id,
+            dry_run=body.dry_run,
+            archive_after_days=body.archive_after_days,
+            delete_after_days=body.delete_after_days,
+            allow_delete=body.allow_delete,
+        )
+        return AdminCortexRawMemoryRetentionApplyResponse(
+            tenant_id=tenant_id,
+            dry_run=out["dry_run"],
+            archive_after_days=out["archive_after_days"],
+            delete_after_days=out["delete_after_days"],
+            archive_candidate_count=out["archive_candidate_count"],
+            delete_candidate_count=out["delete_candidate_count"],
+            archive_candidate_ids=out["archive_candidate_ids"],
+            delete_candidate_ids=out["delete_candidate_ids"],
+            deletes_executed=out["deletes_executed"],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/memory/failures",
+        response_model=AdminCortexRawMemoryFailuresResponse,
+    )
+    def admin_cortex_memory_failures(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexRawMemoryFailuresResponse:
+        """Phase 02 Step 7 — synchronize and expose active failure-class summary."""
+        _assert_tenant(db, tenant_id)
+        out = sync_raw_memory_failure_cases(db, tenant_id)
+        return AdminCortexRawMemoryFailuresResponse(
+            tenant_id=tenant_id,
+            active_failure_count=out["active_failure_count"],
+            active_failure_classes=out["active_failure_classes"],
+            sync=out,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/memory/recovery/validate",
+        response_model=AdminCortexRawMemoryRecoveryValidateResponse,
+    )
+    def admin_cortex_memory_recovery_validate(
+        tenant_id: uuid.UUID,
+        body: AdminCortexRawMemoryRecoveryValidateRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexRawMemoryRecoveryValidateResponse:
+        """Phase 02 Step 7 — run recovery validation with optional index/catalog repairs."""
+        _assert_tenant(db, tenant_id)
+        out = run_raw_memory_recovery_validation(
+            db,
+            tenant_id=tenant_id,
+            apply_repairs=body.apply_repairs,
+        )
+        return AdminCortexRawMemoryRecoveryValidateResponse(
+            tenant_id=tenant_id,
+            status=out["status"],
+            apply_repairs=out["apply_repairs"],
+            active_failures=out["active_failures"],
+            unresolved_recoverable=out["unresolved_recoverable"],
+            detail=out["detail"],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/memory/trust-state",
+        response_model=AdminCortexRawMemoryTrustStateResponse,
+    )
+    def admin_cortex_memory_trust_state(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexRawMemoryTrustStateResponse:
+        """Phase 02 Step 8 — canonical trust annotation for raw-memory scope."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
+
+        rep = verify_tenant_ingestion_invariants(
+            db,
+            tenant_id,
+            run_limit=30,
+            enforce_exhaust_gate=True,
+            enforcement_mode=settings.cortex_raw_memory_enforcement_mode,
+        )
+        trust = rep.get("raw_memory_trust") or {}
+        annotation = trust.get("annotation") if isinstance(trust, dict) else None
+        if not isinstance(annotation, dict):
+            annotation = build_raw_memory_trust_annotation(
+                db,
+                tenant_id=tenant_id,
+                raw_memory_contracts=rep.get("raw_memory_contracts", {}),
+                raw_memory_persistence=rep.get("raw_memory_persistence", {}),
+                raw_memory_temporal=rep.get("raw_memory_temporal", {}),
+                raw_memory_replay=rep.get("raw_memory_replay", {}),
+                raw_memory_query=rep.get("raw_memory_query", {}),
+                raw_memory_failure_recovery=rep.get("raw_memory_failure_recovery", {}),
+            )
+            persist_raw_memory_trust_annotation(db, tenant_id=tenant_id, annotation=annotation)
+        return AdminCortexRawMemoryTrustStateResponse(
+            tenant_id=tenant_id,
+            trust_state=str(annotation.get("trust_state", "unverifiable")),
+            severity=str(annotation.get("severity", "S2")),
+            state_reason_codes=list(annotation.get("state_reason_codes", [])),
+            replay=dict(annotation.get("replay", {})),
+            reconstruction=dict(annotation.get("reconstruction", {})),
+            provenance=dict(annotation.get("provenance", {})),
+            blocking=dict(annotation.get("blocking", {})),
+            continuity_gaps=list(annotation.get("continuity_gaps", [])),
+            verification=dict(annotation.get("verification", {})),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/memory/control-plane",
+        response_model=AdminCortexRawMemoryControlPlaneResponse,
+    )
+    def admin_cortex_memory_control_plane(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexRawMemoryControlPlaneResponse:
+        """Phase 02 Step 9 — operator runtime memory control-plane aggregate."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
+
+        verification_payload = verify_tenant_ingestion_invariants(
+            db,
+            tenant_id,
+            run_limit=30,
+            enforce_exhaust_gate=True,
+            enforcement_mode=settings.cortex_raw_memory_enforcement_mode,
+        )
+        out = build_raw_memory_control_plane(
+            db,
+            tenant_id,
+            verification_payload=verification_payload,
+        )
+        return AdminCortexRawMemoryControlPlaneResponse.model_validate(out)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/memory/phase-closure",
+        response_model=AdminCortexRawMemoryPhaseClosureResponse,
+    )
+    def admin_cortex_memory_phase_closure(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexRawMemoryPhaseClosureResponse:
+        """Phase 02 Step 10 — binary closure gate status."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
+
+        verification_payload = verify_tenant_ingestion_invariants(
+            db,
+            tenant_id,
+            run_limit=30,
+            enforce_exhaust_gate=True,
+            enforcement_mode=settings.cortex_raw_memory_enforcement_mode,
+        )
+        closure = verification_payload.get("raw_memory_phase_closure") or {}
+        return AdminCortexRawMemoryPhaseClosureResponse.model_validate(closure)
+
+    @r.post(
         "/tenants/{tenant_id}/cortex/ingestion/actions/trigger-sync",
         response_model=AdminCortexIngestionTriggerSyncResponse,
     )
@@ -1486,6 +1776,42 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexIngestionTriggerReplayResponse:
         """Enqueue a replay-scoped sync on cortex_replay with isolated checkpoints."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
+
+        verification_payload = verify_tenant_ingestion_invariants(
+            db,
+            tenant_id,
+            run_limit=30,
+            enforce_exhaust_gate=True,
+            enforcement_mode=settings.cortex_raw_memory_enforcement_mode,
+        )
+        trust_annotation = (
+            verification_payload.get("raw_memory_trust", {}).get("annotation")
+            if isinstance(verification_payload.get("raw_memory_trust"), dict)
+            else None
+        )
+        enforcement = evaluate_progressive_enforcement(
+            trust_annotation=trust_annotation if isinstance(trust_annotation, dict) else None,
+            phase_closure=(
+                verification_payload.get("raw_memory_phase_closure")
+                if isinstance(verification_payload.get("raw_memory_phase_closure"), dict)
+                else None
+            ),
+            mode=(
+                settings.cortex_raw_memory_enforcement_mode
+                if settings.cortex_raw_memory_enforcement_mode in {"observe", "progressive", "strict"}
+                else "progressive"
+            ),
+            operation="replay_trigger",
+        )
+        if enforcement["blocked"]:
+            raise HTTPException(
+                status.HTTP_423_LOCKED,
+                detail={
+                    "message": "Replay blocked by raw-memory enforcement policy.",
+                    "enforcement": enforcement,
+                },
+            ) from None
         if body.confirmation != CORTEX_REPLAY_CONFIRM_PHRASE:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -1526,6 +1852,7 @@ def build_admin_router() -> APIRouter:
             connection_id=tc.id,
             tenant_id=tenant_id,
             replay_version=body.replay_version,
+            enforcement=enforcement,
         )
 
     @r.post(

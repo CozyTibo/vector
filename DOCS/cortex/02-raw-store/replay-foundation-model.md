@@ -49,3 +49,9 @@ Replay output must explicitly surface:
 - unverifiable ranges,
 - provider-mutation drift indicators when detected,
 - continuity damage status for affected scopes.
+
+## Stabilization Requirement (Step 13)
+Replay foundation is not considered operationally trustworthy until:
+- forbidden divergence denial paths are validated,
+- D0-D5 scenarios are covered in runtime proof suite,
+- replay trust-state degradation/recovery transitions are reproducible.

@@ -9,20 +9,20 @@ and via Celery ``vector.cortex.ingestion.verify_tenant``.
 
 from __future__ import annotations
 
+import copy
+import threading
+import time
 import uuid
 from collections import Counter
-from typing import Any
+from typing import Any, Literal, cast
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.ingestion.admin_recent_raw import aggregate_raw_ingestion_stats
 from vector.domains.cortex.ingestion.checkpoint_contract import (
     checkpoint_last_incremental_at,
     parse_checkpoint_iso_timestamp,
-)
-from vector.domains.cortex.ingestion.raw_envelope_contract import (
-    EnvelopeContractViolation,
-    validate_raw_payload_for_persistence,
 )
 from vector.domains.cortex.ingestion.live_idempotency import (
     canonical_payload_hash,
@@ -30,14 +30,106 @@ from vector.domains.cortex.ingestion.live_idempotency import (
     derive_source_identity_key,
     derive_source_revision_key,
 )
-from vector.domains.cortex.ingestion.runtime_correctness import verify_runtime_correctness_invariants
+from vector.domains.cortex.ingestion.raw_envelope_contract import (
+    EnvelopeContractViolation,
+    validate_raw_payload_for_persistence,
+)
+from vector.domains.cortex.ingestion.raw_memory_contracts import (
+    verify_phase02_step1_runtime_contracts,
+)
+from vector.domains.cortex.ingestion.raw_memory_critical_integrity import (
+    verify_phase02_step15_critical_integrity,
+)
+from vector.domains.cortex.ingestion.raw_memory_operational_trust_proof import (
+    verify_phase02_step16_operational_trust_proof,
+)
+from vector.domains.cortex.ingestion.raw_memory_control_plane import (
+    build_raw_memory_control_plane,
+    verify_phase02_step9_control_plane_contract,
+)
+from vector.domains.cortex.ingestion.raw_memory_enforcement import (
+    verify_phase02_step11_progressive_enforcement,
+)
+from vector.domains.cortex.ingestion.raw_memory_failure_recovery import (
+    verify_phase02_step7_failure_recovery,
+)
+from vector.domains.cortex.ingestion.raw_memory_persistence import (
+    verify_phase02_step2_persistence_provenance,
+)
+from vector.domains.cortex.ingestion.raw_memory_phase_closure import (
+    evaluate_phase02_step10_closure_gate,
+)
+from vector.domains.cortex.ingestion.raw_memory_query import (
+    verify_phase02_step5_query_model,
+)
+from vector.domains.cortex.ingestion.raw_memory_replay import (
+    verify_phase02_step4_replay_equivalence,
+)
+from vector.domains.cortex.ingestion.raw_memory_replay_hardening import (
+    verify_phase02_step13_replay_divergence_hardening,
+)
+from vector.domains.cortex.ingestion.raw_memory_storage import (
+    verify_phase02_step6_storage_retention,
+)
+from vector.domains.cortex.ingestion.raw_memory_temporal import (
+    verify_phase02_step3_temporal_continuity,
+)
+from vector.domains.cortex.ingestion.raw_memory_trust import (
+    persist_raw_memory_trust_annotation,
+    verify_phase02_step8_trust_api_contract,
+)
+from vector.domains.cortex.ingestion.raw_memory_trust_signal import (
+    verify_phase02_step14_trust_signal_hardening,
+)
+from vector.domains.cortex.ingestion.raw_memory_verification_unified import (
+    build_phase02_verification_truth,
+    compute_phase02_gate_g14_trust_signal_quality,
+    compute_phase02_gate_g15_critical_integrity,
+    compute_phase02_gate_g16_operational_trust_proof,
+    compute_phase02_gates_g1_g7,
+    finalize_phase02_closure_from_canonical_gates,
+    infer_proof_quality,
+    verify_phase02_step12_unified_verification_semantics,
+)
+from vector.domains.cortex.ingestion.runtime_correctness import (
+    verify_runtime_correctness_invariants,
+)
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
-from vector.domains.cortex.ingestion.admin_recent_raw import aggregate_raw_ingestion_stats
 
 RUN_COMPLETED = "COMPLETED"
 RUN_FAILED = "FAILED"
+_VERIFY_CACHE_TTL_SECONDS = 12.0
+_VERIFY_CACHE_LOCK = threading.Lock()
+_VERIFY_CACHE: dict[tuple[str, int, bool, str], tuple[float, dict[str, Any]]] = {}
+
+_EnforcementModeLit = Literal["observe", "progressive", "strict"]
+
+
+def _stamp_phase02_verification_truth_cache_hit(payload: dict[str, Any]) -> None:
+    truth = payload.get("phase02_verification_truth")
+    if not isinstance(truth, dict):
+        return
+    cg = truth.get("canonical_gates")
+    if not isinstance(cg, dict):
+        return
+    _pq_raw = truth.get("proof_quality")
+    pq: dict[str, Any] = dict(_pq_raw) if isinstance(_pq_raw, dict) else {}
+    truth["freshness"] = dict(truth.get("freshness") or {})
+    truth["freshness"]["from_cache"] = True
+    _prec_raw = truth.get("precedence")
+    prec = _prec_raw if isinstance(_prec_raw, dict) else {}
+    align = prec.get("trust_g1_g7_matches_closure")
+    align_bool = True if not isinstance(align, bool) else align
+    truth["proof_quality"] = infer_proof_quality(
+        canonical_gates=cg,
+        from_cache=True,
+        exhaust_gate_enforced=bool(pq.get("exhaust_gate_enforced")),
+        exhaust_gate_passed=pq.get("exhaust_gate_passed"),
+        trust_g1_g7_matches_closure=align_bool,
+    )
+    truth["freshness"]["label"] = "stale"
 
 
 def _check(
@@ -439,8 +531,20 @@ def verify_tenant_ingestion_invariants(
     *,
     run_limit: int = 30,
     enforce_exhaust_gate: bool = False,
+    enforcement_mode: str = "progressive",
 ) -> dict[str, Any]:
     """Sweep recent runs for a tenant plus checkpoint parseability (operator checklist)."""
+    cache_key = (str(tenant_id), int(run_limit), bool(enforce_exhaust_gate), str(enforcement_mode))
+    now = time.monotonic()
+    with _VERIFY_CACHE_LOCK:
+        cached = _VERIFY_CACHE.get(cache_key)
+        if cached is not None:
+            ts, payload = cached
+            if now - ts <= _VERIFY_CACHE_TTL_SECONDS:
+                out = copy.deepcopy(payload)
+                _stamp_phase02_verification_truth_cache_hit(out)
+                return out
+
     stmt = (
         select(IngestionRun)
         .where(IngestionRun.tenant_id == tenant_id)
@@ -453,12 +557,196 @@ def verify_tenant_ingestion_invariants(
         run_reports.append(verify_ingestion_run(session, run.id))
     ckpt = verify_connector_sync_checkpoints(session, tenant_id)
     runtime_correctness = verify_runtime_correctness_invariants(session, tenant_id)
-    run_passed = all(r["passed"] for r in run_reports) if run_reports else True
-    passed = run_passed and ckpt["passed"] and runtime_correctness["passed"]
+    raw_memory_contracts = verify_phase02_step1_runtime_contracts(session, tenant_id)
+    raw_memory_persistence = verify_phase02_step2_persistence_provenance(session, tenant_id)
+    raw_memory_temporal = verify_phase02_step3_temporal_continuity(session, tenant_id)
+    raw_memory_replay = verify_phase02_step4_replay_equivalence(session, tenant_id)
+    raw_memory_replay_hardening = verify_phase02_step13_replay_divergence_hardening(
+        raw_memory_replay
+    )
+    raw_memory_query = verify_phase02_step5_query_model(session, tenant_id)
+    raw_memory_storage = verify_phase02_step6_storage_retention(session, tenant_id)
+    raw_memory_failure_recovery = verify_phase02_step7_failure_recovery(session, tenant_id)
+    _enforcement_modes = {"observe", "progressive", "strict"}
+    mode_norm = enforcement_mode if enforcement_mode in _enforcement_modes else "progressive"
+    gates_g1_g7 = compute_phase02_gates_g1_g7(
+        raw_memory_contracts=raw_memory_contracts,
+        raw_memory_persistence=raw_memory_persistence,
+        raw_memory_temporal=raw_memory_temporal,
+        raw_memory_replay=raw_memory_replay,
+        raw_memory_query=raw_memory_query,
+        raw_memory_failure_recovery=raw_memory_failure_recovery,
+    )
     exhaust = assess_exhaust_depth(session, tenant_id)
+    raw_memory_trust = verify_phase02_step8_trust_api_contract(
+        session,
+        tenant_id=tenant_id,
+        raw_memory_contracts=raw_memory_contracts,
+        raw_memory_persistence=raw_memory_persistence,
+        raw_memory_temporal=raw_memory_temporal,
+        raw_memory_replay=raw_memory_replay,
+        raw_memory_query=raw_memory_query,
+        raw_memory_failure_recovery=raw_memory_failure_recovery,
+        precomputed_gates_g1_g7=gates_g1_g7,
+    )
+    trust_ann = raw_memory_trust.get("annotation") if isinstance(raw_memory_trust, dict) else None
+    control_plane_payload_prelim = build_raw_memory_control_plane(
+        session,
+        tenant_id,
+        verification_payload={
+            "raw_memory_replay": raw_memory_replay,
+            "raw_memory_persistence": raw_memory_persistence,
+            "raw_memory_temporal": raw_memory_temporal,
+            "raw_memory_query": raw_memory_query,
+            "raw_memory_failure_recovery": raw_memory_failure_recovery,
+            "raw_memory_trust": raw_memory_trust,
+            "enforcement_mode": mode_norm,
+            "raw_memory_phase_closure": {},
+        },
+    )
+    raw_memory_control_plane_prelim = verify_phase02_step9_control_plane_contract(
+        control_plane_payload=control_plane_payload_prelim
+    )
+    closure_prelim = evaluate_phase02_step10_closure_gate(
+        tenant_id=tenant_id,
+        raw_memory_contracts=raw_memory_contracts,
+        raw_memory_persistence=raw_memory_persistence,
+        raw_memory_temporal=raw_memory_temporal,
+        raw_memory_replay=raw_memory_replay,
+        raw_memory_query=raw_memory_query,
+        raw_memory_failure_recovery=raw_memory_failure_recovery,
+        raw_memory_trust=raw_memory_trust,
+        raw_memory_control_plane=raw_memory_control_plane_prelim,
+        control_plane_payload=control_plane_payload_prelim,
+        precomputed_gates_g1_g7=gates_g1_g7,
+        raw_memory_replay_hardening=raw_memory_replay_hardening,
+    )
+    gates_pre = closure_prelim.get("gate_results") or {}
+    gates_pre = gates_pre if isinstance(gates_pre, dict) else {}
+    truth_pre = build_phase02_verification_truth(
+        tenant_id=tenant_id,
+        canonical_gates=gates_pre,
+        trust_annotation=trust_ann,
+        from_cache=False,
+        cache_ttl_seconds=_VERIFY_CACHE_TTL_SECONDS,
+        enforcement_mode=mode_norm,
+        exhaust_gate_enforced=enforce_exhaust_gate,
+        exhaust_gate_passed=bool(exhaust.get("gate_passed")) if enforce_exhaust_gate else None,
+        verification_passed=False,
+    )
+    raw_memory_trust_signal = verify_phase02_step14_trust_signal_hardening(truth_pre)
+    raw_memory_critical_integrity = verify_phase02_step15_critical_integrity(session, tenant_id)
+    gates_complete = dict(gates_pre)
+    gates_complete["G14"] = compute_phase02_gate_g14_trust_signal_quality(raw_memory_trust_signal)
+    gates_complete["G15"] = compute_phase02_gate_g15_critical_integrity(raw_memory_critical_integrity)
+    run_passed = all(r["passed"] for r in run_reports) if run_reports else True
+    core_passed = (
+        run_passed
+        and ckpt["passed"]
+        and runtime_correctness["passed"]
+        and raw_memory_contracts["passed"]
+        and raw_memory_persistence["passed"]
+        and raw_memory_temporal["passed"]
+        and raw_memory_replay["passed"]
+        and raw_memory_query["passed"]
+        and raw_memory_storage["passed"]
+        and raw_memory_failure_recovery["passed"]
+        and raw_memory_trust["passed"]
+        and raw_memory_control_plane_prelim["passed"]
+        and raw_memory_replay_hardening["passed"]
+        and raw_memory_trust_signal["passed"]
+        and raw_memory_critical_integrity["passed"]
+    )
     if enforce_exhaust_gate:
-        passed = passed and bool(exhaust.get("gate_passed"))
-    return {
+        core_passed = core_passed and bool(exhaust.get("gate_passed"))
+    phase02_verification_truth = build_phase02_verification_truth(
+        tenant_id=tenant_id,
+        canonical_gates=gates_complete,
+        trust_annotation=trust_ann,
+        from_cache=False,
+        cache_ttl_seconds=_VERIFY_CACHE_TTL_SECONDS,
+        enforcement_mode=mode_norm,
+        exhaust_gate_enforced=enforce_exhaust_gate,
+        exhaust_gate_passed=bool(exhaust.get("gate_passed")) if enforce_exhaust_gate else None,
+        verification_passed=core_passed,
+    )
+    raw_memory_operational_trust_proof = verify_phase02_step16_operational_trust_proof(
+        runtime_correctness=runtime_correctness,
+        raw_memory_temporal=raw_memory_temporal,
+        raw_memory_replay=raw_memory_replay,
+        raw_memory_replay_hardening=raw_memory_replay_hardening,
+        raw_memory_failure_recovery=raw_memory_failure_recovery,
+        raw_memory_critical_integrity=raw_memory_critical_integrity,
+        raw_memory_trust_signal=raw_memory_trust_signal,
+        phase02_verification_truth=phase02_verification_truth,
+    )
+    gates_complete["G16"] = compute_phase02_gate_g16_operational_trust_proof(raw_memory_operational_trust_proof)
+    raw_memory_phase_closure = finalize_phase02_closure_from_canonical_gates(
+        tenant_id=tenant_id,
+        gates=gates_complete,
+        raw_memory_trust=raw_memory_trust,
+    )
+    raw_memory_enforcement = verify_phase02_step11_progressive_enforcement(
+        trust_annotation=trust_ann,
+        phase_closure=raw_memory_phase_closure,
+        enforcement_mode=cast(_EnforcementModeLit, mode_norm),
+    )
+    _prec = phase02_verification_truth.get("precedence")
+    _prec_dict = _prec if isinstance(_prec, dict) else {}
+    _align = _prec_dict.get("trust_g1_g7_matches_closure")
+    align_bool = True if not isinstance(_align, bool) else _align
+    phase02_verification_truth["proof_quality"] = infer_proof_quality(
+        canonical_gates=gates_complete,
+        from_cache=False,
+        exhaust_gate_enforced=enforce_exhaust_gate,
+        exhaust_gate_passed=bool(exhaust.get("gate_passed")) if enforce_exhaust_gate else None,
+        trust_g1_g7_matches_closure=align_bool,
+    )
+    passed = (
+        core_passed
+        and raw_memory_phase_closure["passed"]
+        and raw_memory_enforcement["passed"]
+        and raw_memory_operational_trust_proof["passed"]
+    )
+    if isinstance(trust_ann, dict):
+        ver = dict(trust_ann.get("verification") or {})
+        ver["proof_quality"] = phase02_verification_truth["proof_quality"]
+        ver["freshness"] = phase02_verification_truth["freshness"]
+        persist_raw_memory_trust_annotation(
+            session,
+            tenant_id=tenant_id,
+            annotation={**trust_ann, "verification": ver},
+        )
+    control_plane_payload_final = build_raw_memory_control_plane(
+        session,
+        tenant_id,
+        verification_payload={
+            "raw_memory_replay": raw_memory_replay,
+            "raw_memory_persistence": raw_memory_persistence,
+            "raw_memory_temporal": raw_memory_temporal,
+            "raw_memory_query": raw_memory_query,
+            "raw_memory_failure_recovery": raw_memory_failure_recovery,
+            "raw_memory_trust": raw_memory_trust,
+            "enforcement_mode": mode_norm,
+            "raw_memory_phase_closure": raw_memory_phase_closure,
+            "phase02_verification_truth": phase02_verification_truth,
+            "raw_memory_critical_integrity": raw_memory_critical_integrity,
+            "raw_memory_operational_trust_proof": raw_memory_operational_trust_proof,
+        },
+    )
+    raw_memory_control_plane = verify_phase02_step9_control_plane_contract(
+        control_plane_payload=control_plane_payload_final
+    )
+    passed = passed and raw_memory_control_plane["passed"]
+    raw_memory_verification_step12 = verify_phase02_step12_unified_verification_semantics(
+        phase02_verification_truth=phase02_verification_truth,
+        raw_memory_phase_closure=raw_memory_phase_closure,
+        raw_memory_trust=raw_memory_trust,
+    )
+    passed = passed and raw_memory_verification_step12["passed"]
+    if isinstance(phase02_verification_truth, dict):
+        phase02_verification_truth["aggregate_passed"] = passed
+    out = {
         "tenant_id": str(tenant_id),
         "passed": passed,
         "runs_examined": len(run_reports),
@@ -466,4 +754,25 @@ def verify_tenant_ingestion_invariants(
         "checkpoint_report": ckpt,
         "exhaust_depth": exhaust,
         "runtime_correctness": runtime_correctness,
+        "raw_memory_contracts": raw_memory_contracts,
+        "raw_memory_persistence": raw_memory_persistence,
+        "raw_memory_temporal": raw_memory_temporal,
+        "raw_memory_replay": raw_memory_replay,
+        "raw_memory_replay_hardening": raw_memory_replay_hardening,
+        "raw_memory_trust_signal": raw_memory_trust_signal,
+        "raw_memory_critical_integrity": raw_memory_critical_integrity,
+        "raw_memory_operational_trust_proof": raw_memory_operational_trust_proof,
+        "raw_memory_query": raw_memory_query,
+        "raw_memory_storage": raw_memory_storage,
+        "raw_memory_failure_recovery": raw_memory_failure_recovery,
+        "raw_memory_trust": raw_memory_trust,
+        "raw_memory_control_plane": raw_memory_control_plane,
+        "raw_memory_phase_closure": raw_memory_phase_closure,
+        "raw_memory_enforcement": raw_memory_enforcement,
+        "enforcement_mode": mode_norm,
+        "phase02_verification_truth": phase02_verification_truth,
+        "raw_memory_verification_step12": raw_memory_verification_step12,
     }
+    with _VERIFY_CACHE_LOCK:
+        _VERIFY_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(out))
+    return out

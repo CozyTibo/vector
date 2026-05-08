@@ -1,10 +1,10 @@
 # Phase 02 Binary Closure Gates
 
 ## Rule
-Phase 02 is complete only if all gates pass.
+Phase 02 is complete only if all required gates pass.
 Gate status values: PASS / FAIL (no narrative-only closure).
 
-## Gate Set
+## Baseline Gate Set (Step 10 runtime)
 
 | Gate ID | Gate | PASS Criteria |
 | ------- | ---- | ------------- |
@@ -19,8 +19,24 @@ Gate status values: PASS / FAIL (no narrative-only closure).
 | G9 | Trust-state transitions | Trust-state taxonomy transitions are implemented, observable, and test-covered. |
 | G10 | Replay-safe boundary proof | Replay-safe/non-omniscient boundary messaging enforced in operator surfaces and APIs. |
 
-## Fail-Closed Rule
-If any gate FAILs, Phase 02 remains open.
+## Stabilization Gate Set (Steps 11-16)
+
+| Gate ID | Gate | PASS Criteria |
+| ------- | ---- | ------------- |
+| G11 | Progressive enforcement readiness | Trust-state-aware enforcement policy is runtime-active with `would_block`/`blocked` semantics and catastrophic-only hard blocking. |
+| G12 | Unified verification truth | Closure/trust/control-plane/aggregate verification derive from one canonical computation path with deterministic precedence. |
+| G13 | Replay proof depth | D0-D5 matrix and forbidden-divergence denial paths are runtime-tested and reproducible. |
+| G14 | Trust-signal proof quality | Operator trust surfaces distinguish measured/inferred/stale/unverifiable/partial states. |
+| G15 | Critical integrity strength | Reconstruction-critical continuity pointers and revision/lineage integrity checks are verifiable and trust-impacting. |
+| G16 | Operational trust proof pass | Adversarial runtime trust proof suite passes (replay/corruption/reconstruction/temporal/stale/denial/recovery). |
+
+## Calibrated Enforcement Rule
+Phase 02 uses progressive enforcement while stabilizing:
+- catastrophic trust failures may hard-block operations,
+- degraded/unverifiable states remain operational with explicit warning/risk semantics,
+- `would_block` decisions must be surfaced before universal fail-closed rollout.
+
+If any required gate FAILs, Phase 02 remains open.
 Partial PASS may be reported operationally but cannot close phase status.
 
 ## Tolerance Reference

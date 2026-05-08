@@ -53,8 +53,26 @@ Implement trust-state transitions, gate tolerances, trust annotations, and conti
 ### Step 9 - Runtime Memory Control Plane
 Implement operator memory control plane (inspection + verification + safe actions).
 
-### Step 10 - Final Phase closure trust gate
-Close Phase 02 only when binary closure gates pass per `binary-closure-gates.md`.
+### Step 10 - Baseline Phase closure trust gate runtime
+Establish executable binary closure gate runtime per `binary-closure-gates.md` (baseline gate set).
+
+### Step 11 - Progressive trust enforcement
+Implement trust-aware enforcement policy modes with catastrophic-only hard block at first pass.
+
+### Step 12 - Unified verification semantics
+Unify closure, trust, control-plane, and aggregate verification into one canonical gate computation path.
+
+### Step 13 - Replay divergence hardening
+Harden D0-D5 replay proof matrix and denial-path behavior for forbidden divergence classes.
+
+### Step 14 - Trust-signal hardening
+Add proof-quality/freshness semantics so operator trust surfaces distinguish measured vs inferred vs stale.
+
+### Step 15 - Critical integrity hardening
+Strengthen reconstruction-critical continuity validation and selective integrity constraints where safe.
+
+### Step 16 - Operational trust proof pass
+Run adversarial runtime proof suite (replay/corruption/temporal/stale/denial/recovery) before declaring Phase 02 complete.
 
 ## Operational Closure Criteria (Must Be Explicitly Met)
 Phase 02 is complete only when we can credibly state:
@@ -69,7 +87,10 @@ That requires:
 - tested corruption detection and recovery,
 - admin verifiability (visibility + actions + checklist).
 
-These closure criteria are enforced in Step 10 (final closure gate) after Runtime Memory Control Plane implementation.
+These closure criteria are enforced progressively:
+- Step 10 establishes binary closure gate runtime.
+- Steps 11-15 calibrate enforcement truthfulness, replay proof depth, and integrity strength.
+- Step 16 is final operational proof pass before closure claim.
 Trust-state and degradation semantics for closure decisions are defined in `trust-state-taxonomy.md`.
 
 ## Runtime Closure States (Operational Truth)
@@ -90,13 +111,30 @@ Normative replay equivalence/divergence classes: `replay-equivalence-doctrine.md
 Phase 02 reconstruction semantics are "what was preserved and provable," not "objective total historical truth."
 Normative reconstruction guarantees and gap classes: `reconstruction-semantics-doctrine.md`.
 
-## Phase-Specific Blockers (Current)
-- Runtime closure criteria not yet codified as executable gates.
-- Admin expectations for Phase 02 visibility/actions not yet fully specified.
-- Temporal doctrine for revisions/supersession/deletion semantics needs stronger contract wording.
-- Query-model guarantees (partition/index/hot-cold/replay retrieval) need hard commitments.
+## Enforcement Readiness Model (Calibrated, Non-Brittle)
+Progressive trust enforcement is required before full fail-closed operation:
+- `healthy`: allow operations,
+- `degraded`: allow + warning,
+- `unverifiable`: allow + explicit risk flag,
+- `unsafe`: admin-only or strongly warned operation,
+- `catastrophic`: hard-block operation.
 
-## Remaining Unclear Areas Before Implementation
-- exact numeric threshold values for production calibration (semantics are now defined),
-- final API field naming/enum freeze for trust annotations,
-- exact Step D IA contract across Cortex Overview / Memory / Verification tabs.
+Initial hard blocking is restricted to catastrophic trust failures (lineage impossibility, nondeterministic reconstruction, replay lineage break, invalid revision continuity). Global fail-closed posture is deferred.
+
+## Replay Proof Obligations (Runtime, not narrative)
+- complete D0-D5 replay scenario coverage,
+- deterministic classifier reproducibility for fixed snapshots,
+- explicit forbidden divergence denial-path validation,
+- replay-trust transition assertions under divergence and recovery.
+
+## Operational Proof Requirements (Step 16)
+- adversarial replay and corruption simulations,
+- reconstruction edge-window validation,
+- temporal ordering stress cases,
+- stale-verification and freshness-label correctness,
+- denial-path and remediation/recovery flow validation.
+
+## Implementation Confidence (Updated)
+- Architecture confidence: high.
+- Operational trust confidence (current): moderate.
+- Post-Step-16 target: operationally trustworthy with calibrated enforcement readiness.

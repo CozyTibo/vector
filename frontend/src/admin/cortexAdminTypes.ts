@@ -62,6 +62,16 @@ export type CortexVerification = {
   runs_examined: number;
   run_reports: Array<{ run_id?: string; passed: boolean; checks?: unknown[] }>;
   checkpoint_report: { passed: boolean; checks?: unknown[] };
+  raw_memory_critical_integrity?: { passed?: boolean; state?: string; checks?: unknown[] };
+  raw_memory_operational_trust_proof?: { passed?: boolean; state?: string; checks?: unknown[] };
+  raw_memory_control_plane?: { passed?: boolean; state?: string; checks?: unknown[] };
+  raw_memory_phase_closure?: {
+    passed?: boolean;
+    phase_status?: string;
+    checks?: unknown[];
+    gate_results?: Record<string, unknown>;
+    summary?: Record<string, unknown>;
+  };
   exhaust_depth?: {
     warnings?: Array<{ code: string; severity: string; detail: string }>;
     ping_like_ratio?: number;
@@ -78,6 +88,27 @@ export type CortexVerification = {
       source_revision_key_present?: boolean;
       run_scoped_live_identity_forbidden?: boolean;
     };
+  };
+};
+
+export type CortexMemoryPhaseClosure = {
+  tenant_id: string;
+  passed: boolean;
+  phase_status: "open" | "closed" | string;
+  checks: Array<{ id: string; passed: boolean; detail?: unknown }>;
+  gate_results: Record<
+    string,
+    { decision: "pass" | "warn_only" | "soft_fail" | "hard_fail" | string; reason: string; passed: boolean }
+  >;
+  summary: {
+    hard_fail_count: number;
+    soft_fail_count: number;
+    warn_only_count: number;
+    hard_fails: string[];
+    required_scope_soft_fails: string[];
+    warn_only: string[];
+    warnings_ack_required: string[];
+    blocking_flags_active: string[];
   };
 };
 
@@ -167,6 +198,86 @@ export type CortexRawRecords = {
   offset: number;
   limit: number;
   truncated: boolean;
+};
+
+export type CortexMemoryControlPlane = {
+  tenant_id: string;
+  health_overview: {
+    trust_state: string;
+    severity: string;
+    replay_state: string | null;
+    reconstruction_state: string | null;
+    provenance_state: string | null;
+    continuity_gap_count: number;
+    active_failure_count: number;
+    active_failure_classes: Record<string, number>;
+    latest_recovery_validation: null | {
+      status: string;
+      created_at: string;
+      apply_repairs: boolean;
+    };
+    blocking: Record<string, boolean>;
+    state_reason_codes: string[];
+    /** Phase 02 Step 14 — canonical proof-quality primary from verification truth */
+    proof_quality_primary?: string | null;
+    /** fresh | stale — operator-visible verification snapshot freshness */
+    verification_freshness?: string | null;
+    /** Phase 02 Step 15 — lineage/revision pointer integrity sweep */
+    critical_integrity_passed?: boolean | null;
+    critical_integrity_state?: string | null;
+    /** Phase 02 Step 16 — composite operational trust proof scenarios */
+    operational_trust_passed?: boolean | null;
+    operational_trust_state?: string | null;
+  };
+  inspectors: {
+    replay_inspector: {
+      jobs_count: number;
+      active_jobs: number;
+      failed_jobs: number;
+      latest_jobs: Array<{
+        run_id: string;
+        connector: string;
+        status: string;
+        replay_job_id: string | null;
+        replay_version: number | null;
+        started_at: string | null;
+        finished_at: string | null;
+      }>;
+    };
+    provenance_explorer: { lineage_rows: number; active_failure_classes: Record<string, number> };
+    temporal_reconstruction_inspector: { revision_rows: number; continuity_gaps: Array<Record<string, unknown>> };
+    corruption_continuity_inspector: {
+      active_failure_count: number;
+      active_failures: Array<{
+        gap_id: string;
+        failure_class: string;
+        gap_type: string;
+        trust_state_impact: string;
+        recoverability_class: string;
+        recovery_status: string;
+      }>;
+    };
+    archive_storage_inspector: { tier_counts: Record<string, number> };
+  };
+  verification_checklist: {
+    passed: boolean;
+    items: Array<{ id: string; passed: boolean; detail?: unknown }>;
+  };
+  /** Phase 02 Step 12 — canonical verification snapshot (when present from verification payload). */
+  verification_truth?: Record<string, unknown> | null;
+  phase_closure?: CortexMemoryPhaseClosure;
+  actions: Array<{
+    id: string;
+    method: string;
+    path: string;
+    safe: boolean;
+    scope: string;
+    expected_impact: string;
+  }>;
+  warnings: {
+    must_not_assume: string[];
+    active_failure_sync: Record<string, unknown>;
+  };
 };
 
 export function titleConnector(connector: string): string {

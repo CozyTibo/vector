@@ -22,6 +22,12 @@ Specify hard-fail vs soft-fail behavior for closure gates.
 | G8 Control-plane operability | required inspection/action surface missing | one non-critical operator flow pending | cosmetic UX issues only |
 | G9 Trust-state transitions | transition logic non-deterministic/untested | threshold tuning pending but deterministic logic present | informational transition noise |
 | G10 Replay-safe boundary proof | boundary messaging absent/contradictory | one surface missing explicit wording | wording inconsistency with no behavioral mismatch |
+| G11 Progressive enforcement readiness | catastrophic conditions not blockable; policy engine missing runtime state awareness | `would_block` semantics incomplete on non-critical flows | warning copy/UX mismatches only |
+| G12 Unified verification truth | contradictory pass/fail outcomes across surfaces for same snapshot | duplicate gate implementations with equivalent output but drift risk | non-impacting label mismatch |
+| G13 Replay proof depth | forbidden divergence denial path untested or non-deterministic | partial D0-D5 matrix coverage | low-impact replay diagnostics gaps |
+| G14 Trust-signal quality | stale/measured/inferred semantics absent causing false-green confidence | freshness SLA not yet calibrated | cosmetic signal wording issues |
+| G15 Critical integrity hardening | reconstruction-critical continuity pointer validation absent where required | selective integrity constraints pending rollout plan | non-critical integrity warning backlog |
+| G16 Operational trust proof pass | adversarial trust proof suite fails in required scenarios | one required proof scenario pending rerun | non-critical scenario backlog with clear owner |
 
 ## Closure Rule
 Phase closure requires:

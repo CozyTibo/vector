@@ -1,5 +1,7 @@
 # Canonicalization Layer Goals
 
+> **Normative detail:** `phase-03-normative-index.md`, `phase-03-anti-goals-doctrine.md`, **canonical control plane** `phase-03-canonical-control-plane-doctrine.md`, and **18-stage** `implementation-plan.md` (+ cross-cutting operator track + `MASTER_TRACKER.md` Phase 03 Steps **1–18**).
+
 ## Phase Objectives
 - Produce contract-valid outputs for downstream phases.
 - Preserve provenance and tenant boundaries.

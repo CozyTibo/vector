@@ -6,11 +6,11 @@ const CORTEX_SECTIONS: Array<{ key: string; label: string; enabled: boolean }> =
   { key: "canonical", label: "Canonical", enabled: false },
   { key: "entity-resolution", label: "Entity Resolution", enabled: false },
   { key: "graph", label: "Graph", enabled: false },
-  { key: "memory", label: "Memory", enabled: false },
+  { key: "memory", label: "Memory", enabled: true },
   { key: "reasoning", label: "Reasoning", enabled: false },
   { key: "retrieval", label: "Retrieval", enabled: false },
   { key: "synthesis", label: "Synthesis", enabled: false },
-  { key: "verification", label: "Verification", enabled: false },
+  { key: "verification", label: "Verification", enabled: true },
   { key: "settings-debug", label: "Settings / Debug", enabled: false },
 ];
 

@@ -556,6 +556,7 @@ class AdminCortexIngestionTriggerReplayResponse(BaseModel):
     connection_id: uuid.UUID
     tenant_id: uuid.UUID
     replay_version: int
+    enforcement: dict[str, Any] | None = None
 
 
 class AdminCortexSchedulerPauseRequest(BaseModel):
@@ -586,6 +587,24 @@ class AdminCortexIngestionVerificationResponse(BaseModel):
     checkpoint_report: dict[str, Any]
     exhaust_depth: dict[str, Any] | None = None
     runtime_correctness: dict[str, Any] | None = None
+    raw_memory_contracts: dict[str, Any] | None = None
+    raw_memory_persistence: dict[str, Any] | None = None
+    raw_memory_temporal: dict[str, Any] | None = None
+    raw_memory_replay: dict[str, Any] | None = None
+    raw_memory_replay_hardening: dict[str, Any] | None = None
+    raw_memory_query: dict[str, Any] | None = None
+    raw_memory_storage: dict[str, Any] | None = None
+    raw_memory_failure_recovery: dict[str, Any] | None = None
+    raw_memory_trust: dict[str, Any] | None = None
+    raw_memory_trust_signal: dict[str, Any] | None = None
+    raw_memory_critical_integrity: dict[str, Any] | None = None
+    raw_memory_operational_trust_proof: dict[str, Any] | None = None
+    raw_memory_control_plane: dict[str, Any] | None = None
+    raw_memory_phase_closure: dict[str, Any] | None = None
+    raw_memory_enforcement: dict[str, Any] | None = None
+    enforcement_mode: str | None = None
+    phase02_verification_truth: dict[str, Any] | None = None
+    raw_memory_verification_step12: dict[str, Any] | None = None
 
 
 class AdminCortexIngestionRecentRunItem(BaseModel):
@@ -643,6 +662,141 @@ class AdminCortexConnectorRawRecordsResponse(BaseModel):
     offset: int
     limit: int
     truncated: bool
+
+
+RawMemoryQueryMode = Literal["source", "replay", "audit", "provenance", "temporal"]
+RawMemoryTemporalSubmode = Literal["as_of_t", "latest_before_t", "revision_chain"]
+RawMemoryQueryIntent = Literal[
+    "evidence_retrieval",
+    "lineage_retrieval",
+    "temporal_retrieval",
+    "replay_diagnostics",
+    "audit_retrieval",
+]
+
+
+class AdminCortexRawMemoryQueryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: RawMemoryQueryMode
+    intent: RawMemoryQueryIntent = "evidence_retrieval"
+    query_text: str | None = None
+    connector: str | None = None
+    resource_type: str | None = None
+    source_identity_key: str | None = None
+    source_revision_key: str | None = None
+    replay_job_id: uuid.UUID | None = None
+    run_id: uuid.UUID | None = None
+    provenance_chain_id: str | None = None
+    fetched_after: datetime | None = None
+    fetched_before: datetime | None = None
+    temporal_submode: RawMemoryTemporalSubmode = "revision_chain"
+    as_of: datetime | None = None
+    limit: int = Field(default=100, ge=1, le=200)
+    offset: int = Field(default=0, ge=0, le=50_000)
+
+
+class AdminCortexRawMemoryQueryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    mode: RawMemoryQueryMode
+    items: list[AdminCortexConnectorRawRecordItem]
+    total_count: int
+    offset: int
+    limit: int
+    truncated: bool
+    enforcement: dict[str, Any] | None = None
+
+
+class AdminCortexRawMemoryRetentionApplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dry_run: bool = True
+    archive_after_days: int = Field(default=30, ge=1, le=3650)
+    delete_after_days: int = Field(default=365, ge=1, le=36500)
+    allow_delete: bool = False
+    confirmation: str | None = None
+
+
+class AdminCortexRawMemoryRetentionApplyResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    dry_run: bool
+    archive_after_days: int
+    delete_after_days: int
+    archive_candidate_count: int
+    delete_candidate_count: int
+    archive_candidate_ids: list[int]
+    delete_candidate_ids: list[int]
+    deletes_executed: bool
+
+
+class AdminCortexRawMemoryRecoveryValidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    apply_repairs: bool = True
+
+
+class AdminCortexRawMemoryRecoveryValidateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    status: str
+    apply_repairs: bool
+    active_failures: int
+    unresolved_recoverable: int
+    detail: dict[str, Any]
+
+
+class AdminCortexRawMemoryFailuresResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    active_failure_count: int
+    active_failure_classes: dict[str, int]
+    sync: dict[str, Any]
+
+
+class AdminCortexRawMemoryTrustStateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    trust_state: str
+    severity: str
+    state_reason_codes: list[str]
+    replay: dict[str, Any]
+    reconstruction: dict[str, Any]
+    provenance: dict[str, Any]
+    blocking: dict[str, bool]
+    continuity_gaps: list[dict[str, Any]]
+    verification: dict[str, Any]
+
+
+class AdminCortexRawMemoryControlPlaneResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    health_overview: dict[str, Any]
+    inspectors: dict[str, Any]
+    verification_checklist: dict[str, Any]
+    phase_closure: dict[str, Any] | None = None
+    verification_truth: dict[str, Any] | None = None
+    enforcement: dict[str, Any] | None = None
+    actions: list[dict[str, Any]]
+    warnings: dict[str, Any]
+
+
+class AdminCortexRawMemoryPhaseClosureResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    passed: bool
+    phase_status: str
+    checks: list[dict[str, Any]]
+    gate_results: dict[str, dict[str, Any]]
+    summary: dict[str, Any]
 
 
 class AdminCortexRawIngestionResourceStat(BaseModel):

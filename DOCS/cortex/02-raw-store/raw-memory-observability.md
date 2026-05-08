@@ -21,13 +21,14 @@ Expose:
 
 Do not collapse these into a single "healthy" badge.
 
-## Step 6 Runtime Memory Control Plane Requirement
+## Step 9-16 Runtime Memory Control Plane Requirement
 Phase 02 is not operationally complete until observability supports:
 - replay inspection truth,
 - lineage/provenance continuity inspection,
 - temporal reconstruction inspection,
 - corruption/continuity gap inspection,
 - operator trust closure checklist.
+- verification freshness and proof-quality visibility.
 
 ## Required Dashboards
 - raw memory integrity dashboard,
@@ -42,3 +43,5 @@ Phase 02 is not operationally complete until observability supports:
 - provenance continuity breaches,
 - archive rehydration failure threshold breach,
 - rapid storage saturation events.
+- stale verification snapshot beyond freshness SLA.
+- trust-state degradation without operator acknowledgment.

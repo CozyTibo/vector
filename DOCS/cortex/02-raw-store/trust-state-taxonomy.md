@@ -26,6 +26,16 @@ They replace vague "healthy/unhealthy" language.
 - No automatic transition to healthy without passing closure checks.
 - Unknown state is treated as unverifiable.
 
+## Progressive Enforcement Semantics (Step 11)
+Trust state drives calibrated runtime behavior:
+- `healthy` / `replay-safe` / `reconstruction-safe`: allowed.
+- `partial` / `degraded`: allowed with explicit warnings.
+- `unverifiable`: allowed with elevated risk flags and operator acknowledgment.
+- `unsafe` (derived policy state): admin-only or strongly warned path.
+- catastrophic states (`corrupted`, hard lineage/reconstruction break): blocked.
+
+This is enforcement-readiness posture, not global fail-closed mode.
+
 ## Closure Dependency
 Phase 02 closure requires trust-state transitions to be implemented and testable in admin/runtime flows.
 

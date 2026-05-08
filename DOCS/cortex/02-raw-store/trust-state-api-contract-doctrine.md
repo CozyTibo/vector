@@ -43,7 +43,11 @@ Define canonical machine-readable trust annotations for runtime responses.
 - `verification.last_verified_at`,
 - `verification.gate_results`,
 - `continuity_gaps` (possibly empty, never omitted).
+- `verification.proof_quality` (`measured` | `inferred` | `stale` | `partial` | `unverifiable`),
+- `verification.freshness` (`fresh` | `stale`) with timestamp basis,
+- `enforcement` summary (`mode`, `would_block`, `blocked`, `risk_level`).
 
 ## Behavior
 - `unverifiable`, `replay-diverged`, `continuity-broken`, `corrupted` must include explicit blocking flags.
 - absent trust annotation is invalid contract behavior for Phase 02 operator-facing endpoints.
+- progressive enforcement posture must be explicit: catastrophic-only hard-block at current maturity stage, with `would_block` exposure for non-catastrophic paths.

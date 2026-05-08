@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import logging
+import threading
+import time
 import uuid
 from typing import Any, Literal
 
@@ -24,6 +27,9 @@ from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.settings import Settings
 
 _LOGGER = logging.getLogger("app")
+_OVERVIEW_CACHE_TTL_SECONDS = 8.0
+_OVERVIEW_CACHE_LOCK = threading.Lock()
+_OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 def _operator_scheduler_label(
@@ -243,6 +249,15 @@ def build_cortex_ingestion_admin_overview(
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
     """Assemble visibility payload for :class:`AdminCortexIngestionOverviewResponse`."""
+    cache_key = str(tenant_id)
+    now = time.monotonic()
+    with _OVERVIEW_CACHE_LOCK:
+        cached = _OVERVIEW_CACHE.get(cache_key)
+        if cached is not None:
+            ts, payload = cached
+            if now - ts <= _OVERVIEW_CACHE_TTL_SECONDS:
+                return copy.deepcopy(payload)
+
     tenant = session.get(Tenant, tenant_id)
     if tenant is None:
         raise ValueError("tenant not found")
@@ -357,7 +372,7 @@ def build_cortex_ingestion_admin_overview(
     worker_telemetry = _collect_worker_telemetry(settings)
     duplicate_prevention = _collect_duplicate_prevention_metric(session, tenant_id)
 
-    return {
+    out = {
         "tenant_id": tenant_id,
         "company_name": tenant.company_name,
         "global_scheduler": global_scheduler,
@@ -366,3 +381,6 @@ def build_cortex_ingestion_admin_overview(
         "digest": digest,
         "connectors": connector_rows,
     }
+    with _OVERVIEW_CACHE_LOCK:
+        _OVERVIEW_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(out))
+    return out

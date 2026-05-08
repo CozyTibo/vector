@@ -1,7 +1,9 @@
 # Canonicalization Model
 
+> **Normative supersession:** Phase 03 doctrine now owns definitions and boundaries. Start with `phase-03-canonical-model-doctrine.md` and `phase-03-normative-index.md`. This file remains a short conceptual primer.
+
 ## Definition
-Canonicalization is the semantic transformation layer that converts source-specific raw records into normalized, ontology-aligned organizational memory objects.
+Canonicalization is the **deterministic structural projection layer** that converts Phase 02 raw records into normalized, ontology-aligned organizational memory objects **without semantic inference** (see `phase-03-anti-goals-doctrine.md`).
 
 ## Transformation Boundaries
 - Source-boundary in: raw events with source semantics.

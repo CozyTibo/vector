@@ -306,6 +306,14 @@ class Settings(BaseSettings):
             "and attach the report to the task response (disable in hot paths if needed)."
         ),
     )
+    cortex_raw_memory_enforcement_mode: str = Field(
+        default="progressive",
+        validation_alias="CORTEX_RAW_MEMORY_ENFORCEMENT_MODE",
+        description=(
+            "Phase 02 Step 11 enforcement posture: observe|progressive|strict. "
+            "progressive blocks catastrophic trust failures only and annotates would-block decisions."
+        ),
+    )
     cortex_github_installation_repos_max_pages: int = Field(
         default=100,
         ge=1,

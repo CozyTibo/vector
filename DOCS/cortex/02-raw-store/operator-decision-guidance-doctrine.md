@@ -17,3 +17,8 @@ Provide explicit operator actions for degraded trust states.
 
 ## Global Rule
 When in doubt, downgrade trust-state and preserve explicit uncertainty markers.
+
+## Enforcement-Readiness Rule (Step 11)
+- Operators must see both `would_block` and `blocked` decisions.
+- Non-catastrophic degraded states default to warned/flagged operation, not immediate global hard block.
+- Catastrophic trust failures (`corrupted`, impossible lineage continuity, reconstruction nondeterminism, replay lineage break) are block-worthy.

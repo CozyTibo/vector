@@ -4,17 +4,17 @@
 - **Architecture maturity:** Core foundation defined across Phases 01-04 and 10; storage/queryability challenge pass added.
 - **Ingestion vs exhaust (non‑negotiable distinction):** **Substrate** (runs, replay lanes, envelope validation, checkpoint storage, admin triggers, verification jobs) is **not** Phase 01 success. **Phase 01 success** = **full raw organizational exhaust** per `DOCS/cortex/01-ingestion/phase-01-organizational-exhaust-spec.md` (pagination, per-stream cursors, backfill + incremental, replay semantics, exit criteria). Do not treat “sync ran,” “scope_ping rows exist,” or “integration connected” as exhaust progress. Deep exhaust is tracked in **§2.5**, `organizational-exhaust-execution-track.md`, `connector-exhaust-matrix.md`, `exhaust_coverage_registry.py`, and admin raw aggregates.
 - **Implementation stage:** Phase 01 Steps **0–16** = ingestion substrate + checkpoint spine + connector depth + admin exhaust proof + verification gate + live-lane logical idempotency lock + runtime correctness hardening — **Yes (Phase 01 complete)**.
-- **Current focus:** Phase 02 Step 1 planning/execution with Step 16 correctness suite active in operational verification.
+- **Current focus:** Phase **03** Canonicalization program entry (**Steps 1–18** doctrine-locked); Phase **02** Raw Memory stabilization (**Steps 1–16**) shipped including operational trust proof **G16**.
 - **Total phases:** 10.
 - **Current blockers:** Phase 01 hard blockers cleared; remaining work is post-closure soak/scale confidence and later-phase architecture. (Cortex ingestion routing defaults **on**; use `CORTEX_CONNECTOR_MIGRATION_*=false` only to opt out.)
-- **Next major milestone:** Phase 02 raw memory implementation kick-off with Phase 01 Step 16 invariant suite enforced in production-like runs.
+- **Next major milestone:** Phase **03 Step 1** — canonical ontology foundations (`phase-03-canonical-model-doctrine.md`, `phase-03-normative-index.md`) before deterministic runtime work.
 
 ## 2) Phase Overview
 | Phase | Name | Goal | Architecture Status | Spec Completeness | Ready For Coding |
 | ----- | ---- | ---- | ------------------- | ----------------- | ---------------- |
 | 01 | Ingestion | Bring **organizational exhaust** safely into Cortex (substrate **and** connector depth) | **Substrate + checkpoint spine + Slack/GitHub/Linear/Notion/Calls deep slices + admin exhaust proof + verification gate + Step 15 live idempotency lock + Step 16 runtime correctness hardening** shipped (0–16) | Ready (Core Contracts Frozen) | **Phase 01 closure:** **Yes** |
-| 02 | Raw Memory | Preserve trustworthy replay-safe raw organizational memory continuity (non-semantic) | Architecture Defined | Ready With Caveats | Yes (Caveats) |
-| 03 | Canonicalization | Transform raw exhaust into canonical memory | Architecture Defined | Needs Hardening | Almost |
+| 02 | Raw Memory | Preserve trustworthy replay-safe raw organizational memory continuity (non-semantic) | **Steps 1–16 stabilization shipped** (verification + gates **G13–G16**, operational trust proof) | Ready With Caveats | **Phase 02 closure runtime:** **Yes** (operator verification + proof gates; organizational exhaust depth remains §2.5) |
+| 03 | Canonicalization | Deterministic structural projection from raw memory to canonical primitives (mapping system + replay/provenance + verification split across **Steps 1–18**) | Architecture Defined | Strong (Doctrine + **18-stage program locked** — pre-runtime) | Almost |
 | 04 | Identity & Linking | Reconstruct organizational continuity across tools/time | Architecture Defined | Core Defined | Almost |
 | 05 | Organizational Graph | Model high-fidelity continuity and traversal structure | Not Started | Incomplete | No |
 | 06 | Temporal & Causal Reasoning | Reconstruct causality and temporal organizational logic | Not Started | Incomplete | No |
@@ -78,7 +78,7 @@
 
 No phase is **complete** until its **last numbered step** in this tracker ships **both** production runtime **and** a **strong admin / control plane update** for that same phase.
 
-- **Scope:** Default rule is Phases **03–10 Step 6**. **Phase 02 exception:** Step **9** is the dedicated **Runtime Memory Control Plane** and Step **10** is final phase closure. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
+- **Scope:** Default rule is Phases **03–10 Step 6** where a phase uses the legacy 6-step template. **Phase 03 exception:** Phase 03 runs **Steps 1–18** (granular canonical runtime program); **operator/admin closure + operational certification** must ship through **Steps 16–18** (control plane, stabilization/proof, closure certification)—see Phase 03 tracker rows. **Phase 02 exception:** Step **9** is the dedicated **Runtime Memory Control Plane**, Step **10** establishes baseline closure gate runtime, and Steps **11–16** complete stabilization/proof before final closure confidence. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
 - **“Strong admin update” means at minimum:**
   1. **Visibility** — Operator UI reflects *this phase’s* new reality: health signals, lag/backlog, failure classes, and (where applicable) replay / reprocess / provenance context—not only raw logs.
   2. **Actions** — At least one **primary**, policy-gated operator control for that phase (manual trigger, scoped replay/reprocess, safe pause/resume, cohort toggle, etc.) with clear **scope, queue lane, and expected impact** before execution.
@@ -149,48 +149,86 @@ No phase is **complete** until its **last numbered step** in this tracker ships 
 ### Phase 02 — Raw Memory
 | Step # | Step | Description | Spec Accuracy | Implemented |
 | ------ | ---- | ----------- | ------------- | ----------- |
-| 1 | Runtime contracts + invariants | Immutable append semantics, reconstruction/replay boundaries, provenance continuity, and invariant ownership are frozen for implementation. | Strong | No |
-| 2 | Persistence + provenance runtime model | Durable raw evidence persistence, lineage fields, and replay lineage durability are implemented from authoritative contracts. | Strong | No |
-| 3 | Temporal continuity implementation | Revision chains, supersession/deletion visibility, and timestamp precedence rules are implemented and validated. | Strong | No |
-| 4 | Replay equivalence + divergence implementation | Replay determinism, acceptable/forbidden divergence classes, and replay-safe boundaries are implemented and enforceable. | Strong | No |
-| 5 | Query model implementation (anti-goal enforced) | Connector/lineage/replay/time/revision/provenance retrieval classes are implemented; semantic/graph/intelligence querying is explicitly blocked. | Strong | No |
-| 6 | Storage + retention implementation | Append-only operational semantics, archival/rehydration, replay horizon policy, and compliance deletion behavior are implemented. | Strong | No |
-| 7 | Failure/recovery implementation | Corruption, continuity break, replay interruption, and recovery workflows are implemented with deterministic failure representation. | Strong | No |
-| 8 | Trust-state + API contract implementation | Trust-state transitions, gate tolerances, trust annotations, and continuity-gap response shapes are implemented and operator-visible. | Strong | No |
-| 9 | Runtime Memory Control Plane | Operational memory verification/control plane is implemented: health truth states, replay inspector, lineage/provenance explorer, temporal reconstruction inspector, corruption/continuity inspection, and raw-memory-safe actions. | Ready To Start | No |
-| 10 | Phase closure trust gate | Phase 02 closes only when binary gates pass (replay/provenance/temporal/reconstruction/corruption/query/control-plane/trust-state) with no unresolved blocking states. | Ready To Start | No |
+| 1 | Runtime contracts + invariants | Implemented in runtime verification: I1 raw payload immutability, I2 provenance reconstructability, I3 source identity+revision preservation, I4 replay lineage durability, I5 deterministic retrieval, I6 temporal ordering anchors; exposed in tenant/admin verification as `raw_memory_contracts`. | Strong | Yes |
+| 2 | Persistence + provenance runtime model | Implemented runtime model: durable `raw_memory_lineage_index` table + migration backfill, transactional lineage upsert on every successful raw append (live/replay), replay lineage continuity persisted (`latest_replay_job_id`/`latest_replay_version`), and Step 2 verification checks exposed in tenant/admin verification as `raw_memory_persistence`. | Strong | Yes |
+| 3 | Temporal continuity implementation | Implemented runtime model: durable `raw_memory_revision_index` + migration backfill, temporal revision-chain persistence with supersession linkage, deletion-observed visibility, deterministic ordering precedence (`provider_event_timestamp` -> `source_revision_key` -> `fetched_at` -> stable raw id), and Step 3 verification checks exposed as `raw_memory_temporal` with retrieval helpers (`list_revision_chain`, `latest_known_before_t`). | Strong | Yes |
+| 4 | Replay equivalence + divergence implementation | Implemented runtime replay model: per-replay-job equivalence scan + divergence classification (`D0`-`D5`) with severity/closure metadata, blocking policy for forbidden classes (`D3`+), deterministic replay ordering checks, lineage mismatch detection (`D4`), expected-provider/schema divergence handling (`D1`/`D2`), and tenant/admin verification exposure as `raw_memory_replay`. | Strong | Yes |
+| 5 | Query model implementation (anti-goal enforced) | Implemented runtime query model: deterministic supported evidence retrieval classes (`source`, `replay`, `audit`, `provenance`, `temporal`) via `/admin/tenants/{tenant_id}/cortex/memory/query`, anti-goal guardrails block semantic/graph/intelligence intents, and Step 5 conformance checks are enforced in tenant/admin verification as `raw_memory_query`. | Strong | Yes |
+| 6 | Storage + retention implementation | Implemented runtime storage-retention model: durable `raw_memory_archive_catalog` + `raw_memory_retention_events` (with migration backfill), transactional archive-catalog writes on raw append, policy-driven retention apply path (`/admin/tenants/{tenant_id}/cortex/memory/retention/apply`) supporting dry-run and auditable actions, and Step 6 conformance checks exposed as `raw_memory_storage` in tenant/admin verification. | Strong | Yes |
+| 7 | Failure/recovery implementation | Implemented runtime failure/recovery model: durable failure-case registry (`raw_memory_failure_cases`) and recovery validation ledger (`raw_memory_recovery_validations`), deterministic failure-class synchronization (corruption/lineage/replay divergence/replay interruption/archive corruption), repairable recovery validation workflow (`/admin/tenants/{tenant_id}/cortex/memory/recovery/validate`), failure visibility endpoint (`/admin/tenants/{tenant_id}/cortex/memory/failures`), and Step 7 conformance checks exposed as `raw_memory_failure_recovery` in tenant/admin verification. | Strong | Yes |
+| 8 | Trust-state + API contract implementation | Implemented runtime trust contract: canonical trust annotation payload + gate tolerance decisions (G1-G7), continuity-gap contract shaping from active failure cases, persisted trust snapshots (`raw_memory_trust_state`) and transition events (`raw_memory_trust_transitions`), and operator/API visibility via `/admin/tenants/{tenant_id}/cortex/memory/trust-state` + verification block `raw_memory_trust`. | Strong | Yes |
+| 9 | Runtime Memory Control Plane | Implemented runtime/operator control plane: aggregated memory truth API (`/admin/tenants/{tenant_id}/cortex/memory/control-plane`), step-9 verification contract (`raw_memory_control_plane`), replay/provenance/temporal/corruption inspectors, operator checklist + safe actions surface, and admin UI activation for Cortex Memory/Verification tabs backed by `AdminCortexMemoryPage`. | Strong | Yes |
+| 10 | Phase closure trust gate | Implemented baseline binary closure enforcement: `raw_memory_phase_closure` gate evaluator (G1–G10), hard/soft/warn decision model, active blocking-flag closure deny rule, closure API (`/admin/tenants/{tenant_id}/cortex/memory/phase-closure`), verification integration, and operator-visible phase status (`open`/`closed`) in the Memory/Verification admin surface. | Strong | Yes |
+| 11 | Progressive trust enforcement | Implemented runtime calibrated enforcement policy layer: trust-aware decision engine (`observe`/`progressive`/`strict`), deterministic `would_block` vs `blocked` semantics, catastrophic-only hard-block behavior in progressive mode, enforcement telemetry surfaced in control-plane + verification payload, and trust-aware replay/query route annotations (`enforcement` payload + runtime block on catastrophic state). | Strong | Yes |
+| 12 | Unified verification semantics | Implemented canonical gate path (`raw_memory_verification_unified.py`): shared G1–G7 for trust annotations and closure, merged G8–G10, `phase02_verification_truth` + freshness/proof-quality payload on tenant verification, `raw_memory_verification_step12` contract checks, cache-hit stale proof-quality stamping, control-plane `verification_truth` surface, trust API requires `raw_memory_contracts` for G1 alignment with closure. | Strong | Yes |
+| 13 | Replay divergence hardening | **Implemented:** exported divergence registry (`REPLAY_DIVERGENCE_CLASS_META`, `FORBIDDEN_DIVERGENCE_CLASSES`), **D5** when lineage-breaking replay coincides with active continuity-broken failure cases, `verify_phase02_step13_replay_divergence_hardening` + tenant verification payload `raw_memory_replay_hardening`, stabilization gate **G13** merged into phase closure, denial-path + D2/D3/D4/D5 matrix coverage in `test_step13_replay_divergence_hardening.py`. | Strong | Yes |
+| 14 | Trust-signal hardening | **Implemented:** `infer_proof_quality` primary axis including **inferred** when trust G1–G7 slice diverges from closure; **`freshness.label`** (`fresh`/`stale`); stabilization gate **G14**; `verify_phase02_step14_trust_signal_hardening` + payload `raw_memory_trust_signal`; trust persistence enriched with `verification.proof_quality`/`verification.freshness`; control-plane **`health_overview.proof_quality_primary`** / **`verification_freshness`**; admin Memory + Verification UI surfaces; tests `test_step14_trust_signal.py`. | Strong | Yes |
+| 15 | Critical integrity hardening | **Implemented:** read-only verifier `verify_phase02_step15_critical_integrity` cross-checks revision index ↔ raw fingerprints and lineage ↔ revision heads (trust-critical pointers); stabilization gate **G15** merged into canonical closure path; tenant `/cortex/ingestion/verification` exposes `raw_memory_critical_integrity`; control-plane **`health_overview`** + checklist surface integrity state; admin Memory UI shows critical pointer integrity; tests `test_step15_critical_integrity.py`. | Strong | Yes |
+| 16 | Operational trust proof pass | **Implemented:** composite verifier `verify_phase02_step16_operational_trust_proof` (replay+divergence depth, runtime correctness + recovery, temporal continuity, critical integrity, trust signal, freshness coherence, replay proof artifacts); stabilization gate **G16** on canonical closure path; tenant verification exposes `raw_memory_operational_trust_proof`; control-plane checklist + **`health_overview`** operational trust fields; admin Memory UI tile; tests `test_step16_operational_trust_proof.py`. Phase **02** may be claimed operationally closed when tenant verification passes including **G16** (subject to organizational exhaust caveats in §2.5). | Strong | Yes |
 
 ### Missing / Incomplete
-- Extreme-window replay economics are modeled but not yet benchmarked.
-- Archive rehydration throughput and deep-window query plans require runtime calibration.
-- Phase 02 doctrine ownership and ambiguity map are now explicit (`02-raw-store/normative-index.md`, `02-raw-store/ambiguity-audit.md`).
-- Remaining pre-runtime uncertainty is calibration-only (threshold values + API enum/name freeze).
+- Phase **02** organizational exhaust **depth** remains connector/workload-dependent (§2.5); closure gates prove **substrate + trust mechanics**, not omniscient provider coverage.
 
 ### Implementation Blockers
-- No foundational blockers; proceed with first-slice validation gates from `02-raw-store/raw-memory-readiness-gates.md`.
+- No Phase **02** redesign blockers; Phase **03** runtime remains gated on mapping bundle registry + key appendix acceptance (`phase-03-implementation-readiness-audit.md`).
 
-**Confidence:** Very High (Pre-implementation, calibration caveats only; closure is gate-driven, not narrative)
+**Confidence:** High architecture confidence; Phase **02** operational trust proof path (**G16**) is enforceable in verification — continue soak for scale and connector exhaust expansion under §2.5.
 
 ---
 
-### Phase 03 — Canonicalization
+### Phase 03 — Canonicalization (18-step deterministic canonical runtime program)
 | Step # | Step | Description | Spec Accuracy | Implemented |
 | ------ | ---- | ----------- | ------------- | ----------- |
-| 1 | Canonical memory model | Canonical entities/events/relations model defined | Strong | No |
-| 2 | Mapping and extraction boundaries | Deterministic vs AI extraction boundaries defined | Strong | No |
-| 3 | Ambiguity and confidence model | Ambiguity persistence and confidence propagation defined | Strong | No |
-| 4 | Replay/idempotency semantics | Canonical replay/version/idempotency contracts defined | Strong | No |
-| 5 | Canonical observability/failure model | Failure and quality guardrails defined | Strong | No |
-| 6 | Runtime implementation + admin closure | Deliver runtime **and** operator-grade admin for this phase: visibility, scoped safe actions, verification that the phase is healthy (see **Terminal step — admin & operator closure** above). | Not Started | No |
+| 1 | Canonical ontology foundations | Freeze **structural** ontology slice + enums + non-semantic class graph (`phase-03-canonical-model-doctrine.md`, `phase-03-anti-goals-doctrine.md`). | Strong | No |
+| 2 | Canonical object taxonomy | Lock entity/event/artifact/relationship/snapshot boundaries + examples (`phase-03-canonical-model-doctrine.md`). | Strong | No |
+| 3 | Logical key doctrine + oracle vectors | Author per-class logical key derivation + idempotency tuples + test vectors (`phase-03-logical-key-doctrine.md`). | Strong | No |
+| 4 | Deterministic mapping contracts | Freeze rule/table shapes, evidence grades (E0/E1), forbidden transforms (`phase-03-deterministic-canonicalization-doctrine.md`). | Strong | No |
+| 5 | Mapping bundle registry + versioning | Implement registry process: bundle IDs, pins, compatibility lines, ownership, changelogs (`phase-03-mapping-bundle-registry.md`, `phase-03-mapping-system-doctrine.md`). | Strong | No |
+| 6 | Canonical transform runtime | Deterministic mapping engine + **transform/field lineage** emission (`phase-03-transform-lineage-doctrine.md`). | Strong | No |
+| 7 | Ambiguity persistence runtime | Ambiguity store + lifecycle + competing-rule behaviors (`phase-03-ambiguity-confidence-doctrine.md`). | Strong | No |
+| 8 | Confidence propagation runtime | Wire confidence as structured metadata (no ranking semantics) (`phase-03-ambiguity-confidence-doctrine.md`). | Strong | No |
+| 9 | Canonical identity continuity | Provider-scoped continuity + Phase 04 boundary hooks (`phase-03-identity-continuity-doctrine.md`). | Strong | No |
+| 10 | Replay / rebuild / regeneration runtime | Pins, rebuild jobs, regeneration supersession, divergence **C0–C5** receipts (`phase-03-replay-versioning-doctrine.md`). | Strong | No |
+| 11 | Provenance lineage runtime | Forward/reverse indexes, multi-merge provenance, conflicting evidence chains (`phase-03-provenance-traceability-doctrine.md`). | Strong | No |
+| 12 | Temporal continuity + ordering runtime | Late evidence, supersession chains, rebuild sort order determinism (`phase-03-temporal-timeline-doctrine.md`). | Strong | No |
+| 13 | Canonical query + retrieval runtime | Bounded graph/timeline/provenance queries + anti-goal guards (`phase-03-canonical-query-doctrine.md`). | Strong | No |
+| 14 | Failure, degradation + remediation | Failure taxonomy + **policy-gated recovery** (`phase-03-failure-degradation-doctrine.md`, `phase-03-remediation-recovery-doctrine.md`). | Strong | No |
+| 15 | Canonical verification engine | Invariant suite, CI vectors, divergence tooling (`phase-03-verification-engine-doctrine.md`, `phase-03-closure-gates-doctrine.md`). | Strong | No |
+| 16 | Canonical control plane + admin | Mandatory operator surfaces **A–H** + logical IA (Overview→Recovery); deterministic proof—not semantic dashboards (`phase-03-canonical-control-plane-doctrine.md`). | Strong | No |
+| 17 | Stabilization + proof pass | Soak, economics probes, large-tenant reconstruction drills—evidence recorded (`phase-03-implementation-readiness-audit.md`). | Strong | No |
+| 18 | Closure + operational certification | **G-P03-01–G-P03-21** PASS + archived certification artifacts including **operator visibility gates** (`phase-03-closure-gates-doctrine.md`, `phase-03-canonical-control-plane-doctrine.md`). | Strong | No |
+
+**Phase 03 closure rule:** Phase 03 is **not closed** until **operator-visible deterministic proof surfaces** satisfy **G-P03-15–G-P03-21** (no opaque canonical trust). Operator/control-plane requirements **co-evolve** with runtime stages per `03-canonical/implementation-plan.md` cross-cutting track—not only Step 16.
 
 ### Missing / Incomplete
-- Canonical query optimization strategy is documented but not yet validated with workload traces.
-- Canonical verification doctrine is weaker than Phase 01 operational verification depth.
+- Runtime implementation across Steps **1–18** (spec sequencing complete; execution not started).
+- Mapping bundle registry **operational process** (owners, promotion, CI hooks) must be enforced alongside docs.
+- Canonical query optimization at scale remains workload-dependent.
 
 ### Implementation Blockers
-- Depends on storage/queryability baselines and replay economics thresholds.
+- **Rebuild economics / replay cost:** large-tenant reconstruction may exceed initial budgets—requires soak metrics (**Step 17**) before declaring production readiness.
+- **Mapping evolution:** undeclared compatibility breaks risk **C5** divergence until registry governance is operational (**Step 05**).
+- **Canonical drift:** mitigated only by verification engine (**Step 15**) + pinned bundles (**Step 10**).
+- **Ambiguity explosion:** unresolved mapping backlog may spike—requires monitoring + mapping roadmap (**Steps 07–08**, **17**).
+- **Version migration:** bundle bumps must ship explicit compatibility lines (`phase-03-mapping-bundle-registry.md`).
+- **Logical key stability:** any change requires oracle vector updates (**Step 03**) + gate re-run.
+- Phase 02 stabilization/trust surfaces may gate halt semantics for canonical materialization.
 
-**Confidence:** Needs Architectural Validation
+### Remaining operational risks (explicit)
+
+See `phase-03-implementation-readiness-audit.md` §Operational risks — includes rebuild economics, mapping governance, drift, replay cost, large-tenant reconstruction, ambiguity explosion, version migration, key stability.
+
+**Additional operator-trust risks (control-plane doctrine):**
+
+- **Opaque rebuild drift** — divergence exists but not surfaced to operators (violates **G-P03-15**).
+- **Hidden mapping invalidation** — bundle bumps leave stale canonical scopes invisible (**G-P03-19**).
+- **Ambiguity explosion invisibility** — backlog grows without thresholds/alerts (**G-P03-18**).
+- **Unverifiable canonical provenance** — object inspector cannot show lineage/bundle/rule receipts (**G-P03-16/G-P03-17**).
+- **Operator-blind replay divergence** — regeneration jobs lack receipts / generation metadata (**G-P03-20**).
+
+**Confidence:** **8 / 10** program readiness — doctrine + **implementation-grade sequencing** + **control-plane co-evolution model** locked; execution + economics + **operator proof surfaces** validation remain (**Steps 05–06 partial surfaces through 18**).
+
+**Anti-goals (non-negotiable):** Phase 03 remains **structural, deterministic, provenance-safe, replay-safe** — not semantic reasoning, managerial interpretation, AI synthesis, graph cognition, or execution narratives (`phase-03-anti-goals-doctrine.md`).
 
 ---
 
@@ -336,9 +374,9 @@ No phase is **complete** until its **last numbered step** in this tracker ships 
 
 ## 4) Current Implementation Priority
 - **Completed (Step 0–6, Phase 01 substrate):** Step 5 as before. **Step 6:** operator ingestion control plane — `vector.domains.cortex.ingestion.admin_overview`, `vector.infrastructure.cortex_scheduler_pause`, admin API under `/admin/tenants/{id}/cortex/ingestion` (+ **exhaust-coverage**, **raw-stats**, per-connector **raw-records** browse, actions + global scheduler pause), frontend **Cortex ingestion** tab (substrate + **declared exhaust** panel + ingested-data tabs for **current shallow / partial** streams only), `connector_sync` enqueue for all five connectors; tests `test_step2_scheduler` (Redis pause path), `test_admin_cortex_ingestion_step6` (integration).
-- **Current goal:** Phase 02 Step 1 implementation while running Phase 01 Step 15 soak/telemetry checks.
+- **Current goal:** Begin Phase **03** deterministic canonical runtime program per `DOCS/cortex/implementation/phased-roadmap.md` and Phase **03** normative docs; keep Phase **02** verification green in CI/admin.
 - **Parallel:** migration flags and operator soak continue; Phase 01 closure criteria are already met.
-- **Next planned implementation entry:** Phase 02 Step 1.
+- **Next planned implementation entry:** Phase **03 Step 1** (canonical ontology foundations — freeze primitives/taxonomy before mapping runtime).
 
 ## 5) Implementation Readiness
 | Phase | Architecture | Verification | Ready For Coding |

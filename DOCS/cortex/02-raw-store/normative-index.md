@@ -24,6 +24,8 @@ Single constitutional index for Phase 02 doctrine ownership and precedence.
 | Query model + anti-goals | `raw-memory-query-model.md`, `raw-storage-boundaries.md` |
 | Storage/retention doctrine | `storage-retention-doctrine.md`, `raw-memory-retention.md` |
 | Binary closure gates and tolerances | `binary-closure-gates.md`, `gate-tolerance-semantics.md` |
+| Unified verification semantics | `verification-semantics-doctrine.md`, `trust-state-api-contract-doctrine.md` |
+| Progressive enforcement readiness semantics | `trust-state-taxonomy.md`, `admin-operator-expectations.md`, `binary-closure-gates.md` |
 | Operator decision model | `admin-operator-expectations.md`, `operator-decision-guidance-doctrine.md` |
 | Ambiguity governance | `ambiguity-audit.md`, `runtime-vs-doctrine-ambiguity-register.md` |
 | Phase sequencing / closure step ownership | `../MASTER_TRACKER.md`, `../implementation/phased-roadmap.md` |
@@ -33,4 +35,4 @@ Single constitutional index for Phase 02 doctrine ownership and precedence.
 - Any proposed deviation requires explicit doc update in the owning file and tracker note.
 
 ## Closure Ownership
-Phase 02 closure authority is `binary-closure-gates.md` + `MASTER_TRACKER.md` Phase 02 Step 7.
+Phase 02 closure authority is `binary-closure-gates.md` + `MASTER_TRACKER.md` Phase 02 Steps 10-16.
