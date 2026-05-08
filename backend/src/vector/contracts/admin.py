@@ -421,3 +421,306 @@ class AdminHardDeleteOrphanUserResponse(BaseModel):
     deleted_email: str
 
 
+CortexIngestionConnectorId = Literal["calls", "github", "linear", "notion", "slack"]
+
+
+class AdminCortexIngestionRunSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    status: str
+    replay_mode: bool
+    sync_mode: str
+    source_trigger: str
+    started_at: datetime
+    finished_at: datetime | None
+    error_summary: str | None = None
+    raw_rows_written: int | None = None
+
+
+class AdminCortexConnectorIngestionRow(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    connector: str
+    connection_id: uuid.UUID | None = None
+    connection_status: str | None = None
+    cortex_routed: bool
+    queue_lane_live: str = Field(default="cortex_live")
+    queue_lane_replay: str = Field(default="cortex_replay")
+    checkpoint_last_incremental_at: str | None = None
+    latest_run: AdminCortexIngestionRunSummary | None = None
+
+
+class AdminCortexGlobalScheduler(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    env_scheduler_enabled: bool
+    beat_interval_seconds: int
+    min_gap_seconds: int
+    verify_after_sync: bool
+    redis_url_configured: bool
+    paused_via_redis: bool
+    operator_mode_label: Literal[
+        "Active",
+        "Off (env)",
+        "Paused (operator)",
+        "Off (env) + paused (operator)",
+    ]
+
+
+class AdminCortexWorkerTelemetry(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    status: Literal["ok", "no_workers", "unavailable", "error"]
+    worker_count: int
+    live_queue_workers: int
+    replay_queue_workers: int
+    worker_names: list[str]
+    detail: str | None = None
+
+
+class AdminCortexDuplicatePreventionMetric(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    status: Literal["ok", "warn", "unavailable"]
+    ratio_percent: float | None = None
+    live_rows_examined: int
+    duplicate_groups: int
+    duplicate_rows_excess: int
+    detail: str | None = None
+
+
+class AdminCortexIngestionDigest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    objective: str
+    bottleneck_hint: str
+    confidence_note: str
+    recommended_actions: list[str]
+
+
+class AdminCortexIngestionOverviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    company_name: str
+    global_scheduler: AdminCortexGlobalScheduler
+    worker_telemetry: AdminCortexWorkerTelemetry
+    duplicate_prevention: AdminCortexDuplicatePreventionMetric
+    digest: AdminCortexIngestionDigest
+    connectors: list[AdminCortexConnectorIngestionRow]
+
+
+class AdminCortexIngestionTriggerSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector: CortexIngestionConnectorId
+    connection_id: uuid.UUID | None = None
+    sync_mode: Literal["incremental", "backfill"] = "incremental"
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match the server phrase for manual Cortex sync (see admin UI).",
+    )
+
+
+class AdminCortexIngestionTriggerSyncResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    enqueued: bool = True
+    queue: Literal["cortex_live"] = "cortex_live"
+    connector: str
+    connection_id: uuid.UUID
+    tenant_id: uuid.UUID
+    sync_mode: Literal["incremental", "backfill"] = "incremental"
+    source_trigger: str = "manual_admin"
+
+
+class AdminCortexIngestionTriggerReplayRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector: CortexIngestionConnectorId
+    connection_id: uuid.UUID | None = None
+    replay_version: int = Field(default=1, ge=1, le=1000)
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match the server phrase for Cortex replay (see admin UI).",
+    )
+
+
+class AdminCortexIngestionTriggerReplayResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    replay_job_id: uuid.UUID
+    queue: Literal["cortex_replay"] = "cortex_replay"
+    connector: str
+    connection_id: uuid.UUID
+    tenant_id: uuid.UUID
+    replay_version: int
+
+
+class AdminCortexSchedulerPauseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    paused: bool
+    confirmation: str = Field(
+        ...,
+        description="Must match PAUSE or RESUME phrase from admin UI depending on paused flag.",
+    )
+
+
+class AdminCortexSchedulerPauseResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    paused_via_redis: bool
+
+
+class AdminCortexIngestionVerificationResponse(BaseModel):
+    """Structured output of :func:`verify_tenant_ingestion_invariants` for operators."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    passed: bool
+    runs_examined: int
+    run_reports: list[dict[str, Any]]
+    checkpoint_report: dict[str, Any]
+    exhaust_depth: dict[str, Any] | None = None
+    runtime_correctness: dict[str, Any] | None = None
+
+
+class AdminCortexIngestionRecentRunItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: uuid.UUID
+    connector: str
+    status: str
+    source_trigger: str
+    replay_mode: bool
+    started_at: datetime
+    finished_at: datetime | None = None
+    error_summary: str | None = None
+    raw_rows_written: int | None = None
+    connection_id: uuid.UUID | None = None
+    sync_mode: str | None = None
+    replay_job_id: uuid.UUID | None = None
+    replay_version: int | None = None
+
+
+class AdminCortexIngestionRecentRunsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AdminCortexIngestionRecentRunItem]
+
+
+class AdminCortexConnectorRawRecordItem(BaseModel):
+    """One raw ingestion row for a connector (append-only store)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    run_id: uuid.UUID
+    resource_type: str
+    external_id: str
+    api_endpoint: str
+    query_params: dict[str, Any]
+    payload_body: dict[str, Any]
+    http_status: int
+    fetched_at: datetime
+    idempotency_key: str | None = None
+    source_identity_key: str | None = None
+    source_revision_key: str | None = None
+    replay_job_id: uuid.UUID | None = None
+    replay_version: int | None = None
+
+
+class AdminCortexConnectorRawRecordsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    connector: str
+    items: list[AdminCortexConnectorRawRecordItem]
+    total_count: int
+    offset: int
+    limit: int
+    truncated: bool
+
+
+class AdminCortexRawIngestionResourceStat(BaseModel):
+    """Aggregated raw row counts from ``raw_ingestion_records`` (observed tenant reality)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    connector: str
+    resource_type: str
+    row_count: int
+    oldest_fetched_at: datetime | None = None
+    newest_fetched_at: datetime | None = None
+
+
+class AdminCortexConnectorRawRollup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector: str
+    row_count: int
+    oldest_fetched_at: datetime | None = None
+    newest_fetched_at: datetime | None = None
+    resource_types: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdminCortexRawIngestionStatsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    resources: list[AdminCortexRawIngestionResourceStat]
+    connector_rollups: list[AdminCortexConnectorRawRollup] = Field(default_factory=list)
+
+
+ExhaustCoverageMaturity = Literal["none", "partial", "full"]
+ExhaustHistoricalMaturity = Literal["none", "partial", "full", "n/a"]
+ExhaustReplayMaturity = Literal["no", "partial", "yes"]
+ExhaustCanonMaturity = Literal["none", "partial", "full"]
+ExhaustRowStatus = Literal["missing", "in_progress", "active"]
+
+
+class AdminCortexExhaustResourceCoverageRow(BaseModel):
+    """One resource-type row from :mod:`vector.domains.cortex.ingestion.exhaust_coverage_registry`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    resource_type: str
+    coverage: ExhaustCoverageMaturity
+    historical: ExhaustHistoricalMaturity
+    replay: ExhaustReplayMaturity
+    canonicalization: ExhaustCanonMaturity
+    status: ExhaustRowStatus
+    notes: str | None = None
+
+
+class AdminCortexExhaustConnectorCoverage(BaseModel):
+    """Per-connector exhaust depth for admin visibility (mirrors the exhaust matrix doc)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    connector: CortexIngestionConnectorId
+    maturity_level: int = Field(ge=0, le=6)
+    maturity_level_title: str
+    historical_backfill_summary: str
+    replay_compatibility_summary: str
+    canonicalization_summary: str
+    missing_resource_types: list[str]
+    resources: list[AdminCortexExhaustResourceCoverageRow]
+
+
+class AdminCortexIngestionExhaustCoverageResponse(BaseModel):
+    """Organizational exhaust coverage — static registry aligned with Cortex docs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    connector_exhaust_matrix_doc: str
+    ingestion_depth_model_doc: str
+    organizational_exhaust_definition_doc: str
+    real_ingestion_definition_doc: str
+    connector_expansion_roadmap_doc: str
+    connectors: list[AdminCortexExhaustConnectorCoverage]
+

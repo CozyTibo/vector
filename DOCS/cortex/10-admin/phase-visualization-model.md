@@ -1,5 +1,7 @@
 # Phase Visualization Model
 
+This document defines **what** each phase should expose in the control plane. **When** it must ship: at every phase’s **terminal implementation step** (see `DOCS/cortex/MASTER_TRACKER.md` — **Terminal step — admin & operator closure**), not only at Phase 10.
+
 ## Visualization Contract
 Every phase view must include:
 - current phase state,
@@ -9,7 +11,8 @@ Every phase view must include:
 - lineage/provenance signal health.
 
 ## Phase 01 (Ingestion) Visualization
-- ingestion runs, checkpoints, connector health, lag, throttling, dead-letter, replay jobs.
+- **Substrate (Steps 0–6):** ingestion runs, checkpoints, connector routing, lag, throttling, dead-letter, replay jobs.
+- **Organizational exhaust (Steps 7–14):** raw **exhaust proof** — counts and time span by `connector` × `resource_type`, filters that default away from `*.scope_ping`, drilldown to payloads so operators can confirm real messages / PRs / issues / blocks / transcripts (per `MASTER_TRACKER.md` Step 13–14).
 - control CTAs:
   - root: `Scheduled Polling ON/OFF` with current mode indicator,
   - workspace: `Trigger Connector Ingestion` quick action per connector row.

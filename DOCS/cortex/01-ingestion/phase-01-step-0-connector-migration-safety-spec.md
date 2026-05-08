@@ -39,10 +39,10 @@ Migrate existing connector logic to Cortex-owned ingestion boundaries safely, wi
    - Remove old connector execution path only after parity gates are stable for defined soak period.
 
 ## Feature Flags And Control
-- `cortex_connector_migration_enabled` (global default off).
-- `cortex_connector_migration_<connector>` (connector-level control).
-- `cortex_connector_migration_<connector>_tenants` (tenant cohort allowlist).
-- Emergency kill switch routes traffic to legacy path immediately.
+- `cortex_connector_migration_enabled` (global default **on** in application settings; set `false` to disable).
+- `cortex_connector_migration_<connector>` (per-connector default **on**; set `false` to disable that connector).
+- `cortex_connector_migration_<connector>_tenants` (tenant cohort allowlist; empty = all tenants).
+- Emergency kill switch: set master or per-connector flags to `false` in environment / config.
 
 **Runtime (Vector codebase):** Environment variables `CORTEX_CONNECTOR_MIGRATION_*` map to `Settings` fields; routing uses `vector.domains.cortex.connectors.cortex_ingestion_policy` and `Settings.cortex_migration_route_active`. Admin enqueue shims (`connector_sync.enqueue_*`) raise `NotImplementedError` when the Cortex path is selected for a tenant but the executor is not wired yet.
 

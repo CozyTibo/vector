@@ -4,7 +4,11 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AdminLayout from "./admin/AdminLayout.tsx";
+import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
+import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
+import AdminCortexPlaceholderPage from "./admin/AdminCortexPlaceholderPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
+import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
 import AdminTenantOnboardingPage from "./admin/AdminTenantOnboardingPage.tsx";
 import AdminTenantLayout from "./admin/AdminTenantLayout.tsx";
 import AdminWorkspacePage from "./admin/AdminWorkspacePage.tsx";
@@ -70,6 +74,24 @@ createRoot(document.getElementById("root")!).render(
               <Route path="onboarding" element={<AdminTenantOnboardingPage />} />
               <Route path="overview" element={<RedirectTenantToWorkspace />} />
               <Route path="integrations" element={<AdminIntegrationsPage />} />
+              <Route path="cortex-ingestion" element={<Navigate to="../cortex/ingestion" replace />} />
+              <Route path="cortex" element={<AdminTenantCortexLayout />}>
+                <Route index element={<Navigate to="overview" replace />} />
+                <Route path="overview" element={<AdminCortexOverviewPage />} />
+                <Route path="ingestion" element={<AdminCortexIngestionPage />} />
+                <Route path="canonical" element={<AdminCortexPlaceholderPage title="Canonical" />} />
+                <Route
+                  path="entity-resolution"
+                  element={<AdminCortexPlaceholderPage title="Entity Resolution" />}
+                />
+                <Route path="graph" element={<AdminCortexPlaceholderPage title="Graph" />} />
+                <Route path="memory" element={<AdminCortexPlaceholderPage title="Memory" />} />
+                <Route path="reasoning" element={<AdminCortexPlaceholderPage title="Reasoning" />} />
+                <Route path="retrieval" element={<AdminCortexPlaceholderPage title="Retrieval" />} />
+                <Route path="synthesis" element={<AdminCortexPlaceholderPage title="Synthesis" />} />
+                <Route path="verification" element={<AdminCortexPlaceholderPage title="Verification" />} />
+                <Route path="settings-debug" element={<AdminCortexPlaceholderPage title="Settings / Debug" />} />
+              </Route>
               <Route path="connections" element={<RedirectTenantToIntegrations />} />
               <Route path="slack-onboarding" element={<RedirectTenantToWorkspace />} />
               <Route path="manager-onboarding" element={<RedirectTenantToWorkspace />} />

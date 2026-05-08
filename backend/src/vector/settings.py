@@ -215,37 +215,37 @@ class Settings(BaseSettings):
         ),
     )
     cortex_connector_migration_enabled: bool = Field(
-        default=False,
+        default=True,
         validation_alias="CORTEX_CONNECTOR_MIGRATION_ENABLED",
         description=(
-            "Phase 01: master switch for Cortex-owned ingestion. When false, poll/enqueue sites "
-            "stay disabled (legacy removed)."
+            "Phase 01: master switch for Cortex-owned ingestion (default on). Set false only to "
+            "disable Cortex routing globally (emergency / staged environments)."
         ),
     )
     cortex_connector_migration_calls: bool = Field(
-        default=False,
+        default=True,
         validation_alias="CORTEX_CONNECTOR_MIGRATION_CALLS",
-        description="Enable Cortex ingestion path for calls connector (requires master switch).",
+        description="Cortex ingestion for calls (default on; requires master switch). Set false to opt out.",
     )
     cortex_connector_migration_github: bool = Field(
-        default=False,
+        default=True,
         validation_alias="CORTEX_CONNECTOR_MIGRATION_GITHUB",
-        description="Enable Cortex ingestion path for GitHub connector (requires master switch).",
+        description="Cortex ingestion for GitHub (default on; requires master switch). Set false to opt out.",
     )
     cortex_connector_migration_linear: bool = Field(
-        default=False,
+        default=True,
         validation_alias="CORTEX_CONNECTOR_MIGRATION_LINEAR",
-        description="Enable Cortex ingestion path for Linear connector (requires master switch).",
+        description="Cortex ingestion for Linear (default on; requires master switch). Set false to opt out.",
     )
     cortex_connector_migration_notion: bool = Field(
-        default=False,
+        default=True,
         validation_alias="CORTEX_CONNECTOR_MIGRATION_NOTION",
-        description="Enable Cortex ingestion path for Notion connector (requires master switch).",
+        description="Cortex ingestion for Notion (default on; requires master switch). Set false to opt out.",
     )
     cortex_connector_migration_slack: bool = Field(
-        default=False,
+        default=True,
         validation_alias="CORTEX_CONNECTOR_MIGRATION_SLACK",
-        description="Enable Cortex ingestion path for Slack connector (requires master switch).",
+        description="Cortex ingestion for Slack (default on; requires master switch). Set false to opt out.",
     )
     cortex_connector_migration_calls_tenants: str = Field(
         default="",
@@ -297,6 +297,356 @@ class Settings(BaseSettings):
             "Minimum seconds between enqueueing the same tenant×connector scheduled sync "
             "(uses connector_sync_state.last_incremental_at)."
         ),
+    )
+    cortex_ingestion_verify_after_sync: bool = Field(
+        default=True,
+        validation_alias="CORTEX_INGESTION_VERIFY_AFTER_SYNC",
+        description=(
+            "Phase 01 Step 5: after a successful ingestion run, execute read-only invariant probes "
+            "and attach the report to the task response (disable in hot paths if needed)."
+        ),
+    )
+    cortex_github_installation_repos_max_pages: int = Field(
+        default=100,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_GITHUB_INSTALLATION_REPOS_MAX_PAGES",
+        description=(
+            "Max pages of GET /installation/repositories per sync (100 repos/page max). "
+            "Increase for large installs; each page is one API call."
+        ),
+    )
+    cortex_slack_users_max_pages: int = Field(
+        default=50,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_SLACK_USERS_MAX_PAGES",
+        description="Max users.list cursor pages per Slack ingestion sync (~200 users/page).",
+    )
+    cortex_slack_conversations_max_pages: int = Field(
+        default=50,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_SLACK_CONVERSATIONS_MAX_PAGES",
+        description="Max conversations.list cursor pages per Slack ingestion sync.",
+    )
+    cortex_slack_conversation_types: str = Field(
+        default="public_channel,private_channel",
+        validation_alias="CORTEX_SLACK_CONVERSATION_TYPES",
+        description=(
+            "Comma-separated Slack conversation types for conversations.list. "
+            "Default excludes im/mpim unless policy explicitly allows."
+        ),
+    )
+    cortex_slack_history_channels_per_sync: int = Field(
+        default=5,
+        ge=0,
+        le=50,
+        validation_alias="CORTEX_SLACK_HISTORY_CHANNELS_PER_SYNC",
+        description=(
+            "After listing channels, fetch conversations.history for up to N channels per sync "
+            "(0 disables message history in this pass)."
+        ),
+    )
+    cortex_slack_conversations_history_limit: int = Field(
+        default=200,
+        ge=1,
+        le=1000,
+        validation_alias="CORTEX_SLACK_CONVERSATIONS_HISTORY_LIMIT",
+        description="Slack conversations.history `limit` (most recent messages in the window).",
+    )
+    cortex_slack_history_max_pages_per_channel: int = Field(
+        default=5,
+        ge=1,
+        le=200,
+        validation_alias="CORTEX_SLACK_HISTORY_MAX_PAGES_PER_CHANNEL",
+        description=(
+            "Max conversations.history pages per channel per sync (supports resumable backfill "
+            "with checkpointed next_cursor)."
+        ),
+    )
+    cortex_slack_threads_per_sync: int = Field(
+        default=100,
+        ge=0,
+        le=1000,
+        validation_alias="CORTEX_SLACK_THREADS_PER_SYNC",
+        description="Max thread roots to process via conversations.replies per sync.",
+    )
+    cortex_slack_replies_max_pages_per_thread: int = Field(
+        default=3,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_SLACK_REPLIES_MAX_PAGES_PER_THREAD",
+        description="Max conversations.replies pages per thread root per sync.",
+    )
+    cortex_slack_channel_time_budget_seconds: int = Field(
+        default=20,
+        ge=1,
+        le=600,
+        validation_alias="CORTEX_SLACK_CHANNEL_TIME_BUDGET_SECONDS",
+        description=(
+            "Soft per-run time budget for Slack channel/deep history loop before checkpoint-and-resume."
+        ),
+    )
+    cortex_slack_backfill_oldest_ts: str = Field(
+        default="",
+        validation_alias="CORTEX_SLACK_BACKFILL_OLDEST_TS",
+        description=(
+            "Optional Slack oldest timestamp floor for backfill mode (Unix ts string). "
+            "Empty means workspace/API default window."
+        ),
+    )
+    cortex_linear_issues_first: int = Field(
+        default=50,
+        ge=1,
+        le=250,
+        validation_alias="CORTEX_LINEAR_ISSUES_FIRST",
+        description="How many Linear issues to fetch per sync (GraphQL `issues(first: n)`).",
+    )
+    cortex_linear_issues_max_pages_per_sync: int = Field(
+        default=10,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_ISSUES_MAX_PAGES_PER_SYNC",
+        description="Max paginated `issues` pages per Linear sync before checkpoint resume.",
+    )
+    cortex_linear_stream_first: int = Field(
+        default=100,
+        ge=1,
+        le=250,
+        validation_alias="CORTEX_LINEAR_STREAM_FIRST",
+        description="Default page size for non-issue Linear GraphQL streams.",
+    )
+    cortex_linear_comments_max_pages_per_sync: int = Field(
+        default=5,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_COMMENTS_MAX_PAGES_PER_SYNC",
+        description="Max paginated `comments` pages per Linear sync.",
+    )
+    cortex_linear_projects_max_pages_per_sync: int = Field(
+        default=3,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_PROJECTS_MAX_PAGES_PER_SYNC",
+        description="Max paginated `projects` pages per Linear sync.",
+    )
+    cortex_linear_cycles_max_pages_per_sync: int = Field(
+        default=3,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_CYCLES_MAX_PAGES_PER_SYNC",
+        description="Max paginated `cycles` pages per Linear sync.",
+    )
+    cortex_linear_issue_relations_max_pages_per_sync: int = Field(
+        default=5,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_ISSUE_RELATIONS_MAX_PAGES_PER_SYNC",
+        description="Max paginated `issueRelations` pages per Linear sync.",
+    )
+    cortex_linear_issue_labels_max_pages_per_sync: int = Field(
+        default=3,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_ISSUE_LABELS_MAX_PAGES_PER_SYNC",
+        description="Max paginated `issueLabels` pages per Linear sync.",
+    )
+    cortex_linear_initiatives_max_pages_per_sync: int = Field(
+        default=3,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_INITIATIVES_MAX_PAGES_PER_SYNC",
+        description="Max paginated `initiatives` pages per Linear sync.",
+    )
+    cortex_linear_time_budget_seconds: int = Field(
+        default=25,
+        ge=1,
+        le=600,
+        validation_alias="CORTEX_LINEAR_TIME_BUDGET_SECONDS",
+        description="Soft per-run Linear deep-ingestion budget before checkpoint-and-resume.",
+    )
+    cortex_notion_search_page_size: int = Field(
+        default=50,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_NOTION_SEARCH_PAGE_SIZE",
+        description="Notion `/search` page size for organizational exhaust traversal.",
+    )
+    cortex_notion_search_max_pages_per_sync: int = Field(
+        default=8,
+        ge=1,
+        le=200,
+        validation_alias="CORTEX_NOTION_SEARCH_MAX_PAGES_PER_SYNC",
+        description="Max Notion `/search` pages processed per sync before checkpoint resume.",
+    )
+    cortex_notion_databases_per_sync: int = Field(
+        default=40,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_NOTION_DATABASES_PER_SYNC",
+        description="Max discovered Notion databases to process per sync.",
+    )
+    cortex_notion_database_query_page_size: int = Field(
+        default=100,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_NOTION_DATABASE_QUERY_PAGE_SIZE",
+        description="Notion database query page size (`/databases/{id}/query`).",
+    )
+    cortex_notion_database_query_max_pages_per_database: int = Field(
+        default=5,
+        ge=1,
+        le=200,
+        validation_alias="CORTEX_NOTION_DATABASE_QUERY_MAX_PAGES_PER_DATABASE",
+        description="Max pages for each Notion database query stream per sync.",
+    )
+    cortex_notion_blocks_page_size: int = Field(
+        default=100,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_NOTION_BLOCKS_PAGE_SIZE",
+        description="Notion block children page size (`/blocks/{id}/children`).",
+    )
+    cortex_notion_blocks_max_pages_per_parent: int = Field(
+        default=3,
+        ge=1,
+        le=200,
+        validation_alias="CORTEX_NOTION_BLOCKS_MAX_PAGES_PER_PARENT",
+        description="Max block-children pages fetched for a parent per sync.",
+    )
+    cortex_notion_blocks_parents_per_sync: int = Field(
+        default=100,
+        ge=1,
+        le=2000,
+        validation_alias="CORTEX_NOTION_BLOCKS_PARENTS_PER_SYNC",
+        description="Max distinct page/block parents traversed for children per sync.",
+    )
+    cortex_notion_time_budget_seconds: int = Field(
+        default=25,
+        ge=1,
+        le=600,
+        validation_alias="CORTEX_NOTION_TIME_BUDGET_SECONDS",
+        description="Soft per-run Notion deep-ingestion budget before checkpoint-and-resume.",
+    )
+    cortex_calls_events_page_size: int = Field(
+        default=100,
+        ge=1,
+        le=250,
+        validation_alias="CORTEX_CALLS_EVENTS_PAGE_SIZE",
+        description="Calls meetings/events page size per API page.",
+    )
+    cortex_calls_events_max_pages_per_sync: int = Field(
+        default=8,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_CALLS_EVENTS_MAX_PAGES_PER_SYNC",
+        description="Max Calls events pages processed per sync before checkpoint resume.",
+    )
+    cortex_calls_time_budget_seconds: int = Field(
+        default=25,
+        ge=1,
+        le=600,
+        validation_alias="CORTEX_CALLS_TIME_BUDGET_SECONDS",
+        description="Soft per-run Calls deep-ingestion budget before checkpoint-and-resume.",
+    )
+    cortex_github_pr_fetch_max_repos: int = Field(
+        default=8,
+        ge=0,
+        le=200,
+        validation_alias="CORTEX_GITHUB_PR_FETCH_MAX_REPOS",
+        description="After repo list sync, fetch open+closed PRs for up to this many repos (0 disables PR fetch).",
+    )
+    cortex_github_prs_per_repo: int = Field(
+        default=30,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_PRS_PER_REPO",
+        description="Max pull requests per repo per sync (GitHub REST `/pulls` first page).",
+    )
+    cortex_github_prs_max_pages_per_repo: int = Field(
+        default=5,
+        ge=1,
+        le=200,
+        validation_alias="CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO",
+        description="Max paginated `/pulls` pages per repo per sync.",
+    )
+    cortex_github_reviews_max_pages_per_pr: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_REVIEWS_MAX_PAGES_PER_PR",
+        description="Max pages for `/pulls/{number}/reviews` per PR per sync.",
+    )
+    cortex_github_review_comments_max_pages_per_pr: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_REVIEW_COMMENTS_MAX_PAGES_PER_PR",
+        description="Max pages for `/pulls/{number}/comments` per PR per sync.",
+    )
+    cortex_github_issue_comments_max_pages_per_pr: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_ISSUE_COMMENTS_MAX_PAGES_PER_PR",
+        description="Max pages for `/issues/{number}/comments` per PR per sync.",
+    )
+    cortex_github_commits_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_COMMITS_MAX_PAGES_PER_REPO",
+        description="Max pages for `/repos/{owner}/{repo}/commits` per repo per sync.",
+    )
+    cortex_github_check_runs_max_pages_per_pr: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_CHECK_RUNS_MAX_PAGES_PER_PR",
+        description="Max pages for `/commits/{sha}/check-runs` per PR head sha per sync.",
+    )
+    cortex_github_workflow_runs_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_WORKFLOW_RUNS_MAX_PAGES_PER_REPO",
+        description="Max pages for `/actions/runs` per repo per sync.",
+    )
+    cortex_github_deployments_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_DEPLOYMENTS_MAX_PAGES_PER_REPO",
+        description="Max pages for `/deployments` per repo per sync.",
+    )
+    cortex_github_deployment_statuses_max_pages_per_deployment: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_DEPLOYMENT_STATUSES_MAX_PAGES_PER_DEPLOYMENT",
+        description="Max pages for deployment statuses per deployment per sync.",
+    )
+    cortex_github_branches_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_BRANCHES_MAX_PAGES_PER_REPO",
+        description="Max pages for `/branches` per repo per sync.",
+    )
+    cortex_github_tags_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_TAGS_MAX_PAGES_PER_REPO",
+        description="Max pages for `/tags` per repo per sync.",
+    )
+    cortex_github_repo_time_budget_seconds: int = Field(
+        default=25,
+        ge=1,
+        le=600,
+        validation_alias="CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS",
+        description="Soft per-run GitHub deep-ingestion budget before checkpoint-and-resume.",
     )
 
     @field_validator("github_app_private_key", mode="before")

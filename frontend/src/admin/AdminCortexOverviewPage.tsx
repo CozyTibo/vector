@@ -1,0 +1,369 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+import { adminFetch, adminJson } from "../lib/adminFetch";
+import { readErrorDetail } from "../lib/canonicalApi";
+import {
+  CORTEX_MANUAL_SYNC_CONFIRM_PHRASE,
+  CORTEX_REPLAY_CONFIRM_PHRASE,
+  CORTEX_SCHEDULER_PAUSE_CONFIRM_PHRASE,
+  CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE,
+} from "./adminConstants";
+import { CortexOverview, CortexRawStats, CortexRecentRuns, titleConnector } from "./cortexAdminTypes";
+import { StatusBadge } from "./ui/StatusBadge";
+
+type ActionResult = { connector: string; ok: boolean; detail?: string };
+type ActionSummary = {
+  kind: "sync" | "replay";
+  okCount: number;
+  failCount: number;
+  okConnectors: string[];
+  failures: ActionResult[];
+};
+
+function statCard(title: string, value: string, tone: "ok" | "warn" | "bad" | "neutral", detail?: string) {
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{title}</p>
+        <StatusBadge tone={tone}>{value}</StatusBadge>
+      </div>
+      {detail ? <p className="mt-2 text-xs text-stone-600">{detail}</p> : null}
+    </div>
+  );
+}
+
+export default function AdminCortexOverviewPage() {
+  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [lastActionSummary, setLastActionSummary] = useState<ActionSummary | null>(null);
+
+  const refreshOverviewPulse = () => {
+    const delays = [0, 1200, 3000, 6000, 10000, 14000];
+    for (const ms of delays) {
+      window.setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ["admin-cortex-overview", tenantId] });
+        void qc.invalidateQueries({ queryKey: ["admin-cortex-recent-runs", tenantId] });
+        void qc.invalidateQueries({ queryKey: ["admin-cortex-raw-stats", tenantId] });
+      }, ms);
+    }
+  };
+
+  const overviewQ = useQuery({
+    queryKey: ["admin-cortex-overview", tenantId],
+    queryFn: () => adminJson<CortexOverview>(`/admin/tenants/${tenantId}/cortex/ingestion`),
+    enabled: Boolean(tenantId),
+  });
+  const rawStatsQ = useQuery({
+    queryKey: ["admin-cortex-raw-stats", tenantId],
+    queryFn: () => adminJson<CortexRawStats>(`/admin/tenants/${tenantId}/cortex/ingestion/raw-stats`),
+    enabled: Boolean(tenantId),
+  });
+  const recentRunsQ = useQuery({
+    queryKey: ["admin-cortex-recent-runs", tenantId],
+    queryFn: () => adminJson<CortexRecentRuns>(`/admin/tenants/${tenantId}/cortex/ingestion/recent-runs?limit=25`),
+    enabled: Boolean(tenantId),
+  });
+
+  const pauseMut = useMutation({
+    mutationFn: async (paused: boolean) => {
+      const res = await adminFetch("/admin/cortex/ingestion/scheduler-pause", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paused,
+          confirmation: paused ? CORTEX_SCHEDULER_PAUSE_CONFIRM_PHRASE : CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE,
+        }),
+      });
+      if (!res.ok) throw new Error(await readErrorDetail(res));
+      return res.json() as Promise<{ paused_via_redis: boolean }>;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-overview", tenantId] });
+    },
+  });
+
+  const bulkSyncMut = useMutation({
+    mutationFn: async (connectors: string[]): Promise<ActionResult[]> => {
+      const results = await Promise.all(
+        connectors.map(async (connector): Promise<ActionResult> => {
+          const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/ingestion/actions/trigger-sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ connector, confirmation: CORTEX_MANUAL_SYNC_CONFIRM_PHRASE }),
+          });
+          if (!res.ok) return { connector, ok: false, detail: await readErrorDetail(res) };
+          return { connector, ok: true };
+        }),
+      );
+      return results;
+    },
+    onSuccess: (results) => {
+      const failures = results.filter((x) => !x.ok);
+      const okConnectors = results.filter((x) => x.ok).map((x) => x.connector);
+      setLastActionSummary({
+        kind: "sync",
+        okCount: okConnectors.length,
+        failCount: failures.length,
+        okConnectors,
+        failures,
+      });
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-overview", tenantId] });
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-recent-runs", tenantId] });
+      refreshOverviewPulse();
+    },
+  });
+
+  const bulkReplayMut = useMutation({
+    mutationFn: async (connectors: string[]): Promise<ActionResult[]> => {
+      const results = await Promise.all(
+        connectors.map(async (connector): Promise<ActionResult> => {
+          const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/ingestion/actions/trigger-replay`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              connector,
+              replay_version: 1,
+              confirmation: CORTEX_REPLAY_CONFIRM_PHRASE,
+            }),
+          });
+          if (!res.ok) return { connector, ok: false, detail: await readErrorDetail(res) };
+          return { connector, ok: true };
+        }),
+      );
+      return results;
+    },
+    onSuccess: (results) => {
+      const failures = results.filter((x) => !x.ok);
+      const okConnectors = results.filter((x) => x.ok).map((x) => x.connector);
+      setLastActionSummary({
+        kind: "replay",
+        okCount: okConnectors.length,
+        failCount: failures.length,
+        okConnectors,
+        failures,
+      });
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-overview", tenantId] });
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-recent-runs", tenantId] });
+      refreshOverviewPulse();
+    },
+  });
+
+  const health = useMemo(() => {
+    const o = overviewQ.data;
+    if (!o) return { status: "idle", tone: "neutral" as const };
+    if (!o.global_scheduler.env_scheduler_enabled) return { status: "paused", tone: "warn" as const };
+    if (o.global_scheduler.paused_via_redis) return { status: "paused", tone: "warn" as const };
+    const hasFailed = o.connectors.some((c) => c.latest_run?.status === "FAILED");
+    if (hasFailed) return { status: "degraded", tone: "warn" as const };
+    return { status: "healthy", tone: "ok" as const };
+  }, [overviewQ.data]);
+
+  if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
+  if (overviewQ.isPending) return <p className="text-sm text-stone-600">Loading Cortex overview…</p>;
+  if (overviewQ.isError) return <p className="text-sm text-red-700">{(overviewQ.error as Error).message}</p>;
+
+  const o = overviewQ.data;
+  const wt = o.worker_telemetry;
+  const dedupe = o.duplicate_prevention;
+  const runnableConnectors = o.connectors
+    .filter((c) => c.cortex_routed && c.connection_status === "active")
+    .map((c) => c.connector);
+  const failedRuns = recentRunsQ.data?.items.filter((r) => r.status === "FAILED").length ?? 0;
+  const activeReplay = recentRunsQ.data?.items.filter((r) => r.replay_mode && r.status === "RUNNING").length ?? 0;
+  const replayWorkers = wt.replay_queue_workers;
+  const replayQueueValue =
+    activeReplay > 0 ? "replaying" : replayWorkers > 0 ? "ready" : "idle";
+  const replayQueueTone =
+    activeReplay > 0 ? "warn" : replayWorkers > 0 ? ("ok" as const) : ("warn" as const);
+  const replayQueueDetail =
+    activeReplay > 0
+      ? `${activeReplay} replay run(s) currently active`
+      : replayWorkers > 0
+        ? "No active replay jobs right now; worker is listening."
+        : "No worker currently listening on cortex_replay.";
+  const rowsToday =
+    rawStatsQ.data?.resources
+      .filter((r) => {
+        if (!r.newest_fetched_at) return false;
+        const d = new Date(r.newest_fetched_at);
+        const now = new Date();
+        return (
+          d.getUTCFullYear() === now.getUTCFullYear() &&
+          d.getUTCMonth() === now.getUTCMonth() &&
+          d.getUTCDate() === now.getUTCDate()
+        );
+      })
+      .reduce((acc, r) => acc + r.row_count, 0) ?? 0;
+
+  const latestSuccess = recentRunsQ.data?.items.find((r) => r.status === "COMPLETED");
+  const lagThresholdSec = Math.max(
+    o.global_scheduler.min_gap_seconds * 3,
+    o.global_scheduler.beat_interval_seconds * 2,
+  );
+  const routedActiveConnectors = o.connectors.filter(
+    (c) => c.cortex_routed && c.connection_status === "active",
+  );
+  const laggingConnectors = routedActiveConnectors.filter((c) => {
+    if (!c.checkpoint_last_incremental_at) return true;
+    const ageSec = (Date.now() - new Date(c.checkpoint_last_incremental_at).getTime()) / 1000;
+    return Number.isFinite(ageSec) && ageSec > lagThresholdSec;
+  });
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-stone-900">Cortex Overview</h2>
+            <p className="text-sm text-stone-600">{o.company_name}</p>
+          </div>
+          <StatusBadge tone={health.tone}>{health.status}</StatusBadge>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {statCard("Cortex status", health.status, health.tone)}
+          {statCard(
+            "Live queue health",
+            o.global_scheduler.env_scheduler_enabled && !o.global_scheduler.paused_via_redis ? "active" : "paused",
+            o.global_scheduler.env_scheduler_enabled && !o.global_scheduler.paused_via_redis ? "ok" : "warn",
+            `interval ${o.global_scheduler.beat_interval_seconds}s / gap ${o.global_scheduler.min_gap_seconds}s`,
+          )}
+          {statCard("Replay queue health", replayQueueValue, replayQueueTone, replayQueueDetail)}
+          {statCard(
+            "Active workers",
+            String(wt.worker_count),
+            wt.status === "ok" && wt.worker_count > 0 ? "ok" : "warn",
+            wt.status === "ok"
+              ? `live queue: ${wt.live_queue_workers}, replay queue: ${wt.replay_queue_workers}`
+              : wt.detail ?? "Worker telemetry unavailable.",
+          )}
+          {statCard("Failed runs", String(failedRuns), failedRuns > 0 ? "warn" : "ok", "in last 25 runs")}
+          {statCard(
+            "Last successful ingestion",
+            latestSuccess ? new Date(latestSuccess.started_at).toLocaleString() : "none",
+            latestSuccess ? "ok" : "warn",
+          )}
+          {statCard("Raw rows today", String(rowsToday), rowsToday > 0 ? "ok" : "neutral")}
+          {statCard("Replay jobs active", String(activeReplay), activeReplay > 0 ? "warn" : "neutral")}
+          {statCard(
+            "Duplicate prevention ratio",
+            dedupe.ratio_percent == null ? "n/a" : `${dedupe.ratio_percent}%`,
+            dedupe.status === "ok" ? "ok" : dedupe.status === "warn" ? "warn" : "neutral",
+            dedupe.detail ??
+              `rows ${dedupe.live_rows_examined}, duplicate groups ${dedupe.duplicate_groups}, excess rows ${dedupe.duplicate_rows_excess}`,
+          )}
+          {statCard(
+            "Checkpoint lag warnings",
+            laggingConnectors.length > 0 ? "attention" : "clear",
+            laggingConnectors.length > 0 ? "warn" : "ok",
+            `${laggingConnectors.length} of ${routedActiveConnectors.length} active routed connectors over threshold (${lagThresholdSec}s)`,
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-stone-900">Operational actions</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 hover:bg-indigo-100 disabled:opacity-40"
+            disabled={bulkSyncMut.isPending || runnableConnectors.length === 0}
+            onClick={() => bulkSyncMut.mutate(runnableConnectors)}
+          >
+            {bulkSyncMut.isPending ? "Queueing…" : "Ingest all connectors"}
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-40"
+            disabled={bulkReplayMut.isPending || runnableConnectors.length === 0}
+            onClick={() => bulkReplayMut.mutate(runnableConnectors)}
+          >
+            {bulkReplayMut.isPending ? "Queueing…" : "Replay all connectors"}
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-40"
+            disabled={pauseMut.isPending || o.global_scheduler.paused_via_redis}
+            onClick={() => pauseMut.mutate(true)}
+          >
+            Pause ingestion
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-40"
+            disabled={pauseMut.isPending || !o.global_scheduler.paused_via_redis}
+            onClick={() => pauseMut.mutate(false)}
+          >
+            Resume ingestion
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
+            onClick={() => navigate(`/admin/tenants/${tenantId}/cortex/ingestion?tab=verification`)}
+          >
+            Run verification
+          </button>
+          <button
+            type="button"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100"
+            onClick={() => navigate(`/admin/tenants/${tenantId}/cortex/ingestion?tab=raw-explorer`)}
+          >
+            Open raw explorer
+          </button>
+        </div>
+        {lastActionSummary ? (
+          <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3 text-xs text-stone-700">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone={lastActionSummary.failCount > 0 ? "warn" : "ok"}>
+                {lastActionSummary.kind === "sync" ? "ingest enqueue" : "replay enqueue"}
+              </StatusBadge>
+              <span>
+                queued {lastActionSummary.okCount}, failed {lastActionSummary.failCount}
+              </span>
+            </div>
+            {lastActionSummary.okConnectors.length > 0 ? (
+              <p className="mt-1">queued: {lastActionSummary.okConnectors.map(titleConnector).join(", ")}</p>
+            ) : null}
+            {lastActionSummary.failures.length > 0 ? (
+              <ul className="mt-1 space-y-1">
+                {lastActionSummary.failures.map((f) => (
+                  <li key={`${lastActionSummary.kind}-${f.connector}`}>
+                    {titleConnector(f.connector)}: {f.detail ?? "enqueue failed"}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-stone-900">Connector pulse</h3>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {o.connectors.map((c) => (
+            <button
+              key={c.connector}
+              type="button"
+              onClick={() => navigate(`/admin/tenants/${tenantId}/cortex/ingestion?tab=connectors`)}
+              className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-left hover:bg-stone-100"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-stone-900">{titleConnector(c.connector)}</p>
+                <StatusBadge
+                  tone={!c.cortex_routed ? "neutral" : c.latest_run?.status === "FAILED" ? "bad" : "ok"}
+                >
+                  {!c.cortex_routed ? "not routed" : c.latest_run?.status ?? "idle"}
+                </StatusBadge>
+              </div>
+              <p className="mt-1 text-xs text-stone-600">
+                checkpoint: {c.checkpoint_last_incremental_at ? new Date(c.checkpoint_last_incremental_at).toLocaleString() : "n/a"}
+              </p>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}

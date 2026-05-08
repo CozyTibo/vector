@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import logging
 import uuid
+from datetime import datetime
+from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Annotated, Any, Literal
 
@@ -17,6 +19,22 @@ from vector.api.http.deps import get_db, settings_dep
 from vector.contracts.admin import (
     AdminConnectionsResponse,
     AdminConnectorConnectLinkResponse,
+    AdminCortexConnectorRawRecordItem,
+    AdminCortexConnectorRawRecordsResponse,
+    AdminCortexIngestionExhaustCoverageResponse,
+    AdminCortexIngestionOverviewResponse,
+    AdminCortexIngestionRecentRunItem,
+    AdminCortexIngestionRecentRunsResponse,
+    AdminCortexIngestionTriggerReplayRequest,
+    AdminCortexIngestionTriggerReplayResponse,
+    AdminCortexIngestionTriggerSyncRequest,
+    AdminCortexIngestionTriggerSyncResponse,
+    AdminCortexIngestionVerificationResponse,
+    CortexIngestionConnectorId,
+    AdminCortexRawIngestionResourceStat,
+    AdminCortexRawIngestionStatsResponse,
+    AdminCortexSchedulerPauseRequest,
+    AdminCortexSchedulerPauseResponse,
     AdminHardDeleteOrphanUserRequest,
     AdminHardDeleteOrphanUserResponse,
     AdminHardDeleteTenantRequest,
@@ -61,6 +79,13 @@ from vector.domains.cortex.connectors.notion.oauth_flow import start_notion_oaut
 from vector.domains.cortex.connectors.runtime import runtime_by_id
 from vector.domains.cortex.connectors.slack.errors import SlackConnectorNotConfiguredError
 from vector.domains.cortex.connectors.slack.oauth_flow import start_slack_oauth_url
+from vector.domains.cortex.ingestion.admin_overview import build_cortex_ingestion_admin_overview
+from vector.domains.cortex.ingestion.admin_recent_raw import (
+    aggregate_raw_ingestion_stats,
+    build_connector_raw_rollups,
+    list_raw_records_for_connector,
+    list_recent_ingestion_runs,
+)
 from vector.domains.onboarding.constants import (
     ONBOARDING_ALL_TOOL_IDS,
     ONBOARDING_PROFILE_ROLE_CANONICAL,
@@ -93,12 +118,18 @@ from vector.infrastructure.email.onboarding_activation import (
     enqueue_onboarding_activation_email,
     onboarding_entry_url,
 )
+from vector.infrastructure.observability.ingestion_tasks import PHASE_STEP6, log_ingestion_event
 from vector.settings import Settings, get_settings
 
 _logger = logging.getLogger("app")
 
+CORTEX_SCHEDULER_PAUSE_CONFIRM_PHRASE = "PAUSE ALL SCHEDULED CORTEX INGESTION"
+CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE = "RESUME ALL SCHEDULED CORTEX INGESTION"
+CORTEX_MANUAL_SYNC_CONFIRM_PHRASE = "RUN MANUAL CORTEX INGESTION SYNC"
+CORTEX_REPLAY_CONFIRM_PHRASE = "RUN CORTEX INGESTION REPLAY JOB"
 
-def _enqueue_cortex_poll_sync(connector_id: str):
+
+def _enqueue_cortex_poll_sync(connector_id: str) -> Callable[..., None]:
     """Enqueue Phase 01 Celery sync when flags route this connector×tenant to Cortex."""
 
     def _fn(*args: object, **kwargs: object) -> None:
@@ -116,8 +147,68 @@ def _enqueue_cortex_poll_sync(connector_id: str):
             return
         raise RuntimeError(
             "Connector poll ingestion is unavailable for tenants not routed to Cortex "
-            "(enable CORTEX_CONNECTOR_MIGRATION_* for this connector×tenant).",
+            "(Cortex ingestion is disabled for this connector×tenant in configuration).",
         )
+
+    return _fn
+
+
+def _enqueue_cortex_replay_sync(connector_id: str) -> Callable[..., uuid.UUID]:
+    """Enqueue Phase 01 replay Celery task (cortex_replay queue) when flags route to Cortex."""
+
+    def _fn(*args: object, **kwargs: object) -> uuid.UUID:
+        settings = get_settings()
+        tenant_id = extract_tenant_id_from_enqueue_args(args, kwargs)
+        if tenant_id is None:
+            raise RuntimeError(
+                "tenant_id is required to enqueue connector replay sync "
+                "(pass a positional UUID or tenant_id= keyword).",
+            )
+        if not should_route_ingestion_to_cortex(settings, connector_id, tenant_id):
+            raise RuntimeError(
+                "Connector replay ingestion is unavailable for tenants not routed to Cortex "
+                "(Cortex ingestion is disabled for this connector×tenant in configuration).",
+            )
+        raw_job = kwargs.get("replay_job_id")
+        job_id = uuid.UUID(str(raw_job)) if raw_job is not None else uuid.uuid4()
+        from app.tasks.cortex_ingestion_sync import run_cortex_connector_replay_sync_task
+
+        rv_obj = kwargs.get("replay_version", 1)
+        if isinstance(rv_obj, int):
+            replay_version = rv_obj
+        elif isinstance(rv_obj, str) and rv_obj.strip().isdigit():
+            replay_version = int(rv_obj)
+        else:
+            replay_version = 1
+        run_cortex_connector_replay_sync_task.delay(
+            str(tenant_id),
+            connector_id,
+            str(job_id),
+            replay_version,
+            "manual_replay",
+        )
+        return job_id
+
+    return _fn
+
+
+def _verify_cortex_ingestion_invariants() -> Callable[..., dict[str, Any]]:
+    """Run Step 5 read-only invariant sweep for a tenant (uses ``session_scope``)."""
+
+    def _fn(*args: object, **kwargs: object) -> dict[str, Any]:
+        tenant_id = extract_tenant_id_from_enqueue_args(args, kwargs)
+        if tenant_id is None:
+            raise RuntimeError(
+                "tenant_id is required to verify Cortex ingestion invariants "
+                "(pass tenant_id= keyword or a positional UUID).",
+            )
+        from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
+        from vector.infrastructure.db.session import session_scope
+
+        rl = kwargs.get("run_limit", 30)
+        run_limit = rl if isinstance(rl, int) else 30
+        with session_scope() as session:
+            return verify_tenant_ingestion_invariants(session, tenant_id, run_limit=run_limit)
 
     return _fn
 
@@ -125,8 +216,17 @@ def _enqueue_cortex_poll_sync(connector_id: str):
 # Backward-compat shim for tests/patch targets that still reference
 # `vector.api.http.routes.admin.connector_sync`.
 connector_sync = SimpleNamespace(
+    enqueue_calls_poll_sync=_enqueue_cortex_poll_sync("calls"),
     enqueue_github_poll_sync=_enqueue_cortex_poll_sync("github"),
     enqueue_linear_poll_sync=_enqueue_cortex_poll_sync("linear"),
+    enqueue_notion_poll_sync=_enqueue_cortex_poll_sync("notion"),
+    enqueue_slack_poll_sync=_enqueue_cortex_poll_sync("slack"),
+    enqueue_calls_replay_sync=_enqueue_cortex_replay_sync("calls"),
+    enqueue_github_replay_sync=_enqueue_cortex_replay_sync("github"),
+    enqueue_linear_replay_sync=_enqueue_cortex_replay_sync("linear"),
+    enqueue_notion_replay_sync=_enqueue_cortex_replay_sync("notion"),
+    enqueue_slack_replay_sync=_enqueue_cortex_replay_sync("slack"),
+    verify_ingestion_invariants=_verify_cortex_ingestion_invariants(),
 )
 
 
@@ -575,6 +675,59 @@ def _validate_admin_onboarding_collected_patch(patch: dict[str, Any]) -> None:
 def _assert_tenant(session: Session, tenant_id: uuid.UUID) -> None:
     if tenancy_repo.get_tenant_by_id(session, tenant_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+
+
+def _active_cortex_routed_connection(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    connector_id: str,
+    connection_id: uuid.UUID | None = None,
+) -> TenantConnection:
+    stmt = (
+        select(TenantConnection)
+        .where(
+            TenantConnection.tenant_id == tenant_id,
+            TenantConnection.provider == connector_id,
+            TenantConnection.status == "active",
+        )
+        .order_by(TenantConnection.created_at.desc(), TenantConnection.id.desc())
+    )
+    rows = list(session.scalars(stmt).all())
+    if connection_id is not None:
+        tc = next((x for x in rows if x.id == connection_id), None)
+        if tc is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"Active {connector_id} connection {connection_id} not found for this tenant.",
+            ) from None
+    elif len(rows) > 1:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=(
+                f"Multiple active {connector_id} connections found for this tenant. "
+                "Specify connection_id explicitly to avoid ambiguous ingestion scope."
+            ),
+        ) from None
+    else:
+        tc = rows[0] if rows else None
+
+    if tc is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=f"No active {connector_id} connection for this tenant.",
+        ) from None
+
+    if not should_route_ingestion_to_cortex(settings, connector_id, tenant_id):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "This connector is not routed to Cortex ingestion for this tenant "
+                "(Cortex ingestion is disabled for this connector in configuration)."
+            ),
+        ) from None
+    return tc
 
 
 def _list_tenant_connections(session: Session, tenant_id: uuid.UUID) -> list[TenantConnection]:
@@ -1118,5 +1271,305 @@ def build_admin_router() -> APIRouter:
             tenant_id=tenant_id,
             user_id=member.id,
         )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/ingestion",
+        response_model=AdminCortexIngestionOverviewResponse,
+    )
+    def admin_cortex_ingestion_overview(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexIngestionOverviewResponse:
+        """Phase 01 Step 6 — visibility: runs, checkpoints, routing, scheduler mode (read-only)."""
+        _assert_tenant(db, tenant_id)
+        try:
+            raw = build_cortex_ingestion_admin_overview(db, settings, tenant_id)
+        except ValueError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        return AdminCortexIngestionOverviewResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/ingestion/exhaust-coverage",
+        response_model=AdminCortexIngestionExhaustCoverageResponse,
+    )
+    def admin_cortex_ingestion_exhaust_coverage(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIngestionExhaustCoverageResponse:
+        """Declared organizational exhaust depth (matrix + maturity levels; read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.exhaust_coverage_registry import (
+            build_admin_exhaust_coverage_payload,
+        )
+
+        raw = build_admin_exhaust_coverage_payload(tenant_id=tenant_id)
+        return AdminCortexIngestionExhaustCoverageResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/ingestion/raw-stats",
+        response_model=AdminCortexRawIngestionStatsResponse,
+    )
+    def admin_cortex_ingestion_raw_stats(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        connector: Annotated[str | None, Query()] = None,
+        resource_type: Annotated[str | None, Query()] = None,
+        fetched_after: Annotated[datetime | None, Query()] = None,
+        fetched_before: Annotated[datetime | None, Query()] = None,
+        include_health_rows: Annotated[bool, Query()] = False,
+    ) -> AdminCortexRawIngestionStatsResponse:
+        """Observed raw exhaust aggregates (defaults to hiding health-like ping rows)."""
+        _assert_tenant(db, tenant_id)
+        rows = aggregate_raw_ingestion_stats(
+            db,
+            tenant_id,
+            connector=connector,
+            resource_type=resource_type,
+            fetched_after=fetched_after,
+            fetched_before=fetched_before,
+            include_health_rows=include_health_rows,
+        )
+        rollups = build_connector_raw_rollups(rows)
+        return AdminCortexRawIngestionStatsResponse(
+            tenant_id=tenant_id,
+            resources=[AdminCortexRawIngestionResourceStat.model_validate(x) for x in rows],
+            connector_rollups=rollups,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/ingestion/verification",
+        response_model=AdminCortexIngestionVerificationResponse,
+    )
+    def admin_cortex_ingestion_verification(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        run_limit: Annotated[int, Query(ge=1, le=200)] = 30,
+    ) -> AdminCortexIngestionVerificationResponse:
+        """Phase 01 Step 6 — operator checklist (read-only invariant sweep)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.verification import verify_tenant_ingestion_invariants
+
+        rep = verify_tenant_ingestion_invariants(
+            db,
+            tenant_id,
+            run_limit=run_limit,
+            enforce_exhaust_gate=True,
+        )
+        log_ingestion_event(
+            _logger,
+            logging.INFO,
+            "admin cortex ingestion verification",
+            task_name="admin_cortex_ingestion_verification",
+            phase=PHASE_STEP6,
+            outcome="passed" if rep["passed"] else "failed",
+            tenant_id=str(tenant_id),
+        )
+        return AdminCortexIngestionVerificationResponse.model_validate(rep)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/ingestion/recent-runs",
+        response_model=AdminCortexIngestionRecentRunsResponse,
+    )
+    def admin_cortex_ingestion_recent_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    ) -> AdminCortexIngestionRecentRunsResponse:
+        """Recent ingestion runs for drill-down (read-only)."""
+        _assert_tenant(db, tenant_id)
+        rows = list_recent_ingestion_runs(db, tenant_id, limit=limit)
+        return AdminCortexIngestionRecentRunsResponse(
+            items=[AdminCortexIngestionRecentRunItem.model_validate(x) for x in rows],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/ingestion/connectors/{connector}/raw-records",
+        response_model=AdminCortexConnectorRawRecordsResponse,
+    )
+    def admin_cortex_ingestion_connector_raw_records(
+        tenant_id: uuid.UUID,
+        connector: CortexIngestionConnectorId,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+        resource_type: Annotated[str | None, Query()] = None,
+        fetched_after: Annotated[datetime | None, Query()] = None,
+        fetched_before: Annotated[datetime | None, Query()] = None,
+        search_query: Annotated[str | None, Query()] = None,
+        include_health_rows: Annotated[bool, Query()] = False,
+    ) -> AdminCortexConnectorRawRecordsResponse:
+        """Raw rows for tenant+connector with Step 13 filters and payload drilldown search."""
+        _assert_tenant(db, tenant_id)
+        items, truncated, total_count = list_raw_records_for_connector(
+            db,
+            tenant_id,
+            connector,
+            limit=limit,
+            offset=offset,
+            resource_type=resource_type,
+            fetched_after=fetched_after,
+            fetched_before=fetched_before,
+            search_query=search_query,
+            include_health_rows=include_health_rows,
+        )
+        return AdminCortexConnectorRawRecordsResponse(
+            tenant_id=tenant_id,
+            connector=connector,
+            items=[AdminCortexConnectorRawRecordItem.model_validate(x) for x in items],
+            total_count=total_count,
+            offset=offset,
+            limit=limit,
+            truncated=truncated,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/ingestion/actions/trigger-sync",
+        response_model=AdminCortexIngestionTriggerSyncResponse,
+    )
+    def admin_cortex_ingestion_trigger_sync(
+        tenant_id: uuid.UUID,
+        body: AdminCortexIngestionTriggerSyncRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexIngestionTriggerSyncResponse:
+        """Enqueue one manual live-lane sync (cortex_live) for a routed connector."""
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != CORTEX_MANUAL_SYNC_CONFIRM_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        tc = _active_cortex_routed_connection(
+            db,
+            settings,
+            tenant_id=tenant_id,
+            connector_id=body.connector,
+            connection_id=body.connection_id,
+        )
+        from app.tasks.cortex_ingestion_sync import run_cortex_connector_sync_task
+
+        run_cortex_connector_sync_task.delay(
+            str(tenant_id),
+            body.connector,
+            "manual_admin",
+            body.sync_mode,
+            str(tc.id),
+        )
+        log_ingestion_event(
+            _logger,
+            logging.INFO,
+            "admin cortex manual sync enqueued",
+            task_name="admin_cortex_ingestion_trigger_sync",
+            phase=PHASE_STEP6,
+            outcome="enqueued",
+            tenant_id=str(tenant_id),
+            connector=body.connector,
+            sync_mode=body.sync_mode,
+        )
+        return AdminCortexIngestionTriggerSyncResponse(
+            connector=body.connector,
+            connection_id=tc.id,
+            tenant_id=tenant_id,
+            sync_mode=body.sync_mode,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/ingestion/actions/trigger-replay",
+        response_model=AdminCortexIngestionTriggerReplayResponse,
+    )
+    def admin_cortex_ingestion_trigger_replay(
+        tenant_id: uuid.UUID,
+        body: AdminCortexIngestionTriggerReplayRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexIngestionTriggerReplayResponse:
+        """Enqueue a replay-scoped sync on cortex_replay with isolated checkpoints."""
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != CORTEX_REPLAY_CONFIRM_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        tc = _active_cortex_routed_connection(
+            db,
+            settings,
+            tenant_id=tenant_id,
+            connector_id=body.connector,
+            connection_id=body.connection_id,
+        )
+        job_id = uuid.uuid4()
+        from app.tasks.cortex_ingestion_sync import run_cortex_connector_replay_sync_task
+
+        run_cortex_connector_replay_sync_task.delay(
+            str(tenant_id),
+            body.connector,
+            str(job_id),
+            body.replay_version,
+            "manual_admin_replay",
+            str(tc.id),
+        )
+        log_ingestion_event(
+            _logger,
+            logging.INFO,
+            "admin cortex replay sync enqueued",
+            task_name="admin_cortex_ingestion_trigger_replay",
+            phase=PHASE_STEP6,
+            outcome="enqueued",
+            tenant_id=str(tenant_id),
+            connector=body.connector,
+            ing_replay_job_id=str(job_id),
+        )
+        return AdminCortexIngestionTriggerReplayResponse(
+            replay_job_id=job_id,
+            connector=body.connector,
+            connection_id=tc.id,
+            tenant_id=tenant_id,
+            replay_version=body.replay_version,
+        )
+
+    @r.post(
+        "/cortex/ingestion/scheduler-pause",
+        response_model=AdminCortexSchedulerPauseResponse,
+    )
+    def admin_cortex_ingestion_scheduler_pause(
+        body: AdminCortexSchedulerPauseRequest,
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexSchedulerPauseResponse:
+        """Global operator brake: pause/resume Beat enqueue via Redis (all tenants)."""
+        from vector.infrastructure.cortex_scheduler_pause import (
+            scheduler_pause_redis_available,
+            write_scheduler_paused_flag,
+        )
+
+        if not scheduler_pause_redis_available(settings):
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Scheduler pause requires REDIS_URL (same broker Celery uses).",
+            ) from None
+        if body.paused:
+            if body.confirmation != CORTEX_SCHEDULER_PAUSE_CONFIRM_PHRASE:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    detail="Confirmation phrase does not match pause phrase.",
+                ) from None
+        elif body.confirmation != CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match resume phrase.",
+            ) from None
+        try:
+            write_scheduler_paused_flag(settings, paused=body.paused)
+        except RuntimeError as e:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
+        log_ingestion_event(
+            _logger,
+            logging.INFO,
+            "admin cortex scheduler pause flag written",
+            task_name="admin_cortex_ingestion_scheduler_pause",
+            phase=PHASE_STEP6,
+            outcome="paused" if body.paused else "resumed",
+        )
+        return AdminCortexSchedulerPauseResponse(paused_via_redis=body.paused)
 
     return r

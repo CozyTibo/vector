@@ -65,6 +65,7 @@ celery_app = Celery(
         "app.tasks.onboarding_activation_task",
         "app.tasks.cortex_ingestion_sync",
         "app.tasks.cortex_ingestion_scheduler",
+        "app.tasks.cortex_ingestion_verify",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -78,11 +79,13 @@ celery_app.conf.imports = (
     "app.tasks.onboarding_activation_task",
     "app.tasks.cortex_ingestion_sync",
     "app.tasks.cortex_ingestion_scheduler",
+    "app.tasks.cortex_ingestion_verify",
 )
 
-# Phase 01 Step 2: live incremental sync lane (orchestration-model.md).
+# Phase 01 Step 2–3: live lane vs replay lane (orchestration-model.md, replay-strategy.md).
 celery_app.conf.task_routes = {
     "vector.cortex.ingestion.run_sync": {"queue": "cortex_live"},
+    "vector.cortex.ingestion.run_sync_replay": {"queue": "cortex_replay"},
 }
 
 _tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "300"))
@@ -101,6 +104,7 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.onboarding_activation_task")
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
+    importlib.import_module("app.tasks.cortex_ingestion_verify")
 
 
 _register_tasks()
@@ -113,3 +117,4 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.onboarding_activation_task")
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
+    importlib.import_module("app.tasks.cortex_ingestion_verify")

@@ -10,6 +10,7 @@ Define mandatory pre-implementation conditions per phase to prevent premature co
 - Provenance gate: lineage obligations are complete and testable.
 - Temporal gate: timestamp and validity-window semantics are unambiguous.
 - AI boundary gate: allowed/forbidden AI behavior is explicit for the phase.
+- **Admin closure gate:** The phase’s **terminal tracker step** plan includes operator **visibility**, **scoped actions**, and **verification** for that phase (`DOCS/cortex/MASTER_TRACKER.md` — **Terminal step — admin & operator closure**). Coding the runtime without the admin slice fails this gate.
 
 ## Phase Gates
 
@@ -53,6 +54,7 @@ Define mandatory pre-implementation conditions per phase to prevent premature co
 ### `10-admin`
 - Operational RBAC and audit schema finalized.
 - Replay authorization and approval workflow finalized.
+- Per-phase Step **6** admin slices from Phases **01–09** are specified enough that Phase 10 can **integrate** them (navigation, deduplication, dangerous-action consolidation)—not invent ingestion/raw/canonical visibility only here.
 
 ## Gate Failure Rule
 If any required gate fails, implementation for that phase is blocked until resolution is documented and reviewed.

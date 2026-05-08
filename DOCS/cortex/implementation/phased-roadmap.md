@@ -29,3 +29,6 @@ Expose explainable synthesis outputs with provenance and confidence metadata.
 
 ## Phase 10: Admin/Governance
 Operational controls for replay, monitoring, policy, and lifecycle management.
+
+## Cross-cutting: admin closure every phase
+Phases **01–09** each end with **Step 6 = runtime + admin closure** (per-phase operator visibility, triggers, and verification). Phase **10** integrates those slices into the unified governance UX; it does not replace the requirement that earlier phases already shipped their own closure when they completed.

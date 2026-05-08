@@ -115,8 +115,8 @@ def test_admin_github_enqueue_requires_tenant_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/vector_test")
-    monkeypatch.delenv("CORTEX_CONNECTOR_MIGRATION_ENABLED", raising=False)
-    monkeypatch.delenv("CORTEX_CONNECTOR_MIGRATION_GITHUB", raising=False)
+    monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_ENABLED", "false")
+    monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_GITHUB", "false")
 
     from vector.api.http.routes.admin import connector_sync
     from vector.settings import get_settings
@@ -134,8 +134,8 @@ def test_admin_github_enqueue_raises_when_not_cortex_routed(
 ) -> None:
     tid = uuid.uuid4()
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/vector_test")
-    monkeypatch.delenv("CORTEX_CONNECTOR_MIGRATION_ENABLED", raising=False)
-    monkeypatch.delenv("CORTEX_CONNECTOR_MIGRATION_GITHUB", raising=False)
+    monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_ENABLED", "false")
+    monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_GITHUB", "false")
 
     from vector.api.http.routes.admin import connector_sync
     from vector.settings import get_settings
@@ -168,5 +168,41 @@ def test_admin_github_enqueue_dispatches_celery_when_cortex_flagged(
             task_mod.delay = MagicMock()
             connector_sync.enqueue_github_poll_sync(tenant_id=tid)
             task_mod.delay.assert_called_once_with(str(tid), "github", "manual")
+    finally:
+        get_settings.cache_clear()
+
+
+def test_admin_github_replay_enqueue_dispatches_replay_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = uuid.uuid4()
+    job = uuid.uuid4()
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost:5432/vector_test")
+    monkeypatch.setenv("ENV", "development")
+    monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_ENABLED", "true")
+    monkeypatch.setenv("CORTEX_CONNECTOR_MIGRATION_GITHUB", "true")
+
+    from unittest.mock import MagicMock, patch
+
+    from vector.api.http.routes.admin import connector_sync
+    from vector.settings import get_settings
+
+    get_settings.cache_clear()
+    try:
+        replay_task = "app.tasks.cortex_ingestion_sync.run_cortex_connector_replay_sync_task"
+        with patch(replay_task) as task_mod:
+            task_mod.delay = MagicMock()
+            connector_sync.enqueue_github_replay_sync(
+                tenant_id=tid,
+                replay_job_id=str(job),
+                replay_version=2,
+            )
+            task_mod.delay.assert_called_once_with(
+                str(tid),
+                "github",
+                str(job),
+                2,
+                "manual_replay",
+            )
     finally:
         get_settings.cache_clear()

@@ -14,6 +14,88 @@ from vector.settings import Settings
 GITHUB_OAUTH_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token"
 
 
+def _github_rest_get(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    path: str,
+    params: dict[str, Any] | None = None,
+    timeout: float = 60.0,
+) -> httpx.Response:
+    base = settings.github_rest_api_base_url().rstrip("/")
+    p = path if path.startswith("/") else f"/{path}"
+    url = f"{base}{p}"
+    try:
+        resp = httpx.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {installation_access_token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            params=params or None,
+            timeout=timeout,
+        )
+    except httpx.RequestError as e:
+        raise GitHubApiError(f"github request failed ({p}): {e}") from e
+    if resp.status_code == 429:
+        raise GitHubApiError(f"github rate limited (429) for {p}") from None
+    if resp.is_error:
+        snippet = (resp.text or "").replace("\n", " ")[:400]
+        raise GitHubApiError(
+            f"github {p} http {resp.status_code}" + (f" — {snippet}" if snippet else ""),
+        ) from None
+    return resp
+
+
+def _github_rest_array(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    path: str,
+    params: dict[str, Any] | None = None,
+    timeout: float = 60.0,
+) -> list[dict[str, Any]]:
+    resp = _github_rest_get(
+        settings,
+        installation_access_token,
+        path=path,
+        params=params,
+        timeout=timeout,
+    )
+    try:
+        data = resp.json()
+    except ValueError:
+        raise GitHubApiError(f"github {path} not json (http {resp.status_code})") from None
+    if not isinstance(data, list):
+        raise GitHubApiError(f"github {path} response not array")
+    return [x for x in data if isinstance(x, dict)]
+
+
+def _github_rest_object(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    path: str,
+    params: dict[str, Any] | None = None,
+    timeout: float = 60.0,
+) -> dict[str, Any]:
+    resp = _github_rest_get(
+        settings,
+        installation_access_token,
+        path=path,
+        params=params,
+        timeout=timeout,
+    )
+    try:
+        data = resp.json()
+    except ValueError:
+        raise GitHubApiError(f"github {path} not json (http {resp.status_code})") from None
+    if not isinstance(data, dict):
+        raise GitHubApiError(f"github {path} response not object")
+    return data
+
+
 @dataclass(frozen=True)
 class GitHubUserTokenExchange:
     access_token: str
@@ -139,29 +221,25 @@ def create_github_installation_access_token(
     return token
 
 
-def list_installation_repositories_first_page(
+def list_installation_repositories_page(
     settings: Settings,
-    installation_id: int,
+    installation_access_token: str,
     *,
-    per_page: int = 50,
+    page: int,
+    per_page: int = 100,
 ) -> tuple[list[dict[str, Any]], int | None]:
-    """GET /installation/repositories (first page) using an installation access token.
-
-    Returns repository dicts from the GitHub API (``repositories`` array) and ``total_count`` when
-    present.
-    """
-    token = create_github_installation_access_token(settings, installation_id)
+    """GET /installation/repositories for one ``page`` (installation bearer token)."""
     base = settings.github_rest_api_base_url().rstrip("/")
     url = f"{base}/installation/repositories"
     try:
         resp = httpx.get(
             url,
             headers={
-                "Authorization": f"Bearer {token}",
+                "Authorization": f"Bearer {installation_access_token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2022-11-28",
             },
-            params={"per_page": min(per_page, 100)},
+            params={"per_page": min(per_page, 100), "page": max(page, 1)},
             timeout=60.0,
         )
     except httpx.RequestError as e:
@@ -187,3 +265,268 @@ def list_installation_repositories_first_page(
     total = data.get("total_count")
     total_int = int(total) if isinstance(total, int) else None
     return repos, total_int
+
+
+def list_repo_pulls(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    per_page: int = 30,
+    state: str = "all",
+) -> list[dict[str, Any]]:
+    """GET /repos/{owner}/{repo}/pulls first page (compat wrapper)."""
+    return list_repo_pulls_page(
+        settings,
+        installation_access_token,
+        owner=owner,
+        repo=repo,
+        page=1,
+        per_page=per_page,
+        state=state,
+    )
+
+
+def list_repo_pulls_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 30,
+    state: str = "all",
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/pulls",
+        params={
+            "state": state,
+            "per_page": min(per_page, 100),
+            "page": max(page, 1),
+            "sort": "updated",
+            "direction": "desc",
+        },
+    )
+
+
+def list_pull_reviews_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    pull_number: int,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/pulls/{pull_number}/reviews",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_pull_review_comments_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    pull_number: int,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/pulls/{pull_number}/comments",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_pull_issue_comments_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    pull_number: int,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/issues/{pull_number}/comments",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_repo_commits_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/commits",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_repo_check_runs_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    ref: str,
+    page: int,
+    per_page: int = 100,
+) -> tuple[list[dict[str, Any]], int | None]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    obj = _github_rest_object(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/commits/{ref}/check-runs",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+    rows_raw = obj.get("check_runs")
+    rows = [x for x in rows_raw if isinstance(x, dict)] if isinstance(rows_raw, list) else []
+    total = obj.get("total_count")
+    return rows, int(total) if isinstance(total, int) else None
+
+
+def list_repo_workflow_runs_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> tuple[list[dict[str, Any]], int | None]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    obj = _github_rest_object(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/actions/runs",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+    rows_raw = obj.get("workflow_runs")
+    rows = [x for x in rows_raw if isinstance(x, dict)] if isinstance(rows_raw, list) else []
+    total = obj.get("total_count")
+    return rows, int(total) if isinstance(total, int) else None
+
+
+def list_repo_deployments_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/deployments",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_deployment_statuses_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    deployment_id: int,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/deployments/{deployment_id}/statuses",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_repo_branches_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/branches",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_repo_tags_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/tags",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_installation_repositories_first_page(
+    settings: Settings,
+    installation_id: int,
+    *,
+    per_page: int = 50,
+) -> tuple[list[dict[str, Any]], int | None]:
+    """GET /installation/repositories (first page) using an installation access token.
+
+    Returns repository dicts from the GitHub API (``repositories`` array) and ``total_count`` when
+    present.
+    """
+    token = create_github_installation_access_token(settings, installation_id)
+    return list_installation_repositories_page(settings, token, page=1, per_page=per_page)

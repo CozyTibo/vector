@@ -48,5 +48,9 @@ class RawIngestionRecord(Base):
         nullable=False,
         index=True,
     )
+    replay_job_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    replay_version: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     source_trigger: Mapped[str] = mapped_column(String(32), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_identity_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    source_revision_key: Mapped[str] = mapped_column(String(128), nullable=False)

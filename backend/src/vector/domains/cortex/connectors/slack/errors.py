@@ -19,3 +19,7 @@ class SlackConnectorNotConfiguredError(Exception):
 
 class SlackWorkspaceConflictError(Exception):
     """Another tenant already owns this Slack workspace connection."""
+
+
+class SlackWebApiError(Exception):
+    """Slack Web API returned ok=false or an HTTP failure during ingestion."""

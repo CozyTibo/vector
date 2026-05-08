@@ -13,6 +13,7 @@ from vector.domains.cortex.connectors.cortex_ingestion_policy import (
     SUPPORTED_CONNECTOR_IDS,
     should_route_ingestion_to_cortex,
 )
+from vector.domains.cortex.ingestion.checkpoint_contract import checkpoint_last_incremental_at
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.settings import Settings
@@ -27,7 +28,7 @@ class RoutedSyncJob(NamedTuple):
 
 
 def _parse_last_incremental_at(state: dict[str, object]) -> datetime | None:
-    raw = state.get("last_incremental_at")
+    raw = checkpoint_last_incremental_at(state)
     if not isinstance(raw, str) or not raw.strip():
         return None
     try:

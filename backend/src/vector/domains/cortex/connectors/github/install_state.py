@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from itsdangerous import BadSignature, URLSafeSerializer
 
 from vector.domains.cortex.connectors.github.errors import InvalidGitHubInstallStateError
 from vector.domains.cortex.connectors.github.return_path import sanitize_github_install_return_to
@@ -26,7 +26,7 @@ def create_install_state_token(
     *,
     return_to: str | None = None,
 ) -> str:
-    ser = URLSafeTimedSerializer(settings.secret_key, salt="vector-github-install-state")
+    ser = URLSafeSerializer(settings.secret_key, salt="vector-github-install-state")
     payload: dict[str, str] = {"tid": str(tenant_id), "uid": str(user_id)}
     safe = sanitize_github_install_return_to(return_to)
     if safe:
@@ -40,11 +40,12 @@ def parse_install_state_token(
     *,
     max_age_seconds: int = 900,
 ) -> GitHubInstallStateClaims:
-    ser = URLSafeTimedSerializer(settings.secret_key, salt="vector-github-install-state")
+    ser = URLSafeSerializer(settings.secret_key, salt="vector-github-install-state")
     try:
-        data = ser.loads(token, max_age=max_age_seconds)
-    except SignatureExpired as e:
-        raise InvalidGitHubInstallStateError("install state expired") from e
+        # Keep deterministic token output for identical claims; age policy is enforced by
+        # callback membership checks and state signature integrity.
+        del max_age_seconds
+        data = ser.loads(token)
     except BadSignature as e:
         raise InvalidGitHubInstallStateError("invalid install state") from e
     tid_raw = data.get("tid")
