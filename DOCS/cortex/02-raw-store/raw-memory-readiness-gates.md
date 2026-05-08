@@ -6,6 +6,8 @@ Define minimum operational conditions required before Phase 02 coding begins.
 ## Gate Checklist
 | Gate | Requirement | Status |
 | ---- | ----------- | ------ |
+| Trust boundary frozen | Guarantees vs non-guarantees documented and accepted (`trust-boundaries.md`) | Met |
+| Replay-safe semantics frozen | Replay-safe vs replay-complete distinction explicit in doctrine | Met |
 | Replay assumptions accepted | Scoped replay default, broad replay controls defined | Met |
 | Archival strategy validated | Replayable archive + rehydration model documented | Met (Needs runtime calibration) |
 | Index strategy reviewed | Replay/integrity-critical index set documented | Met (Needs live tuning) |
@@ -13,6 +15,7 @@ Define minimum operational conditions required before Phase 02 coding begins.
 | Corruption recovery defined | Detection and recovery path is documented | Met |
 | Reprocessing model validated | Scoped reprocessing and blast-radius controls defined | Met (Needs runtime validation) |
 | Observability baseline defined | Query/replay/rehydration signals and alerts specified | Met (Thresholds pending calibration) |
+| Admin/operator contract defined | Required inspection surfaces/actions/checklist documented (`admin-operator-expectations.md`) | Met |
 
 ## Gate Outcome
 **Implementation gate status: PASS WITH CAVEATS**
@@ -21,3 +24,4 @@ Define minimum operational conditions required before Phase 02 coding begins.
 - Replay economics at extreme windows remain modeled, not benchmarked.
 - Archive rehydration SLOs require measured validation.
 - Query plan stability requires production-like workload sampling.
+- Trust-state thresholds (`operationally proven` vs `degraded`) need production calibration.

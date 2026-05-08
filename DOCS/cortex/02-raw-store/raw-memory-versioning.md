@@ -22,3 +22,7 @@ Version metadata must allow auditors to answer:
 - which extractor/parser version saw this payload,
 - which replay context consumed this payload,
 - how historical versions differ without mutating raw evidence.
+
+## Versioning Boundary
+Versioning tracks observed payload evolution and processing context.
+It is not a guarantee that every provider-side historical state was captured.

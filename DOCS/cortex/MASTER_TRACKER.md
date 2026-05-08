@@ -13,7 +13,7 @@
 | Phase | Name | Goal | Architecture Status | Spec Completeness | Ready For Coding |
 | ----- | ---- | ---- | ------------------- | ----------------- | ---------------- |
 | 01 | Ingestion | Bring **organizational exhaust** safely into Cortex (substrate **and** connector depth) | **Substrate + checkpoint spine + Slack/GitHub/Linear/Notion/Calls deep slices + admin exhaust proof + verification gate + Step 15 live idempotency lock + Step 16 runtime correctness hardening** shipped (0–16) | Ready (Core Contracts Frozen) | **Phase 01 closure:** **Yes** |
-| 02 | Raw Memory | Preserve immutable replayable organizational history | Architecture Defined | Ready With Caveats | Yes (Caveats) |
+| 02 | Raw Memory | Preserve trustworthy replay-safe raw organizational memory continuity (non-semantic) | Architecture Defined | Ready With Caveats | Yes (Caveats) |
 | 03 | Canonicalization | Transform raw exhaust into canonical memory | Architecture Defined | Needs Hardening | Almost |
 | 04 | Identity & Linking | Reconstruct organizational continuity across tools/time | Architecture Defined | Core Defined | Almost |
 | 05 | Organizational Graph | Model high-fidelity continuity and traversal structure | Not Started | Incomplete | No |
@@ -78,7 +78,7 @@
 
 No phase is **complete** until its **last numbered step** in this tracker ships **both** production runtime **and** a **strong admin / control plane update** for that same phase.
 
-- **Scope:** Phases **02–10 Step 6**. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
+- **Scope:** Default rule is Phases **03–10 Step 6**. **Phase 02 exception:** Step **9** is the dedicated **Runtime Memory Control Plane** and Step **10** is final phase closure. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
 - **“Strong admin update” means at minimum:**
   1. **Visibility** — Operator UI reflects *this phase’s* new reality: health signals, lag/backlog, failure classes, and (where applicable) replay / reprocess / provenance context—not only raw logs.
   2. **Actions** — At least one **primary**, policy-gated operator control for that phase (manual trigger, scoped replay/reprocess, safe pause/resume, cohort toggle, etc.) with clear **scope, queue lane, and expected impact** before execution.
@@ -149,21 +149,27 @@ No phase is **complete** until its **last numbered step** in this tracker ships 
 ### Phase 02 — Raw Memory
 | Step # | Step | Description | Spec Accuracy | Implemented |
 | ------ | ---- | ----------- | ------------- | ----------- |
-| 1 | Immutable memory model | Raw event immutability and lifecycle defined | Strong | No |
-| 2 | Provenance-safe raw retention | Evidence-preserving storage semantics defined | Strong | No |
-| 3 | Replay foundation rules | Replay dependency on raw memory defined | Strong | No |
-| 4 | Raw access/query contracts | Query and retrieval boundaries documented | Strong | No |
-| 5 | Raw-store governance and recovery | Corruption/recovery and governance model defined | Strong | No |
-| 6 | Runtime implementation + admin closure | Deliver runtime **and** operator-grade admin for this phase: visibility, scoped safe actions, verification that the phase is healthy (see **Terminal step — admin & operator closure** above). | Ready To Start | No |
+| 1 | Runtime contracts + invariants | Immutable append semantics, reconstruction/replay boundaries, provenance continuity, and invariant ownership are frozen for implementation. | Strong | No |
+| 2 | Persistence + provenance runtime model | Durable raw evidence persistence, lineage fields, and replay lineage durability are implemented from authoritative contracts. | Strong | No |
+| 3 | Temporal continuity implementation | Revision chains, supersession/deletion visibility, and timestamp precedence rules are implemented and validated. | Strong | No |
+| 4 | Replay equivalence + divergence implementation | Replay determinism, acceptable/forbidden divergence classes, and replay-safe boundaries are implemented and enforceable. | Strong | No |
+| 5 | Query model implementation (anti-goal enforced) | Connector/lineage/replay/time/revision/provenance retrieval classes are implemented; semantic/graph/intelligence querying is explicitly blocked. | Strong | No |
+| 6 | Storage + retention implementation | Append-only operational semantics, archival/rehydration, replay horizon policy, and compliance deletion behavior are implemented. | Strong | No |
+| 7 | Failure/recovery implementation | Corruption, continuity break, replay interruption, and recovery workflows are implemented with deterministic failure representation. | Strong | No |
+| 8 | Trust-state + API contract implementation | Trust-state transitions, gate tolerances, trust annotations, and continuity-gap response shapes are implemented and operator-visible. | Strong | No |
+| 9 | Runtime Memory Control Plane | Operational memory verification/control plane is implemented: health truth states, replay inspector, lineage/provenance explorer, temporal reconstruction inspector, corruption/continuity inspection, and raw-memory-safe actions. | Ready To Start | No |
+| 10 | Phase closure trust gate | Phase 02 closes only when binary gates pass (replay/provenance/temporal/reconstruction/corruption/query/control-plane/trust-state) with no unresolved blocking states. | Ready To Start | No |
 
 ### Missing / Incomplete
 - Extreme-window replay economics are modeled but not yet benchmarked.
 - Archive rehydration throughput and deep-window query plans require runtime calibration.
+- Phase 02 doctrine ownership and ambiguity map are now explicit (`02-raw-store/normative-index.md`, `02-raw-store/ambiguity-audit.md`).
+- Remaining pre-runtime uncertainty is calibration-only (threshold values + API enum/name freeze).
 
 ### Implementation Blockers
 - No foundational blockers; proceed with first-slice validation gates from `02-raw-store/raw-memory-readiness-gates.md`.
 
-**Confidence:** High Confidence (With Caveats)
+**Confidence:** Very High (Pre-implementation, calibration caveats only; closure is gate-driven, not narrative)
 
 ---
 

@@ -11,6 +11,9 @@
 - canonical relationship synthesis,
 - organizational concept classification,
 - semantic dedupe or clustering.
+- identity resolution decisions,
+- graph semantics or traversal intelligence,
+- AI interpretation/reasoning artifacts.
 
 ## Boundary Enforcement
 - only source and ingestion metadata fields are persisted.

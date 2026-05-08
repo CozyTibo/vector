@@ -5,6 +5,10 @@ Define adapter contracts, backfill/incremental strategy, idempotent ingestion en
 
 ## Phase 2: Raw Event Store
 Implement immutable raw events, replay checkpoints, retention policy interfaces.
+Add dedicated Runtime Memory Control Plane step before final Phase 02 closure.
+Phase 02 closure is binary-gated on replay/provenance/reconstruction/corruption/admin trust checks, not narrative confidence.
+Phase 02 doctrine authority is centralized in `02-raw-store/normative-index.md`.
+Phase 02 implementation sequencing is explicitly expanded to Steps 1-10 in `02-raw-store/implementation-plan.md` and `MASTER_TRACKER.md`.
 
 ## Phase 3: Canonicalization
 Define canonical schema, deterministic mapping, provenance guarantees.
@@ -31,4 +35,6 @@ Expose explainable synthesis outputs with provenance and confidence metadata.
 Operational controls for replay, monitoring, policy, and lifecycle management.
 
 ## Cross-cutting: admin closure every phase
-Phases **01–09** each end with **Step 6 = runtime + admin closure** (per-phase operator visibility, triggers, and verification). Phase **10** integrates those slices into the unified governance UX; it does not replace the requirement that earlier phases already shipped their own closure when they completed.
+Default: Phases **03–09** end with **Step 6 = runtime + admin closure** (per-phase operator visibility, triggers, and verification).  
+**Phase 02 exception:** Step **9** is dedicated Runtime Memory Control Plane and Step **10** is final trust closure.  
+Phase **10** integrates those slices into the unified governance UX; it does not replace the requirement that earlier phases already shipped their own closure when they completed.
