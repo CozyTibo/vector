@@ -39,6 +39,9 @@ Mapping failures produce **mapping-scoped** degraded states—never bypass ambig
 ## References
 
 - `phase-03-mapping-bundle-registry.md`
+- `phase-03-bundle-pinning-doctrine.md`
+- `phase-03-oracle-vectors-doctrine.md`
+- `phase-03-ci-deterministic-enforcement-doctrine.md`
 - `phase-03-logical-key-doctrine.md`
 - `phase-03-transform-lineage-doctrine.md`
 - `phase-03-deterministic-canonicalization-doctrine.md`

@@ -16,7 +16,7 @@ Provide **automated, deterministic verification** for canonical runtime slices:
 | -------------- | ----------- |
 | **Invariant evaluation** | Executes checks for determinism, provenance completeness, ordering, ambiguity persistence |
 | **Fixture harness** | Runs frozen corpus vectors per bundle pin |
-| **Divergence classification** | Computes C0–C4 / mapping drift categories with structured receipts |
+| **Divergence classification** | Computes **C0–C5** canonical rebuild divergence classes with structured receipts (`phase-03-replay-versioning-doctrine.md`) |
 | **Regression sentinel** | Detects unintended logical-key drift across CI merges |
 
 ## Non-responsibilities

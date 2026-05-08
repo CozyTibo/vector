@@ -1,6 +1,6 @@
 # Phase 03 — Canonicalization Implementation Plan (Implementation-Grade Sequencing)
 
-**Last updated:** 2026-05-08 (cross-cutting operator track + control-plane co-evolution)  
+**Last updated:** 2026-05-08 (determinism institutionalization: registry / pinning / oracle / CI governance doctrines)  
 **Purpose:** **Granular operational sequencing** for a deterministic canonical substrate—**not** doctrine rewrite. Doctrines remain authoritative in `phase-03-*.md` and `phase-03-normative-index.md`.
 
 ## Anti-drift principle
@@ -28,9 +28,9 @@ Each numbered stage maps to **one primary runtime responsibility**. Stages **may
 | ----- | ---- | --------------------------------- | ---------------- |
 | **01** | Canonical ontology foundations | Frozen **structural** ontology slice: allowed types, enums, non-interpretive class graph | `phase-03-canonical-model-doctrine.md`, `phase-03-anti-goals-doctrine.md` |
 | **02** | Canonical object taxonomy | Authoritative class list + entity/event/artifact/edge/snapshot boundaries | `phase-03-canonical-model-doctrine.md` |
-| **03** | Logical key doctrine + key oracle | Per-class logical key spec + test vectors (pre-code) | `phase-03-logical-key-doctrine.md` |
+| **03** | Logical key doctrine + key oracle | Per-class logical key spec + oracle vectors manifest (pre-runtime) | `phase-03-logical-key-doctrine.md`, `phase-03-oracle-vectors-doctrine.md` |
 | **04** | Deterministic mapping contracts | Rule/table shapes, evidence grades, forbidden ops | `phase-03-deterministic-canonicalization-doctrine.md` |
-| **05** | Mapping bundle registry + versioning | Live registry process + pins + compatibility + ownership | `phase-03-mapping-bundle-registry.md`, `phase-03-mapping-system-doctrine.md` |
+| **05** | Mapping bundle registry + versioning | Live registry process + pins + compatibility + ownership + **promotion governance** | `phase-03-mapping-bundle-registry.md`, `phase-03-bundle-pinning-doctrine.md`, `phase-03-mapping-system-doctrine.md`, `phase-03-ci-deterministic-enforcement-doctrine.md` |
 | **06** | Canonical transform runtime | Deterministic engine applying bundles; field lineage emission | `phase-03-transform-lineage-doctrine.md`, `phase-03-mapping-system-doctrine.md` |
 | **07** | Ambiguity persistence runtime | Storage + lifecycle for unresolved/contested states | `phase-03-ambiguity-confidence-doctrine.md` |
 | **08** | Confidence propagation runtime | Propagation as structured metadata (not ranking) | `phase-03-ambiguity-confidence-doctrine.md` |
@@ -40,7 +40,7 @@ Each numbered stage maps to **one primary runtime responsibility**. Stages **may
 | **12** | Temporal continuity + ordering runtime | Deterministic ordering + supersession + rebuild sort keys | `phase-03-temporal-timeline-doctrine.md` |
 | **13** | Canonical query + retrieval runtime | Supported query classes, budgets, anti-goal enforcement | `phase-03-canonical-query-doctrine.md` |
 | **14** | Failure, degradation, remediation | Classified failures + **policy-gated** recovery flows | `phase-03-failure-degradation-doctrine.md`, `phase-03-remediation-recovery-doctrine.md` |
-| **15** | Canonical verification engine | Gate automation, CI vectors, divergence reporting | `phase-03-verification-engine-doctrine.md`, `phase-03-closure-gates-doctrine.md` |
+| **15** | Canonical verification engine | Gate automation, oracle manifests, CI enforcement hooks, divergence reporting | `phase-03-verification-engine-doctrine.md`, `phase-03-oracle-vectors-doctrine.md`, `phase-03-ci-deterministic-enforcement-doctrine.md`, `phase-03-closure-gates-doctrine.md` |
 | **16** | Canonical control plane + admin | Operator visibility/actions; mandatory surfaces **A–H** | `phase-03-canonical-control-plane-doctrine.md` |
 | **17** | Stabilization + proof pass | Soak, perf/replay economics probes, large-tenant drills | `phase-03-implementation-readiness-audit.md` (operational) |
 | **18** | Closure + operational certification | **G-P03-01–G-P03-21** evidence pack + sign-off (includes operator visibility gates) | `phase-03-closure-gates-doctrine.md`, `phase-03-canonical-control-plane-doctrine.md` |
@@ -87,8 +87,10 @@ Each numbered stage maps to **one primary runtime responsibility**. Stages **may
 
 ## Readiness checklist (pre-Stage-06 coding)
 
-- Registry + bundle pins drafted (**Stage 05**).
-- Logical key oracle vectors drafted (**Stage 03**).
+- Registry governance **operational contract** accepted (`phase-03-mapping-bundle-registry.md`) — not advisory text.
+- Bundle pinning semantics accepted (`phase-03-bundle-pinning-doctrine.md`) — explicit failure modes for missing pins.
+- Logical key oracle **manifest** drafted (**Stage 03**) per `phase-03-oracle-vectors-doctrine.md`.
+- CI deterministic enforcement policy wired for repo (**Stage 05 / 15**) per `phase-03-ci-deterministic-enforcement-doctrine.md` (promotion fail-closed).
 - Gate fixtures inventory exists (**Stage 15** prep parallel to **03–05**).
 
 ## Exit criteria (phase closure)
@@ -99,7 +101,10 @@ Each numbered stage maps to **one primary runtime responsibility**. Stages **may
 
 ## Explicit blockers & risks
 
-See `phase-03-implementation-readiness-audit.md` §Remaining operational risks.
+- **Existential (block operational closure):** registry lifecycle + hashes + oracle manifests + CI enforcement **not running as infra** — see `phase-03-closure-gates-doctrine.md` §Existential deterministic infrastructure.
+- **Economic / scale:** rebuild/replay cost — see readiness audit §Determinism institutionalization audit.
+
+Additional risks: `phase-03-implementation-readiness-audit.md` §Operational risks.
 
 ## References
 

@@ -1,6 +1,19 @@
 # Phase 03 — Verification & Closure Gates (Binary PASS/FAIL)
 
-**Status:** normative pre-implementation gates. Implementation must not begin until governance accepts these as testable.
+**Status:** normative pre-implementation gates. **Gate semantics** are testable once registry/oracle/CI contracts are operational—**see existential infrastructure below** for what “Phase 03 operational closure” requires beyond narrative docs.
+
+## Existential deterministic infrastructure (operational closure prerequisites)
+
+Phase **03** cannot claim **operational closure** (certification-ready; trusted broad materialization) unless **all** are true as **running operational contracts**, not doctrine text alone:
+
+| Prerequisite | Authoritative doctrine |
+| ------------ | ---------------------- |
+| Registry governance operationalized (lifecycle, hashes, promotions, rollback/freeze) | `phase-03-mapping-bundle-registry.md` |
+| Bundle pins enforced (no floating mappings / no implicit latest) | `phase-03-bundle-pinning-doctrine.md` |
+| Oracle vectors institutionalized (manifests + promotion-bound oracle PASS) | `phase-03-oracle-vectors-doctrine.md` |
+| CI drift enforcement active (fail-closed promotion; reproducible reports) | `phase-03-ci-deterministic-enforcement-doctrine.md` |
+
+These prerequisites **materialize** gates **G-P03-09, G-P03-10, G-P03-11, G-P03-12** as enforceable—not aspirational.
 
 ## Gate posture
 
@@ -19,7 +32,7 @@
 | **G-P03-06** | Temporal continuity | Late-arriving + supersession fixtures reproduce deterministic ordering |
 | **G-P03-07** | Anti-goal hygiene | Static/policy checks forbid semantic/managerial/LLM fields & intents per anti-goals |
 | **G-P03-08** | Corruption detection | Duplicate logical keys / missing lineage / orphan canonical rows = FAIL |
-| **G-P03-09** | Registry integrity | Every active bundle has ownership, compatibility line, artifact hashes, changelog |
+| **G-P03-09** | Registry integrity | Every **approved** bundle has ownership, compatibility line, artifact hashes, changelog |
 | **G-P03-10** | Key stability | Logical key derivations match oracle vectors per class; no clock/random dependence |
 | **G-P03-11** | Remap safety | Regeneration under declared compatible bump matches expected C2 receipts; undeclared drift fails |
 | **G-P03-12** | Verification engine | Invariant suite emits signed report artifact; can be re-run in CI and admin |
@@ -44,6 +57,10 @@ Canonical gates assume Phase 02 raw memory gates relevant to substrate trust are
 
 ## References
 
+- Bundle pinning: `phase-03-bundle-pinning-doctrine.md`
+- Oracle vectors: `phase-03-oracle-vectors-doctrine.md`
+- CI enforcement: `phase-03-ci-deterministic-enforcement-doctrine.md`
+- Mapping bundle registry: `phase-03-mapping-bundle-registry.md`
 - Implementation readiness audit: `phase-03-implementation-readiness-audit.md`
 - Implementation sequencing: `implementation-plan.md`
 - Canonical control plane obligations: `phase-03-canonical-control-plane-doctrine.md`

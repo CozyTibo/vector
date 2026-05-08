@@ -42,3 +42,4 @@ For each canonical object class K:
 
 - Identity continuity (human/org): `phase-03-identity-continuity-doctrine.md`
 - Registry: `phase-03-mapping-bundle-registry.md`
+- Oracle regression vectors: `phase-03-oracle-vectors-doctrine.md`

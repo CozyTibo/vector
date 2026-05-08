@@ -40,6 +40,9 @@
 | Binary closure gates | `phase-03-closure-gates-doctrine.md` |
 | **Mapping system umbrella** | `phase-03-mapping-system-doctrine.md` |
 | **Mapping bundle registry & governance** | `phase-03-mapping-bundle-registry.md` |
+| **Bundle pinning & deterministic bundle resolution** | `phase-03-bundle-pinning-doctrine.md` |
+| **Oracle vectors & deterministic regression** | `phase-03-oracle-vectors-doctrine.md` |
+| **CI deterministic drift enforcement** | `phase-03-ci-deterministic-enforcement-doctrine.md` |
 | **Logical key derivation & idempotency tuples** | `phase-03-logical-key-doctrine.md` |
 | **Transform + field lineage + remap** | `phase-03-transform-lineage-doctrine.md` |
 | Granular implementation sequencing (Stages 1–18) | `implementation-plan.md` |

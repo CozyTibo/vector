@@ -75,8 +75,11 @@ When rebuild oracle differs from persisted canonical rows:
 
 ## Version pinning rules
 
+Authoritative resolution semantics: `phase-03-bundle-pinning-doctrine.md`.
+
 - Every canonical materialization job logs **resolved bundle pin** after applying tenant defaults + policy overrides.
-- **Active head** policy (always latest active bundle) is allowed only with explicit blast-radius controls + staged rollout—default should be explicit pins for rebuild proofs.
+- **Active head** policy (always latest **approved** bundle) is **discouraged**; when permitted it **must** be implemented as an **explicit versioned policy artifact** (equivalent transparency to a pin)—never an implicit resolver default.
+- **Forbidden:** implicit “latest bundle” selection for authoritative identity/order without such an artifact (**maps to floating mappings**).
 
 ## Transform compatibility
 
@@ -88,6 +91,9 @@ Regeneration **never** deletes historical canonical projections; it creates supe
 
 ## References
 
+- Bundle pinning (deterministic resolution): `phase-03-bundle-pinning-doctrine.md`
+- Oracle vectors: `phase-03-oracle-vectors-doctrine.md`
+- CI enforcement: `phase-03-ci-deterministic-enforcement-doctrine.md`
 - Mapping registry: `phase-03-mapping-bundle-registry.md`
 - Temporal ordering: `phase-03-temporal-timeline-doctrine.md`
 - Closure gates: `phase-03-closure-gates-doctrine.md`

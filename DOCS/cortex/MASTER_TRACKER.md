@@ -202,16 +202,16 @@ No phase is **complete** until its **last numbered step** in this tracker ships 
 
 ### Missing / Incomplete
 - Runtime implementation across Steps **1–18** (spec sequencing complete; execution not started).
-- Mapping bundle registry **operational process** (owners, promotion, CI hooks) must be enforced alongside docs.
+- **Governance infra execution:** registry lifecycle + pin enforcement + oracle manifests + CI promotion suites must exist as **running systems** — doctrines `phase-03-mapping-bundle-registry.md`, `phase-03-bundle-pinning-doctrine.md`, `phase-03-oracle-vectors-doctrine.md`, `phase-03-ci-deterministic-enforcement-doctrine.md` (see `phase-03-closure-gates-doctrine.md` §Existential deterministic infrastructure).
 - Canonical query optimization at scale remains workload-dependent.
 
 ### Implementation Blockers
 - **Rebuild economics / replay cost:** large-tenant reconstruction may exceed initial budgets—requires soak metrics (**Step 17**) before declaring production readiness.
-- **Mapping evolution:** undeclared compatibility breaks risk **C5** divergence until registry governance is operational (**Step 05**).
-- **Canonical drift:** mitigated only by verification engine (**Step 15**) + pinned bundles (**Step 10**).
+- **Mapping evolution:** undeclared compatibility breaks risk **C5** divergence until registry governance is **operational** (**Step 05**) — see hardened registry doctrine.
+- **Canonical drift:** mitigated by verification engine (**Step 15**) + **pinned bundles** (**Step 10**) + **CI fail-closed promotion** (`phase-03-ci-deterministic-enforcement-doctrine.md`).
 - **Ambiguity explosion:** unresolved mapping backlog may spike—requires monitoring + mapping roadmap (**Steps 07–08**, **17**).
 - **Version migration:** bundle bumps must ship explicit compatibility lines (`phase-03-mapping-bundle-registry.md`).
-- **Logical key stability:** any change requires oracle vector updates (**Step 03**) + gate re-run.
+- **Logical key stability:** any change requires oracle vector updates (**Step 03**) + gate re-run (`phase-03-oracle-vectors-doctrine.md`).
 - Phase 02 stabilization/trust surfaces may gate halt semantics for canonical materialization.
 
 ### Remaining operational risks (explicit)

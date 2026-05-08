@@ -1,6 +1,6 @@
 # Phase 03 — Implementation Readiness Audit (Pre-Runtime + Operational Program Review)
 
-**Status:** assessment artifact (non-normative). **Updated:** 2026-05-08 (implementation sequencing expansion).  
+**Status:** assessment artifact (non-normative). **Updated:** 2026-05-08 (determinism institutionalization: registry / pinning / oracle / CI doctrines).  
 **Scope:** doctrine completeness, sequencing granularity, and architectural traps **before** coding/schema/API work.
 
 ## Executive snapshot
@@ -12,8 +12,9 @@
 | Replay risk | Medium — Phase 02 trust + deterministic engine proofs + **rebuild economics** |
 | Identity risk | Lower in Phase 03 — explicit Phase 04 boundary |
 | Provenance risk | Medium — multi-parent + forward index discipline |
-| Determinism risk | Medium — key oracle + bundle pins must be CI-gated |
-| Mapping governance | **Heightened** — registry/compatibility now first-class; failure = C5 class |
+| Determinism risk | **Contained by contract** — oracle vectors + CI enforcement doctrines define **fail-closed** promotion; residual risk until runners + manifests exist in infra |
+| Mapping governance | **Operational contract** — `phase-03-mapping-bundle-registry.md` (lifecycle, hashes, promotions); failure class **C5** |
+| Pinning / drift | **Operational contract** — `phase-03-bundle-pinning-doctrine.md`, `phase-03-ci-deterministic-enforcement-doctrine.md` forbid floating mappings & implicit latest |
 
 ## Ambiguity audit
 
@@ -69,8 +70,32 @@ Remaining gap is **execution proof + economics validation** (Stages **17–18**)
 
 - **GO** for staged runtime execution beginning **Stage 01** subject to Phase 02 prerequisites documented in `MASTER_TRACKER.md`.
 - **NO-GO for “phase complete”** until **Stage 18** certification artifacts archive PASS for declared connector slices.
+- **NO-GO for “operational closure” / broad trusted materialization** until **existential infrastructure** in `phase-03-closure-gates-doctrine.md` is implemented as running systems (registry governance, pins, oracle manifests, CI enforcement)—not docs-only.
+
+## Determinism institutionalization audit (concise)
+
+**Purpose:** separate **enforceable** controls from **aspirational** text after governance hardening.
+
+| Topic | Enforceable (once infra exists) | Still aspirational / pending proof |
+| ----- | ------------------------------ | ---------------------------------- |
+| Bundle lifecycle & hashes | Promotion blocked without manifest hash match + lifecycle legality | Tamper-evident storage backing registry records |
+| Pins | Authoritative resolution fails closed without pin (`phase-03-bundle-pinning-doctrine.md`) | Multi-region pin sync semantics (must be explicit per deployment) |
+| Oracle vectors | Promotion blocked without oracle PASS (`phase-03-oracle-vectors-doctrine.md`) | Full connector coverage economics |
+| CI | Merge/deploy blocked on drift (`phase-03-ci-deterministic-enforcement-doctrine.md`) | Org-wide signing keys & retention policy choices |
+| Rebuild economics | Explicitly tracked | Large-tenant rebuild windows remain **cost-constrained** — doctrine does not remove physics |
+
+**Unresolved governance questions (explicit):**
+
+- Numeric ambiguity explosion caps per tenant tier (policy—not doctrinally fixed).
+- SOC-style artifact retention duration (organization-specific).
+
+**Scale/economics caveats:** unchanged — Stage **17** still required to validate rebuild/replay economics at tenant scale.
 
 ## References
 
+- Registry: `phase-03-mapping-bundle-registry.md`
+- Pinning: `phase-03-bundle-pinning-doctrine.md`
+- Oracle vectors: `phase-03-oracle-vectors-doctrine.md`
+- CI enforcement: `phase-03-ci-deterministic-enforcement-doctrine.md`
 - Sequencing: `implementation-plan.md`
 - Gates: `phase-03-closure-gates-doctrine.md`
