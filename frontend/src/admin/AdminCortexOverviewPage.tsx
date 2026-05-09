@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 import {
+  CORTEX_FLUSH_RERUN_CONFIRM_PHRASE,
   CORTEX_MANUAL_SYNC_CONFIRM_PHRASE,
   CORTEX_REPLAY_CONFIRM_PHRASE,
   CORTEX_SCHEDULER_PAUSE_CONFIRM_PHRASE,
@@ -20,6 +21,11 @@ type ActionSummary = {
   failCount: number;
   okConnectors: string[];
   failures: ActionResult[];
+};
+type FlushRerunSummary = {
+  enqueued_connectors: string[];
+  canonical_backlog_task_id: string | null;
+  deleted_rows_total: number;
 };
 
 function statCard(title: string, value: string, tone: "ok" | "warn" | "bad" | "neutral", detail?: string) {
@@ -39,6 +45,7 @@ export default function AdminCortexOverviewPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [lastActionSummary, setLastActionSummary] = useState<ActionSummary | null>(null);
+  const [lastFlushRerunSummary, setLastFlushRerunSummary] = useState<FlushRerunSummary | null>(null);
 
   const refreshOverviewPulse = () => {
     const delays = [0, 1200, 3000, 6000, 10000, 14000];
@@ -147,6 +154,35 @@ export default function AdminCortexOverviewPage() {
       });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-overview", tenantId] });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-recent-runs", tenantId] });
+      refreshOverviewPulse();
+    },
+  });
+  const flushRerunMut = useMutation({
+    mutationFn: async (confirmation: string) => {
+      const res = await adminFetch(
+        `/admin/tenants/${tenantId}/cortex/ingestion/actions/flush-rerun-to-canonical`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirmation,
+            canonical_batch_limit: 1000,
+          }),
+        },
+      );
+      if (!res.ok) throw new Error(await readErrorDetail(res));
+      return res.json() as Promise<{
+        enqueued_connectors: string[];
+        canonical_backlog_task_id: string | null;
+        deleted_rows_total: number;
+      }>;
+    },
+    onSuccess: (payload) => {
+      setLastFlushRerunSummary({
+        enqueued_connectors: payload.enqueued_connectors ?? [],
+        canonical_backlog_task_id: payload.canonical_backlog_task_id,
+        deleted_rows_total: payload.deleted_rows_total ?? 0,
+      });
       refreshOverviewPulse();
     },
   });
@@ -284,6 +320,20 @@ export default function AdminCortexOverviewPage() {
           </button>
           <button
             type="button"
+            className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-40"
+            disabled={flushRerunMut.isPending}
+            onClick={() => {
+              const typed = window.prompt(
+                `Dangerous action.\n\nType exactly:\n${CORTEX_FLUSH_RERUN_CONFIRM_PHRASE}`,
+              );
+              if (typed == null) return;
+              flushRerunMut.mutate(typed.trim());
+            }}
+          >
+            {flushRerunMut.isPending ? "Submitting…" : "Flush + rerun to canonical"}
+          </button>
+          <button
+            type="button"
             className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-40"
             disabled={pauseMut.isPending || o.global_scheduler.paused_via_redis}
             onClick={() => pauseMut.mutate(true)}
@@ -335,6 +385,26 @@ export default function AdminCortexOverviewPage() {
                 ))}
               </ul>
             ) : null}
+          </div>
+        ) : null}
+        {flushRerunMut.isError ? (
+          <p className="mt-2 text-xs text-red-700">{(flushRerunMut.error as Error).message}</p>
+        ) : null}
+        {lastFlushRerunSummary ? (
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge tone="warn">flush + rerun accepted</StatusBadge>
+              <span>deleted rows: {lastFlushRerunSummary.deleted_rows_total}</span>
+            </div>
+            <p className="mt-1">
+              enqueued connectors:{" "}
+              {lastFlushRerunSummary.enqueued_connectors.length > 0
+                ? lastFlushRerunSummary.enqueued_connectors.map(titleConnector).join(", ")
+                : "none"}
+            </p>
+            <p className="mt-1">
+              canonical backlog task: {lastFlushRerunSummary.canonical_backlog_task_id ?? "not enqueued"}
+            </p>
           </div>
         ) : null}
       </section>

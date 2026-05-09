@@ -24,6 +24,12 @@ def viewer_org(linear: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def viewer_ping(linear: dict[str, Any], _variables: dict[str, Any] | None) -> dict[str, Any]:
+    """Matches ``query ViewerPing { viewer { id name } }`` (sync_executor health probe)."""
+    v = linear["viewer"]
+    return {"data": {"viewer": {"id": v["id"], "name": v["name"]}}}
+
+
 def _public(obj: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in obj.items() if not k.startswith("_") and k != "issueId"}
 
@@ -121,6 +127,12 @@ def op_initiatives(linear: dict[str, Any], variables: dict[str, Any] | None) -> 
     return {"data": {"initiatives": _connection(linear["initiatives"], variables)}}
 
 
+def op_project_updates(linear: dict[str, Any], variables: dict[str, Any] | None) -> dict[str, Any]:
+    items = list(linear.get("projectUpdates") or [])
+    items = sorted(items, key=_by_updated_desc, reverse=True)
+    return {"data": {"projectUpdates": _connection(items, variables)}}
+
+
 # Legacy: viewer-scoped issues (older ingestion); still supported without operationName.
 def viewer_issues_connection(
     linear: dict[str, Any], variables: dict[str, Any] | None
@@ -145,6 +157,7 @@ def issues_connection(linear: dict[str, Any], *, first: int, after: str | None) 
 
 
 _OPERATION_HANDLERS: dict[str, Any] = {
+    "ViewerPing": viewer_ping,
     "LinearIngestViewer": lambda lin, v: viewer_org(lin),
     "LinearIngestTeams": op_teams,
     "LinearIngestUsers": op_users,
@@ -156,6 +169,7 @@ _OPERATION_HANDLERS: dict[str, Any] = {
     "LinearIngestIssueLabels": op_issue_labels,
     "LinearIngestCycles": op_cycles,
     "LinearIngestInitiatives": op_initiatives,
+    "LinearIngestProjectUpdates": op_project_updates,
 }
 
 
@@ -167,6 +181,9 @@ def handle_graphql(linear: dict[str, Any], body: dict[str, Any]) -> dict[str, An
         return _OPERATION_HANDLERS[op](linear, variables)
 
     q = (body.get("query") or "").replace("\n", " ").strip()
+    # Ping sends query-only body (no operationName): query ViewerPing { viewer { id name } }
+    if "ViewerPing" in q:
+        return viewer_ping(linear, variables)
     if "viewer" in q and "issues" in q.lower():
         return viewer_issues_connection(linear, variables)
     if "viewer" in q and "organization" in q:

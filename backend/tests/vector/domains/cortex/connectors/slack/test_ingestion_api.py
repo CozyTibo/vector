@@ -24,7 +24,15 @@ def test_iter_conversations_history_pages_uses_next_cursor(monkeypatch: Any) -> 
         },
     ]
 
-    def _fake_post(token: str, method: str, *, json_body: dict[str, Any], timeout: float = 60.0) -> dict[str, Any]:
+    def _fake_post(
+        token: str,
+        method: str,
+        *,
+        json_body: dict[str, Any],
+        api_base: str | None = None,
+        timeout: float = 60.0,
+    ) -> dict[str, Any]:
+        del api_base, timeout
         assert token == "xoxb-test"
         assert method == "conversations.history"
         calls.append(dict(json_body))
@@ -65,7 +73,15 @@ def test_iter_conversations_replies_pages_passes_thread_context(monkeypatch: Any
         },
     ]
 
-    def _fake_post(token: str, method: str, *, json_body: dict[str, Any], timeout: float = 60.0) -> dict[str, Any]:
+    def _fake_post(
+        token: str,
+        method: str,
+        *,
+        json_body: dict[str, Any],
+        api_base: str | None = None,
+        timeout: float = 60.0,
+    ) -> dict[str, Any]:
+        del api_base, timeout
         assert token == "xoxb-test"
         assert method == "conversations.replies"
         calls.append(dict(json_body))

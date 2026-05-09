@@ -44,8 +44,8 @@ def test_mock_connectors_rejected_in_production() -> None:
         _restore("VECTOR_USE_MOCK_CONNECTORS", old_mock)
 
 
-def test_mock_mode_swaps_github_rest_and_linear_graphql_only() -> None:
-    """Mirror GitHub: real OAuth hosts; mock only replaces REST / GraphQL data plane."""
+def test_mock_mode_swaps_data_plane_connector_urls() -> None:
+    """OAuth hosts remain real; connector data-plane endpoints switch to local mock."""
     old_env = os.environ.get("ENV")
     old_mock = os.environ.get("VECTOR_USE_MOCK_CONNECTORS")
     old_base = os.environ.get("VECTOR_MOCK_CONNECTOR_BASE_URL")
@@ -60,6 +60,8 @@ def test_mock_mode_swaps_github_rest_and_linear_graphql_only() -> None:
         assert s.linear_graphql_url() == "http://127.0.0.1:9183/linear/graphql"
         assert s.linear_graphql_oauth_profile_url() == "https://api.linear.app/graphql"
         assert s.linear_oauth_token_url() == "https://api.linear.app/oauth/token"
+        assert s.notion_api_base_url() == "http://127.0.0.1:9183/notion/v1"
+        assert s.calls_google_calendar_events_base_url() == "http://127.0.0.1:9183/google-calendar/v3"
     finally:
         get_settings.cache_clear()
         _restore("ENV", old_env)
@@ -79,6 +81,8 @@ def test_github_rest_defaults_to_real_api() -> None:
         assert s.github_rest_api_app_install_base_url() == "https://api.github.com"
         assert s.linear_graphql_url() == "https://api.linear.app/graphql"
         assert s.linear_oauth_token_url() == "https://api.linear.app/oauth/token"
+        assert s.notion_api_base_url() == "https://api.notion.com/v1"
+        assert s.calls_google_calendar_events_base_url() == "https://www.googleapis.com/calendar/v3"
     finally:
         get_settings.cache_clear()
         _restore("ENV", old_env)

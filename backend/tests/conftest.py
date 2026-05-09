@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
+
+# `mock_connectors` lives under `backend/` (sibling to `tests/`); unit tests import it by top-level name.
+_backend_dir = Path(__file__).resolve().parents[1]
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
 
 # Must run before any `vector.*` import: otherwise `Settings` loads repo `.env` and breaks tests that
 # `monkeypatch.delenv` / expect connectors to be unconfigured, and GitHub JWT tests (PEM vs path).

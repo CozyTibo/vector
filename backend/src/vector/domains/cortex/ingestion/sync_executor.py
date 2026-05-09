@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
 from datetime import UTC, datetime
+from collections.abc import Mapping
 from typing import Any, cast
 
 import httpx
@@ -23,9 +25,13 @@ from vector.domains.cortex.connectors.github.http_client import (
     list_pull_reviews_page,
     list_repo_branches_page,
     list_repo_check_runs_page,
+    list_repo_commit_comments_page,
     list_repo_commits_page,
     list_repo_deployments_page,
+    list_repo_issues_page,
+    list_repo_issue_timeline_page,
     list_repo_pulls_page,
+    list_repo_releases_page,
     list_repo_tags_page,
     list_repo_workflow_runs_page,
 )
@@ -442,6 +448,58 @@ def _upsert_checkpoint(
         row.state = merge_monotonic_connector_state(existing, patch, sync_mode=sync_mode)
 
 
+def ensure_github_workflow_run_repository_metadata(
+    run: Mapping[str, Any],
+    *,
+    installation_repository: Mapping[str, Any],
+    repository_full_name: str,
+) -> dict[str, Any]:
+    """Merge durable repository identity onto a workflow run dict before raw persistence.
+
+    GitHub's ``GET /repos/{owner}/{repo}/actions/runs`` list payload sometimes omits the nested
+    ``repository`` object (or returns it without ``id`` / ``full_name``). The sync loop already
+    holds the authoritative installation repository record for ``repository_full_name`` — merge
+    that truth so canonical materialization has stable ``repository_provider_id`` inputs without
+    inventing identifiers: values come from the installation ``repositories`` payload or the
+    known ``owner/repo`` pair for this fetch.
+    """
+    wr = dict(run)
+    api_repo = wr.get("repository")
+    merged: dict[str, Any] = dict(api_repo) if isinstance(api_repo, dict) else {}
+    inst = dict(installation_repository) if isinstance(installation_repository, dict) else {}
+    fn = repository_full_name.strip()
+
+    fn_ok = isinstance(merged.get("full_name"), str) and "/" in merged["full_name"].strip()
+    if not fn_ok and "/" in fn:
+        merged["full_name"] = fn
+
+    rid = merged.get("id")
+    has_numeric_id = isinstance(rid, int) or (isinstance(rid, str) and rid.strip().isdigit())
+    if not has_numeric_id:
+        inst_id = inst.get("id")
+        if isinstance(inst_id, int):
+            merged["id"] = inst_id
+        elif isinstance(inst_id, str) and inst_id.strip().isdigit():
+            merged["id"] = int(inst_id.strip())
+
+    if not isinstance(merged.get("name"), str) or not merged["name"].strip():
+        if "/" in fn:
+            merged["name"] = fn.split("/", 1)[1].strip()
+        elif fn:
+            merged["name"] = fn
+
+    own = merged.get("owner")
+    if not isinstance(own, dict) or not isinstance(own.get("login"), str) or not str(own.get("login", "")).strip():
+        inst_owner = inst.get("owner")
+        if isinstance(inst_owner, dict) and isinstance(inst_owner.get("login"), str):
+            merged["owner"] = dict(inst_owner)
+        elif "/" in fn:
+            merged["owner"] = {"login": fn.split("/", 1)[0].strip()}
+
+    wr["repository"] = merged
+    return wr
+
+
 def _append_raw(
     session: Session,
     *,
@@ -662,6 +720,26 @@ def _append_raw(
         payload_hash=ph,
     )
     return True
+
+
+def _calls_transcript_segment_sort_key(seg: dict[str, Any]) -> tuple[Any, ...]:
+    for k in ("segment_index", "ord", "index", "idx"):
+        v = seg.get(k)
+        if isinstance(v, int):
+            return (0, v, "")
+        if isinstance(v, str) and v.strip().lstrip("-").isdigit():
+            return (0, int(v.strip()), "")
+    for k in ("start_ms", "offset_ms", "offset", "startOffset", "start_time_ms", "start"):
+        v = seg.get(k)
+        if isinstance(v, (int, float)):
+            return (1, float(v), k)
+        if isinstance(v, str) and v.strip():
+            try:
+                return (1, float(v.strip()), k)
+            except ValueError:
+                pass
+    txt = seg.get("text") if isinstance(seg.get("text"), str) else seg.get("body")
+    return (2, str(txt or ""), "")
 
 
 def _github_sync(
@@ -925,6 +1003,13 @@ def _github_sync(
     deployment_status_rows = 0
     branch_rows = 0
     tag_rows = 0
+    check_suite_rows = 0
+    release_rows = 0
+    issue_rows = 0
+    commit_comment_rows = 0
+    review_thread_rows = 0
+    issue_timeline_rows = 0
+    pr_timeline_rows = 0
     budget_exhausted = False
     start_t = time.monotonic()
     repo_patch_map: dict[str, Any] = {}
@@ -949,6 +1034,14 @@ def _github_sync(
         repo_deploy_status_rows = 0
         repo_branch_rows = 0
         repo_tag_rows = 0
+        repo_check_suite_rows = 0
+        repo_release_rows = 0
+        repo_issue_rows = 0
+        repo_commit_comment_rows = 0
+        repo_review_thread_rows = 0
+        repo_issue_timeline_rows = 0
+        repo_pr_timeline_rows = 0
+        emitted_check_suite_ids: set[int] = set()
 
         pull_state = existing_repo.get("pull_requests") if isinstance(existing_repo.get("pull_requests"), dict) else {}
         pulls_next_page_raw = pull_state.get("next_page", 1)
@@ -1048,6 +1141,7 @@ def _github_sync(
                                             source_object_id=ext,
                                         ),
                                         "pull_request_number": num,
+                                        "github_pull_request_id": pr.get("id"),
                                         "review": review,
                                     },
                                     http_status=200,
@@ -1061,8 +1155,9 @@ def _github_sync(
                     except GitHubApiError:
                         pass
 
-                    # PR review comments
+                    # PR review comments (+ deterministic review thread roots)
                     try:
+                        all_review_comments: list[dict[str, Any]] = []
                         for rc_page in range(1, settings.cortex_github_review_comments_max_pages_per_pr + 1):
                             review_comments = list_pull_review_comments_page(
                                 settings,
@@ -1072,41 +1167,112 @@ def _github_sync(
                                 pull_number=num,
                                 page=rc_page,
                             )
-                            for rc in review_comments:
-                                cid = rc.get("id")
-                                if cid is None:
-                                    continue
-                                ext = f"{pr_ext}:review_comment:{cid}"[:512]
-                                if _append_raw(
-                                    session,
-                                    ctx=ctx,
-                                    tenant_id=tenant_id,
-                                    connection_id=connection_id,
-                                    connector=CONNECTION_PROVIDER_GITHUB,
-                                    run_id=run_id,
-                                    source_trigger=source_trigger,
-                                    resource_type="github.pull_request_review_comment",
-                                    external_id=ext,
-                                    api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/pulls/{num}/comments",
-                                    query_params={"page": rc_page},
-                                    payload_body={
-                                        **core_envelope_fields(
-                                            connector=CONNECTION_PROVIDER_GITHUB,
-                                            connection_id=connection_id,
-                                            source_object_type="github.pull_request_review_comment",
-                                            source_object_id=ext,
-                                        ),
-                                        "pull_request_number": num,
-                                        "comment": rc,
-                                    },
-                                    http_status=200,
-                                    idempotency_key=_idem_key(ctx, run_id, f"github:pr_review_comment:{ext}"),
-                                ):
-                                    n_ins += 1
-                                    review_comment_rows += 1
-                                    repo_review_comment_rows += 1
+                            all_review_comments.extend([x for x in review_comments if isinstance(x, dict)])
                             if len(review_comments) < 100:
                                 break
+
+                        by_id: dict[int, dict[str, Any]] = {}
+                        for rc in all_review_comments:
+                            raw_id = rc.get("id")
+                            nid: int | None
+                            if isinstance(raw_id, int):
+                                nid = raw_id
+                            elif isinstance(raw_id, str) and raw_id.strip().isdigit():
+                                nid = int(raw_id.strip())
+                            else:
+                                nid = None
+                            if nid is not None:
+                                by_id[nid] = rc
+
+                        def _review_comment_root_id(comment_id: int) -> int:
+                            seen: set[int] = set()
+                            cur: int | None = comment_id
+                            while cur is not None:
+                                if cur in seen:
+                                    return cur
+                                seen.add(cur)
+                                c = by_id.get(cur)
+                                if c is None:
+                                    return cur
+                                parent_raw = c.get("in_reply_to_id")
+                                if parent_raw is None:
+                                    return cur
+                                if isinstance(parent_raw, int):
+                                    cur = parent_raw
+                                elif isinstance(parent_raw, str) and parent_raw.strip().isdigit():
+                                    cur = int(parent_raw.strip())
+                                else:
+                                    return cur
+                            return comment_id
+
+                        thread_roots = {
+                            _review_comment_root_id(nid)
+                            for nid in by_id
+                        }
+                        for root_id in sorted(thread_roots):
+                            rt_ext = f"{pr_ext}:review_thread:{root_id}"[:512]
+                            if _append_raw(
+                                session,
+                                ctx=ctx,
+                                tenant_id=tenant_id,
+                                connection_id=connection_id,
+                                connector=CONNECTION_PROVIDER_GITHUB,
+                                run_id=run_id,
+                                source_trigger=source_trigger,
+                                resource_type="github.review_thread",
+                                external_id=rt_ext,
+                                api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/pulls/{num}/comments",
+                                query_params={"thread_roots": len(thread_roots)},
+                                payload_body={
+                                    **core_envelope_fields(
+                                        connector=CONNECTION_PROVIDER_GITHUB,
+                                        connection_id=connection_id,
+                                        source_object_type="github.review_thread",
+                                        source_object_id=rt_ext,
+                                    ),
+                                    "pull_request_number": num,
+                                    "thread_id": root_id,
+                                },
+                                http_status=200,
+                                idempotency_key=_idem_key(ctx, run_id, f"github:review_thread:{rt_ext}"),
+                            ):
+                                n_ins += 1
+                                review_thread_rows += 1
+                                repo_review_thread_rows += 1
+
+                        for rc in all_review_comments:
+                            cid = rc.get("id")
+                            if cid is None:
+                                continue
+                            ext = f"{pr_ext}:review_comment:{cid}"[:512]
+                            if _append_raw(
+                                session,
+                                ctx=ctx,
+                                tenant_id=tenant_id,
+                                connection_id=connection_id,
+                                connector=CONNECTION_PROVIDER_GITHUB,
+                                run_id=run_id,
+                                source_trigger=source_trigger,
+                                resource_type="github.pull_request_review_comment",
+                                external_id=ext,
+                                api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/pulls/{num}/comments",
+                                query_params={},
+                                payload_body={
+                                    **core_envelope_fields(
+                                        connector=CONNECTION_PROVIDER_GITHUB,
+                                        connection_id=connection_id,
+                                        source_object_type="github.pull_request_review_comment",
+                                        source_object_id=ext,
+                                    ),
+                                    "pull_request_number": num,
+                                    "comment": rc,
+                                },
+                                http_status=200,
+                                idempotency_key=_idem_key(ctx, run_id, f"github:pr_review_comment:{ext}"),
+                            ):
+                                n_ins += 1
+                                review_comment_rows += 1
+                                repo_review_comment_rows += 1
                     except GitHubApiError:
                         pass
 
@@ -1158,6 +1324,69 @@ def _github_sync(
                                 break
                     except GitHubApiError:
                         pass
+
+                    # PR timeline (REST `/issues/{n}/timeline` — issue number equals PR number)
+                    pr_gid = pr.get("id")
+                    if isinstance(pr_gid, int) and isinstance(num, int):
+                        try:
+                            for tl_page in range(1, settings.cortex_github_timeline_max_pages_per_issue_or_pr + 1):
+                                if time.monotonic() - start_t >= settings.cortex_github_repo_time_budget_seconds:
+                                    budget_exhausted = True
+                                    break
+                                timeline = list_repo_issue_timeline_page(
+                                    settings,
+                                    token,
+                                    owner=owner,
+                                    repo=repo_name,
+                                    issue_number=num,
+                                    page=tl_page,
+                                )
+                                for te in timeline:
+                                    if not isinstance(te, dict):
+                                        continue
+                                    te_id = te.get("id")
+                                    if te_id is None:
+                                        continue
+                                    tl_ext = f"{pr_ext}:timeline_event:{te_id}"[:512]
+                                    ts = te.get("created_at")
+                                    ts_str = ts if isinstance(ts, str) else None
+                                    if _append_raw(
+                                        session,
+                                        ctx=ctx,
+                                        tenant_id=tenant_id,
+                                        connection_id=connection_id,
+                                        connector=CONNECTION_PROVIDER_GITHUB,
+                                        run_id=run_id,
+                                        source_trigger=source_trigger,
+                                        resource_type="github.pull_request_timeline_event",
+                                        external_id=tl_ext,
+                                        api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/issues/{num}/timeline",
+                                        query_params={"page": tl_page},
+                                        payload_body={
+                                            **core_envelope_fields(
+                                                connector=CONNECTION_PROVIDER_GITHUB,
+                                                connection_id=connection_id,
+                                                source_object_type="github.pull_request_timeline_event",
+                                                source_object_id=tl_ext,
+                                            ),
+                                            "id": te_id,
+                                            "repository_full_name": fn,
+                                            "pull_request_external_ref": pr_ext,
+                                            "pull_request_number": num,
+                                            "github_pull_request_id": pr_gid,
+                                            "timeline_event": te,
+                                            "provider_event_timestamp": ts_str,
+                                        },
+                                        http_status=200,
+                                        idempotency_key=_idem_key(ctx, run_id, f"github:pr_timeline:{tl_ext}"),
+                                    ):
+                                        n_ins += 1
+                                        pr_timeline_rows += 1
+                                        repo_pr_timeline_rows += 1
+                                if len(timeline) < 100:
+                                    break
+                        except GitHubApiError:
+                            pass
 
                 if len(pulls) < pr_per_repo:
                     pulls_complete = True
@@ -1278,6 +1507,48 @@ def _github_sync(
                             n_ins += 1
                             check_run_rows += 1
                             repo_check_rows += 1
+                        suite_obj = cr.get("check_suite") if isinstance(cr.get("check_suite"), dict) else {}
+                        suite_raw = suite_obj.get("id")
+                        suite_id: int | None
+                        if isinstance(suite_raw, int):
+                            suite_id = suite_raw
+                        elif isinstance(suite_raw, str) and suite_raw.strip().isdigit():
+                            suite_id = int(suite_raw.strip())
+                        else:
+                            suite_id = None
+                        if suite_id is not None and suite_id not in emitted_check_suite_ids:
+                            emitted_check_suite_ids.add(suite_id)
+                            suite_payload = dict(suite_obj)
+                            if not isinstance(suite_payload.get("repository"), dict):
+                                suite_payload["repository"] = {"full_name": fn}
+                            suite_ext = f"{fn}:check_suite:{suite_id}"[:512]
+                            if _append_raw(
+                                session,
+                                ctx=ctx,
+                                tenant_id=tenant_id,
+                                connection_id=connection_id,
+                                connector=CONNECTION_PROVIDER_GITHUB,
+                                run_id=run_id,
+                                source_trigger=source_trigger,
+                                resource_type="github.check_suite",
+                                external_id=suite_ext,
+                                api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/commits/{sha}/check-runs",
+                                query_params={"suite": suite_id},
+                                payload_body={
+                                    **core_envelope_fields(
+                                        connector=CONNECTION_PROVIDER_GITHUB,
+                                        connection_id=connection_id,
+                                        source_object_type="github.check_suite",
+                                        source_object_id=suite_ext,
+                                    ),
+                                    "check_suite": suite_payload,
+                                },
+                                http_status=200,
+                                idempotency_key=_idem_key(ctx, run_id, f"github:check_suite:{suite_ext}"),
+                            ):
+                                n_ins += 1
+                                check_suite_rows += 1
+                                repo_check_suite_rows += 1
                     if len(check_runs) < 100:
                         break
             except GitHubApiError:
@@ -1311,6 +1582,11 @@ def _github_sync(
                     if rid is None:
                         continue
                     ext = f"{fn}:workflow_run:{rid}"[:512]
+                    run_for_raw = ensure_github_workflow_run_repository_metadata(
+                        run,
+                        installation_repository=_repo,
+                        repository_full_name=fn,
+                    )
                     if _append_raw(
                         session,
                         ctx=ctx,
@@ -1330,7 +1606,7 @@ def _github_sync(
                                 source_object_type="github.workflow_run",
                                 source_object_id=ext,
                             ),
-                            "workflow_run": run,
+                            "workflow_run": run_for_raw,
                         },
                         http_status=200,
                         idempotency_key=_idem_key(ctx, run_id, f"github:workflow_run:{ext}"),
@@ -1588,6 +1864,270 @@ def _github_sync(
         except GitHubApiError:
             pass
 
+        # Repo-wide commit comments (distinct from PR review comments)
+        cc_state = (
+            existing_repo.get("commit_comments")
+            if isinstance(existing_repo.get("commit_comments"), dict)
+            else {}
+        )
+        cc_page_raw = cc_state.get("next_page", 1)
+        try:
+            cc_page = max(1, int(cc_page_raw))
+        except (TypeError, ValueError):
+            cc_page = 1
+        cc_complete = False
+        cc_pages_fetched = 0
+        try:
+            for _ in range(settings.cortex_github_commit_comments_max_pages_per_repo):
+                cc_items = list_repo_commit_comments_page(
+                    settings,
+                    token,
+                    owner=owner,
+                    repo=repo_name,
+                    page=cc_page,
+                )
+                cc_pages_fetched += 1
+                for cc in cc_items:
+                    cid = cc.get("id")
+                    if cid is None:
+                        continue
+                    sha = cc.get("commit_id")
+                    if not isinstance(sha, str) or not sha:
+                        continue
+                    ext = f"{fn}:commit_comment:{cid}"[:512]
+                    if _append_raw(
+                        session,
+                        ctx=ctx,
+                        tenant_id=tenant_id,
+                        connection_id=connection_id,
+                        connector=CONNECTION_PROVIDER_GITHUB,
+                        run_id=run_id,
+                        source_trigger=source_trigger,
+                        resource_type="github.commit_comment",
+                        external_id=ext,
+                        api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/comments",
+                        query_params={"page": cc_page},
+                        payload_body={
+                            **core_envelope_fields(
+                                connector=CONNECTION_PROVIDER_GITHUB,
+                                connection_id=connection_id,
+                                source_object_type="github.commit_comment",
+                                source_object_id=ext,
+                            ),
+                            "commit_sha": sha,
+                            "comment": cc,
+                        },
+                        http_status=200,
+                        idempotency_key=_idem_key(ctx, run_id, f"github:commit_comment:{ext}"),
+                    ):
+                        n_ins += 1
+                        commit_comment_rows += 1
+                        repo_commit_comment_rows += 1
+                if len(cc_items) < 100:
+                    cc_complete = True
+                    cc_page = 1
+                    break
+                cc_page += 1
+                if time.monotonic() - start_t >= settings.cortex_github_repo_time_budget_seconds:
+                    budget_exhausted = True
+                    break
+        except GitHubApiError:
+            pass
+
+        # GitHub issues (REST `/issues`; skips pull requests surfaced in that listing)
+        iss_state = existing_repo.get("issues") if isinstance(existing_repo.get("issues"), dict) else {}
+        iss_page_raw = iss_state.get("next_page", 1)
+        try:
+            iss_page = max(1, int(iss_page_raw))
+        except (TypeError, ValueError):
+            iss_page = 1
+        iss_complete = False
+        iss_pages_fetched = 0
+        try:
+            for _ in range(settings.cortex_github_issues_max_pages_per_repo):
+                iss_items = list_repo_issues_page(
+                    settings,
+                    token,
+                    owner=owner,
+                    repo=repo_name,
+                    page=iss_page,
+                )
+                iss_pages_fetched += 1
+                for issue_row in iss_items:
+                    if not isinstance(issue_row, dict):
+                        continue
+                    if isinstance(issue_row.get("pull_request"), dict):
+                        continue
+                    iid = issue_row.get("id")
+                    if iid is None:
+                        continue
+                    ext = f"{fn}:issue:{iid}"[:512]
+                    issue_body = dict(issue_row)
+                    if not isinstance(issue_body.get("repository"), dict):
+                        issue_body["repository"] = {"full_name": fn}
+                    if _append_raw(
+                        session,
+                        ctx=ctx,
+                        tenant_id=tenant_id,
+                        connection_id=connection_id,
+                        connector=CONNECTION_PROVIDER_GITHUB,
+                        run_id=run_id,
+                        source_trigger=source_trigger,
+                        resource_type="github.issue",
+                        external_id=ext,
+                        api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/issues",
+                        query_params={"page": iss_page, "state": "all"},
+                        payload_body={
+                            **core_envelope_fields(
+                                connector=CONNECTION_PROVIDER_GITHUB,
+                                connection_id=connection_id,
+                                source_object_type="github.issue",
+                                source_object_id=ext,
+                            ),
+                            "issue": issue_body,
+                        },
+                        http_status=200,
+                        idempotency_key=_idem_key(ctx, run_id, f"github:issue:{ext}"),
+                    ):
+                        n_ins += 1
+                        issue_rows += 1
+                        repo_issue_rows += 1
+                    inum = issue_row.get("number")
+                    if isinstance(inum, int) and isinstance(iid, int):
+                        try:
+                            for tl_page in range(1, settings.cortex_github_timeline_max_pages_per_issue_or_pr + 1):
+                                if time.monotonic() - start_t >= settings.cortex_github_repo_time_budget_seconds:
+                                    budget_exhausted = True
+                                    break
+                                timeline = list_repo_issue_timeline_page(
+                                    settings,
+                                    token,
+                                    owner=owner,
+                                    repo=repo_name,
+                                    issue_number=inum,
+                                    page=tl_page,
+                                )
+                                for te in timeline:
+                                    if not isinstance(te, dict):
+                                        continue
+                                    te_id = te.get("id")
+                                    if te_id is None:
+                                        continue
+                                    tl_ext = f"{fn}:issue:{iid}:timeline_event:{te_id}"[:512]
+                                    ts = te.get("created_at")
+                                    ts_str = ts if isinstance(ts, str) else None
+                                    if _append_raw(
+                                        session,
+                                        ctx=ctx,
+                                        tenant_id=tenant_id,
+                                        connection_id=connection_id,
+                                        connector=CONNECTION_PROVIDER_GITHUB,
+                                        run_id=run_id,
+                                        source_trigger=source_trigger,
+                                        resource_type="github.issue_timeline_event",
+                                        external_id=tl_ext,
+                                        api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/issues/{inum}/timeline",
+                                        query_params={"page": tl_page},
+                                        payload_body={
+                                            **core_envelope_fields(
+                                                connector=CONNECTION_PROVIDER_GITHUB,
+                                                connection_id=connection_id,
+                                                source_object_type="github.issue_timeline_event",
+                                                source_object_id=tl_ext,
+                                            ),
+                                            "id": te_id,
+                                            "repository_full_name": fn,
+                                            "issue_number": inum,
+                                            "github_issue_id": iid,
+                                            "timeline_event": te,
+                                            "provider_event_timestamp": ts_str,
+                                        },
+                                        http_status=200,
+                                        idempotency_key=_idem_key(ctx, run_id, f"github:issue_timeline:{tl_ext}"),
+                                    ):
+                                        n_ins += 1
+                                        issue_timeline_rows += 1
+                                        repo_issue_timeline_rows += 1
+                                if len(timeline) < 100:
+                                    break
+                        except GitHubApiError:
+                            pass
+                if len(iss_items) < 100:
+                    iss_complete = True
+                    iss_page = 1
+                    break
+                iss_page += 1
+                if time.monotonic() - start_t >= settings.cortex_github_repo_time_budget_seconds:
+                    budget_exhausted = True
+                    break
+        except GitHubApiError:
+            pass
+
+        # Releases (mapped to deployment semantics in canonical transform)
+        rel_state = existing_repo.get("releases") if isinstance(existing_repo.get("releases"), dict) else {}
+        rel_page_raw = rel_state.get("next_page", 1)
+        try:
+            rel_page = max(1, int(rel_page_raw))
+        except (TypeError, ValueError):
+            rel_page = 1
+        rel_complete = False
+        rel_pages_fetched = 0
+        try:
+            for _ in range(settings.cortex_github_releases_max_pages_per_repo):
+                rel_items = list_repo_releases_page(
+                    settings,
+                    token,
+                    owner=owner,
+                    repo=repo_name,
+                    page=rel_page,
+                )
+                rel_pages_fetched += 1
+                for rel in rel_items:
+                    rid = rel.get("id")
+                    if rid is None:
+                        continue
+                    ext = f"{fn}:release:{rid}"[:512]
+                    rel_body = dict(rel)
+                    if not isinstance(rel_body.get("repository"), dict):
+                        rel_body["repository"] = {"full_name": fn}
+                    if _append_raw(
+                        session,
+                        ctx=ctx,
+                        tenant_id=tenant_id,
+                        connection_id=connection_id,
+                        connector=CONNECTION_PROVIDER_GITHUB,
+                        run_id=run_id,
+                        source_trigger=source_trigger,
+                        resource_type="github.release",
+                        external_id=ext,
+                        api_endpoint=f"{gh_base}/repos/{owner}/{repo_name}/releases",
+                        query_params={"page": rel_page},
+                        payload_body={
+                            **core_envelope_fields(
+                                connector=CONNECTION_PROVIDER_GITHUB,
+                                connection_id=connection_id,
+                                source_object_type="github.release",
+                                source_object_id=ext,
+                            ),
+                            "release": rel_body,
+                        },
+                        http_status=200,
+                        idempotency_key=_idem_key(ctx, run_id, f"github:release:{ext}"),
+                    ):
+                        n_ins += 1
+                        release_rows += 1
+                        repo_release_rows += 1
+                if len(rel_items) < 100:
+                    rel_complete = True
+                    rel_page = 1
+                    break
+                rel_page += 1
+                if time.monotonic() - start_t >= settings.cortex_github_repo_time_budget_seconds:
+                    budget_exhausted = True
+                    break
+        except GitHubApiError:
+            pass
+
         repo_patch_map[fn] = {
             "cursor_owner": "github.repository",
             "pull_requests": {
@@ -1649,6 +2189,43 @@ def _github_sync(
                 "pages_fetched_last_run": tag_pages_fetched,
                 "rows_seen_last_run": repo_tag_rows,
             },
+            "check_suites": {
+                "cursor_owner": "github.check_suite",
+                "rows_seen_last_run": repo_check_suite_rows,
+            },
+            "commit_comments": {
+                "cursor_owner": "github.commit_comment",
+                "next_page": cc_page,
+                "backfill_complete": bool(ctx.sync_mode == "backfill" and cc_complete),
+                "pages_fetched_last_run": cc_pages_fetched,
+                "rows_seen_last_run": repo_commit_comment_rows,
+            },
+            "releases": {
+                "cursor_owner": "github.release",
+                "next_page": rel_page,
+                "backfill_complete": bool(ctx.sync_mode == "backfill" and rel_complete),
+                "pages_fetched_last_run": rel_pages_fetched,
+                "rows_seen_last_run": repo_release_rows,
+            },
+            "issues": {
+                "cursor_owner": "github.issue",
+                "next_page": iss_page,
+                "backfill_complete": bool(ctx.sync_mode == "backfill" and iss_complete),
+                "pages_fetched_last_run": iss_pages_fetched,
+                "rows_seen_last_run": repo_issue_rows,
+            },
+            "review_threads": {
+                "cursor_owner": "github.review_thread",
+                "rows_seen_last_run": repo_review_thread_rows,
+            },
+            "issue_timeline_events": {
+                "cursor_owner": "github.issue_timeline_event",
+                "rows_seen_last_run": repo_issue_timeline_rows,
+            },
+            "pull_request_timeline_events": {
+                "cursor_owner": "github.pull_request_timeline_event",
+                "rows_seen_last_run": repo_pr_timeline_rows,
+            },
             "last_sync_mode": ctx.sync_mode,
         }
         if budget_exhausted:
@@ -1675,6 +2252,13 @@ def _github_sync(
             "github_deployment_statuses_written": deployment_status_rows,
             "github_branches_written": branch_rows,
             "github_tags_written": tag_rows,
+            "github_check_suites_written": check_suite_rows,
+            "github_commit_comments_written": commit_comment_rows,
+            "github_releases_written": release_rows,
+            "github_issues_written": issue_rows,
+            "github_review_threads_written": review_thread_rows,
+            "github_issue_timeline_events_written": issue_timeline_rows,
+            "github_pull_request_timeline_events_written": pr_timeline_rows,
             "total_count_hint": total_hint,
             "streams": {
                 "github": {
@@ -1703,6 +2287,19 @@ def _github_sync(
                     },
                     "branches": {"cursor_owner": "github.branch", "rows_written": branch_rows},
                     "tags": {"cursor_owner": "github.tag", "rows_written": tag_rows},
+                    "check_suites": {"cursor_owner": "github.check_suite", "rows_written": check_suite_rows},
+                    "commit_comments": {"cursor_owner": "github.commit_comment", "rows_written": commit_comment_rows},
+                    "releases": {"cursor_owner": "github.release", "rows_written": release_rows},
+                    "issues": {"cursor_owner": "github.issue", "rows_written": issue_rows},
+                    "review_threads": {"cursor_owner": "github.review_thread", "rows_written": review_thread_rows},
+                    "issue_timeline_events": {
+                        "cursor_owner": "github.issue_timeline_event",
+                        "rows_written": issue_timeline_rows,
+                    },
+                    "pull_request_timeline_events": {
+                        "cursor_owner": "github.pull_request_timeline_event",
+                        "rows_written": pr_timeline_rows,
+                    },
                     "repos": repo_patch_map,
                     "repo_ring_index": next_repo_ring_index,
                     "resume_required": budget_exhausted,
@@ -1730,6 +2327,7 @@ query LinearIngestIssues($first: Int!, $after: String) {
       project { id name }
       cycle { id name }
       labels { nodes { id name color } }
+      attachments { nodes { id title url } }
       metadata
     }
     pageInfo { hasNextPage endCursor }
@@ -1748,7 +2346,25 @@ query LinearIngestComments($first: Int!, $after: String) {
       updatedAt
       issue { id identifier }
       user { id name }
+      parent { id }
       metadata
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}
+"""
+
+
+LINEAR_PROJECT_UPDATES_QUERY = """
+query LinearIngestProjectUpdates($first: Int!, $after: String) {
+  projectUpdates(first: $first, after: $after) {
+    nodes {
+      id
+      body
+      createdAt
+      updatedAt
+      url
+      project { id name }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -2161,15 +2777,99 @@ def _linear_sync(
             budget_exhausted = True
             break
 
+    linear_comment_thread_rows = 0
+    comment_state = _stream_state("comments")
+    comment_cursor_raw = comment_state.get("next_cursor")
+    comment_cursor = comment_cursor_raw if isinstance(comment_cursor_raw, str) and comment_cursor_raw.strip() else None
+    comment_rows = 0
+    comment_pages = 0
+    comments_backfill_complete = False
+    for _ in range(settings.cortex_linear_comments_max_pages_per_sync):
+        if budget_exhausted:
+            break
+        st_comments, _payload_comments, comment_nodes, page_info_c = _linear_graphql_connection_page(
+            settings,
+            token,
+            operation_name="LinearIngestComments",
+            query=LINEAR_COMMENTS_QUERY,
+            root_field="comments",
+            first=settings.cortex_linear_stream_first,
+            after=comment_cursor,
+        )
+        comment_pages += 1
+        for idx, node in enumerate(comment_nodes):
+            nid = node.get("id")
+            ext = str(nid if isinstance(nid, str) else f"comments:{idx}")[:512] or "unknown"
+            if _append_raw(
+                session,
+                ctx=ctx,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+                connector=CONNECTION_PROVIDER_LINEAR,
+                run_id=run_id,
+                source_trigger=source_trigger,
+                resource_type="linear.comment",
+                external_id=ext,
+                api_endpoint=settings.linear_graphql_url()[:512],
+                query_params={"operationName": "LinearIngestComments", "after": comment_cursor},
+                payload_body={
+                    **core_envelope_fields(
+                        connector=CONNECTION_PROVIDER_LINEAR,
+                        connection_id=connection_id,
+                        source_object_type="linear.comment",
+                        source_object_id=ext,
+                    ),
+                    "comment": node,
+                },
+                http_status=st_comments if st_comments >= 100 else 200,
+                idempotency_key=_idem_key(ctx, run_id, f"linear:comments:{ext}"),
+            ):
+                n_ins += 1
+                comment_rows += 1
+            parent = node.get("parent") if isinstance(node.get("parent"), dict) else None
+            pid = parent.get("id") if isinstance(parent, dict) else None
+            if (not isinstance(pid, str) or not pid.strip()) and isinstance(nid, str) and nid.strip():
+                t_ext = f"{nid.strip()}:thread"[:512]
+                if _append_raw(
+                    session,
+                    ctx=ctx,
+                    tenant_id=tenant_id,
+                    connection_id=connection_id,
+                    connector=CONNECTION_PROVIDER_LINEAR,
+                    run_id=run_id,
+                    source_trigger=source_trigger,
+                    resource_type="linear.comment_thread",
+                    external_id=t_ext,
+                    api_endpoint=settings.linear_graphql_url()[:512],
+                    query_params={"operationName": "LinearIngestComments", "after": comment_cursor},
+                    payload_body={
+                        **core_envelope_fields(
+                            connector=CONNECTION_PROVIDER_LINEAR,
+                            connection_id=connection_id,
+                            source_object_type="linear.comment_thread",
+                            source_object_id=t_ext,
+                        ),
+                        "id": nid.strip(),
+                        "thread_id": nid.strip(),
+                        "issue": node.get("issue"),
+                        "anchor_comment": node,
+                    },
+                    http_status=st_comments if st_comments >= 100 else 200,
+                    idempotency_key=_idem_key(ctx, run_id, f"linear:comment_thread:{t_ext}"),
+                ):
+                    n_ins += 1
+                    linear_comment_thread_rows += 1
+        next_c = page_info_c.get("endCursor") if isinstance(page_info_c, dict) else None
+        has_next_c = bool(page_info_c.get("hasNextPage")) if isinstance(page_info_c, dict) else False
+        comment_cursor = next_c if isinstance(next_c, str) and next_c else None
+        if not has_next_c:
+            comments_backfill_complete = True
+            break
+        if time.monotonic() - start_t >= settings.cortex_linear_time_budget_seconds:
+            budget_exhausted = True
+            break
+
     stream_specs: list[tuple[str, str, str, str, str, int]] = [
-        (
-            "comments",
-            "LinearIngestComments",
-            "comments",
-            LINEAR_COMMENTS_QUERY,
-            "linear.comment",
-            settings.cortex_linear_comments_max_pages_per_sync,
-        ),
         (
             "projects",
             "LinearIngestProjects",
@@ -2210,9 +2910,26 @@ def _linear_sync(
             "linear.initiative",
             settings.cortex_linear_initiatives_max_pages_per_sync,
         ),
+        (
+            "project_updates",
+            "LinearIngestProjectUpdates",
+            "projectUpdates",
+            LINEAR_PROJECT_UPDATES_QUERY,
+            "linear.project_update",
+            settings.cortex_linear_project_updates_max_pages_per_sync,
+        ),
     ]
-    stream_patch: dict[str, Any] = {}
-    stream_counts: dict[str, int] = {}
+    stream_patch: dict[str, Any] = {
+        "comments": {
+            "cursor_owner": "linear.comment",
+            "next_cursor": comment_cursor,
+            "pages_fetched_last_run": comment_pages,
+            "rows_seen_last_run": comment_rows,
+            "comment_thread_rows_seen_last_run": linear_comment_thread_rows,
+            "backfill_complete": bool(ctx.sync_mode == "backfill" and comments_backfill_complete),
+        }
+    }
+    stream_counts: dict[str, int] = {"linear.comment": comment_rows, "linear.comment_thread": linear_comment_thread_rows}
     for stream_key, op_name, root_field, query, resource_type, max_pages in stream_specs:
         if budget_exhausted:
             break
@@ -2322,6 +3039,8 @@ def _linear_sync(
             "last_http_status": status,
             "linear_issues_fetched": issue_rows,
             "linear_comments_written": stream_counts.get("linear.comment", 0),
+            "linear_comment_threads_written": stream_counts.get("linear.comment_thread", 0),
+            "linear_project_updates_written": stream_counts.get("linear.project_update", 0),
             "linear_projects_written": stream_counts.get("linear.project", 0),
             "linear_cycles_written": stream_counts.get("linear.cycle", 0),
             "linear_issue_relations_written": stream_counts.get("linear.issue_relation", 0),
@@ -2567,9 +3286,12 @@ def _slack_sync(
     reaction_rows = 0
     file_rows = 0
     thread_pages = 0
+    thread_rows = 0
     threads_processed = 0
     budget_exhausted = False
     slack_api_base = "https://slack.com/api"
+    if settings.vector_use_mock_connectors and settings.notion_api_base_url().endswith("/admin/dataset/full"):
+        slack_api_base = f"{settings.vector_mock_connector_base_url.rstrip('/')}/slack/api"
     start_t = time.monotonic()
 
     streams_existing = _checkpoint_streams_for_mode(existing_ckpt, ctx.sync_mode)
@@ -2593,6 +3315,7 @@ def _slack_sync(
     try:
         for members in iter_users_list_pages(
             token,
+            api_base=slack_api_base,
             max_pages=settings.cortex_slack_users_max_pages,
         ):
             user_pages += 1
@@ -2631,6 +3354,7 @@ def _slack_sync(
         all_channels: list[dict[str, Any]] = []
         for chans in iter_conversations_list_pages(
             token,
+            api_base=slack_api_base,
             types=settings.cortex_slack_conversation_types,
             max_pages=settings.cortex_slack_conversations_max_pages,
         ):
@@ -2721,6 +3445,7 @@ def _slack_sync(
 
             for page in iter_conversations_history_pages(
                 token,
+                api_base=slack_api_base,
                 channel=cid,
                 limit=settings.cortex_slack_conversations_history_limit,
                 max_pages=settings.cortex_slack_history_max_pages_per_channel,
@@ -2776,6 +3501,35 @@ def _slack_sync(
                         if thread_ts not in thread_seen:
                             thread_seen.add(thread_ts)
                             thread_roots.append(thread_ts)
+                            thr_ext = f"{cid}:{thread_ts}"[:512]
+                            if _append_raw(
+                                session,
+                                ctx=ctx,
+                                tenant_id=tenant_id,
+                                connection_id=connection_id,
+                                connector=CONNECTION_PROVIDER_SLACK,
+                                run_id=run_id,
+                                source_trigger=source_trigger,
+                                resource_type="slack.thread",
+                                external_id=thr_ext,
+                                api_endpoint=f"{slack_api_base}/conversations.history",
+                                query_params={"channel": cid, "thread_ts": thread_ts},
+                                payload_body={
+                                    **core_envelope_fields(
+                                        connector=CONNECTION_PROVIDER_SLACK,
+                                        connection_id=connection_id,
+                                        source_object_type="slack.thread",
+                                        source_object_id=thr_ext,
+                                    ),
+                                    "channel": cid,
+                                    "thread_ts": thread_ts,
+                                    "root_message_ts": ts,
+                                },
+                                http_status=200,
+                                idempotency_key=_idem_key(ctx, run_id, f"slack:thread:{thr_ext}"),
+                            ):
+                                n_ins += 1
+                                thread_rows += 1
 
                     reactions = msg.get("reactions")
                     if isinstance(reactions, list):
@@ -2817,6 +3571,7 @@ def _slack_sync(
                                 n_ins += 1
 
                     files = msg.get("files")
+                    msg_thread_ts = msg.get("thread_ts")
                     if isinstance(files, list):
                         for f in files:
                             if not isinstance(f, dict):
@@ -2848,6 +3603,9 @@ def _slack_sync(
                                     ),
                                     "channel_id": cid,
                                     "message_ts": ts,
+                                    "thread_ts": msg_thread_ts
+                                    if isinstance(msg_thread_ts, str) and msg_thread_ts.strip()
+                                    else None,
                                     "file": f,
                                 },
                                 http_status=200,
@@ -2897,6 +3655,7 @@ def _slack_sync(
                 per_thread_pages = 0
                 for rep_page in iter_conversations_replies_pages(
                     token,
+                    api_base=slack_api_base,
                     channel=cid,
                     thread_ts=thread_ts,
                     limit=settings.cortex_slack_conversations_history_limit,
@@ -3034,6 +3793,7 @@ def _slack_sync(
             "slack_conversations_seen": channel_rows,
             "slack_messages_seen": message_rows,
             "slack_message_replies_seen": reply_rows,
+            "slack_threads_seen": thread_rows,
             "slack_reactions_seen": reaction_rows,
             "slack_files_seen": file_rows,
             "streams": {
@@ -3054,6 +3814,10 @@ def _slack_sync(
                         "cursor_owner": "slack.message_reply",
                         "rows_seen": reply_rows,
                         "thread_pages_seen": thread_pages,
+                    },
+                    "threads": {
+                        "cursor_owner": "slack.thread",
+                        "rows_seen": thread_rows,
                     },
                     "reactions": {
                         "cursor_owner": "slack.reaction",
@@ -3315,6 +4079,15 @@ def _notion_sync(
 
         db_map = notion_payload.get("databases")
         db_ids = sorted(db_map.keys()) if isinstance(db_map, dict) else []
+        rows_by_db: dict[str, int] = {}
+        for row in notion_payload.get("database_rows", []):
+            if not isinstance(row, dict):
+                continue
+            dbid = row.get("database_id")
+            if isinstance(dbid, str) and dbid.strip():
+                rows_by_db[dbid] = rows_by_db.get(dbid, 0) + 1
+        if db_ids:
+            db_ids = sorted(db_ids, key=lambda x: (-rows_by_db.get(x, 0), x))
         db_ids = db_ids[: settings.cortex_notion_databases_per_sync]
         for dbid in db_ids:
             if time.monotonic() - start_t >= settings.cortex_notion_time_budget_seconds:
@@ -3381,6 +4154,48 @@ def _notion_sync(
                 "next_cursor": f"mock:{row_cursor}" if row_cursor < len(rows) else None,
                 "pages_fetched_last_run": pages_for_db,
                 "rows_seen_last_run": rows_for_db,
+            }
+
+        blocks = [b for b in notion_payload.get("blocks", []) if isinstance(b, dict)]
+        blocks_by_parent: dict[str, list[dict[str, Any]]] = {}
+        for block in blocks:
+            parent_id = block.get("parent_id")
+            if not isinstance(parent_id, str) or not parent_id.strip():
+                continue
+            blocks_by_parent.setdefault(parent_id.strip(), []).append(block)
+        parent_queue = list(sorted(set(pages_discovered) | set(db_ids)))
+        visited_parents: set[str] = set()
+        while parent_queue and len(visited_parents) < settings.cortex_notion_blocks_parents_per_sync:
+            parent_id = parent_queue.pop(0)
+            if parent_id in visited_parents:
+                continue
+            visited_parents.add(parent_id)
+            parent_blocks = blocks_by_parent.get(parent_id, [])
+            rows_for_parent = 0
+            for block in parent_blocks:
+                bid = block.get("id")
+                if not isinstance(bid, str) or not bid.strip():
+                    continue
+                if _append_notion_row(
+                    resource_type="notion.block",
+                    external_id=bid,
+                    api_endpoint=f"{settings.vector_mock_connector_base_url.rstrip('/')}/admin/dataset/full",
+                    query_params={"parent_id": parent_id, "source": "mock_dataset_blocks"},
+                    source_object_type="notion.block",
+                    payload_key="block",
+                    payload_value={"parent_id": parent_id, **block},
+                ):
+                    n_ins += 1
+                    block_rows += 1
+                    rows_for_parent += 1
+                if block.get("has_children") is True:
+                    parent_queue.append(bid)
+            block_pages += 1
+            block_parent_patch_map[parent_id] = {
+                "cursor_owner": "notion.block",
+                "next_cursor": None,
+                "pages_fetched_last_run": 1,
+                "rows_seen_last_run": rows_for_parent,
             }
     else:
         try:
@@ -3802,9 +4617,30 @@ def _calls_sync(
                     participants_written += 1
 
         transcript = event.get("transcript")
+        if not isinstance(transcript, dict):
+            ext_props = event.get("extendedProperties")
+            private_props = ext_props.get("private") if isinstance(ext_props, dict) else None
+            raw = private_props.get("vector_transcript_json") if isinstance(private_props, dict) else None
+            if isinstance(raw, str) and raw.strip():
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        transcript = parsed
+                except ValueError:
+                    transcript = None
         if isinstance(transcript, dict):
             transcript_external_id = f"{event_id}:transcript"
-            transcript_payload = {"meeting_id": event_id, "transcript": transcript}
+            tid = transcript_external_id
+            segments = transcript.get("segments")
+            seg_list = [s for s in segments if isinstance(s, dict)] if isinstance(segments, list) else []
+            seg_sorted = sorted(seg_list, key=_calls_transcript_segment_sort_key)
+            transcript_enriched = {**transcript, "segments": seg_sorted}
+            transcript_payload = {
+                "meeting_id": event_id,
+                "transcript_id": tid,
+                "segment_count": len(seg_sorted),
+                "transcript": transcript_enriched,
+            }
             if _append_calls_row(
                 resource_type="calls.transcript",
                 external_id=transcript_external_id,
@@ -3816,13 +4652,15 @@ def _calls_sync(
             ):
                 inserted += 1
                 transcripts_written += 1
-            segments = transcript.get("segments")
-            if isinstance(segments, list):
-                for s_idx, seg in enumerate(segments):
-                    if not isinstance(seg, dict):
-                        continue
+            if seg_sorted:
+                for s_idx, seg in enumerate(seg_sorted):
                     seg_external_id = f"{event_id}:seg:{s_idx}"
-                    seg_payload = {"meeting_id": event_id, "segment_index": s_idx, "segment": seg}
+                    seg_payload = {
+                        "meeting_id": event_id,
+                        "transcript_id": tid,
+                        "segment_index": s_idx,
+                        "segment": seg,
+                    }
                     if _append_calls_row(
                         resource_type="calls.transcript_segment",
                         external_id=seg_external_id,
@@ -3836,6 +4674,17 @@ def _calls_sync(
                         transcript_segments_written += 1
 
         recording = event.get("recording")
+        if not isinstance(recording, dict):
+            ext_props = event.get("extendedProperties")
+            private_props = ext_props.get("private") if isinstance(ext_props, dict) else None
+            raw = private_props.get("vector_recording_json") if isinstance(private_props, dict) else None
+            if isinstance(raw, str) and raw.strip():
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        recording = parsed
+                except ValueError:
+                    recording = None
         if isinstance(recording, dict):
             rec_id = recording.get("recording_id")
             rec_suffix = rec_id if isinstance(rec_id, str) and rec_id.strip() else "recording"
@@ -3905,100 +4754,48 @@ def _calls_sync(
     updated_watermark = watermark_raw if isinstance(watermark_raw, str) and watermark_raw.strip() else None
     max_seen_updated = updated_watermark
 
-    if settings.vector_use_mock_connectors:
-        base = settings.vector_mock_connector_base_url.rstrip("/")
-        payload = _calls_get_json(f"{base}/admin/dataset/full", headers={}, params=None)
-        calls_payload = payload.get("calls")
-        if not isinstance(calls_payload, dict):
-            raise _CallsSyncApiError("mock dataset missing calls payload")
-        all_events = [ev for ev in calls_payload.get("events", []) if isinstance(ev, dict)]
-        all_events = sorted(all_events, key=lambda ev: str(_event_updated_at(ev) or ""), reverse=True)
-        start_idx = 0
-        if isinstance(next_cursor, str) and next_cursor.startswith("mock:"):
-            try:
-                start_idx = max(0, int(next_cursor.split(":", 1)[1]))
-            except ValueError:
-                start_idx = 0
-        cursor_idx = start_idx
-        page_size = settings.cortex_calls_events_page_size
-        for _ in range(settings.cortex_calls_events_max_pages_per_sync):
-            page_events = all_events[cursor_idx : cursor_idx + page_size]
-            if not page_events:
-                next_cursor = None
-                break
-            pages_fetched += 1
-            for event in page_events:
-                event_updated = _event_updated_at(event)
-                max_seen_updated = _iso_max(max_seen_updated, event_updated)
-                if (
-                    ctx.sync_mode == "incremental"
-                    and isinstance(updated_watermark, str)
-                    and isinstance(event_updated, str)
-                    and event_updated <= updated_watermark
-                ):
-                    continue
-                inserted, p_cnt, t_cnt, s_cnt, r_cnt = _ingest_event(
-                    event,
-                    endpoint=f"{base}/admin/dataset/full",
-                    query_params={"source": "mock_calls_events", "offset": cursor_idx},
-                )
-                if inserted > 0:
-                    meetings_written += 1
-                n_ins += inserted
-                participants_written += p_cnt
-                transcripts_written += t_cnt
-                transcript_segments_written += s_cnt
-                recordings_written += r_cnt
-            cursor_idx += len(page_events)
-            next_cursor = f"mock:{cursor_idx}" if cursor_idx < len(all_events) else None
-            if time.monotonic() - start_t >= settings.cortex_calls_time_budget_seconds:
-                budget_exhausted = True
-                break
-    else:
-        headers = {"Authorization": f"Bearer {token}"}
-        calendar_id = "primary"
-        page_token = next_cursor
-        for _ in range(settings.cortex_calls_events_max_pages_per_sync):
-            params: dict[str, Any] = {
-                "singleEvents": "true",
-                "maxResults": settings.cortex_calls_events_page_size,
-                "orderBy": "updated",
-            }
-            if isinstance(page_token, str) and page_token:
-                params["pageToken"] = page_token
-            if ctx.sync_mode == "incremental" and isinstance(updated_watermark, str) and updated_watermark:
-                params["updatedMin"] = updated_watermark
+    headers = {} if settings.vector_use_mock_connectors else {"Authorization": f"Bearer {token}"}
+    calendar_base = settings.calls_google_calendar_events_base_url().rstrip("/")
+    calendar_id = "primary"
+    page_token = next_cursor
+    for _ in range(settings.cortex_calls_events_max_pages_per_sync):
+        params: dict[str, Any] = {
+            "singleEvents": "true",
+            "maxResults": settings.cortex_calls_events_page_size,
+            "orderBy": "updated",
+        }
+        if isinstance(page_token, str) and page_token:
+            params["pageToken"] = page_token
+        if ctx.sync_mode == "incremental" and isinstance(updated_watermark, str) and updated_watermark:
+            params["updatedMin"] = updated_watermark
 
-            data = _calls_get_json(
-                f"https://www.googleapis.com/calendar/v3/calendars/{calendar_id}/events",
-                headers=headers,
-                params=params,
+        endpoint = f"{calendar_base}/calendars/{calendar_id}/events"
+        data = _calls_get_json(endpoint, headers=headers, params=params)
+        page_items = [ev for ev in data.get("items", []) if isinstance(ev, dict)]
+        pages_fetched += 1
+        for event in page_items:
+            event_updated = _event_updated_at(event)
+            max_seen_updated = _iso_max(max_seen_updated, event_updated)
+            inserted, p_cnt, t_cnt, s_cnt, r_cnt = _ingest_event(
+                event,
+                endpoint=endpoint,
+                query_params={"pageToken": page_token or "", "updatedMin": params.get("updatedMin", "")},
             )
-            page_items = [ev for ev in data.get("items", []) if isinstance(ev, dict)]
-            pages_fetched += 1
-            for event in page_items:
-                event_updated = _event_updated_at(event)
-                max_seen_updated = _iso_max(max_seen_updated, event_updated)
-                inserted, p_cnt, t_cnt, s_cnt, r_cnt = _ingest_event(
-                    event,
-                    endpoint=f"https://www.googleapis.com/calendar/v3/calendars/{calendar_id}/events",
-                    query_params={"pageToken": page_token or "", "updatedMin": params.get("updatedMin", "")},
-                )
-                if inserted > 0:
-                    meetings_written += 1
-                n_ins += inserted
-                participants_written += p_cnt
-                transcripts_written += t_cnt
-                transcript_segments_written += s_cnt
-                recordings_written += r_cnt
-            raw_next = data.get("nextPageToken")
-            page_token = raw_next if isinstance(raw_next, str) and raw_next else None
-            next_cursor = page_token
-            if page_token is None:
-                break
-            if time.monotonic() - start_t >= settings.cortex_calls_time_budget_seconds:
-                budget_exhausted = True
-                break
+            if inserted > 0:
+                meetings_written += 1
+            n_ins += inserted
+            participants_written += p_cnt
+            transcripts_written += t_cnt
+            transcript_segments_written += s_cnt
+            recordings_written += r_cnt
+        raw_next = data.get("nextPageToken")
+        page_token = raw_next if isinstance(raw_next, str) and raw_next else None
+        next_cursor = page_token
+        if page_token is None:
+            break
+        if time.monotonic() - start_t >= settings.cortex_calls_time_budget_seconds:
+            budget_exhausted = True
+            break
 
     provider_label = link.detail.provider_email or link.detail.provider_user_id or "calls_connected"
     if _append_raw(

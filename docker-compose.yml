@@ -90,6 +90,7 @@ services:
       - ./.env:/app/.env:ro
       - ./backend/src:/app/src
       - ./backend/tests:/app/tests
+      - ./backend/mock_connectors:/app/mock_connectors
       - ./backend/alembic:/app/alembic
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/README.md:/app/README.md

@@ -528,13 +528,14 @@ def test_step13_matrix_d2_schema_reinterpretation(db_session: Session) -> None:
         **env,
         "updated_at": "2026-01-01T00:00:10+00:00",
         "text": "x",
-        "ingestion_version": {"schema": "a"},
+        # D2: same logical row, distinct ingestion_version tuple (envelope requires int triple).
+        "ingestion_version": {"schema_version": 1, "extraction_version": 1, "processor_version": 1},
     }
     replay_body = {
         **env,
         "updated_at": "2026-01-01T00:00:10+00:00",
         "text": "x",
-        "ingestion_version": {"schema": "b"},
+        "ingestion_version": {"schema_version": 1, "extraction_version": 1, "processor_version": 2},
     }
     assert _append_raw(
         db_session,

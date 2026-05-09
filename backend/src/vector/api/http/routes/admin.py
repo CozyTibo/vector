@@ -5,8 +5,8 @@ from __future__ import annotations
 import copy
 import logging
 import uuid
-from datetime import datetime
 from collections.abc import Callable
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Annotated, Any, Literal
 
@@ -19,32 +19,91 @@ from vector.api.http.deps import get_db, settings_dep
 from vector.contracts.admin import (
     AdminConnectionsResponse,
     AdminConnectorConnectLinkResponse,
+    AdminCortexAmbiguityAggregates,
+    AdminCortexAmbiguityConnectorRollupItem,
+    AdminCortexAmbiguityLifecycleRequest,
+    AdminCortexAmbiguityLifecycleResponse,
+    AdminCortexAmbiguityListResponse,
+    AdminCortexAmbiguityRecordItem,
+    AdminCortexCanonicalCertificationArchiveDetailResponse,
+    AdminCortexCanonicalCertificationArchiveItem,
+    AdminCortexCanonicalCertificationArchiveRequest,
+    AdminCortexCanonicalCertificationArchiveResponse,
+    AdminCortexCanonicalCertificationArchivesListResponse,
+    AdminCortexCanonicalCertificationPackResponse,
+    AdminCortexCanonicalControlPlaneResponse,
+    AdminCortexCanonicalCoverageMatrixResponse,
+    AdminCortexCanonicalKindInvariantsResponse,
+    AdminCortexCanonicalFailuresResponse,
+    AdminCortexCanonicalOntologyResponse,
+    AdminCortexCanonicalQueryRequest,
+    AdminCortexCanonicalQueryResponse,
+    AdminCortexCanonicalRemediationValidateRequest,
+    AdminCortexCanonicalRemediationValidateResponse,
+    AdminCortexCanonicalVerificationGateResult,
+    AdminCortexCanonicalVerificationRunItem,
+    AdminCortexCanonicalVerificationRunRequest,
+    AdminCortexCanonicalVerificationRunResponse,
+    AdminCortexCanonicalVerificationRunsListResponse,
+    AdminCortexConfidenceSummaryResponse,
     AdminCortexConnectorRawRecordItem,
     AdminCortexConnectorRawRecordsResponse,
+    AdminCortexIdentityAnchorItem,
+    AdminCortexIdentityAnchorListResponse,
     AdminCortexIngestionExhaustCoverageResponse,
     AdminCortexIngestionOverviewResponse,
     AdminCortexIngestionRecentRunItem,
     AdminCortexIngestionRecentRunsResponse,
+    AdminCortexFlushAndRerunRequest,
+    AdminCortexFlushAndRerunResponse,
     AdminCortexIngestionTriggerReplayRequest,
     AdminCortexIngestionTriggerReplayResponse,
     AdminCortexIngestionTriggerSyncRequest,
     AdminCortexIngestionTriggerSyncResponse,
     AdminCortexIngestionVerificationResponse,
-    CortexIngestionConnectorId,
+    AdminCortexMappingRegistryResponse,
+    AdminCortexMaterializeBacklogAsyncRequest,
+    AdminCortexMaterializeBacklogAsyncResponse,
+    AdminCortexMaterializeBacklogFailureItem,
+    AdminCortexMaterializeBacklogRequest,
+    AdminCortexMaterializeBacklogResponse,
+    AdminCortexMaterializeTransformRequest,
+    AdminCortexMaterializeTransformResponse,
+    AdminCortexOpenAmbiguityRequest,
+    AdminCortexOpenAmbiguityResponse,
+    AdminCortexOracleManifestResponse,
+    AdminCortexProvenanceByMaterializationResponse,
+    AdminCortexProvenanceByRawResponse,
+    AdminCortexProvenanceRecordItem,
     AdminCortexRawIngestionResourceStat,
     AdminCortexRawIngestionStatsResponse,
+    AdminCortexRawMemoryControlPlaneResponse,
+    AdminCortexRawMemoryFailuresResponse,
+    AdminCortexRawMemoryPhaseClosureResponse,
     AdminCortexRawMemoryQueryRequest,
     AdminCortexRawMemoryQueryResponse,
-    AdminCortexRawMemoryRetentionApplyRequest,
-    AdminCortexRawMemoryRetentionApplyResponse,
     AdminCortexRawMemoryRecoveryValidateRequest,
     AdminCortexRawMemoryRecoveryValidateResponse,
-    AdminCortexRawMemoryFailuresResponse,
+    AdminCortexRawMemoryRetentionApplyRequest,
+    AdminCortexRawMemoryRetentionApplyResponse,
     AdminCortexRawMemoryTrustStateResponse,
-    AdminCortexRawMemoryControlPlaneResponse,
-    AdminCortexRawMemoryPhaseClosureResponse,
+    AdminCortexReplayJobDetailResponse,
+    AdminCortexReplayJobItem,
+    AdminCortexReplayJobListResponse,
+    AdminCortexReplayJobReceiptItem,
+    AdminCortexReplayJobRunRequest,
     AdminCortexSchedulerPauseRequest,
     AdminCortexSchedulerPauseResponse,
+    AdminCortexStabilizationProofRunItem,
+    AdminCortexStabilizationProofRunRequest,
+    AdminCortexStabilizationProofRunResponse,
+    AdminCortexStabilizationProofRunsListResponse,
+    AdminCortexTemporalRebuildPreviewRequest,
+    AdminCortexTemporalRebuildPreviewResponse,
+    AdminCortexTemporalRebuildPreviewRow,
+    AdminCortexTemporalSupersessionItem,
+    AdminCortexTemporalSupersessionsListResponse,
+    AdminCortexTransformLineageListResponse,
     AdminHardDeleteOrphanUserRequest,
     AdminHardDeleteOrphanUserResponse,
     AdminHardDeleteTenantRequest,
@@ -61,6 +120,7 @@ from vector.contracts.admin import (
     AdminToolOptionItem,
     AdminUserListItem,
     AdminUserListResponse,
+    CortexIngestionConnectorId,
     OnboardingAdminSnapshot,
     OnboardingChatMessageItem,
     SlackCollaboratorMemberSnapshot,
@@ -96,18 +156,19 @@ from vector.domains.cortex.ingestion.admin_recent_raw import (
     list_raw_records_for_connector,
     list_recent_ingestion_runs,
 )
-from vector.domains.cortex.ingestion.raw_memory_query import execute_raw_memory_query
-from vector.domains.cortex.ingestion.raw_memory_storage import apply_raw_memory_retention_policy
+from vector.domains.cortex.ingestion.raw_memory_control_plane import build_raw_memory_control_plane
+from vector.domains.cortex.ingestion.raw_memory_enforcement import evaluate_progressive_enforcement
 from vector.domains.cortex.ingestion.raw_memory_failure_recovery import (
     run_raw_memory_recovery_validation,
     sync_raw_memory_failure_cases,
 )
+from vector.domains.cortex.ingestion.full_pipeline_reset import flush_tenant_cortex_pipeline_state
+from vector.domains.cortex.ingestion.raw_memory_query import execute_raw_memory_query
+from vector.domains.cortex.ingestion.raw_memory_storage import apply_raw_memory_retention_policy
 from vector.domains.cortex.ingestion.raw_memory_trust import (
     build_raw_memory_trust_annotation,
     persist_raw_memory_trust_annotation,
 )
-from vector.domains.cortex.ingestion.raw_memory_control_plane import build_raw_memory_control_plane
-from vector.domains.cortex.ingestion.raw_memory_enforcement import evaluate_progressive_enforcement
 from vector.domains.onboarding.constants import (
     ONBOARDING_ALL_TOOL_IDS,
     ONBOARDING_PROFILE_ROLE_CANONICAL,
@@ -150,6 +211,7 @@ CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE = "RESUME ALL SCHEDULED CORTEX INGESTION"
 CORTEX_RAW_MEMORY_DELETE_CONFIRM_PHRASE = "APPLY RAW MEMORY RETENTION DELETION"
 CORTEX_MANUAL_SYNC_CONFIRM_PHRASE = "RUN MANUAL CORTEX INGESTION SYNC"
 CORTEX_REPLAY_CONFIRM_PHRASE = "RUN CORTEX INGESTION REPLAY JOB"
+CORTEX_FLUSH_RERUN_CONFIRM_PHRASE = "FLUSH RAW DATA AND RERUN CORTEX TO CANONICAL"
 
 
 def _enqueue_cortex_poll_sync(connector_id: str) -> Callable[..., None]:
@@ -1713,6 +1775,1049 @@ def build_admin_router() -> APIRouter:
         closure = verification_payload.get("raw_memory_phase_closure") or {}
         return AdminCortexRawMemoryPhaseClosureResponse.model_validate(closure)
 
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/ontology",
+        response_model=AdminCortexCanonicalOntologyResponse,
+    )
+    def admin_cortex_canonical_ontology(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalOntologyResponse:
+        """Phase 03 Steps 1–17 — ontology + taxonomy + logical keys + contracts + registry + transform + ambiguity + confidence + identity + replay + provenance + temporal ordering + canonical query + failure/remediation + verification engine + control-plane + stabilization-proof pointers."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.ontology import (
+            build_phase03_step01_ontology_public_document,
+        )
+
+        raw = build_phase03_step01_ontology_public_document(tenant_id=tenant_id)
+        return AdminCortexCanonicalOntologyResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/control-plane",
+        response_model=AdminCortexCanonicalControlPlaneResponse,
+    )
+    def admin_cortex_canonical_control_plane(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalControlPlaneResponse:
+        """Phase 03 Step 16 — operator canonical control-plane aggregate (substrate metrics + IA route hints)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_control_plane import (
+            build_canonical_control_plane,
+        )
+
+        raw = build_canonical_control_plane(db, tenant_id)
+        return AdminCortexCanonicalControlPlaneResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/coverage-matrix",
+        response_model=AdminCortexCanonicalCoverageMatrixResponse,
+    )
+    def admin_cortex_canonical_coverage_matrix(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalCoverageMatrixResponse:
+        """Canonical coverage matrix — routing registry + ingest exhaust + live raw/materialization counts."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_coverage_matrix import (
+            build_canonical_coverage_matrix,
+        )
+
+        raw = build_canonical_coverage_matrix(db, tenant_id=tenant_id)
+        return AdminCortexCanonicalCoverageMatrixResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/kind-invariants",
+        response_model=AdminCortexCanonicalKindInvariantsResponse,
+    )
+    def admin_cortex_canonical_kind_invariants(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalKindInvariantsResponse:
+        """Canonical kind invariant contract matrix (identity/temporal/provenance/structure/ambiguity)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_kind_invariants import (
+            build_canonical_kind_invariants_document,
+        )
+
+        raw = build_canonical_kind_invariants_document()
+        return AdminCortexCanonicalKindInvariantsResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/stabilization-proof",
+        response_model=AdminCortexStabilizationProofRunResponse,
+    )
+    def admin_cortex_canonical_stabilization_proof_snapshot(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexStabilizationProofRunResponse:
+        """Phase 03 Step 17 — live stabilization / economics proof snapshot (read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_stabilization_proof import (
+            build_stabilization_proof_report,
+        )
+
+        raw = build_stabilization_proof_report(db, tenant_id)
+        raw["persisted_run_id"] = None
+        return AdminCortexStabilizationProofRunResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/stabilization-proof/run",
+        response_model=AdminCortexStabilizationProofRunResponse,
+    )
+    def admin_cortex_canonical_stabilization_proof_run(
+        tenant_id: uuid.UUID,
+        body: AdminCortexStabilizationProofRunRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexStabilizationProofRunResponse:
+        """Phase 03 Step 17 — compute stabilization proof; optionally persist ledger row."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_stabilization_proof import (
+            run_stabilization_proof_pass,
+        )
+
+        raw = run_stabilization_proof_pass(db, tenant_id=tenant_id, persist=body.persist)
+        if body.persist:
+            db.commit()
+        return AdminCortexStabilizationProofRunResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/stabilization-proof/runs",
+        response_model=AdminCortexStabilizationProofRunsListResponse,
+    )
+    def admin_cortex_canonical_stabilization_proof_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> AdminCortexStabilizationProofRunsListResponse:
+        """Phase 03 Step 17 — recent persisted stabilization proof runs."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_stabilization_proof import (
+            STABILIZATION_PROOF_SCHEMA_VERSION,
+            list_stabilization_proof_runs,
+            stabilization_proof_run_public_dict,
+        )
+
+        rows = list_stabilization_proof_runs(db, tenant_id=tenant_id, limit=limit)
+        items: list[AdminCortexStabilizationProofRunItem] = []
+        for r in rows:
+            d = stabilization_proof_run_public_dict(r)
+            items.append(
+                AdminCortexStabilizationProofRunItem(
+                    id=d["id"],
+                    tenant_id=d["tenant_id"],
+                    proof_schema_version=d["proof_schema_version"],
+                    passed=d["passed"],
+                    probes_json=d["probes_json"],
+                    created_at=d["created_at"],
+                )
+            )
+        return AdminCortexStabilizationProofRunsListResponse(
+            stabilization_proof_schema_version=STABILIZATION_PROOF_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            runs=items,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/oracle-manifest",
+        response_model=AdminCortexOracleManifestResponse,
+    )
+    def admin_cortex_canonical_oracle_manifest(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOracleManifestResponse:
+        """Phase 03 Step 3 — oracle vectors manifest (pre-runtime CI/promotion inventory)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.oracle_manifest import (
+            build_oracle_manifest_public_document,
+        )
+
+        raw = build_oracle_manifest_public_document(tenant_id=tenant_id)
+        return AdminCortexOracleManifestResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/mapping-registry",
+        response_model=AdminCortexMappingRegistryResponse,
+    )
+    def admin_cortex_canonical_mapping_registry(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexMappingRegistryResponse:
+        """Phase 03 Step 5 — mapping bundle registry, pins, compatibility edges, changelog."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.mapping_bundle_registry import (
+            build_tenant_mapping_registry_public_document,
+        )
+
+        raw = build_tenant_mapping_registry_public_document(db=db, tenant_id=tenant_id)
+        return AdminCortexMappingRegistryResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/transform/materialize",
+        response_model=AdminCortexMaterializeTransformResponse,
+    )
+    def admin_cortex_canonical_transform_materialize(
+        tenant_id: uuid.UUID,
+        body: AdminCortexMaterializeTransformRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexMaterializeTransformResponse:
+        """Phase 03 Step 6 — run deterministic stub transform + persist field lineage."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.transform_runtime import (
+            MaterializeError,
+            materialization_public_dict,
+            materialize_raw_record,
+        )
+
+        try:
+            mat = materialize_raw_record(
+                db,
+                tenant_id=tenant_id,
+                bundle_id=body.bundle_id,
+                raw_record_id=body.raw_record_id,
+            )
+        except MaterializeError as exc:
+            from vector.domains.cortex.canonical.failure_remediation_runtime import (
+                record_transform_materialize_failure,
+            )
+
+            record_transform_materialize_failure(
+                db,
+                tenant_id=tenant_id,
+                bundle_id=body.bundle_id,
+                raw_record_id=body.raw_record_id,
+                message=str(exc),
+            )
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        payload = {"materialization": materialization_public_dict(mat)}
+        return AdminCortexMaterializeTransformResponse.model_validate(payload)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog",
+        response_model=AdminCortexMaterializeBacklogResponse,
+    )
+    def admin_cortex_canonical_transform_materialize_backlog(
+        tenant_id: uuid.UUID,
+        body: AdminCortexMaterializeBacklogRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexMaterializeBacklogResponse:
+        """Route-routable ingested rows missing a materialization for ``bundle_id`` (batched; scopeable)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.transform_runtime import (
+            MaterializeError,
+            materialize_stub_backlog,
+        )
+
+        try:
+            raw = materialize_stub_backlog(
+                db,
+                tenant_id=tenant_id,
+                bundle_id=body.bundle_id,
+                connector=body.connector,
+                resource_type=body.resource_type,
+                batch_limit=body.batch_limit,
+                dry_run=body.dry_run,
+            )
+        except MaterializeError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        failures = [
+            AdminCortexMaterializeBacklogFailureItem.model_validate(x) for x in raw["failures"]
+        ]
+        return AdminCortexMaterializeBacklogResponse(
+            transform_runtime_schema_version=raw["transform_runtime_schema_version"],
+            tenant_id=raw["tenant_id"],
+            bundle_id=raw["bundle_id"],
+            dry_run=raw["dry_run"],
+            stub_resource_pairs_selected=raw["stub_resource_pairs_selected"],
+            scope_connector=raw.get("scope_connector"),
+            scope_resource_type=raw.get("scope_resource_type"),
+            batch_limit_applied=raw["batch_limit_applied"],
+            candidate_more_remain=raw["candidate_more_remain"],
+            attempted=raw["attempted"],
+            attempted_by_resource_type=raw.get("attempted_by_resource_type") or {},
+            succeeded=raw["succeeded"],
+            succeeded_by_resource_type=raw.get("succeeded_by_resource_type") or {},
+            failures=failures,
+            raw_record_ids_sample=raw["raw_record_ids_sample"],
+            duration_ms=raw.get("duration_ms"),
+            throughput_rows_per_second=raw.get("throughput_rows_per_second"),
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog-async",
+        response_model=AdminCortexMaterializeBacklogAsyncResponse,
+    )
+    def admin_cortex_canonical_transform_materialize_backlog_async(
+        tenant_id: uuid.UUID,
+        body: AdminCortexMaterializeBacklogAsyncRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexMaterializeBacklogAsyncResponse:
+        """Enqueue Celery drain of routable backlog until idle (scopeable connector/resource_type filters)."""
+        _assert_tenant(db, tenant_id)
+        from app.tasks.cortex_canonical_materialize_backlog import drain_stub_materialize_backlog_task
+        from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+
+        hint = body.bundle_id.strip() if body.bundle_id and body.bundle_id.strip() else None
+        resolved = hint or resolve_default_bundle_id_for_stub_transform(db, tenant_id)
+        if resolved is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "no_transformable_bundle — add a tenant mapping pin or ensure an approved/candidate bundle exists"
+                ),
+            )
+        enqueued_batch_limit = body.batch_limit if body.batch_limit is not None else 400
+        try:
+            async_result = drain_stub_materialize_backlog_task.delay(
+                str(tenant_id),
+                resolved,
+                body.connector,
+                body.resource_type,
+                enqueued_batch_limit,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"celery_enqueue_failed:{exc}",
+            ) from exc
+
+        return AdminCortexMaterializeBacklogAsyncResponse(
+            enqueued=True,
+            celery_task_id=str(async_result.id),
+            tenant_id=str(tenant_id),
+            bundle_id_used=resolved,
+            scope_connector=body.connector.strip() if body.connector and body.connector.strip() else None,
+            scope_resource_type=body.resource_type.strip() if body.resource_type and body.resource_type.strip() else None,
+            batch_limit=enqueued_batch_limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/transform/lineage",
+        response_model=AdminCortexTransformLineageListResponse,
+    )
+    def admin_cortex_canonical_transform_lineage(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexTransformLineageListResponse:
+        """Phase 03 Steps 6–8 — recent transform materializations + field lineage + confidence metadata."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.confidence_runtime import (
+            CONFIDENCE_PROPAGATION_SCHEMA_VERSION,
+        )
+        from vector.domains.cortex.canonical.transform_runtime import (
+            TRANSFORM_RUNTIME_SCHEMA_VERSION,
+            list_recent_materializations,
+            materialization_public_dict,
+        )
+
+        mats = list_recent_materializations(db, tenant_id=tenant_id, limit=limit)
+        raw = {
+            "transform_runtime_schema_version": TRANSFORM_RUNTIME_SCHEMA_VERSION,
+            "confidence_propagation_schema_version": CONFIDENCE_PROPAGATION_SCHEMA_VERSION,
+            "tenant_id": str(tenant_id),
+            "materializations": [materialization_public_dict(m) for m in mats],
+        }
+        return AdminCortexTransformLineageListResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/confidence/summary",
+        response_model=AdminCortexConfidenceSummaryResponse,
+    )
+    def admin_cortex_canonical_confidence_summary(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexConfidenceSummaryResponse:
+        """Phase 03 Step 8 — aggregate confidence_class counts over field lineage (structured, non-ranking)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.confidence_runtime import (
+            CONFIDENCE_NON_RANKING_SEMANTICS,
+            CONFIDENCE_PROPAGATION_SCHEMA_VERSION,
+            confidence_class_rollup_for_tenant,
+        )
+
+        total, by_class = confidence_class_rollup_for_tenant(db, tenant_id=tenant_id)
+        return AdminCortexConfidenceSummaryResponse(
+            confidence_propagation_schema_version=CONFIDENCE_PROPAGATION_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            field_lineage_rows_total=total,
+            by_confidence_class=by_class,
+            confidence_non_ranking_semantics=CONFIDENCE_NON_RANKING_SEMANTICS,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/identity/anchors",
+        response_model=AdminCortexIdentityAnchorListResponse,
+    )
+    def admin_cortex_canonical_identity_anchors_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexIdentityAnchorListResponse:
+        """Phase 03 Step 9 — provider-scoped canonical identity anchors + Phase 04 handoff hooks."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.identity_runtime import (
+            IDENTITY_RUNTIME_SCHEMA_VERSION,
+            identity_anchor_public_dict,
+            list_identity_anchors,
+        )
+
+        rows = list_identity_anchors(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexIdentityAnchorListResponse(
+            identity_runtime_schema_version=IDENTITY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            anchors=[AdminCortexIdentityAnchorItem.model_validate(identity_anchor_public_dict(x)) for x in rows],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/identity/anchors/{canonical_entity_id}",
+        response_model=AdminCortexIdentityAnchorItem,
+    )
+    def admin_cortex_canonical_identity_anchor_detail(
+        tenant_id: uuid.UUID,
+        canonical_entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityAnchorItem:
+        """Phase 03 Step 9 — single identity anchor by deterministic canonical_entity_id."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.identity_runtime import (
+            get_identity_anchor,
+            identity_anchor_public_dict,
+        )
+
+        row = get_identity_anchor(db, tenant_id=tenant_id, canonical_entity_id=canonical_entity_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="identity_anchor_not_found")
+        return AdminCortexIdentityAnchorItem.model_validate(identity_anchor_public_dict(row))
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/replay-jobs/run",
+        response_model=AdminCortexReplayJobDetailResponse,
+    )
+    def admin_cortex_canonical_replay_job_run(
+        tenant_id: uuid.UUID,
+        body: AdminCortexReplayJobRunRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReplayJobDetailResponse:
+        """Phase 03 Step 10 — pinned-bundle rebuild/regeneration with C0–C5 divergence receipts."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.replay_runtime import (
+            REPLAY_RUNTIME_SCHEMA_VERSION,
+            ReplayJobError,
+            execute_canonical_replay_job,
+            replay_job_public_dict,
+            replay_receipt_public_dict,
+        )
+
+        try:
+            job = execute_canonical_replay_job(
+                db,
+                tenant_id=tenant_id,
+                pinned_bundle_id=body.pinned_bundle_id,
+                job_kind=body.job_kind,
+                raw_record_ids=body.raw_record_ids,
+                source_bundle_id=body.source_bundle_id,
+                dry_run=body.dry_run,
+                connector=body.connector,
+                resource_type=body.resource_type,
+                include_dependency_neighborhood=body.include_dependency_neighborhood,
+                subtree_anchor_raw_record_id=body.subtree_anchor_raw_record_id,
+                parent_anchor_raw_record_id=body.parent_anchor_raw_record_id,
+            )
+        except ReplayJobError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        receipts = sorted(job.receipts, key=lambda r: r.id)
+        return AdminCortexReplayJobDetailResponse(
+            replay_runtime_schema_version=REPLAY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            job=AdminCortexReplayJobItem.model_validate(replay_job_public_dict(job)),
+            receipts=[AdminCortexReplayJobReceiptItem.model_validate(replay_receipt_public_dict(r)) for r in receipts],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/replay-jobs",
+        response_model=AdminCortexReplayJobListResponse,
+    )
+    def admin_cortex_canonical_replay_jobs_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    ) -> AdminCortexReplayJobListResponse:
+        """Phase 03 Step 10 — recent canonical replay jobs (pins + receipts summary)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.replay_runtime import (
+            REPLAY_RUNTIME_SCHEMA_VERSION,
+            list_replay_jobs,
+            replay_job_public_dict,
+        )
+
+        jobs = list_replay_jobs(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexReplayJobListResponse(
+            replay_runtime_schema_version=REPLAY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            jobs=[AdminCortexReplayJobItem.model_validate(replay_job_public_dict(j)) for j in jobs],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/replay-jobs/{job_id}",
+        response_model=AdminCortexReplayJobDetailResponse,
+    )
+    def admin_cortex_canonical_replay_job_detail(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReplayJobDetailResponse:
+        """Phase 03 Step 10 — single replay job with ordered divergence receipts."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.replay_runtime import (
+            REPLAY_RUNTIME_SCHEMA_VERSION,
+            get_replay_job,
+            replay_job_public_dict,
+            replay_receipt_public_dict,
+        )
+
+        job = get_replay_job(db, tenant_id=tenant_id, job_id=job_id)
+        if job is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="replay_job_not_found")
+        receipts = sorted(job.receipts, key=lambda r: r.id)
+        return AdminCortexReplayJobDetailResponse(
+            replay_runtime_schema_version=REPLAY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            job=AdminCortexReplayJobItem.model_validate(replay_job_public_dict(job)),
+            receipts=[AdminCortexReplayJobReceiptItem.model_validate(replay_receipt_public_dict(r)) for r in receipts],
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/replay-jobs/{job_id}/resume",
+        response_model=AdminCortexReplayJobDetailResponse,
+    )
+    def admin_cortex_canonical_replay_job_resume(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReplayJobDetailResponse:
+        """Resume a failed replay job using the stored deterministic process order (Phase 03 hardening)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.replay_runtime import (
+            REPLAY_RUNTIME_SCHEMA_VERSION,
+            ReplayJobError,
+            get_replay_job,
+            replay_job_public_dict,
+            replay_receipt_public_dict,
+            resume_canonical_replay_job,
+        )
+
+        try:
+            job = resume_canonical_replay_job(db, tenant_id=tenant_id, job_id=job_id)
+        except ReplayJobError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        job = get_replay_job(db, tenant_id=tenant_id, job_id=job_id)
+        assert job is not None
+        receipts = sorted(job.receipts, key=lambda r: r.id)
+        return AdminCortexReplayJobDetailResponse(
+            replay_runtime_schema_version=REPLAY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            job=AdminCortexReplayJobItem.model_validate(replay_job_public_dict(job)),
+            receipts=[AdminCortexReplayJobReceiptItem.model_validate(replay_receipt_public_dict(r)) for r in receipts],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/provenance/raw-records/{raw_record_id}",
+        response_model=AdminCortexProvenanceByRawResponse,
+    )
+    def admin_cortex_canonical_provenance_by_raw(
+        tenant_id: uuid.UUID,
+        raw_record_id: int,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexProvenanceByRawResponse:
+        """Phase 03 Step 11 — forward index: canonical provenance rows citing this raw record."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.provenance_runtime import (
+            PROVENANCE_RUNTIME_SCHEMA_VERSION,
+            list_provenance_for_raw_record,
+            provenance_public_dict,
+        )
+
+        rows = list_provenance_for_raw_record(db, tenant_id=tenant_id, raw_record_id=raw_record_id, limit=limit)
+        return AdminCortexProvenanceByRawResponse(
+            provenance_runtime_schema_version=PROVENANCE_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            raw_record_id=raw_record_id,
+            records=[AdminCortexProvenanceRecordItem.model_validate(provenance_public_dict(r)) for r in rows],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/provenance/materializations/{materialization_id}",
+        response_model=AdminCortexProvenanceByMaterializationResponse,
+    )
+    def admin_cortex_canonical_provenance_by_materialization(
+        tenant_id: uuid.UUID,
+        materialization_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexProvenanceByMaterializationResponse:
+        """Phase 03 Step 11 — provenance envelope for a transform materialization (reverse trace)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.provenance_runtime import (
+            PROVENANCE_RUNTIME_SCHEMA_VERSION,
+            get_provenance_for_materialization,
+            provenance_public_dict,
+        )
+
+        row = get_provenance_for_materialization(
+            db, tenant_id=tenant_id, materialization_id=materialization_id
+        )
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="provenance_record_not_found")
+        return AdminCortexProvenanceByMaterializationResponse(
+            provenance_runtime_schema_version=PROVENANCE_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            record=AdminCortexProvenanceRecordItem.model_validate(provenance_public_dict(row)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/temporal/supersessions",
+        response_model=AdminCortexTemporalSupersessionsListResponse,
+    )
+    def admin_cortex_canonical_temporal_supersessions_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        bundle_id: Annotated[str | None, Query(description="Optional filter to one mapping bundle id")] = None,
+    ) -> AdminCortexTemporalSupersessionsListResponse:
+        """Phase 03 Step 12 — append-only supersession ledger (prior materialization replaced on same scope)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.temporal_runtime import (
+            TEMPORAL_RUNTIME_SCHEMA_VERSION,
+            list_temporal_supersessions,
+            supersession_public_dict,
+        )
+
+        rows = list_temporal_supersessions(db, tenant_id=tenant_id, limit=limit, bundle_id=bundle_id)
+        return AdminCortexTemporalSupersessionsListResponse(
+            temporal_runtime_schema_version=TEMPORAL_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            items=[AdminCortexTemporalSupersessionItem.model_validate(supersession_public_dict(r)) for r in rows],
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/temporal/rebuild-preview",
+        response_model=AdminCortexTemporalRebuildPreviewResponse,
+    )
+    def admin_cortex_canonical_temporal_rebuild_preview(
+        tenant_id: uuid.UUID,
+        body: AdminCortexTemporalRebuildPreviewRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexTemporalRebuildPreviewResponse:
+        """Phase 03 Step 12 — deterministic ordering preview for replay/rebuild raw id lists (read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.temporal_runtime import (
+            TEMPORAL_RUNTIME_SCHEMA_VERSION,
+            preview_rebuild_raw_order,
+        )
+
+        ordered = preview_rebuild_raw_order(db, tenant_id=tenant_id, raw_record_ids=body.raw_record_ids)
+        return AdminCortexTemporalRebuildPreviewResponse(
+            temporal_runtime_schema_version=TEMPORAL_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            ordered=[AdminCortexTemporalRebuildPreviewRow.model_validate(r) for r in ordered],
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/query",
+        response_model=AdminCortexCanonicalQueryResponse,
+    )
+    def admin_cortex_canonical_query(
+        tenant_id: uuid.UUID,
+        body: AdminCortexCanonicalQueryRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalQueryResponse:
+        """Phase 03 Step 13 — bounded canonical retrieval (anti-goal guarded; truncation metadata when capped)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_query_runtime import (
+            CANONICAL_QUERY_RUNTIME_SCHEMA_VERSION,
+            CanonicalQueryError,
+            execute_canonical_query,
+        )
+
+        try:
+            raw_out = execute_canonical_query(
+                db,
+                tenant_id=tenant_id,
+                query_class=body.query_class,
+                intent=body.intent,
+                query_text=body.query_text,
+                params=body.params,
+                limit=body.limit,
+            )
+        except CanonicalQueryError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexCanonicalQueryResponse(
+            canonical_query_runtime_schema_version=CANONICAL_QUERY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            query_class=str(raw_out["query_class"]),
+            result_kind=str(raw_out["result_kind"]),
+            payload=raw_out["payload"],
+            truncation=raw_out.get("truncation"),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/failures",
+        response_model=AdminCortexCanonicalFailuresResponse,
+    )
+    def admin_cortex_canonical_failures(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalFailuresResponse:
+        """Phase 03 Step 14 — active canonical failure cases + recent remediation validations."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.failure_remediation_runtime import (
+            sync_canonical_failure_cases,
+        )
+
+        raw = sync_canonical_failure_cases(db, tenant_id)
+        return AdminCortexCanonicalFailuresResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/remediation/validate",
+        response_model=AdminCortexCanonicalRemediationValidateResponse,
+    )
+    def admin_cortex_canonical_remediation_validate(
+        tenant_id: uuid.UUID,
+        body: AdminCortexCanonicalRemediationValidateRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalRemediationValidateResponse:
+        """Phase 03 Step 14 — policy-gated remediation validation (scoped rebuild or ambiguity triage ack)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.failure_remediation_runtime import (
+            validate_canonical_remediation,
+        )
+
+        raw = validate_canonical_remediation(
+            db,
+            tenant_id=tenant_id,
+            remediation_class=body.remediation_class,
+            dry_run=body.dry_run,
+            confirm_execution=body.confirm_execution,
+            failure_case_gap_id=body.failure_case_gap_id,
+            payload=body.payload,
+        )
+        return AdminCortexCanonicalRemediationValidateResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/verification/run",
+        response_model=AdminCortexCanonicalVerificationRunResponse,
+    )
+    def admin_cortex_canonical_verification_run(
+        tenant_id: uuid.UUID,
+        body: AdminCortexCanonicalVerificationRunRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalVerificationRunResponse:
+        """Phase 03 Step 15 — deterministic canonical invariant sweep + optional persisted report (G-P03-12)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_verification_engine import (
+            run_canonical_verification,
+        )
+
+        raw = run_canonical_verification(
+            db,
+            tenant_id=tenant_id,
+            materialization_sample_limit=body.materialization_sample_limit,
+            persist=body.persist,
+        )
+        gates = [AdminCortexCanonicalVerificationGateResult.model_validate(g) for g in raw["gates"]]
+        return AdminCortexCanonicalVerificationRunResponse(
+            canonical_verification_engine_schema_version=raw["canonical_verification_engine_schema_version"],
+            tenant_id=raw["tenant_id"],
+            passed=raw["passed"],
+            gates=gates,
+            evidence=raw["evidence"],
+            persisted_run_id=raw.get("persisted_run_id"),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/verification/runs",
+        response_model=AdminCortexCanonicalVerificationRunsListResponse,
+    )
+    def admin_cortex_canonical_verification_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> AdminCortexCanonicalVerificationRunsListResponse:
+        """Phase 03 Step 15 — recent persisted verification runs for audit replay."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_verification_engine import (
+            CANONICAL_VERIFICATION_ENGINE_SCHEMA_VERSION,
+            list_canonical_verification_runs,
+            verification_run_public_dict,
+        )
+
+        rows = list_canonical_verification_runs(db, tenant_id=tenant_id, limit=limit)
+        items: list[AdminCortexCanonicalVerificationRunItem] = []
+        for r in rows:
+            d = verification_run_public_dict(r)
+            items.append(
+                AdminCortexCanonicalVerificationRunItem(
+                    id=d["id"],
+                    tenant_id=d["tenant_id"],
+                    engine_schema_version=d["engine_schema_version"],
+                    passed=d["passed"],
+                    gates=[AdminCortexCanonicalVerificationGateResult.model_validate(x) for x in d["gates_json"]],
+                    evidence=d["evidence_json"],
+                    created_at=d["created_at"],
+                )
+            )
+        return AdminCortexCanonicalVerificationRunsListResponse(
+            canonical_verification_engine_schema_version=CANONICAL_VERIFICATION_ENGINE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            runs=items,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/certification-pack",
+        response_model=AdminCortexCanonicalCertificationPackResponse,
+    )
+    def admin_cortex_canonical_certification_pack_snapshot(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        materialization_sample_limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexCanonicalCertificationPackResponse:
+        """Phase 03 Step 18 — operator-visible certification evidence pack + closure gate matrix (pre-archive)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_certification_pack import (
+            build_canonical_certification_pack,
+        )
+
+        raw = build_canonical_certification_pack(
+            db,
+            tenant_id=tenant_id,
+            materialization_sample_limit=materialization_sample_limit,
+        )
+        return AdminCortexCanonicalCertificationPackResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/certification-pack/archive",
+        response_model=AdminCortexCanonicalCertificationArchiveResponse,
+    )
+    def admin_cortex_canonical_certification_pack_archive(
+        tenant_id: uuid.UUID,
+        body: AdminCortexCanonicalCertificationArchiveRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalCertificationArchiveResponse:
+        """Phase 03 Step 18 — persist certification pack when all hard-fail closure rows pass."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_certification_pack import (
+            CERTIFICATION_PACK_SCHEMA_VERSION,
+            persist_canonical_certification_archive,
+        )
+
+        raw = persist_canonical_certification_archive(
+            db,
+            tenant_id=tenant_id,
+            materialization_sample_limit=body.materialization_sample_limit,
+        )
+        pack = raw["pack"]
+        db.commit()
+        return AdminCortexCanonicalCertificationArchiveResponse(
+            persisted=bool(raw["persisted"]),
+            passed=bool(raw["passed"]),
+            archive_id=raw.get("archive_id"),
+            certification_pack_schema_version=int(
+                pack.get("certification_pack_schema_version") or CERTIFICATION_PACK_SCHEMA_VERSION
+            ),
+            tenant_id=str(tenant_id),
+            pack=pack,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/certification-pack/archives",
+        response_model=AdminCortexCanonicalCertificationArchivesListResponse,
+    )
+    def admin_cortex_canonical_certification_pack_archives(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> AdminCortexCanonicalCertificationArchivesListResponse:
+        """Phase 03 Step 18 — recent archived certification packs."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_certification_pack import (
+            CERTIFICATION_PACK_SCHEMA_VERSION,
+            certification_archive_public_dict,
+            list_canonical_certification_archives,
+        )
+
+        rows = list_canonical_certification_archives(db, tenant_id=tenant_id, limit=limit)
+        items = [
+            AdminCortexCanonicalCertificationArchiveItem.model_validate(certification_archive_public_dict(r))
+            for r in rows
+        ]
+        return AdminCortexCanonicalCertificationArchivesListResponse(
+            certification_pack_schema_version=CERTIFICATION_PACK_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            archives=items,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/certification-pack/archives/{archive_id}",
+        response_model=AdminCortexCanonicalCertificationArchiveDetailResponse,
+    )
+    def admin_cortex_canonical_certification_pack_archive_detail(
+        tenant_id: uuid.UUID,
+        archive_id: int,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalCertificationArchiveDetailResponse:
+        """Phase 03 Step 18 — fetch one archived certification pack (full JSON)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.canonical_certification_pack import (
+            get_canonical_certification_archive,
+        )
+
+        row = get_canonical_certification_archive(db, tenant_id=tenant_id, archive_id=archive_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Certification archive not found.") from None
+        return AdminCortexCanonicalCertificationArchiveDetailResponse(
+            id=row.id,
+            tenant_id=str(row.tenant_id),
+            certification_pack_schema_version=row.certification_pack_schema_version,
+            passed=row.passed,
+            created_at=row.created_at,
+            pack=dict(row.pack_json),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/ambiguity",
+        response_model=AdminCortexAmbiguityListResponse,
+    )
+    def admin_cortex_canonical_ambiguity_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        status: Annotated[str | None, Query(description="Filter by ambiguity status")] = None,
+        ambiguity_class: Annotated[str | None, Query(description="Filter by ambiguity_class")] = None,
+        connector: Annotated[str | None, Query(description="Filter by primary_connector")] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexAmbiguityListResponse:
+        """Phase 03 Step 7 — list ambiguity receipts + operator aggregates (counts by status/class/connector)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.ambiguity_runtime import (
+            AMBIGUITY_RUNTIME_SCHEMA_VERSION,
+            ambiguity_record_public_dict,
+            build_ambiguity_aggregates,
+            list_ambiguity_records,
+        )
+
+        ag = build_ambiguity_aggregates(db, tenant_id=tenant_id)
+        rows = list_ambiguity_records(
+            db,
+            tenant_id=tenant_id,
+            status=status,
+            ambiguity_class=ambiguity_class,
+            connector=connector,
+            limit=limit,
+        )
+        aggregates = AdminCortexAmbiguityAggregates(
+            by_status=ag["by_status"],
+            by_class=ag["by_class"],
+            by_connector_resource=[AdminCortexAmbiguityConnectorRollupItem(**x) for x in ag["by_connector_resource"]],
+        )
+        records = [AdminCortexAmbiguityRecordItem.model_validate(ambiguity_record_public_dict(r)) for r in rows]
+        return AdminCortexAmbiguityListResponse(
+            ambiguity_runtime_schema_version=AMBIGUITY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            aggregates=aggregates,
+            records=records,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canonical/ambiguity/{ambiguity_id}",
+        response_model=AdminCortexOpenAmbiguityResponse,
+    )
+    def admin_cortex_canonical_ambiguity_detail(
+        tenant_id: uuid.UUID,
+        ambiguity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOpenAmbiguityResponse:
+        """Phase 03 Step 7 — one ambiguity record with append-only lifecycle event log."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.ambiguity_runtime import (
+            ambiguity_record_public_dict,
+            get_ambiguity_record,
+        )
+
+        rec = get_ambiguity_record(db, tenant_id=tenant_id, ambiguity_record_id=ambiguity_id)
+        if rec is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="ambiguity_record_not_found")
+        payload = ambiguity_record_public_dict(rec, include_events=True)
+        return AdminCortexOpenAmbiguityResponse(record=AdminCortexAmbiguityRecordItem.model_validate(payload))
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/ambiguity",
+        response_model=AdminCortexOpenAmbiguityResponse,
+    )
+    def admin_cortex_canonical_ambiguity_open(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOpenAmbiguityRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOpenAmbiguityResponse:
+        """Phase 03 Step 7 — open a new ambiguity receipt (durable row + opened lifecycle event)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.ambiguity_runtime import (
+            AmbiguityError,
+            ambiguity_record_public_dict,
+            open_ambiguity_record,
+        )
+
+        try:
+            rec = open_ambiguity_record(
+                db,
+                tenant_id=tenant_id,
+                bundle_id=body.bundle_id,
+                ambiguity_class=body.ambiguity_class,
+                scope=body.scope,
+                raw_record_ids=body.raw_record_ids,
+                rule_ids_involved=body.rule_ids_involved,
+                record_handle=body.record_handle,
+                evidence_payload=body.evidence_payload,
+            )
+        except AmbiguityError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexOpenAmbiguityResponse(
+            record=AdminCortexAmbiguityRecordItem.model_validate(ambiguity_record_public_dict(rec))
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/ambiguity/{ambiguity_id}/lifecycle",
+        response_model=AdminCortexAmbiguityLifecycleResponse,
+    )
+    def admin_cortex_canonical_ambiguity_lifecycle(
+        tenant_id: uuid.UUID,
+        ambiguity_id: uuid.UUID,
+        body: AdminCortexAmbiguityLifecycleRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexAmbiguityLifecycleResponse:
+        """Phase 03 Step 7 — supersede or void an ambiguity (append-only lifecycle log + status update)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.ambiguity_runtime import (
+            AmbiguityError,
+            ambiguity_record_public_dict,
+            transition_ambiguity_record,
+        )
+
+        try:
+            rec = transition_ambiguity_record(
+                db,
+                tenant_id=tenant_id,
+                ambiguity_record_id=ambiguity_id,
+                target_status=body.target_status,
+                supersession_note=body.supersession_note,
+                superseded_by_ambiguity_id=body.superseded_by_ambiguity_id,
+            )
+        except AmbiguityError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexAmbiguityLifecycleResponse(
+            record=AdminCortexAmbiguityRecordItem.model_validate(ambiguity_record_public_dict(rec))
+        )
+
     @r.post(
         "/tenants/{tenant_id}/cortex/ingestion/actions/trigger-sync",
         response_model=AdminCortexIngestionTriggerSyncResponse,
@@ -1853,6 +2958,98 @@ def build_admin_router() -> APIRouter:
             tenant_id=tenant_id,
             replay_version=body.replay_version,
             enforcement=enforcement,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/ingestion/actions/flush-rerun-to-canonical",
+        response_model=AdminCortexFlushAndRerunResponse,
+    )
+    def admin_cortex_flush_rerun_to_canonical(
+        tenant_id: uuid.UUID,
+        body: AdminCortexFlushAndRerunRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexFlushAndRerunResponse:
+        """Flush tenant Cortex state, rerun all routed connectors, then enqueue canonical backlog drain."""
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != CORTEX_FLUSH_RERUN_CONFIRM_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match flush+rerun safeguard phrase.",
+            ) from None
+
+        active_connections = list(
+            db.scalars(
+                select(TenantConnection)
+                .where(
+                    TenantConnection.tenant_id == tenant_id,
+                    TenantConnection.status == "active",
+                )
+                .order_by(TenantConnection.provider.asc(), TenantConnection.created_at.desc())
+            ).all()
+        )
+        connector_candidates = sorted({c.provider for c in active_connections})
+        routed_connectors = [
+            connector
+            for connector in connector_candidates
+            if should_route_ingestion_to_cortex(settings, connector, tenant_id)
+        ]
+
+        flush_summary = flush_tenant_cortex_pipeline_state(db, tenant_id=tenant_id)
+
+        from app.tasks.cortex_full_pipeline_rerun import run_cortex_flush_rerun_to_canonical_task
+        from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+
+        enqueued_connectors: list[str] = []
+        orchestrator_connectors: list[dict[str, str]] = []
+        for connector in routed_connectors:
+            tc = _active_cortex_routed_connection(
+                db,
+                settings,
+                tenant_id=tenant_id,
+                connector_id=connector,
+            )
+            enqueued_connectors.append(connector)
+            orchestrator_connectors.append({"connector": connector, "connection_id": str(tc.id)})
+
+        resolved_bundle_id = resolve_default_bundle_id_for_stub_transform(db, tenant_id)
+        if resolved_bundle_id is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "no_transformable_bundle — add a tenant mapping pin or ensure an approved/candidate bundle exists"
+                ),
+            )
+
+        async_result = run_cortex_flush_rerun_to_canonical_task.delay(
+            str(tenant_id),
+            resolved_bundle_id,
+            orchestrator_connectors,
+            body.canonical_batch_limit,
+        )
+
+        log_ingestion_event(
+            _logger,
+            logging.WARNING,
+            "admin cortex full flush+rerun enqueued",
+            task_name="admin_cortex_flush_rerun_to_canonical",
+            phase=PHASE_STEP6,
+            outcome="enqueued",
+            tenant_id=str(tenant_id),
+            connectors=enqueued_connectors,
+            canonical_batch_limit=body.canonical_batch_limit,
+            deleted_rows_total=flush_summary["deleted_rows_total"],
+        )
+        return AdminCortexFlushAndRerunResponse(
+            tenant_id=tenant_id,
+            enqueued_connectors=enqueued_connectors,
+            canonical_backlog_task_id=str(async_result.id) if async_result and async_result.id else None,
+            canonical_batch_limit=body.canonical_batch_limit,
+            deleted_rows_total=int(flush_summary["deleted_rows_total"]),
+            deleted_rows_by_table={
+                str(k): int(v)
+                for k, v in (flush_summary.get("deleted_rows_by_table") or {}).items()
+            },
         )
 
     @r.post(

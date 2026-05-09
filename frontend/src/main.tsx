@@ -8,6 +8,22 @@ import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexMemoryPage from "./admin/AdminCortexMemoryPage.tsx";
 import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
 import AdminCortexPlaceholderPage from "./admin/AdminCortexPlaceholderPage.tsx";
+import AdminCortexCanonicalAmbiguitiesPage from "./admin/AdminCortexCanonicalAmbiguitiesPage.tsx";
+import AdminCortexCanonicalCertificationPage from "./admin/AdminCortexCanonicalCertificationPage.tsx";
+import AdminCortexCanonicalCoveragePage from "./admin/AdminCortexCanonicalCoveragePage.tsx";
+import AdminCortexCanonicalControlPlanePage from "./admin/AdminCortexCanonicalControlPlanePage.tsx";
+import AdminCortexCanonicalDebugTabPage from "./admin/AdminCortexCanonicalDebugTabPage.tsx";
+import AdminCortexCanonicalDoctrineTabPage from "./admin/AdminCortexCanonicalDoctrineTabPage.tsx";
+import AdminCortexCanonicalLayout from "./admin/AdminCortexCanonicalLayout.tsx";
+import AdminCortexCanonicalLegacyOntologyToolsPage from "./admin/AdminCortexCanonicalLegacyOntologyToolsPage.tsx";
+import AdminCortexCanonicalAdvancedLayout from "./admin/AdminCortexCanonicalAdvancedLayout.tsx";
+import AdminCortexCanonicalFailuresPage from "./admin/AdminCortexCanonicalFailuresPage.tsx";
+import AdminCortexCanonicalHealthPage from "./admin/AdminCortexCanonicalHealthPage.tsx";
+import AdminCortexCanonicalRegistryPage from "./admin/AdminCortexCanonicalRegistryPage.tsx";
+import AdminCortexCanonicalReplayTabPage from "./admin/AdminCortexCanonicalReplayTabPage.tsx";
+import AdminCortexCanonicalRuntimePage from "./admin/AdminCortexCanonicalRuntimePage.tsx";
+import AdminCortexCanonicalStabilizationPage from "./admin/AdminCortexCanonicalStabilizationPage.tsx";
+import AdminCortexCanonicalVerificationTabPage from "./admin/AdminCortexCanonicalVerificationTabPage.tsx";
 import AdminCortexVerificationPage from "./admin/AdminCortexVerificationPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
@@ -81,7 +97,39 @@ createRoot(document.getElementById("root")!).render(
                 <Route index element={<Navigate to="overview" replace />} />
                 <Route path="overview" element={<AdminCortexOverviewPage />} />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
-                <Route path="canonical" element={<AdminCortexPlaceholderPage title="Canonical" />} />
+                <Route path="canonical" element={<AdminCortexCanonicalLayout />}>
+                  <Route index element={<Navigate to="health" replace />} />
+                  <Route path="health" element={<AdminCortexCanonicalHealthPage />} />
+                  <Route path="coverage" element={<AdminCortexCanonicalCoveragePage />} />
+                  <Route path="failures" element={<AdminCortexCanonicalFailuresPage />} />
+                  <Route path="advanced" element={<AdminCortexCanonicalAdvancedLayout />}>
+                    <Route index element={<Navigate to="runtime" replace />} />
+                    <Route path="runtime" element={<AdminCortexCanonicalRuntimePage />} />
+                    <Route path="replay" element={<AdminCortexCanonicalReplayTabPage />} />
+                    <Route path="verification" element={<AdminCortexCanonicalVerificationTabPage />} />
+                    <Route path="ambiguities" element={<AdminCortexCanonicalAmbiguitiesPage />} />
+                    <Route path="registry" element={<AdminCortexCanonicalRegistryPage />} />
+                    <Route path="doctrine" element={<AdminCortexCanonicalDoctrineTabPage />} />
+                    <Route path="debug" element={<AdminCortexCanonicalDebugTabPage />} />
+                    <Route path="legacy-tools" element={<AdminCortexCanonicalLegacyOntologyToolsPage />} />
+                    <Route path="inspector" element={<AdminCortexCanonicalControlPlanePage />} />
+                    <Route path="stabilization" element={<AdminCortexCanonicalStabilizationPage />} />
+                    <Route path="certification" element={<AdminCortexCanonicalCertificationPage />} />
+                  </Route>
+                  <Route path="overview" element={<Navigate to="health" replace />} />
+                  <Route path="runtime" element={<Navigate to="advanced/runtime" replace />} />
+                  <Route path="replay" element={<Navigate to="advanced/replay" replace />} />
+                  <Route path="verification" element={<Navigate to="advanced/verification" replace />} />
+                  <Route path="ambiguities" element={<Navigate to="advanced/ambiguities" replace />} />
+                  <Route path="registry" element={<Navigate to="advanced/registry" replace />} />
+                  <Route path="doctrine" element={<Navigate to="advanced/doctrine" replace />} />
+                  <Route path="debug" element={<Navigate to="advanced/debug" replace />} />
+                  <Route path="legacy-tools" element={<Navigate to="advanced/legacy-tools" replace />} />
+                  <Route path="inspector" element={<Navigate to="advanced/inspector" replace />} />
+                  <Route path="stabilization" element={<Navigate to="advanced/stabilization" replace />} />
+                  <Route path="certification" element={<Navigate to="advanced/certification" replace />} />
+                  <Route path="control-plane" element={<Navigate to="health" replace />} />
+                </Route>
                 <Route
                   path="entity-resolution"
                   element={<AdminCortexPlaceholderPage title="Entity Resolution" />}

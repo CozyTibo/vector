@@ -178,6 +178,13 @@ def _assert_no_github_activity_for_linear_only_users(
         if login in skip:
             msg = f"linear-only user {login} must not open GitHub issues"
             raise AssertionError(msg)
+    for rel in gh_pkg.get("releases") or []:
+        if not isinstance(rel, dict):
+            continue
+        login = rel.get("author", {}).get("login")
+        if login in skip:
+            msg = f"linear-only user {login} must not publish GitHub releases"
+            raise AssertionError(msg)
 
 
 @dataclass
@@ -566,6 +573,22 @@ def _build_linear(
             },
         )
 
+    project_updates: list[dict[str, Any]] = []
+    for pi, proj in enumerate(projects):
+        pu_ts = t0 + timedelta(hours=pi + 3)
+        iso_c = _iso(pu_ts)
+        iso_u = _iso(pu_ts + timedelta(hours=1))
+        project_updates.append(
+            {
+                "id": _u(seed, "project_update", proj["id"]),
+                "body": f"## {proj['name']}\n\nWeekly digest: scope stable; blockers tracked as issues.",
+                "createdAt": iso_c,
+                "updatedAt": iso_u,
+                "url": f"https://linear.app/project/{proj['id']}/update/{pi}",
+                "project": {"id": proj["id"], "name": proj["name"]},
+            },
+        )
+
     epics: list[dict[str, Any]] = []
     for i in range(sc.TARGET_EPICS):
         eid = _u(seed, "epic", str(i))
@@ -770,6 +793,7 @@ def _build_linear(
         issue = {
             "id": iid,
             "identifier": identifier,
+            "url": f"https://linear.app/{team['key']}/{identifier}",
             "title": title,
             "description": desc,
             "priority": priority,
@@ -797,6 +821,19 @@ def _build_linear(
             else {"nodes": []},
             "metadata": meta,
             "github_pr_number": None,
+            "attachments": {
+                "nodes": (
+                    [
+                        {
+                            "id": _u(seed, "att", iid),
+                            "title": "spec.pdf",
+                            "url": f"https://linear.app/attachments/{iid}",
+                        }
+                    ]
+                    if i % 19 == 0
+                    else []
+                ),
+            },
             "_pattern_flags": [],
             "_issue_index": i,
         }
@@ -1075,6 +1112,7 @@ def _build_linear(
         "cycles": cycles,
         "labels": labels,
         "initiatives": initiatives,
+        "projectUpdates": project_updates,
         "users": [
             {
                 "id": u["linear_user_id"],
@@ -1433,6 +1471,27 @@ def _build_github(
             },
         )
 
+    releases_gh: list[dict[str, Any]] = []
+    rel_seq = 0
+    for repo in repos:
+        for rel_idx in range(2):
+            releases_gh.append(
+                {
+                    "id": 800000 + rel_seq,
+                    "node_id": f"REL_{rel_seq}",
+                    "tag_name": f"mock-rel-{repo['full_name'].replace('/', '-')}-{rel_idx}",
+                    "name": f"Mock release {rel_idx}",
+                    "body": "Automated mock release for connector exhaust.",
+                    "draft": False,
+                    "prerelease": bool(rel_idx % 2),
+                    "created_at": _iso(t0 + timedelta(days=rel_seq % 20)),
+                    "published_at": _iso(t0 + timedelta(days=rel_seq % 20, hours=2)),
+                    "author": gh_user_blob(gh_users[rel_seq % len(gh_users)]),
+                    "repository": {"id": repo["id"], "full_name": repo["full_name"]},
+                }
+            )
+            rel_seq += 1
+
     # Multi-repo: same Linear key, two PRs in different repos (pattern: multi_repo_change)
     if len(linear_issues) > 50:
         ident = linear_issues[50]["identifier"]
@@ -1533,9 +1592,11 @@ def _build_github(
         "pull_requests": prs,
         "pull_request_reviews": pr_reviews,
         "issues": issues_gh,
+        "releases": releases_gh,
         "issue_comments": issue_comments,
         "commits": commits_out,
         "pr_commits": pr_commits_map,
+        "issue_timelines": {},
         "installation_token": "mock-gh-install-token-vector",
     }
 
@@ -1751,6 +1812,7 @@ def _build_notion(
     pages: list[dict[str, Any]] = []
     databases: dict[str, dict[str, Any]] = {}
     database_rows: list[dict[str, Any]] = []
+    notion_blocks: list[dict[str, Any]] = []
     notion_comments: list[dict[str, Any]] = []
     relations: list[dict[str, Any]] = []
     issues = linear_pkg.get("issues", [])
@@ -1871,6 +1933,44 @@ def _build_notion(
                 "snippet": f"Thread summary: {str(ev.get('text', ''))[:180]}",
             }
         )
+    parent_candidates = [p.get("id") for p in pages[:18] if isinstance(p.get("id"), str)]
+    parent_candidates.extend(
+        [r.get("id") for r in database_rows[:18] if isinstance(r.get("id"), str)]
+    )
+    for i, parent_id in enumerate(parent_candidates):
+        block_id = _u(seed, "notion", "block", str(i))
+        notion_blocks.append(
+            {
+                "id": block_id,
+                "parent_id": parent_id,
+                "type": "paragraph",
+                "has_children": i % 5 == 0,
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "plain_text": f"Execution note block {i + 1} for parent {parent_id[:8]}."
+                        }
+                    ]
+                },
+            }
+        )
+        if i % 5 == 0:
+            child_id = _u(seed, "notion", "block-child", str(i))
+            notion_blocks.append(
+                {
+                    "id": child_id,
+                    "parent_id": block_id,
+                    "type": "bulleted_list_item",
+                    "has_children": False,
+                    "bulleted_list_item": {
+                        "rich_text": [
+                            {
+                                "plain_text": "Follow-up child block preserving deterministic parent/child structure."
+                            }
+                        ]
+                    },
+                }
+            )
     return {
         "workspace": {
             "id": _u(seed, "notion", "workspace"),
@@ -1879,6 +1979,7 @@ def _build_notion(
         },
         "databases": databases,
         "database_rows": database_rows,
+        "blocks": notion_blocks,
         "comments": notion_comments,
         "relations": relations,
         "search_result_count": len(pages),
@@ -1892,6 +1993,7 @@ def _build_notion(
             "linear_comment_inputs": len(linear_comments),
             "databases": len(databases),
             "database_rows": len(database_rows),
+            "blocks": len(notion_blocks),
             "relations": len(relations),
         },
     }

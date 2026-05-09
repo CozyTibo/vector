@@ -21,10 +21,12 @@ def slack_web_api_post(
     method: str,
     *,
     json_body: dict[str, Any],
+    api_base: str | None = None,
     timeout: float = 60.0,
 ) -> dict[str, Any]:
     """POST https://slack.com/api/{method} with Bearer token; honors Retry-After on 429."""
-    url = f"{SLACK_API}/{method}"
+    base = (api_base or SLACK_API).rstrip("/")
+    url = f"{base}/{method}"
     for attempt in range(8):
         try:
             r = httpx.post(
@@ -64,6 +66,7 @@ def slack_web_api_post(
 def iter_users_list_pages(
     token: str,
     *,
+    api_base: str | None = None,
     limit: int = 200,
     max_pages: int,
 ) -> Iterator[list[dict[str, Any]]]:
@@ -72,7 +75,7 @@ def iter_users_list_pages(
         body: dict[str, Any] = {"limit": min(limit, 200)}
         if cursor:
             body["cursor"] = cursor
-        data = slack_web_api_post(token, "users.list", json_body=body)
+        data = slack_web_api_post(token, "users.list", json_body=body, api_base=api_base)
         if not data.get("ok"):
             raise SlackWebApiError(str(data.get("error", "users.list_failed")))
         raw = data.get("members")
@@ -92,6 +95,7 @@ def iter_users_list_pages(
 def iter_conversations_list_pages(
     token: str,
     *,
+    api_base: str | None = None,
     types: str = "public_channel,private_channel",
     limit: int = 200,
     max_pages: int,
@@ -105,7 +109,7 @@ def iter_conversations_list_pages(
         }
         if cursor:
             body["cursor"] = cursor
-        data = slack_web_api_post(token, "conversations.list", json_body=body)
+        data = slack_web_api_post(token, "conversations.list", json_body=body, api_base=api_base)
         if not data.get("ok"):
             raise SlackWebApiError(str(data.get("error", "conversations.list_failed")))
         raw = data.get("channels")
@@ -125,6 +129,7 @@ def iter_conversations_list_pages(
 def conversations_history(
     token: str,
     *,
+    api_base: str | None = None,
     channel: str,
     limit: int,
 ) -> list[dict[str, Any]]:
@@ -133,6 +138,7 @@ def conversations_history(
         token,
         "conversations.history",
         json_body={"channel": channel, "limit": min(limit, 1000)},
+        api_base=api_base,
     )
     if not data.get("ok"):
         raise SlackWebApiError(str(data.get("error", "conversations.history_failed")))
@@ -153,6 +159,7 @@ def _next_cursor(data: dict[str, Any]) -> str | None:
 def conversations_history_page(
     token: str,
     *,
+    api_base: str | None = None,
     channel: str,
     limit: int,
     cursor: str | None = None,
@@ -169,7 +176,7 @@ def conversations_history_page(
         body["latest"] = latest
     if inclusive:
         body["inclusive"] = True
-    data = slack_web_api_post(token, "conversations.history", json_body=body)
+    data = slack_web_api_post(token, "conversations.history", json_body=body, api_base=api_base)
     if not data.get("ok"):
         raise SlackWebApiError(str(data.get("error", "conversations.history_failed")))
     raw = data.get("messages")
@@ -184,6 +191,7 @@ def conversations_history_page(
 def iter_conversations_history_pages(
     token: str,
     *,
+    api_base: str | None = None,
     channel: str,
     limit: int,
     max_pages: int,
@@ -196,6 +204,7 @@ def iter_conversations_history_pages(
     for _ in range(max_pages):
         page = conversations_history_page(
             token,
+            api_base=api_base,
             channel=channel,
             limit=limit,
             cursor=cur,
@@ -213,6 +222,7 @@ def iter_conversations_history_pages(
 def conversations_replies_page(
     token: str,
     *,
+    api_base: str | None = None,
     channel: str,
     thread_ts: str,
     limit: int,
@@ -230,7 +240,7 @@ def conversations_replies_page(
         body["latest"] = latest
     if inclusive:
         body["inclusive"] = True
-    data = slack_web_api_post(token, "conversations.replies", json_body=body)
+    data = slack_web_api_post(token, "conversations.replies", json_body=body, api_base=api_base)
     if not data.get("ok"):
         raise SlackWebApiError(str(data.get("error", "conversations.replies_failed")))
     raw = data.get("messages")
@@ -245,6 +255,7 @@ def conversations_replies_page(
 def iter_conversations_replies_pages(
     token: str,
     *,
+    api_base: str | None = None,
     channel: str,
     thread_ts: str,
     limit: int,
@@ -258,6 +269,7 @@ def iter_conversations_replies_pages(
     for _ in range(max_pages):
         page = conversations_replies_page(
             token,
+            api_base=api_base,
             channel=channel,
             thread_ts=thread_ts,
             limit=limit,

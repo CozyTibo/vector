@@ -226,10 +226,12 @@ def _classify_job(
                 cls = "D2"
             else:
                 cls = "D4"
+        elif _is_schema_reinterpretation(row, live_row):
+            # Envelope-only deltas (e.g. ingestion_version) are stripped from canonical hash/revision;
+            # classify before payload-hash equality so schema reinterpretation is visible as D2.
+            cls = "D2"
         elif live_row.payload_hash == row.payload_hash:
             cls = "D0"
-        elif _is_schema_reinterpretation(row, live_row):
-            cls = "D2"
         else:
             cls = "D1"
         if cls == "D4" and upgrade_d4_to_d5:

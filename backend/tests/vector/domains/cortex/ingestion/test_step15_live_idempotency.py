@@ -84,7 +84,7 @@ def test_step15_live_dedupe_and_revision_append(
     state = {"version": 1}
 
     def _mock_get(url: str, **kwargs: Any) -> _MockResponse:
-        if not url.endswith("/admin/dataset/full"):
+        if "/google-calendar/v3/calendars/" not in url or "/events" not in url:
             return _MockResponse({}, status_code=404)
         updated = "2026-05-08T10:00:00Z" if state["version"] == 1 else "2026-05-09T10:00:00Z"
         event = {
@@ -93,7 +93,7 @@ def test_step15_live_dedupe_and_revision_append(
             "updated": updated,
             "attendees": [{"email": "a@example.com", "response_status": "accepted"}],
         }
-        return _MockResponse({"calls": {"events": [event]}})
+        return _MockResponse({"items": [event], "nextPageToken": None})
 
     monkeypatch.setattr(sync_executor.httpx, "get", _mock_get)
 

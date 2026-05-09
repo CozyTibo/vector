@@ -517,6 +517,89 @@ def list_repo_tags_page(
     )
 
 
+def list_repo_commit_comments_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    """List commit comments for a repository (not PR review comments)."""
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/comments",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_repo_releases_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/releases",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_repo_issues_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/issues",
+        params={
+            "per_page": min(per_page, 100),
+            "page": max(page, 1),
+            "state": "all",
+        },
+    )
+
+
+def list_repo_issue_timeline_page(
+    settings: Settings,
+    installation_access_token: str,
+    *,
+    owner: str,
+    repo: str,
+    issue_number: int,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    """GET /repos/{owner}/{repo}/issues/{issue_number}/timeline (issue or PR number)."""
+    owner_s = owner.strip().strip("/")
+    repo_s = repo.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/repos/{owner_s}/{repo_s}/issues/{issue_number}/timeline",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
 def list_installation_repositories_first_page(
     settings: Settings,
     installation_id: int,

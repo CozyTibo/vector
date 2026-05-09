@@ -280,6 +280,167 @@ export type CortexMemoryControlPlane = {
   };
 };
 
+export type CortexStabilizationProofReport = {
+  tenant_id: string;
+  stabilization_proof_schema_version: number;
+  overall_passed: boolean;
+  hard_fail_passed: boolean;
+  warn_only_all_passed: boolean;
+  proof_checklist: Array<{ id: string; passed: boolean; severity?: string; detail?: unknown }>;
+  substrate_scale: Record<string, unknown>;
+  replay_economics: Record<string, unknown>;
+  verification_continuity: Record<string, unknown>;
+  ambiguity_pressure: Record<string, unknown>;
+  mapping_governance: Record<string, unknown>;
+  reconstruction_slice: Record<string, unknown>;
+  doctrine_anchors: string[];
+  warnings: { must_not_assume: string[] };
+  persisted_run_id: number | null;
+};
+
+export type CortexStabilizationProofRunsList = {
+  stabilization_proof_schema_version: number;
+  tenant_id: string;
+  runs: Array<{
+    id: number;
+    tenant_id: string;
+    proof_schema_version: number;
+    passed: boolean;
+    probes_json: Record<string, unknown>;
+    created_at: string;
+  }>;
+};
+
+export type CortexCanonicalCertificationClosureGate = {
+  id: string;
+  name: string;
+  passed: boolean;
+  severity: string;
+  detail?: Record<string, unknown>;
+};
+
+export type CortexCanonicalCertificationPack = {
+  certification_pack_schema_version: number;
+  tenant_id: string;
+  built_at_clock: string;
+  verification_matrix_excerpt: Record<string, unknown>;
+  stabilization_proof_excerpt: Record<string, unknown>;
+  control_plane_excerpt: Record<string, unknown>;
+  replay_jobs_excerpt: Record<string, unknown>;
+  ambiguity_excerpt: Record<string, unknown>;
+  mapping_registry_excerpt: Record<string, unknown>;
+  lineage_operator_sample_excerpt: Record<string, unknown>;
+  doctrine_notes: Record<string, unknown>;
+  closure_gate_matrix: CortexCanonicalCertificationClosureGate[];
+  certification_pack_contract: { passed: boolean; errors?: string[] };
+};
+
+export type CortexCanonicalCertificationArchiveResult = {
+  persisted: boolean;
+  passed: boolean;
+  archive_id: number | null;
+  certification_pack_schema_version: number;
+  tenant_id: string;
+  pack: Record<string, unknown>;
+};
+
+export type CortexCanonicalCertificationArchivesList = {
+  certification_pack_schema_version: number;
+  tenant_id: string;
+  archives: Array<{
+    id: number;
+    tenant_id: string;
+    certification_pack_schema_version: number;
+    passed: boolean;
+    created_at: string;
+  }>;
+};
+
+/** Subset of backend `health_overview` used by the control-plane admin UI. */
+export type CortexCanonicalControlPlaneHealthOverview = {
+  materialization_row_count: number;
+  field_lineage_row_count: number;
+  provenance_record_row_count?: number;
+  temporal_supersession_row_count?: number;
+  active_canonical_failure_count: number;
+  active_canonical_failure_classes?: Record<string, number>;
+  replay_jobs_in_window: number;
+  replay_job_status_counts?: Record<string, number>;
+  replay_divergence_class_totals_recent_completed?: Record<string, number>;
+  replay_dependency_edge_count?: number;
+  replay_dependency_cycle_detected?: boolean;
+  orphan_dependency_ref_count?: number;
+  mapping_bundle_inventory_count: number;
+  mapping_pin_row_count: number;
+  ambiguity_by_status?: Record<string, unknown>;
+  ambiguity_open_count: number;
+  ambiguity_explosion_warn?: boolean;
+  verification_freshness_label: string;
+  last_verification_passed?: boolean | null;
+  latest_remediation_validation?: Record<string, unknown> | null;
+};
+
+/** Canonical verification ledger row (GET …/verification/runs). */
+export type CortexCanonicalVerificationGateResult = {
+  id: string;
+  name: string;
+  passed: boolean;
+  severity: string;
+  detail: Record<string, unknown>;
+};
+
+export type CortexCanonicalVerificationRunRow = {
+  id: number;
+  tenant_id: string;
+  engine_schema_version: number;
+  passed: boolean;
+  gates: CortexCanonicalVerificationGateResult[];
+  evidence: Record<string, unknown>;
+  created_at: string | null;
+};
+
+export type CortexCanonicalVerificationRunsList = {
+  canonical_verification_engine_schema_version: number;
+  tenant_id: string;
+  runs: CortexCanonicalVerificationRunRow[];
+};
+
+export type CortexCanonicalControlPlane = {
+  tenant_id: string;
+  canonical_control_plane_schema_version: number;
+  health_overview: CortexCanonicalControlPlaneHealthOverview;
+  inspectors: Record<string, unknown>;
+  verification_checklist: {
+    passed: boolean;
+    items: Array<{ id: string; passed: boolean; detail?: unknown }>;
+  };
+  verification_truth: Record<string, unknown> | null;
+  logical_information_architecture: Record<
+    string,
+    { doctrine_surface?: string; summary?: string; admin_route_hints?: string[] }
+  >;
+  actions: Array<{
+    id: string;
+    method: string;
+    path: string;
+    safe: boolean;
+    scope: string;
+    expected_impact: string;
+  }>;
+  warnings: { must_not_assume: string[]; canonical_failure_sync: Record<string, unknown> };
+};
+
+/** POST …/transform/materialize-backlog-async */
+export type CortexCanonicalMaterializeBacklogAsyncResponse = {
+  enqueued: boolean;
+  celery_task_id: string;
+  tenant_id: string;
+  bundle_id_used: string;
+  scope_connector?: string | null;
+  scope_resource_type?: string | null;
+  batch_limit?: number | null;
+};
+
 export function titleConnector(connector: string): string {
   if (connector === "github") return "GitHub";
   if (connector === "calls") return "Calls";

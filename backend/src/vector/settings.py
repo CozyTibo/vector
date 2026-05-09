@@ -467,6 +467,13 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_LINEAR_INITIATIVES_MAX_PAGES_PER_SYNC",
         description="Max paginated `initiatives` pages per Linear sync.",
     )
+    cortex_linear_project_updates_max_pages_per_sync: int = Field(
+        default=3,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_LINEAR_PROJECT_UPDATES_MAX_PAGES_PER_SYNC",
+        description="Max paginated `projectUpdates` pages per Linear sync.",
+    )
     cortex_linear_time_budget_seconds: int = Field(
         default=25,
         ge=1,
@@ -649,6 +656,34 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_GITHUB_TAGS_MAX_PAGES_PER_REPO",
         description="Max pages for `/tags` per repo per sync.",
     )
+    cortex_github_commit_comments_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_COMMIT_COMMENTS_MAX_PAGES_PER_REPO",
+        description="Max pages for repo-wide `/comments` (commit comments) per repo per sync.",
+    )
+    cortex_github_releases_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_RELEASES_MAX_PAGES_PER_REPO",
+        description="Max pages for `/releases` per repo per sync.",
+    )
+    cortex_github_issues_max_pages_per_repo: int = Field(
+        default=2,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_ISSUES_MAX_PAGES_PER_REPO",
+        description="Max pages for `/issues` per repo per sync.",
+    )
+    cortex_github_timeline_max_pages_per_issue_or_pr: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GITHUB_TIMELINE_MAX_PAGES_PER_ISSUE_OR_PR",
+        description="Max pages for `/issues/{n}/timeline` per issue or pull request number per sync.",
+    )
     cortex_github_repo_time_budget_seconds: int = Field(
         default=25,
         ge=1,
@@ -747,7 +782,14 @@ class Settings(BaseSettings):
         return "https://api.notion.com/v1/oauth/token"
 
     def notion_api_base_url(self) -> str:
+        if self.vector_use_mock_connectors:
+            return f"{self.vector_mock_connector_base_url.rstrip('/')}/notion/v1"
         return "https://api.notion.com/v1"
+
+    def calls_google_calendar_events_base_url(self) -> str:
+        if self.vector_use_mock_connectors:
+            return f"{self.vector_mock_connector_base_url.rstrip('/')}/google-calendar/v3"
+        return "https://www.googleapis.com/calendar/v3"
 
     def cortex_migration_route_active(self, connector_id: str, tenant_id: uuid.UUID) -> bool:
         """True when migration flags route this connector×tenant onto the Cortex ingestion path."""

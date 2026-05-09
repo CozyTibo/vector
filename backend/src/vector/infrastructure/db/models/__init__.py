@@ -1,6 +1,34 @@
 """ORM models — import side effects register metadata."""
 
 from vector.infrastructure.db.models.calls_connection_detail import CallsConnectionDetail
+from vector.infrastructure.db.models.cortex_canonical_identity_anchor import CortexCanonicalIdentityAnchor
+from vector.infrastructure.db.models.cortex_canonical_provenance_record import CortexCanonicalProvenanceRecord
+from vector.infrastructure.db.models.cortex_canonical_temporal_supersession import CortexCanonicalTemporalSupersession
+from vector.infrastructure.db.models.cortex_canonical_certification_archive import (
+    CortexCanonicalCertificationArchive,
+)
+from vector.infrastructure.db.models.cortex_canonical_stabilization_proof_run import (
+    CortexCanonicalStabilizationProofRun,
+)
+from vector.infrastructure.db.models.cortex_canonical_verification_run import CortexCanonicalVerificationRun
+from vector.infrastructure.db.models.cortex_canonical_replay_job import CortexCanonicalReplayJob
+from vector.infrastructure.db.models.cortex_canonical_replay_job_receipt import CortexCanonicalReplayJobReceipt
+from vector.infrastructure.db.models.cortex_canonical_ambiguity_lifecycle_event import (
+    CortexCanonicalAmbiguityLifecycleEvent,
+)
+from vector.infrastructure.db.models.cortex_canonical_ambiguity_record import CortexCanonicalAmbiguityRecord
+from vector.infrastructure.db.models.cortex_canonical_failure_case import CortexCanonicalFailureCase
+from vector.infrastructure.db.models.cortex_canonical_field_lineage import CortexCanonicalFieldLineage
+from vector.infrastructure.db.models.cortex_canonical_remediation_validation import (
+    CortexCanonicalRemediationValidation,
+)
+from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
+    CortexCanonicalTransformMaterialization,
+)
+from vector.infrastructure.db.models.cortex_mapping_bundle import CortexMappingBundle
+from vector.infrastructure.db.models.cortex_mapping_bundle_changelog import CortexMappingBundleChangelogEntry
+from vector.infrastructure.db.models.cortex_mapping_bundle_compatibility import CortexMappingBundleCompatibilityEdge
+from vector.infrastructure.db.models.cortex_mapping_bundle_pin import CortexMappingBundlePin
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.github_connection_detail import GithubConnectionDetail
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
@@ -27,6 +55,24 @@ from vector.infrastructure.db.models.user import User
 
 __all__ = [
     "ConnectorSyncState",
+    "CortexCanonicalIdentityAnchor",
+    "CortexCanonicalProvenanceRecord",
+    "CortexCanonicalTemporalSupersession",
+    "CortexCanonicalCertificationArchive",
+    "CortexCanonicalStabilizationProofRun",
+    "CortexCanonicalVerificationRun",
+    "CortexCanonicalReplayJob",
+    "CortexCanonicalReplayJobReceipt",
+    "CortexCanonicalAmbiguityLifecycleEvent",
+    "CortexCanonicalAmbiguityRecord",
+    "CortexCanonicalFailureCase",
+    "CortexCanonicalFieldLineage",
+    "CortexCanonicalRemediationValidation",
+    "CortexCanonicalTransformMaterialization",
+    "CortexMappingBundle",
+    "CortexMappingBundleChangelogEntry",
+    "CortexMappingBundleCompatibilityEdge",
+    "CortexMappingBundlePin",
     "CallsConnectionDetail",
     "NotionConnectionDetail",
     "OnboardingMessage",

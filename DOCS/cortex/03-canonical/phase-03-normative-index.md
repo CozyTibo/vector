@@ -47,6 +47,7 @@
 | **Transform + field lineage + remap** | `phase-03-transform-lineage-doctrine.md` |
 | Granular implementation sequencing (Stages 1–18) | `implementation-plan.md` |
 | Readiness / operational risk assessment | `phase-03-implementation-readiness-audit.md` |
+| **Phase 3.5 — reference plane, continuity edges, execution primitives, bundle continuity** | `phase-35-organizational-continuity-foundation.md` (**XREF** → Phase 04+) |
 
 ## Upstream dependencies (must remain stable)
 

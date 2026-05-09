@@ -3,7 +3,7 @@ import { NavLink, Outlet, useParams } from "react-router-dom";
 const CORTEX_SECTIONS: Array<{ key: string; label: string; enabled: boolean }> = [
   { key: "overview", label: "Overview", enabled: true },
   { key: "ingestion", label: "Ingestion", enabled: true },
-  { key: "canonical", label: "Canonical", enabled: false },
+  { key: "canonical", label: "Canonical", enabled: true },
   { key: "entity-resolution", label: "Entity Resolution", enabled: false },
   { key: "graph", label: "Graph", enabled: false },
   { key: "memory", label: "Memory", enabled: true },
