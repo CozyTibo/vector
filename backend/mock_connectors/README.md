@@ -5,7 +5,8 @@ Mock HTTP server for **GitHub REST**, **Linear GraphQL**, **Notion REST subset**
 **Do not** enable this in production, CI, or AWS. Server-side rules: `VECTOR_USE_MOCK_CONNECTORS=true` is valid only when `ENV=development`.
 
 Strategy: [`DOCS/strategy/local-mock-connectors-and-fixtures.md`](../../DOCS/strategy/local-mock-connectors-and-fixtures.md).  
-Seed audit (contents, usage, gaps): [`DOCS/strategy/mock-data-seed-audit.md`](../../DOCS/strategy/mock-data-seed-audit.md).
+Seed audit (contents, usage, gaps): [`DOCS/strategy/mock-data-seed-audit.md`](../../DOCS/strategy/mock-data-seed-audit.md).  
+**Phase 04 (identity & continuity):** hostile deterministic mock scenarios, personas, and replay-drift taxonomy — [`DOCS/cortex/04-identity/phase-04-mock-data-strategy.md`](../../DOCS/cortex/04-identity/phase-04-mock-data-strategy.md).
 
 ## Prerequisites
 
