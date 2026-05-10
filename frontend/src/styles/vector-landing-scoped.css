@@ -2180,6 +2180,18 @@
 #vector-landing .slack-dots span:nth-child(3) {
   animation-delay: 0.3s;
 }
+#vector-landing #cta.section {
+  background: rgba(250, 250, 251, 0.72);
+  padding-top: clamp(1.6rem, 3vw, 2.6rem);
+  padding-bottom: clamp(1.6rem, 3vw, 2.6rem);
+}
+#vector-landing #cta .cta-card {
+  padding-top: clamp(0.5rem, 1.2vw, 1rem);
+  padding-bottom: clamp(0.5rem, 1.2vw, 1rem);
+}
+#vector-landing #cta .cta-actions {
+  margin-top: clamp(1.25rem, 2.4vw, 1.75rem);
+}
 #vector-landing .cta-card {
   border: none;
   border-radius: 0;
@@ -2274,6 +2286,142 @@
 }
 #vector-landing .btn-light:hover {
   border-color: #d4d4d8;
+}
+
+/* FAQ strip - shares vertical rhythm with timeline-contrast / impact-strip */
+#vector-landing .faq-strip {
+  width: 100%;
+  margin: 0;
+  padding: clamp(2.4rem, 4.6vw, 4.4rem) 1.25rem;
+  background: #fff;
+}
+@media (min-width: 640px) {
+  #vector-landing .faq-strip {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+#vector-landing .faq-strip__inner {
+  max-width: min(58rem, 100%);
+  margin: 0 auto;
+}
+#vector-landing .faq-strip__header {
+  text-align: center;
+  margin-bottom: clamp(1.6rem, 2.8vw, 2.4rem);
+}
+#vector-landing .faq-strip__header h2 {
+  margin: 0;
+  font-size: clamp(2rem, 2vw + 1.4rem, 3.35rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+#vector-landing .faq-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(15, 15, 18, 0.08);
+}
+#vector-landing .faq-list__item {
+  border-bottom: 1px solid rgba(15, 15, 18, 0.08);
+}
+#vector-landing .faq-item {
+  padding: 0;
+  background: transparent;
+}
+#vector-landing .faq-item > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: clamp(1.05rem, 1.6vw, 1.4rem) 0.25rem;
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: clamp(1rem, 0.4vw + 0.92rem, 1.18rem);
+  line-height: 1.35;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  outline: none;
+}
+#vector-landing .faq-item > summary::-webkit-details-marker {
+  display: none;
+}
+#vector-landing .faq-item > summary:hover .faq-item__q-text {
+  color: #1f1f24;
+}
+#vector-landing .faq-item > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+#vector-landing .faq-item__q-text {
+  flex: 1;
+  min-width: 0;
+  text-wrap: balance;
+}
+#vector-landing .faq-item__icon {
+  flex-shrink: 0;
+  position: relative;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+#vector-landing .faq-item__icon::before,
+#vector-landing .faq-item__icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(15, 15, 18, 0.55);
+  transition: transform 220ms ease, opacity 180ms ease;
+}
+#vector-landing .faq-item__icon::before {
+  width: 1.1rem;
+  height: 2px;
+  transform: translate(-50%, -50%);
+}
+#vector-landing .faq-item__icon::after {
+  width: 2px;
+  height: 1.1rem;
+  transform: translate(-50%, -50%);
+}
+#vector-landing .faq-item[open] > summary .faq-item__icon::after {
+  transform: translate(-50%, -50%) scaleY(0);
+  opacity: 0;
+}
+#vector-landing .faq-item[open] > summary .faq-item__icon::before {
+  background: var(--accent);
+}
+#vector-landing .faq-item__a {
+  padding: 0 0.25rem clamp(1.1rem, 1.6vw, 1.4rem);
+  font-family: var(--font);
+  font-size: clamp(0.95rem, 0.32vw + 0.86rem, 1.07rem);
+  line-height: 1.6;
+  color: rgba(15, 15, 18, 0.72);
+  max-width: 56rem;
+}
+#vector-landing .faq-item__a p {
+  margin: 0;
+}
+#vector-landing .faq-item__a p + p {
+  margin-top: 0.75em;
+}
+#vector-landing .faq-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(232, 120, 190, 0.35);
+}
+#vector-landing .faq-link:hover {
+  border-bottom-color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  #vector-landing .faq-item__icon::before,
+  #vector-landing .faq-item__icon::after {
+    transition: none;
+  }
 }
 
 #vector-landing footer {

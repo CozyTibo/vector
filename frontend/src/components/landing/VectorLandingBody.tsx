@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import vectorHeroAvatarUrl from "../../assets/logo.jpeg";
@@ -44,6 +44,100 @@ const ACTION_CAPABILITIES = [
     sub: "You step in for decisions. Vector handles the rest.",
   },
 ] as const;
+
+const FAQ_ITEMS: ReadonlyArray<{ q: string; a: ReactNode }> = [
+  {
+    q: "Who is Vector for?",
+    a: (
+      <p>
+        Engineering leaders and their managers, anyone responsible for delivery who ends up absorbing the
+        coordination tax instead of shipping. Vector removes that overhead. No more firefighting. No more
+        surprises. Lean delivery.
+      </p>
+    ),
+  },
+  {
+    q: "How does Vector show up for me?",
+    a: (
+      <>
+        <p>You don&apos;t go to Vector. Vector comes to you, entirely through Slack.</p>
+        <p>
+          A daily briefing every morning. A nudge in the right thread when something needs action. A sprint
+          recap when you ask for it.
+        </p>
+        <p>No new tool. No new workflow. Just the right context at the right moment.</p>
+      </>
+    ),
+  },
+  {
+    q: "How is Vector different from productivity tools?",
+    a: (
+      <>
+        <p>
+          Most tools make managers more informed. Vector makes managers less necessary for routine
+          coordination.
+        </p>
+        <p>
+          The difference is where the loop closes: with a dashboard, you still have to read it, interpret it,
+          act. With Vector, the loop closes automatically. You&apos;re only notified when something needs a
+          human decision, everything else is handled.
+        </p>
+      </>
+    ),
+  },
+  {
+    q: "How is Vector different from a Claude agent we could build ourselves?",
+    a: (
+      <p>
+        Building the agent is the easy part. The hard part is knowing which signals predict a miss, which
+        coordination patterns precede a slip, what healthy execution looks like, and encoding that into
+        something that works reliably across engineering orgs. That&apos;s Vector&apos;s core product.
+        You&apos;re not buying an LLM wrapper. You&apos;re buying a brain that understands how your team
+        works.
+      </p>
+    ),
+  },
+  {
+    q: "Does Vector read our Slack messages?",
+    a: (
+      <>
+        <p>
+          Yes, and this is deliberate. Most execution problems don&apos;t show up in Jira. They surface in a
+          message that didn&apos;t get a reply, or a thread where a decision quietly shifted.
+        </p>
+        <p>
+          Vector reads channel content to build a real picture of coordination. It&apos;s processed
+          in-context, but never stored. Private messages are out of scope and remain private.
+        </p>
+      </>
+    ),
+  },
+  {
+    q: "Does Vector track individual performance?",
+    a: (
+      <p>
+        No. Vector tracks coordination patterns: whether work is moving, where dependencies are forming, where
+        blockers are accumulating. It doesn&apos;t score individuals, rank engineers, or produce performance
+        ratings.
+      </p>
+    ),
+  },
+  {
+    q: "How do we know our data is safe?",
+    a: (
+      <p>
+        Our DPA explicitly prohibits Anthropic from using your data for AI training, limits data retention to
+        what&apos;s needed to process a request, and lists every subprocessor with access. Infrastructure
+        runs on AWS Ireland (SOC 2 Type II, ISO 27001, ISO 27701). If procurement needs to review it before
+        signing, reach out at{" "}
+        <a className="faq-link" href="mailto:victoire@angelcorp.ai">
+          victoire@angelcorp.ai
+        </a>
+        .
+      </p>
+    ),
+  },
+];
 
 const IMPACT_BLOCKS = [
   {
@@ -546,6 +640,29 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 </a>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="faq-strip" id="faq" aria-labelledby="faq-heading">
+          <div className="faq-strip__inner">
+            <header className="faq-strip__header">
+              <h2 id="faq-heading">
+                Frequently asked <span className="accent">questions</span>
+              </h2>
+            </header>
+            <ul className="faq-list" role="list">
+              {FAQ_ITEMS.map((item) => (
+                <li key={item.q} className="faq-list__item">
+                  <details className="faq-item">
+                    <summary className="faq-item__q">
+                      <span className="faq-item__q-text">{item.q}</span>
+                      <span className="faq-item__icon" aria-hidden="true" />
+                    </summary>
+                    <div className="faq-item__a">{item.a}</div>
+                  </details>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
       </main>
