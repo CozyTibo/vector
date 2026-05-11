@@ -1869,6 +1869,97 @@ def materialize_raw_record(
     return mat_fresh
 
 
+def repair_tenant_materialization_oracle_determinism_drift(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str | None = None,
+    scan_limit: int = 500,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Re-materialize sampled rows whose persisted hashes diverge from ``resolve_materialization_input`` (G-P03-01).
+
+    Backlog drains only create *missing* rows; this path repairs stale projections after mapping/oracle drift.
+    """
+    lim = max(1, min(int(scan_limit), 5000))
+    bid_filter = bundle_id.strip() if isinstance(bundle_id, str) and bundle_id.strip() else None
+    stmt = (
+        select(CortexCanonicalTransformMaterialization)
+        .where(CortexCanonicalTransformMaterialization.tenant_id == tenant_id)
+        .order_by(
+            nullslast(CortexCanonicalTransformMaterialization.canonical_processed_at.desc()),
+            CortexCanonicalTransformMaterialization.created_at.desc(),
+        )
+        .limit(lim)
+    )
+    if bid_filter is not None:
+        stmt = stmt.where(CortexCanonicalTransformMaterialization.bundle_id == bid_filter)
+    mats = list(db.scalars(stmt).all())
+
+    mismatch_sample: list[dict[str, Any]] = []
+    resolution_failed_sample: list[dict[str, Any]] = []
+    repaired_count = 0
+    mismatch_total = 0
+    resolution_failed_total = 0
+
+    for mat in mats:
+        try:
+            res = resolve_materialization_input(
+                db,
+                tenant_id=tenant_id,
+                bundle_id=mat.bundle_id,
+                raw_record_id=int(mat.raw_record_id),
+            )
+        except MaterializeError as exc:
+            resolution_failed_total += 1
+            if len(resolution_failed_sample) < 40:
+                resolution_failed_sample.append(
+                    {
+                        "materialization_id": str(mat.id),
+                        "bundle_id": mat.bundle_id,
+                        "raw_record_id": mat.raw_record_id,
+                        "error": str(exc),
+                    }
+                )
+            continue
+        if res.logical_key_hash == mat.logical_key_hash and res.emitted_snapshot_hash == mat.emitted_snapshot_hash:
+            continue
+        mismatch_total += 1
+        if len(mismatch_sample) < 40:
+            mismatch_sample.append(
+                {
+                    "materialization_id": str(mat.id),
+                    "bundle_id": mat.bundle_id,
+                    "raw_record_id": mat.raw_record_id,
+                    "stored_logical_key_hash": mat.logical_key_hash,
+                    "oracle_logical_key_hash": res.logical_key_hash,
+                    "stored_snapshot_hash": mat.emitted_snapshot_hash,
+                    "oracle_snapshot_hash": res.emitted_snapshot_hash,
+                }
+            )
+        if not dry_run:
+            materialize_raw_record(
+                db,
+                tenant_id=tenant_id,
+                bundle_id=mat.bundle_id,
+                raw_record_id=int(mat.raw_record_id),
+            )
+            repaired_count += 1
+
+    return {
+        "transform_runtime_schema_version": TRANSFORM_RUNTIME_SCHEMA_VERSION,
+        "tenant_id": str(tenant_id),
+        "bundle_id_filter": bid_filter,
+        "scanned_count": len(mats),
+        "mismatch_count": mismatch_total,
+        "resolution_failed_count": resolution_failed_total,
+        "repaired_count": repaired_count,
+        "dry_run": dry_run,
+        "mismatch_sample": mismatch_sample,
+        "resolution_failed_sample": resolution_failed_sample,
+    }
+
+
 def stub_routing_pairs(
     *,
     connector: str | None = None,

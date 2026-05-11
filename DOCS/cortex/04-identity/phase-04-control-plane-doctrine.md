@@ -454,6 +454,7 @@ When routes ship (**P04-18**), the generated or hand-authored **OpenAPI 3** desc
 
 - `phase-04-implementation-plan.md` — P04-17, P04-18, §12 gates, §13 admin minimums  
 - `phase-04-mock-data-strategy.md` — scenarios that **should** fill queues/cards in dev/CI  
+- `phase-04-topology-vs-meaning-doctrine.md` — admin must not conflate Phase 03 topology with org meaning (**G-P04-08**)  
 - `phase-04-normative-index.md`  
 - `phase-03-canonical-control-plane-doctrine.md` — precedent philosophy  
 - `10-admin/phase-visualization-model.md`, `dangerous-action-safety-model.md`, `admin-permissions-model.md` — safety/RBAC patterns  

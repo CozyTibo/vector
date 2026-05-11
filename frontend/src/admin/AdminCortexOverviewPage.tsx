@@ -160,7 +160,7 @@ export default function AdminCortexOverviewPage() {
   const flushRerunMut = useMutation({
     mutationFn: async (confirmation: string) => {
       const res = await adminFetch(
-        `/admin/tenants/${tenantId}/cortex/ingestion/actions/flush-rerun-to-canonical`,
+        `/admin/tenants/${tenantId}/cortex/ingestion/actions/flush-rerun-to-identity`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -330,7 +330,7 @@ export default function AdminCortexOverviewPage() {
               flushRerunMut.mutate(typed.trim());
             }}
           >
-            {flushRerunMut.isPending ? "Submitting…" : "Flush + rerun to canonical"}
+            {flushRerunMut.isPending ? "Submitting…" : "Flush + rerun to Identity"}
           </button>
           <button
             type="button"
@@ -393,7 +393,7 @@ export default function AdminCortexOverviewPage() {
         {lastFlushRerunSummary ? (
           <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone="warn">flush + rerun accepted</StatusBadge>
+              <StatusBadge tone="warn">flush + rerun to Identity accepted</StatusBadge>
               <span>deleted rows: {lastFlushRerunSummary.deleted_rows_total}</span>
             </div>
             <p className="mt-1">
@@ -403,7 +403,8 @@ export default function AdminCortexOverviewPage() {
                 : "none"}
             </p>
             <p className="mt-1">
-              canonical backlog task: {lastFlushRerunSummary.canonical_backlog_task_id ?? "not enqueued"}
+              pipeline task (ingest → canonical → Identity backfill):{" "}
+              {lastFlushRerunSummary.canonical_backlog_task_id ?? "not enqueued"}
             </p>
           </div>
         ) : null}

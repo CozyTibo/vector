@@ -128,7 +128,7 @@ function NextConnectStep(next: ConnectorQueueId): OnboardingStep {
   return "SCANNING";
 }
 
-/** Order matches backend `onboarding_flow._connect_queue_full_from_tools` (Slack → PM → GitHub). */
+/** Order matches backend `onboarding_flow._connect_queue_full_from_tools` (Slack → Linear/Notion → GitHub). */
 function connectQueueFromTools(answers: Record<string, unknown>): ConnectorQueueId[] {
   const t = answers.tools as Record<string, string[]> | undefined;
   if (!t) {
@@ -378,13 +378,7 @@ export default function OnboardingPage() {
     enabled: Boolean(
       tenantId &&
         ob.data?.current_step &&
-        [
-          "SLACK_STAKEHOLDERS",
-          "SLACK_COLLABORATORS",
-          "SLACK_COLLABORATORS_CONFIRM",
-          "SLACK_TEAM_MEMBERS",
-          "SLACK_TEAM_MEMBERS_CONFIRM",
-        ].includes(ob.data.current_step),
+        ["SLACK_STAKEHOLDERS"].includes(ob.data.current_step),
     ),
   });
 
@@ -823,24 +817,16 @@ export default function OnboardingPage() {
       setStakeholdersSubmitError(null);
       setStakeholdersBusy(true);
       try {
-        const uid = payload.slack_user_ids[0]!;
-        const username = payload.text.trim().replace(/^@/, "") || uid;
-        const labelRaw = payload.mention_labels[0];
-        const label =
-          typeof labelRaw === "string" && labelRaw.trim() ? labelRaw.trim() : username;
         await patchOnboarding(apiBase, {
-          current_step: "SLACK_COLLABORATORS",
           answers: {
             slack_stakeholders: {
               raw_text: payload.text,
               slack_user_ids: payload.slack_user_ids,
               mention_labels: payload.mention_labels,
             },
-            slack_collaborators: {
-              members: [{ slack_user_id: uid, username, label }],
-            },
           },
         });
+        await completeOnboarding(apiBase);
         if (tenantId) {
           await qc.invalidateQueries({ queryKey: onboardingQueryKey(apiBase, tenantId) });
           await qc.invalidateQueries({ queryKey: ["me", apiBase] });

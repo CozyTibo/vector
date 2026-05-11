@@ -4,7 +4,8 @@
 **Purpose:** define the **complete** Phase 04 execution program: stages, doctrines, persistence, replay, verification, admin minimums, closure, and boundaries—**without** implementing runtime in this document.
 
 **Normative architecture shell:** `phase-04-architecture-identity-linking-doctrine.md`  
-**Normative index / doctrine registry:** `phase-04-normative-index.md`  
+**Normative index / doctrine registry:** `phase-04-normative-index.md` (**P04-01 frozen** — §Program freeze)  
+**Anti-goals:** `phase-04-anti-goals-doctrine.md`  
 **Hostile continuity mock data (dev/CI):** `phase-04-mock-data-strategy.md`  
 **Upstream substrate:** Phases 01–03 + Phase 3.5 (`vector.domains.cortex.continuity`).
 
@@ -16,7 +17,7 @@
 
 **GO** to execute Phase 04 as the **organizational continuity layer**—**after** doctrine freeze (§5) and schema sketches for §7 are accepted.  
 
-**NO-GO** to runtime coding if: merge/hint/candidate/authoritative classes are not frozen; if topology-vs-meaning boundary is not a **verification-enforced** invariant; if cross-bundle equivalence is unspecified.
+**NO-GO** to **full** Phase 04 linkage runtime (ledger, merges, replay jobs, DB) if: merge/hint/candidate/authoritative classes are not frozen; if cross-bundle equivalence is unspecified. **Topology vs meaning:** **G-P04-08** is **verification-enforced** for org-meaning **payload** validation (P04-02); DB-level org link table enforcement follows P04-04+.
 
 Phase 04 **must not** subsume Phase 05 (graph storage/traversal), Phase 06 (causal semantics), Phase 07 (retrieval ranking), or Phase 08 (synthesis).
 
@@ -97,13 +98,13 @@ Each row: **Stage | Objective | Why | Deliverables | Doctrine | Runtime module |
 | ----- | ------- |
 | **Objective** | Freeze Phase 04 normative index; anti-goals; vocabulary. |
 | **Why** | Prevents split-brain semantics across modules. |
-| **Deliverables** | `phase-04-normative-index.md`; glossary § |
-| **Doctrine** | New index file |
-| **Runtime** | — |
+| **Deliverables** | `phase-04-normative-index.md` (§Program freeze + expanded glossary); `phase-04-anti-goals-doctrine.md`; `vector.domains.cortex.identity.normative.PHASE04_PROGRAM_FREEZE_VERSION` |
+| **Doctrine** | Index + anti-goals (**Shipped**) |
+| **Runtime** | `vector.domains.cortex.identity` — **metadata only** (`normative.py`) |
 | **DB** | — |
 | **Replay** | N/A |
-| **Verification** | Doc lint / peer review gate |
-| **Tests** | — |
+| **Verification** | Automated doc contract: `test_phase04_step01_normative_freeze.py` |
+| **Tests** | `backend/tests/vector/domains/cortex/identity/test_phase04_step01_normative_freeze.py` |
 | **Admin** | — |
 | **Downstream** | Unlocks all stages |
 
@@ -111,16 +112,16 @@ Each row: **Stage | Objective | Why | Deliverables | Doctrine | Runtime module |
 
 | Field | Content |
 | ----- | ------- |
-| **Objective** | Make “materialization DAG edge” vs “org meaning link” disjoint types at **type system + verification** level. |
+| **Objective** | Make “materialization DAG edge” vs “org meaning link” disjoint at **validator + verification** level. |
 | **Why** | Prevents graph/causal poisoning. |
-| **Deliverables** | `phase-04-topology-vs-meaning-doctrine.md`; invariant IDs `INV-P04-TOPO-01..` |
-| **Doctrine** | New |
-| **Runtime** | `identity.boundary_checks` (pure validators) |
+| **Deliverables** | **`phase-04-topology-vs-meaning-doctrine.md`** (**INV-P04-TOPO-01**–**05**, **G-P04-08**); **`vector.domains.cortex.identity.boundary_checks`**; **G-P04-08** in **`run_canonical_verification`**; ontology bump **21** (gate list + anchor). |
+| **Doctrine** | **Shipped** |
+| **Runtime** | **`identity.boundary_checks`** (**Shipped**) |
 | **DB** | — |
 | **Replay** | N/A |
-| **Verification** | **G-P04-TOPO-01** forbidden cross-import in link payloads |
-| **Tests** | Negative: topology edge shape rejected by org link validator |
-| **Admin** | Doc link in operator handbook |
+| **Verification** | **G-P04-08** / **G-P04-TOPO-01** static harness in canonical verification |
+| **Tests** | `test_phase04_step02_boundary_checks.py` + ontology/verification gate list updates |
+| **Admin** | Ontology lists **G-P04-08**; operator handbook → topology doctrine |
 | **Downstream** | P05, P06 safe |
 
 ### Stage P04-03 — Org handle + org entity doctrine
@@ -417,14 +418,14 @@ Each row: **Stage | Objective | Why | Deliverables | Doctrine | Runtime module |
 | ----- | ------- |
 | **Objective** | Load tests on regen; storage estimates; explosion thresholds. |
 | **Why** | Prevent Phase 04 from becoming cost sink. |
-| **Deliverables** | readiness audit update |
-| **Doctrine** | `phase-04-readiness-audit.md` |
-| **Runtime** | probes |
-| **DB** | indexes |
+| **Deliverables** | readiness audit update (**Shipped**) |
+| **Doctrine** | `phase-04-readiness-audit.md` (**Shipped**) |
+| **Runtime** | probes (**Shipped:** `vector.domains.cortex.identity.readiness_economics`) |
+| **DB** | indexes (**Shipped:** Alembic `20260511_0067`) |
 | **Replay** | budget |
-| **Verification** | perf gates optional |
-| **Tests** | perf smoke; regen/replay cost on **`nexora_p04_hostile_baseline`** (mock strategy §17) |
-| **Admin** | warnings |
+| **Verification** | **`G-P04-ECO-01`** (**Shipped**, `warn_only`) |
+| **Tests** | **`test_phase04_step21_readiness_economics.py`**; optional hostile-baseline soak per mock strategy §17 |
+| **Admin** | warnings (**Shipped:** `GET .../readiness-economics` + Identity overview panel) |
 | **Downstream** | cost |
 
 ### Stage P04-22 — Closure + certification pack (Phase 04)
@@ -433,14 +434,14 @@ Each row: **Stage | Objective | Why | Deliverables | Doctrine | Runtime module |
 | ----- | ------- |
 | **Objective** | Archive certification artifacts; **G-P04-01–G-P04-26** all pass; sign-off. |
 | **Why** | Same institutional pattern as Phase 03 Step 18. |
-| **Deliverables** | `phase-04-closure-gates-doctrine.md`; pack builder |
-| **Doctrine** | New |
-| **Runtime** | `identity.certification_pack` |
-| **DB** | `cortex_org_certification_archive` |
-| **Replay** | pack includes regen hashes |
-| **Verification** | **G-P04-CLOSE-01** |
-| **Tests** | pack contract tests |
-| **Admin** | download pack |
+| **Deliverables** | `phase-04-closure-gates-doctrine.md` (**Shipped**); org pack builder (**Shipped**) |
+| **Doctrine** | `phase-04-closure-gates-doctrine.md` (**Shipped**) |
+| **Runtime** | **`vector.domains.cortex.identity.org_identity_certification_pack`** (**Shipped**) |
+| **DB** | **`cortex_org_certification_archives`** / Alembic **`20260511_0068`** (**Shipped**) |
+| **Replay** | pack excerpts include canonical verification snapshot (bounded) |
+| **Verification** | **`G-P04-CLOSE-01`** (**Shipped**, `hard_fail`) |
+| **Tests** | **`test_phase04_step22_org_certification_pack.py`** (**Shipped**) |
+| **Admin** | **`GET/POST .../cortex/identity/certification-pack`** + archives (**Shipped**) |
 | **Downstream** | Phase 05 kickoff |
 
 ---
@@ -450,7 +451,7 @@ Each row: **Stage | Objective | Why | Deliverables | Doctrine | Runtime module |
 **Must exist before runtime (minimum):**
 
 1. `phase-04-normative-index.md`
-2. `phase-04-topology-vs-meaning-doctrine.md`
+2. `phase-04-topology-vs-meaning-doctrine.md` (**Shipped** — P04-02; `boundary_checks`, **G-P04-08**)
 3. `phase-04-org-entity-and-handle-doctrine.md`
 4. `phase-04-link-ledger-doctrine.md`
 5. `phase-04-merge-governance-doctrine.md`
@@ -468,8 +469,8 @@ Each row: **Stage | Objective | Why | Deliverables | Doctrine | Runtime module |
 17. `phase-04-control-plane-doctrine.md` (**Shipped** — Execution Continuity Operator Console: §§3–18, route inventory §15, **G-P04-21–G-P04-26**)
 18. `phase-04-backfill-doctrine.md`
 19. `phase-04-readiness-audit.md`
-20. `phase-04-closure-gates-doctrine.md`
-21. `phase-04-anti-goals-doctrine.md` (may merge into index)
+20. `phase-04-closure-gates-doctrine.md` (**Shipped** — P04-22; **G-P04-CLOSE-01** + org certification pack)
+21. `phase-04-anti-goals-doctrine.md` (**Shipped** — P04-01; may still cross-link from index only)
 22. `phase-04-graph-boundary-doctrine.md` (explicit “no traversal engine in P04”)
 23. `phase-04-mock-data-strategy.md` (**Shipped** — hostile deterministic mock/fixture program for identity stress; **not** a runtime doctrine file but **normative** for `backend/mock_connectors/` Phase 04 work)
 
@@ -735,6 +736,8 @@ Indexes: tenant_id + temporal queries; handle id; link type + validity; evidence
 ## References
 
 - `phase-04-architecture-identity-linking-doctrine.md`
+- `phase-04-anti-goals-doctrine.md`
+- `phase-04-topology-vs-meaning-doctrine.md` (P04-02; **G-P04-08**)
 - `phase-04-control-plane-doctrine.md` (operator console, routes §15, gates **G-P04-21–G-P04-26**)
 - `phase-04-mock-data-strategy.md` (hostile continuity mock/fixtures)
 - `phase-04-normative-index.md`

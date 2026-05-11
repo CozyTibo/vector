@@ -16,6 +16,7 @@ export default function AdminCortexCanonicalVerificationTabPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [verifPersist, setVerifPersist] = useState(true);
   const [verifSampleLimit, setVerifSampleLimit] = useState("50");
+  const [repairScanLimit, setRepairScanLimit] = useState("500");
 
   const qRuns = useQuery({
     queryKey: ["admin-cortex-canonical-verification-runs", tenantId],
@@ -37,6 +38,27 @@ export default function AdminCortexCanonicalVerificationTabPage() {
           body: JSON.stringify({
             persist: verifPersist,
             materialization_sample_limit: Number.isFinite(lim) ? lim : 50,
+          }),
+        },
+      );
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-verification-runs", tenantId] });
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-control-plane", tenantId] });
+    },
+  });
+
+  const determinismRepairMut = useMutation({
+    mutationFn: async () => {
+      const lim = Number.parseInt(repairScanLimit, 10);
+      return adminJson<Record<string, unknown>>(
+        `/admin/tenants/${tenantId}/cortex/canonical/verification/repair-determinism-drift`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            dry_run: false,
+            scan_limit: Number.isFinite(lim) ? lim : 500,
           }),
         },
       );
@@ -72,6 +94,41 @@ export default function AdminCortexCanonicalVerificationTabPage() {
             Run verification…
           </button>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-stone-900">Repair oracle determinism drift (G-P03-01)</h3>
+        <p className="mt-1 text-sm text-stone-600">
+          Re-materializes sampled rows whose stored logical key / snapshot hashes differ from the current oracle. Use
+          after mapping or transform routing changes when verification shows <span className="font-mono">G-P03-01</span>{" "}
+          failing, then run verification again.
+        </p>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <label className="block text-xs text-stone-600">
+            scan_limit (1–5000)
+            <input
+              className="mt-1 w-40 rounded border border-stone-200 px-2 py-1 font-mono text-xs"
+              value={repairScanLimit}
+              onChange={(e) => setRepairScanLimit(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-50 disabled:opacity-50"
+            disabled={determinismRepairMut.isPending}
+            onClick={() => determinismRepairMut.mutate()}
+          >
+            {determinismRepairMut.isPending ? "Repairing…" : "POST repair-determinism-drift"}
+          </button>
+        </div>
+        {determinismRepairMut.isError ? (
+          <p className="mt-2 text-sm text-red-700">{(determinismRepairMut.error as Error).message}</p>
+        ) : null}
+        {determinismRepairMut.isSuccess ? (
+          <pre className="mt-3 max-h-48 overflow-auto rounded border bg-stone-50 p-2 font-mono text-[11px]">
+            {JSON.stringify(determinismRepairMut.data, null, 2)}
+          </pre>
+        ) : null}
       </section>
 
       <CanonicalFilterToolbar filters={filters} onChange={setFilters} />

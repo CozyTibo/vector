@@ -2,6 +2,28 @@
 
 from vector.infrastructure.db.models.calls_connection_detail import CallsConnectionDetail
 from vector.infrastructure.db.models.cortex_canonical_identity_anchor import CortexCanonicalIdentityAnchor
+from vector.infrastructure.db.models.cortex_bundle_equivalence_declaration import (
+    CortexBundleEquivalenceDeclaration,
+)
+from vector.infrastructure.db.models.cortex_org_ambiguity_record import CortexOrgAmbiguityRecord
+from vector.infrastructure.db.models.cortex_org_failure_case import CortexOrgFailureCase
+from vector.infrastructure.db.models.cortex_org_remediation_validation import CortexOrgRemediationValidation
+from vector.infrastructure.db.models.cortex_org_verification_run import CortexOrgVerificationRun
+from vector.infrastructure.db.models.cortex_identity_celery_dispatch import CortexIdentityCeleryDispatch
+from vector.infrastructure.db.models.cortex_org_entity import CortexOrgEntity
+from vector.infrastructure.db.models.cortex_org_certification_archive import CortexOrgCertificationArchive
+from vector.infrastructure.db.models.cortex_org_identity_backfill_run import CortexOrgIdentityBackfillRun
+from vector.infrastructure.db.models.cortex_org_identity_console_audit import CortexOrgIdentityConsoleAudit
+from vector.infrastructure.db.models.cortex_org_primitive_instance import CortexOrgPrimitiveInstance
+from vector.infrastructure.db.models.cortex_link_rule_version import CortexLinkRuleVersion
+from vector.infrastructure.db.models.cortex_org_link import CortexOrgLink
+from vector.infrastructure.db.models.cortex_org_link_replay_job import CortexOrgLinkReplayJob
+from vector.infrastructure.db.models.cortex_org_link_replay_job_receipt import CortexOrgLinkReplayJobReceipt
+from vector.infrastructure.db.models.cortex_org_link_candidate import CortexOrgLinkCandidate
+from vector.infrastructure.db.models.cortex_org_link_candidate_batch import CortexOrgLinkCandidateBatch
+from vector.infrastructure.db.models.cortex_org_link_promotion_policy import CortexOrgLinkPromotionPolicy
+from vector.infrastructure.db.models.cortex_org_merge import CortexOrgMerge
+from vector.infrastructure.db.models.cortex_org_merge_policy import CortexOrgMergePolicy
 from vector.infrastructure.db.models.cortex_canonical_provenance_record import CortexCanonicalProvenanceRecord
 from vector.infrastructure.db.models.cortex_canonical_temporal_supersession import CortexCanonicalTemporalSupersession
 from vector.infrastructure.db.models.cortex_canonical_certification_archive import (
@@ -55,7 +77,27 @@ from vector.infrastructure.db.models.user import User
 
 __all__ = [
     "ConnectorSyncState",
+    "CortexBundleEquivalenceDeclaration",
     "CortexCanonicalIdentityAnchor",
+    "CortexOrgAmbiguityRecord",
+    "CortexOrgFailureCase",
+    "CortexOrgRemediationValidation",
+    "CortexOrgVerificationRun",
+    "CortexIdentityCeleryDispatch",
+    "CortexOrgCertificationArchive",
+    "CortexOrgEntity",
+    "CortexOrgIdentityBackfillRun",
+    "CortexOrgIdentityConsoleAudit",
+    "CortexOrgPrimitiveInstance",
+    "CortexLinkRuleVersion",
+    "CortexOrgLink",
+    "CortexOrgLinkReplayJob",
+    "CortexOrgLinkReplayJobReceipt",
+    "CortexOrgLinkCandidate",
+    "CortexOrgLinkCandidateBatch",
+    "CortexOrgLinkPromotionPolicy",
+    "CortexOrgMerge",
+    "CortexOrgMergePolicy",
     "CortexCanonicalProvenanceRecord",
     "CortexCanonicalTemporalSupersession",
     "CortexCanonicalCertificationArchive",

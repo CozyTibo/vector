@@ -12,8 +12,8 @@ import uuid
 from enum import StrEnum
 from typing import Any, Final
 
-# Bump when ontology graph, taxonomy, logical keys, mapping-contract, registry, transform, ambiguity, confidence, identity, replay, provenance, temporal ordering, canonical query, failure/remediation, verification engine, control-plane, stabilization-proof, or certification-pack metadata shape changes.
-ONTOLOGY_SCHEMA_VERSION: Final[int] = 20
+# Bump when ontology graph, taxonomy, logical keys, mapping-contract, registry, transform, ambiguity, confidence, identity, replay, provenance, temporal ordering, canonical query, failure/remediation, verification engine, control-plane, stabilization-proof, certification-pack, or Phase 04 org-entity / link-ledger / merge-governance / link-temporal / bundle-equivalence / graph-projection / org-ambiguity / org-identity-verification / org-failure-remediation admin metadata shape changes.
+ONTOLOGY_SCHEMA_VERSION: Final[int] = 41
 
 
 class CanonicalLayerKind(StrEnum):
@@ -226,6 +226,33 @@ def build_phase03_step01_ontology_public_document(*, tenant_id: uuid.UUID | None
     )
     from vector.domains.cortex.canonical.verification_engine_metadata import build_verification_engine_pointer_section
     from vector.domains.cortex.canonical.identity_metadata import build_identity_runtime_pointer_section
+    from vector.domains.cortex.identity.bundle_equivalence_metadata import build_bundle_equivalence_pointer_section
+    from vector.domains.cortex.identity.org_link_replay_metadata import build_org_link_replay_pointer_section
+    from vector.domains.cortex.identity.link_rule_version_metadata import build_link_rule_version_pointer_section
+    from vector.domains.cortex.identity.execution_primitive_persistence_metadata import (
+        build_execution_primitive_persistence_pointer_section,
+    )
+    from vector.domains.cortex.identity.graph_projection_export_metadata import (
+        build_org_graph_projection_export_pointer_section,
+    )
+    from vector.domains.cortex.identity.org_ambiguity_metadata import build_org_ambiguity_runtime_pointer_section
+    from vector.domains.cortex.identity.org_failure_remediation_metadata import (
+        build_org_failure_remediation_pointer_section,
+    )
+    from vector.domains.cortex.identity.identity_control_plane_metadata import (
+        build_identity_control_plane_pointer_section,
+    )
+    from vector.domains.cortex.identity.readiness_economics_metadata import (
+        build_identity_readiness_economics_pointer_section,
+    )
+    from vector.domains.cortex.identity.org_identity_certification_pack_metadata import (
+        build_org_identity_certification_pack_pointer_section,
+    )
+    from vector.domains.cortex.identity.backfill_metadata import build_org_identity_backfill_pointer_section
+    from vector.domains.cortex.identity.org_verification_metadata import build_org_identity_verification_pointer_section
+    from vector.domains.cortex.identity.link_ledger_metadata import build_link_ledger_pointer_section
+    from vector.domains.cortex.identity.merge_governance_metadata import build_merge_governance_pointer_section
+    from vector.domains.cortex.identity.org_entity_metadata import build_org_entity_pointer_section
     from vector.domains.cortex.canonical.provenance_metadata import build_provenance_runtime_pointer_section
     from vector.domains.cortex.canonical.query_metadata import build_canonical_query_pointer_section
     from vector.domains.cortex.canonical.replay_metadata import build_replay_runtime_pointer_section
@@ -240,6 +267,21 @@ def build_phase03_step01_ontology_public_document(*, tenant_id: uuid.UUID | None
     ambiguity_pointer_section = build_ambiguity_runtime_pointer_section()
     confidence_section = build_confidence_taxonomy_public_section()
     identity_pointer_section = build_identity_runtime_pointer_section()
+    org_entity_pointer_section = build_org_entity_pointer_section()
+    link_ledger_pointer_section = build_link_ledger_pointer_section()
+    bundle_equivalence_pointer_section = build_bundle_equivalence_pointer_section()
+    org_link_replay_pointer_section = build_org_link_replay_pointer_section()
+    link_rule_version_pointer_section = build_link_rule_version_pointer_section()
+    execution_primitive_persistence_pointer_section = build_execution_primitive_persistence_pointer_section()
+    org_graph_projection_export_pointer_section = build_org_graph_projection_export_pointer_section()
+    org_ambiguity_runtime_pointer_section = build_org_ambiguity_runtime_pointer_section()
+    org_identity_verification_pointer_section = build_org_identity_verification_pointer_section()
+    org_identity_backfill_pointer_section = build_org_identity_backfill_pointer_section()
+    org_failure_remediation_pointer_section = build_org_failure_remediation_pointer_section()
+    identity_control_plane_pointer_section = build_identity_control_plane_pointer_section()
+    identity_readiness_economics_pointer_section = build_identity_readiness_economics_pointer_section()
+    org_identity_certification_pack_pointer_section = build_org_identity_certification_pack_pointer_section()
+    merge_governance_pointer_section = build_merge_governance_pointer_section()
     replay_pointer_section = build_replay_runtime_pointer_section()
     provenance_pointer_section = build_provenance_runtime_pointer_section()
     temporal_pointer_section = build_temporal_runtime_pointer_section()
@@ -275,8 +317,8 @@ def build_phase03_step01_ontology_public_document(*, tenant_id: uuid.UUID | None
     out: dict[str, Any] = {
         "ontology_schema_version": ONTOLOGY_SCHEMA_VERSION,
         "phase": "03",
-        "implementation_step": 18,
-        "completed_implementation_steps": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        "implementation_step": 22,
+        "completed_implementation_steps": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
         "name": "phase03_step18_certification_pack",
         "layers": [x.value for x in sorted(CanonicalLayerKind, key=lambda z: z.value)],
         "object_kinds": kinds_out,
@@ -289,6 +331,21 @@ def build_phase03_step01_ontology_public_document(*, tenant_id: uuid.UUID | None
         **ambiguity_pointer_section,
         **confidence_section,
         **identity_pointer_section,
+        **org_entity_pointer_section,
+        **link_ledger_pointer_section,
+        **bundle_equivalence_pointer_section,
+        **org_link_replay_pointer_section,
+        **link_rule_version_pointer_section,
+        **execution_primitive_persistence_pointer_section,
+        **org_graph_projection_export_pointer_section,
+        **org_ambiguity_runtime_pointer_section,
+        **org_identity_verification_pointer_section,
+        **org_identity_backfill_pointer_section,
+        **org_failure_remediation_pointer_section,
+        **identity_control_plane_pointer_section,
+        **identity_readiness_economics_pointer_section,
+        **org_identity_certification_pack_pointer_section,
+        **merge_governance_pointer_section,
         **replay_pointer_section,
         **provenance_pointer_section,
         **temporal_pointer_section,
@@ -320,6 +377,15 @@ def build_phase03_step01_ontology_public_document(*, tenant_id: uuid.UUID | None
             "DOCS/cortex/03-canonical/phase-03-closure-gates-doctrine.md",
             "DOCS/cortex/03-canonical/phase-03-canonical-control-plane-doctrine.md",
             "DOCS/cortex/03-canonical/phase-03-implementation-readiness-audit.md",
+            "DOCS/cortex/04-identity/phase-04-link-ledger-doctrine.md",
+            "DOCS/cortex/04-identity/phase-04-candidate-vs-authoritative-linkage-doctrine.md",
+            "DOCS/cortex/04-identity/phase-04-merge-governance-doctrine.md",
+            "DOCS/cortex/04-identity/phase-04-hint-and-prohibited-link-doctrine.md",
+            "DOCS/cortex/04-identity/phase-04-verification-gates-doctrine.md",
+            "DOCS/cortex/04-identity/phase-04-failure-remediation-doctrine.md",
+            "DOCS/cortex/04-identity/phase-04-control-plane-doctrine.md",
+            "DOCS/cortex/04-identity/phase-04-readiness-audit.md",
+            "DOCS/cortex/04-identity/phase-04-closure-gates-doctrine.md",
         ],
     }
     if tenant_id is not None:

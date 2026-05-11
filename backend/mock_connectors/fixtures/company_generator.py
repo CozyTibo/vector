@@ -9,6 +9,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from mock_connectors.fixtures import cortex_capability_scenarios as ccs
+from mock_connectors.fixtures import phase04_continuity_fixtures as p4c
+from mock_connectors.fixtures import phase04_org_recurrence_topology as p4ort
 from mock_connectors.fixtures import execution_chaos as ex_chaos
 from mock_connectors.fixtures import execution_stories as ex
 from mock_connectors.fixtures import nexora_content as nx
@@ -210,6 +212,7 @@ def generate_dataset(seed: int) -> MockDataset:
     repos = _build_repos(seed, users)
     linear_pkg = _build_linear(seed, rng, users, repos, t0, end)
     gh_pkg = _build_github(seed, rng, users, repos, linear_pkg, t0, end)
+    _inject_phase04_github_pull_request_continuity(gh_pkg, seed=seed)
     _assert_no_github_activity_for_linear_only_users(users, gh_pkg)
     slack_events = _build_slack(seed, users, linear_pkg, t0, end)
     notion_pkg = _build_notion(seed, users, linear_pkg, slack_events, t0, end)
@@ -235,6 +238,14 @@ def generate_dataset(seed: int) -> MockDataset:
         slack_events,
         notion_pkg,
         calls_pkg,
+    )
+    p04_recurrence = p4ort.apply_org_recurrence_cross_tool_surface(
+        seed=seed,
+        users=users,
+        github=gh_pkg,
+        linear=linear_pkg,
+        slack_events=slack_events,
+        t0=t0,
     )
     cc_errs = ccs.validate_cortex_capability_dataset_strength(
         linear_pkg, gh_pkg, slack_events, calls_pkg, notion_pkg
@@ -266,6 +277,7 @@ def generate_dataset(seed: int) -> MockDataset:
             "cortex_capability_scenarios": ccs.cortex_capability_scenario_tags(),
             "cortex_capability_evidence": cc_evidence,
             "execution_chaos_tags": chaos_tags,
+            "p04_org_recurrence_topology": p04_recurrence,
         },
     )
 
@@ -284,6 +296,7 @@ def dataset_to_json_dict(ds: MockDataset) -> dict[str, Any]:
         "edges": ds.edges,
         "pattern_coverage": ds.pattern_coverage,
         "meta": ds.meta,
+        "continuity_fixture": p4c.build_continuity_fixture_sidecar(seed=ds.seed),
     }
 
 
@@ -1637,7 +1650,11 @@ def _build_slack(
             "linear_issue_id": None,
             "pattern": "discussion_drift",
             "reactions": [{"name": "eyes", "count": 2}, {"name": "white_check_mark", "count": 1}],
-            "metadata": {"scenario": "discussion_drift", "source": "channel_message"},
+            "metadata": {
+                "scenario": "discussion_drift",
+                "source": "channel_message",
+                "continuity_fixture": {"cluster_key": "p04md_hostile_cluster_alpha", "family": "P04MD-A03"},
+            },
         },
         {
             "id": _u(seed, "slack", "2"),
@@ -1660,7 +1677,11 @@ def _build_slack(
             "linear_issue_id": None,
             "pattern": "cross_tool_ping",
             "reactions": [{"name": "thread", "count": 1}],
-            "metadata": {"scenario": "cross_tool_ping", "source": "channel_message"},
+            "metadata": {
+                "scenario": "cross_tool_ping",
+                "source": "channel_message",
+                "continuity_fixture": {"cluster_key": "p04md_hostile_cluster_alpha", "family": "P04MD-A03"},
+            },
         },
     ]
     if bundle:
@@ -1774,7 +1795,38 @@ def _build_slack(
                     "metadata": {"scenario": ev.get("metadata", {}).get("scenario"), "source": "message_deleted"},
                 }
             )
+    p4c.extend_slack_events_for_hostile_identity_continuity(enriched, seed=seed, users=users, t0=t0)
     return sorted(enriched, key=lambda e: str(e.get("updated_at") or e.get("ts")))
+
+
+def _inject_phase04_github_pull_request_continuity(gh_pkg: dict[str, Any], *, seed: int) -> None:
+    """Tag a small slice of PR payloads so anchor continuity can cross-link with Slack hostile fixtures."""
+    prs = gh_pkg.get("pull_requests")
+    if not isinstance(prs, list) or not prs:
+        return
+    shared_subject = "p04:cross_tool_morgan_split_identity_bundle"
+    stable_acc = f"p04_hostile_stable_account_{seed % 10009:05d}"
+    n = 0
+    for pr in prs:
+        if not isinstance(pr, dict):
+            continue
+        user = pr.get("user")
+        login = str(user.get("login") or "") if isinstance(user, dict) else ""
+        if login != "thagler":
+            continue
+        md = dict(pr.get("metadata") or {})
+        md["continuity_fixture"] = {
+            "cluster_key": "p04md_hostile_cluster_alpha",
+            "link_subject": shared_subject,
+            "stable_account_key": stable_acc,
+            "ambiguity_cohort_key": "p04_hostile_cross_bundle_handles",
+            "org_ambiguity_class": "handle_collision_unresolved",
+            "family": "P04MD-H01",
+        }
+        pr["metadata"] = md
+        n += 1
+        if n >= 5:
+            break
 
 
 def _build_edges(

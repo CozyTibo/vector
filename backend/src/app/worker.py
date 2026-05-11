@@ -17,6 +17,7 @@ importlib.import_module("app.tasks.cortex_ingestion_scheduler")
 importlib.import_module("app.tasks.cortex_ingestion_verify")
 importlib.import_module("app.tasks.cortex_canonical_materialize_backlog")
 importlib.import_module("app.tasks.cortex_full_pipeline_rerun")
+importlib.import_module("app.tasks.cortex_org_link_jobs")
 
 _REQUIRED_EMAIL_TASKS = (
     "vector.email.send",

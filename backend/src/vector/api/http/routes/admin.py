@@ -24,7 +24,11 @@ from vector.contracts.admin import (
     AdminCortexAmbiguityLifecycleRequest,
     AdminCortexAmbiguityLifecycleResponse,
     AdminCortexAmbiguityListResponse,
+    AdminCortexAmbiguityQueueListResponse,
     AdminCortexAmbiguityRecordItem,
+    AdminCortexBundleEquivalenceDeclarationCreateRequest,
+    AdminCortexBundleEquivalenceDeclarationItem,
+    AdminCortexBundleEquivalenceDeclarationListResponse,
     AdminCortexCanonicalCertificationArchiveDetailResponse,
     AdminCortexCanonicalCertificationArchiveItem,
     AdminCortexCanonicalCertificationArchiveRequest,
@@ -33,8 +37,10 @@ from vector.contracts.admin import (
     AdminCortexCanonicalCertificationPackResponse,
     AdminCortexCanonicalControlPlaneResponse,
     AdminCortexCanonicalCoverageMatrixResponse,
-    AdminCortexCanonicalKindInvariantsResponse,
+    AdminCortexCanonicalDeterminismRepairRequest,
+    AdminCortexCanonicalDeterminismRepairResponse,
     AdminCortexCanonicalFailuresResponse,
+    AdminCortexCanonicalKindInvariantsResponse,
     AdminCortexCanonicalOntologyResponse,
     AdminCortexCanonicalQueryRequest,
     AdminCortexCanonicalQueryResponse,
@@ -48,19 +54,38 @@ from vector.contracts.admin import (
     AdminCortexConfidenceSummaryResponse,
     AdminCortexConnectorRawRecordItem,
     AdminCortexConnectorRawRecordsResponse,
+    AdminCortexFlushAndRerunRequest,
+    AdminCortexFlushAndRerunResponse,
     AdminCortexIdentityAnchorItem,
     AdminCortexIdentityAnchorListResponse,
+    AdminCortexIdentityBackfillFromAnchorsRequest,
+    AdminCortexIdentityBackfillFromAnchorsResponse,
+    AdminCortexIdentityBackfillRunItem,
+    AdminCortexIdentityBackfillRunsListResponse,
+    AdminCortexIdentityControlPlaneResponse,
+    AdminCortexIdentityContinuityRebuildRequest,
+    AdminCortexIdentityContinuityRebuildResponse,
+    AdminCortexIdentityContinuityVerifyResponse,
+    AdminCortexIdentityContinuityEvidenceInspectResponse,
+    AdminCortexIdentityHandlesExplorerResponse,
+    AdminCortexIdentityLegacyCeleryAsyncDispatchResponse,
+    AdminCortexIdentityLinkCandidatesRegenerateAsyncRequest,
+    AdminCortexIdentityOperatorActionRequest,
+    AdminCortexIdentityReadinessEconomicsResponse,
+    AdminCortexIdentityWorkerTaskStatusResponse,
     AdminCortexIngestionExhaustCoverageResponse,
     AdminCortexIngestionOverviewResponse,
     AdminCortexIngestionRecentRunItem,
     AdminCortexIngestionRecentRunsResponse,
-    AdminCortexFlushAndRerunRequest,
-    AdminCortexFlushAndRerunResponse,
     AdminCortexIngestionTriggerReplayRequest,
     AdminCortexIngestionTriggerReplayResponse,
     AdminCortexIngestionTriggerSyncRequest,
     AdminCortexIngestionTriggerSyncResponse,
     AdminCortexIngestionVerificationResponse,
+    AdminCortexLinkRuleVersionCreateRequest,
+    AdminCortexLinkRuleVersionDetailResponse,
+    AdminCortexLinkRuleVersionItem,
+    AdminCortexLinkRuleVersionListResponse,
     AdminCortexMappingRegistryResponse,
     AdminCortexMaterializeBacklogAsyncRequest,
     AdminCortexMaterializeBacklogAsyncResponse,
@@ -69,9 +94,59 @@ from vector.contracts.admin import (
     AdminCortexMaterializeBacklogResponse,
     AdminCortexMaterializeTransformRequest,
     AdminCortexMaterializeTransformResponse,
+    AdminCortexMergeQueueDetailResponse,
+    AdminCortexMergeQueueListResponse,
     AdminCortexOpenAmbiguityRequest,
     AdminCortexOpenAmbiguityResponse,
     AdminCortexOracleManifestResponse,
+    AdminCortexOrgAmbiguityAppendRequest,
+    AdminCortexOrgAmbiguityDetailResponse,
+    AdminCortexOrgAmbiguityItem,
+    AdminCortexOrgAmbiguityListResponse,
+    AdminCortexOrgAmbiguityQueueRowV1,
+    AdminCortexOrgEntityItem,
+    AdminCortexOrgEntityListResponse,
+    AdminCortexOrgFailureCaseItem,
+    AdminCortexOrgFailuresResponse,
+    AdminCortexOrgGraphProjectionResponse,
+    AdminCortexOrgHandleListRowV1,
+    AdminCortexOrgIdentityCertificationArchiveDetailResponse,
+    AdminCortexOrgIdentityCertificationArchiveItem,
+    AdminCortexOrgIdentityCertificationArchiveRequest,
+    AdminCortexOrgIdentityCertificationArchiveResponse,
+    AdminCortexOrgIdentityCertificationArchivesListResponse,
+    AdminCortexOrgIdentityCertificationPackResponse,
+    AdminCortexOrgIdentityVerificationRunItem,
+    AdminCortexOrgIdentityVerificationRunRequest,
+    AdminCortexOrgIdentityVerificationRunResponse,
+    AdminCortexOrgIdentityVerificationRunsListResponse,
+    AdminCortexOrgLinkCandidateBatchSummary,
+    AdminCortexOrgLinkCandidateQueueResponse,
+    AdminCortexOrgLinkExplorerRowV1,
+    AdminCortexOrgLinkItem,
+    AdminCortexOrgLinkListResponse,
+    AdminCortexOrgLinkReplayJobDetailResponse,
+    AdminCortexOrgLinkReplayJobEnqueueRequest,
+    AdminCortexOrgLinkReplayJobEnqueueResponse,
+    AdminCortexOrgLinkReplayJobItem,
+    AdminCortexOrgLinkReplayJobListResponse,
+    AdminCortexOrgLinkReplayJobReceiptItem,
+    AdminCortexOrgLinkReplayJobRunRequest,
+    AdminCortexOrgLinkTemporalStripItem,
+    AdminCortexOrgLinkTemporalTimelineResponse,
+    AdminCortexOrgMergeCreateRequest,
+    AdminCortexOrgMergeItem,
+    AdminCortexOrgMergeListResponse,
+    AdminCortexOrgPrimitiveInstanceAppendRequest,
+    AdminCortexOrgPrimitiveInstanceDetailResponse,
+    AdminCortexOrgPrimitiveInstanceItem,
+    AdminCortexOrgPrimitiveInstanceListResponse,
+    AdminCortexOrgPrimitiveListRowV1,
+    AdminCortexOrgProjectionPreviewResponse,
+    AdminCortexOrgRemediationValidateRequest,
+    AdminCortexOrgRemediationValidateResponse,
+    AdminCortexOrgRemediationValidationItem,
+    AdminCortexPrimitiveExplorerListResponse,
     AdminCortexProvenanceByMaterializationResponse,
     AdminCortexProvenanceByRawResponse,
     AdminCortexProvenanceRecordItem,
@@ -156,13 +231,13 @@ from vector.domains.cortex.ingestion.admin_recent_raw import (
     list_raw_records_for_connector,
     list_recent_ingestion_runs,
 )
+from vector.domains.cortex.ingestion.full_pipeline_reset import flush_tenant_cortex_pipeline_state
 from vector.domains.cortex.ingestion.raw_memory_control_plane import build_raw_memory_control_plane
 from vector.domains.cortex.ingestion.raw_memory_enforcement import evaluate_progressive_enforcement
 from vector.domains.cortex.ingestion.raw_memory_failure_recovery import (
     run_raw_memory_recovery_validation,
     sync_raw_memory_failure_cases,
 )
-from vector.domains.cortex.ingestion.full_pipeline_reset import flush_tenant_cortex_pipeline_state
 from vector.domains.cortex.ingestion.raw_memory_query import execute_raw_memory_query
 from vector.domains.cortex.ingestion.raw_memory_storage import apply_raw_memory_retention_policy
 from vector.domains.cortex.ingestion.raw_memory_trust import (
@@ -211,7 +286,7 @@ CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE = "RESUME ALL SCHEDULED CORTEX INGESTION"
 CORTEX_RAW_MEMORY_DELETE_CONFIRM_PHRASE = "APPLY RAW MEMORY RETENTION DELETION"
 CORTEX_MANUAL_SYNC_CONFIRM_PHRASE = "RUN MANUAL CORTEX INGESTION SYNC"
 CORTEX_REPLAY_CONFIRM_PHRASE = "RUN CORTEX INGESTION REPLAY JOB"
-CORTEX_FLUSH_RERUN_CONFIRM_PHRASE = "FLUSH RAW DATA AND RERUN CORTEX TO CANONICAL"
+CORTEX_FLUSH_RERUN_CONFIRM_PHRASE = "FLUSH RAW DATA AND RERUN CORTEX TO IDENTITY"
 
 
 def _enqueue_cortex_poll_sync(connector_id: str) -> Callable[..., None]:
@@ -2055,8 +2130,12 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexMaterializeBacklogAsyncResponse:
         """Enqueue Celery drain of routable backlog until idle (scopeable connector/resource_type filters)."""
         _assert_tenant(db, tenant_id)
-        from app.tasks.cortex_canonical_materialize_backlog import drain_stub_materialize_backlog_task
-        from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+        from app.tasks.cortex_canonical_materialize_backlog import (
+            drain_stub_materialize_backlog_task,
+        )
+        from vector.domains.cortex.canonical.transform_runtime import (
+            resolve_default_bundle_id_for_stub_transform,
+        )
 
         hint = body.bundle_id.strip() if body.bundle_id and body.bundle_id.strip() else None
         resolved = hint or resolve_default_bundle_id_for_stub_transform(db, tenant_id)
@@ -2190,6 +2269,1714 @@ def build_admin_router() -> APIRouter:
         if row is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="identity_anchor_not_found")
         return AdminCortexIdentityAnchorItem.model_validate(identity_anchor_public_dict(row))
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/entities",
+        response_model=AdminCortexOrgEntityListResponse,
+    )
+    def admin_cortex_identity_org_entities_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> AdminCortexOrgEntityListResponse:
+        """Phase 04 Step 3 — read-only org entity (org handle) list per doctrine."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_entities import (
+            ORG_ENTITY_RUNTIME_SCHEMA_VERSION,
+            list_org_entities,
+            org_entity_public_dict,
+        )
+
+        rows = list_org_entities(db, tenant_id=tenant_id, limit=limit)
+        entities = [
+            AdminCortexOrgEntityItem.model_validate(org_entity_public_dict(x)) for x in rows
+        ]
+        return AdminCortexOrgEntityListResponse(
+            org_entity_runtime_schema_version=ORG_ENTITY_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            entities=entities,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/entities/{org_entity_id}",
+        response_model=AdminCortexOrgEntityItem,
+    )
+    def admin_cortex_identity_org_entity_detail(
+        tenant_id: uuid.UUID,
+        org_entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgEntityItem:
+        """Phase 04 Step 3 — read-only org entity detail by deterministic id."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_entities import (
+            get_org_entity,
+            org_entity_public_dict,
+        )
+
+        row = get_org_entity(db, tenant_id=tenant_id, org_entity_id=org_entity_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_entity_not_found")
+        return AdminCortexOrgEntityItem.model_validate(org_entity_public_dict(row))
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/handles",
+        response_model=AdminCortexIdentityHandlesExplorerResponse,
+    )
+    def admin_cortex_identity_handles_explorer_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> AdminCortexIdentityHandlesExplorerResponse:
+        """Phase 04 Step 18 — handles explorer (**org_handle_list_row_v1**), alias of org entities with queue row shape."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.operator_console import (
+            IDENTITY_OPERATOR_CONSOLE_SCHEMA_VERSION,
+            list_org_handle_list_rows,
+        )
+
+        rows = list_org_handle_list_rows(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexIdentityHandlesExplorerResponse(
+            identity_operator_console_schema_version=IDENTITY_OPERATOR_CONSOLE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            rows=[AdminCortexOrgHandleListRowV1.model_validate(x) for x in rows],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/handles/{handle_id}",
+        response_model=AdminCortexOrgEntityItem,
+    )
+    def admin_cortex_identity_handle_detail(
+        tenant_id: uuid.UUID,
+        handle_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgEntityItem:
+        """Phase 04 Step 18 — handle inspector (same payload as ``…/entities/{id}``)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_entities import (
+            get_org_entity,
+            org_entity_public_dict,
+        )
+
+        row = get_org_entity(db, tenant_id=tenant_id, org_entity_id=handle_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_entity_not_found")
+        return AdminCortexOrgEntityItem.model_validate(org_entity_public_dict(row))
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/links",
+        response_model=AdminCortexOrgLinkListResponse,
+    )
+    def admin_cortex_identity_org_links_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+        link_authority: Annotated[str | None, Query()] = None,
+        link_class: Annotated[str | None, Query()] = None,
+        authoritative_only: Annotated[bool | None, Query()] = None,
+        candidate_only: Annotated[bool | None, Query()] = None,
+        ambiguous: Annotated[bool | None, Query()] = None,
+        revoked: Annotated[bool | None, Query()] = None,
+        replay_drift: Annotated[bool | None, Query()] = None,
+        rule_version: Annotated[str | None, Query()] = None,
+        primitive_id: Annotated[uuid.UUID | None, Query()] = None,
+        handle_id: Annotated[uuid.UUID | None, Query()] = None,
+        time_valid_at: Annotated[datetime | None, Query()] = None,
+    ) -> AdminCortexOrgLinkListResponse:
+        """Phase 04 Step 4 + Step 18 — link ledger list + §9.2 explorer rows (**org_link_list_row_v1**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.link_explorer import list_org_link_explorer_rows
+        from vector.domains.cortex.identity.link_ledger import (
+            LINK_LEDGER_RUNTIME_SCHEMA_VERSION,
+            link_public_dict,
+            list_org_links,
+        )
+
+        la = link_authority.strip() if link_authority else None
+        lc = link_class.strip() if link_class else None
+        rows = list_org_links(db, tenant_id=tenant_id, limit=limit, link_authority=la, link_class=lc)
+        links = [AdminCortexOrgLinkItem.model_validate(link_public_dict(x)) for x in rows]
+        explorer_dicts = list_org_link_explorer_rows(
+            db,
+            tenant_id=tenant_id,
+            limit=limit,
+            authoritative_only=authoritative_only,
+            candidate_only=candidate_only,
+            ambiguous=ambiguous,
+            revoked=revoked,
+            replay_drift=replay_drift,
+            rule_version=rule_version,
+            primitive_id=primitive_id,
+            handle_id=handle_id,
+            time_valid_at=time_valid_at,
+        )
+        explorer_rows = [AdminCortexOrgLinkExplorerRowV1.model_validate(x) for x in explorer_dicts]
+        return AdminCortexOrgLinkListResponse(
+            link_ledger_runtime_schema_version=LINK_LEDGER_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            links=links,
+            explorer_rows=explorer_rows,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/links/hints",
+        response_model=AdminCortexOrgLinkListResponse,
+    )
+    def admin_cortex_identity_org_link_hints_bucket(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> AdminCortexOrgLinkListResponse:
+        """Phase 04 Step 7 — read-only hint / inferred / prohibited link bucket."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.link_ledger import (
+            LINK_LEDGER_RUNTIME_SCHEMA_VERSION,
+            link_public_dict,
+            list_org_link_hint_bucket,
+        )
+
+        rows = list_org_link_hint_bucket(db, tenant_id=tenant_id, limit=limit)
+        links = [AdminCortexOrgLinkItem.model_validate(link_public_dict(x)) for x in rows]
+        return AdminCortexOrgLinkListResponse(
+            link_ledger_runtime_schema_version=LINK_LEDGER_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            links=links,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/links/timeline",
+        response_model=AdminCortexOrgLinkTemporalTimelineResponse,
+    )
+    def admin_cortex_identity_org_link_temporal_timeline(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+        include_revoked: Annotated[bool, Query()] = False,
+    ) -> AdminCortexOrgLinkTemporalTimelineResponse:
+        """Phase 04 Step 8 — temporal validity + revocation timeline strip (read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.link_ledger import (
+            LINK_LEDGER_RUNTIME_SCHEMA_VERSION,
+            list_org_link_temporal_timeline,
+        )
+        from vector.domains.cortex.identity.org_link_temporal import (
+            ORG_LINK_TEMPORAL_SCHEMA_VERSION,
+            org_link_temporal_strip_public,
+        )
+
+        rows = list_org_link_temporal_timeline(
+            db, tenant_id=tenant_id, limit=limit, include_revoked=include_revoked
+        )
+        strips = [
+            AdminCortexOrgLinkTemporalStripItem.model_validate(org_link_temporal_strip_public(x)) for x in rows
+        ]
+        return AdminCortexOrgLinkTemporalTimelineResponse(
+            org_link_temporal_schema_version=ORG_LINK_TEMPORAL_SCHEMA_VERSION,
+            link_ledger_runtime_schema_version=LINK_LEDGER_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            strips=strips,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/links/{link_id}",
+        response_model=AdminCortexOrgLinkItem,
+    )
+    def admin_cortex_identity_org_link_detail(
+        tenant_id: uuid.UUID,
+        link_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkItem:
+        """Phase 04 Step 4 — read-only single link row."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.link_ledger import get_org_link, link_public_dict
+
+        row = get_org_link(db, tenant_id=tenant_id, link_id=link_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_link_not_found")
+        return AdminCortexOrgLinkItem.model_validate(link_public_dict(row))
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/links/{link_id}/revoke",
+        response_model=AdminCortexOrgLinkItem,
+    )
+    def admin_cortex_identity_org_link_revoke(
+        tenant_id: uuid.UUID,
+        link_id: uuid.UUID,
+        body: AdminCortexIdentityOperatorActionRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkItem:
+        """Phase 04 Step 18 — policy-gated soft revoke + durable audit row (**G-P04-23**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.link_ledger import (
+            LinkLedgerInvariantError,
+            link_public_dict,
+            soft_revoke_org_link,
+        )
+        from vector.domains.cortex.identity.operator_audit import append_identity_console_audit
+        from vector.domains.cortex.identity.operator_console import (
+            IDENTITY_OPERATOR_CONSOLE_CONFIRM_PHRASE,
+        )
+
+        if body.confirmation_phrase.strip() != IDENTITY_OPERATOR_CONSOLE_CONFIRM_PHRASE:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="confirmation_phrase_invalid")
+        try:
+            row = soft_revoke_org_link(db, tenant_id=tenant_id, link_id=link_id)
+            append_identity_console_audit(
+                db,
+                tenant_id=tenant_id,
+                surface="link_ledger",
+                action_kind="org_link_revoke",
+                ref_uuid=link_id,
+                detail_json={"operator_note": body.operator_note} if body.operator_note else {},
+            )
+            db.commit()
+        except LinkLedgerInvariantError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexOrgLinkItem.model_validate(link_public_dict(row))
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/link-candidates",
+        response_model=AdminCortexOrgLinkCandidateQueueResponse,
+    )
+    def admin_cortex_identity_link_candidate_queue(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        batch_limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    ) -> AdminCortexOrgLinkCandidateQueueResponse:
+        """Phase 04 Step 5 — sparse candidate queue (recent batches + bounded rows per batch)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.candidate_generation import (
+            CANDIDATE_GENERATION_SCHEMA_VERSION,
+            candidate_batch_public_dict,
+            candidate_row_public_dict,
+            list_candidate_batches,
+            list_candidates_for_batch,
+        )
+
+        summaries: list[AdminCortexOrgLinkCandidateBatchSummary] = []
+        for batch in list_candidate_batches(db, tenant_id=tenant_id, limit=batch_limit):
+            cands = list_candidates_for_batch(db, tenant_id=tenant_id, batch_id=batch.id)[:50]
+            payload = {
+                **candidate_batch_public_dict(batch),
+                "candidates": [candidate_row_public_dict(c) for c in cands],
+            }
+            summaries.append(AdminCortexOrgLinkCandidateBatchSummary.model_validate(payload))
+        return AdminCortexOrgLinkCandidateQueueResponse(
+            candidate_generation_schema_version=CANDIDATE_GENERATION_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            batches=summaries,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/link-candidates/regenerate-async",
+        response_model=AdminCortexIdentityLegacyCeleryAsyncDispatchResponse,
+    )
+    def admin_cortex_identity_link_candidates_regenerate_async(
+        tenant_id: uuid.UUID,
+        body: AdminCortexIdentityLinkCandidatesRegenerateAsyncRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityLegacyCeleryAsyncDispatchResponse:
+        """Phase 04 Step 19 — enqueue legacy candidate regen Celery task + dispatch registry row."""
+        _assert_tenant(db, tenant_id)
+        from app.tasks.cortex_org_link_jobs import (
+            CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES,
+            regenerate_link_candidates_task,
+        )
+        from vector.domains.cortex.identity.worker_dispatch import append_identity_celery_dispatch
+
+        try:
+            ar = regenerate_link_candidates_task.delay(str(tenant_id), body.rule_version.strip())
+        except Exception as exc:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"celery_enqueue_failed:{exc}",
+            ) from exc
+        append_identity_celery_dispatch(
+            db,
+            tenant_id=tenant_id,
+            celery_task_id=str(ar.id),
+            task_name=CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES,
+            request_summary={"rule_version": body.rule_version.strip()},
+        )
+        db.commit()
+        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{ar.id}"
+        return AdminCortexIdentityLegacyCeleryAsyncDispatchResponse(
+            tenant_id=str(tenant_id),
+            celery_task_id=str(ar.id),
+            task_name=CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES,
+            worker_task_status_path=path,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/authoritative-replay-async",
+        response_model=AdminCortexIdentityLegacyCeleryAsyncDispatchResponse,
+    )
+    def admin_cortex_identity_authoritative_replay_async(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityLegacyCeleryAsyncDispatchResponse:
+        """Phase 04 Step 19 — enqueue legacy authoritative replay hash Celery task + dispatch row."""
+        _assert_tenant(db, tenant_id)
+        from app.tasks.cortex_org_link_jobs import (
+            CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS,
+            replay_authoritative_links_task,
+        )
+        from vector.domains.cortex.identity.worker_dispatch import append_identity_celery_dispatch
+
+        try:
+            ar = replay_authoritative_links_task.delay(str(tenant_id))
+        except Exception as exc:
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"celery_enqueue_failed:{exc}",
+            ) from exc
+        append_identity_celery_dispatch(
+            db,
+            tenant_id=tenant_id,
+            celery_task_id=str(ar.id),
+            task_name=CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS,
+            request_summary={},
+        )
+        db.commit()
+        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{ar.id}"
+        return AdminCortexIdentityLegacyCeleryAsyncDispatchResponse(
+            tenant_id=str(tenant_id),
+            celery_task_id=str(ar.id),
+            task_name=CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS,
+            worker_task_status_path=path,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/merges",
+        response_model=AdminCortexOrgMergeListResponse,
+    )
+    def admin_cortex_identity_merges_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> AdminCortexOrgMergeListResponse:
+        """Phase 04 Step 6 — read-only merge ledger list."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.merge_governance import (
+            MERGE_GOVERNANCE_SCHEMA_VERSION,
+            list_org_merges,
+            merge_public_dict,
+        )
+
+        rows = list_org_merges(db, tenant_id=tenant_id, limit=limit)
+        merges = [AdminCortexOrgMergeItem.model_validate(merge_public_dict(x)) for x in rows]
+        return AdminCortexOrgMergeListResponse(
+            merge_governance_schema_version=MERGE_GOVERNANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            merges=merges,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/merges",
+        response_model=AdminCortexOrgMergeItem,
+    )
+    def admin_cortex_identity_merges_append(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgMergeCreateRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgMergeItem:
+        """Phase 04 Step 6 — append merge ledger row (durable merge_record)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.merge_governance import (
+            MergeGovernanceError,
+            append_org_merge,
+            merge_public_dict,
+        )
+
+        try:
+            row = append_org_merge(
+                db,
+                tenant_id=tenant_id,
+                merge_kind=body.merge_kind,
+                merge_policy_id=body.merge_policy_id,
+                source_entity_ids=list(body.source_entity_ids),
+                target_entity_id=body.target_entity_id,
+                evidence_raw_record_ids=list(body.evidence_raw_record_ids),
+                operator_user_id=body.operator_user_id,
+                supersedes_merge_id=body.supersedes_merge_id,
+                metadata_json=body.metadata_json,
+            )
+            db.commit()
+        except MergeGovernanceError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexOrgMergeItem.model_validate(merge_public_dict(row))
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/bundle-equivalence",
+        response_model=AdminCortexBundleEquivalenceDeclarationListResponse,
+    )
+    def admin_cortex_identity_bundle_equivalence_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=500)] = 200,
+        include_revoked: Annotated[bool, Query()] = False,
+    ) -> AdminCortexBundleEquivalenceDeclarationListResponse:
+        """Phase 04 Step 9 — list bundle equivalence declarations (audit)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.bundle_equivalence import (
+            BUNDLE_EQUIVALENCE_SCHEMA_VERSION,
+            bundle_equivalence_public_dict,
+            list_bundle_equivalence_declarations,
+        )
+
+        rows = list_bundle_equivalence_declarations(
+            db, tenant_id=tenant_id, limit=limit, include_revoked=include_revoked
+        )
+        items = [
+            AdminCortexBundleEquivalenceDeclarationItem.model_validate(bundle_equivalence_public_dict(x))
+            for x in rows
+        ]
+        return AdminCortexBundleEquivalenceDeclarationListResponse(
+            bundle_equivalence_schema_version=BUNDLE_EQUIVALENCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            declarations=items,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/bundle-equivalence",
+        response_model=AdminCortexBundleEquivalenceDeclarationItem,
+    )
+    def admin_cortex_identity_bundle_equivalence_append(
+        tenant_id: uuid.UUID,
+        body: AdminCortexBundleEquivalenceDeclarationCreateRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexBundleEquivalenceDeclarationItem:
+        """Phase 04 Step 9 — append equivalence declaration (operator escape hatch)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.bundle_equivalence import (
+            BundleEquivalenceError,
+            append_bundle_equivalence_declaration,
+            bundle_equivalence_public_dict,
+        )
+
+        try:
+            row = append_bundle_equivalence_declaration(
+                db,
+                tenant_id=tenant_id,
+                bundle_id_a=body.bundle_id_a,
+                bundle_id_b=body.bundle_id_b,
+                evidence_raw_record_ids=list(body.evidence_raw_record_ids),
+                metadata_json=body.metadata_json,
+            )
+            db.commit()
+        except BundleEquivalenceError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexBundleEquivalenceDeclarationItem.model_validate(bundle_equivalence_public_dict(row))
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/replay-jobs/run",
+        response_model=AdminCortexOrgLinkReplayJobDetailResponse,
+    )
+    def admin_cortex_identity_org_link_replay_job_run(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgLinkReplayJobRunRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkReplayJobDetailResponse:
+        """Phase 04 Step 10 — run org link continuity replay / candidate regen (job + L-class receipts)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_link_replay_runtime import (
+            ORG_LINK_REPLAY_SCHEMA_VERSION,
+            OrgLinkReplayError,
+            execute_org_link_replay_job,
+            org_link_replay_job_public_dict,
+            org_link_replay_receipt_public_dict,
+        )
+
+        try:
+            job = execute_org_link_replay_job(
+                db,
+                tenant_id=tenant_id,
+                job_kind=body.job_kind,
+                pinned_rule_version=body.pinned_rule_version,
+                dry_run=body.dry_run,
+                scope_json=body.scope_json,
+            )
+            db.commit()
+        except OrgLinkReplayError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        receipts = sorted(job.receipts, key=lambda r: r.id)
+        return AdminCortexOrgLinkReplayJobDetailResponse(
+            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
+            receipts=[
+                AdminCortexOrgLinkReplayJobReceiptItem.model_validate(org_link_replay_receipt_public_dict(r))
+                for r in receipts
+            ],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/replay-jobs",
+        response_model=AdminCortexOrgLinkReplayJobListResponse,
+    )
+    def admin_cortex_identity_org_link_replay_jobs_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexOrgLinkReplayJobListResponse:
+        """Phase 04 Step 10 — list recent org link replay jobs."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_link_replay_runtime import (
+            ORG_LINK_REPLAY_SCHEMA_VERSION,
+            list_org_link_replay_jobs,
+            org_link_replay_job_public_dict,
+        )
+
+        jobs = list_org_link_replay_jobs(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexOrgLinkReplayJobListResponse(
+            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            jobs=[AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(j)) for j in jobs],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/replay-jobs/{job_id}",
+        response_model=AdminCortexOrgLinkReplayJobDetailResponse,
+    )
+    def admin_cortex_identity_org_link_replay_job_detail(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkReplayJobDetailResponse:
+        """Phase 04 Step 10 — org link replay job + receipts."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_link_replay_runtime import (
+            ORG_LINK_REPLAY_SCHEMA_VERSION,
+            get_org_link_replay_job,
+            org_link_replay_job_public_dict,
+            org_link_replay_receipt_public_dict,
+        )
+
+        job = get_org_link_replay_job(db, tenant_id=tenant_id, job_id=job_id)
+        if job is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_link_replay_job_not_found")
+        receipts = sorted(job.receipts, key=lambda r: r.id)
+        return AdminCortexOrgLinkReplayJobDetailResponse(
+            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
+            receipts=[
+                AdminCortexOrgLinkReplayJobReceiptItem.model_validate(org_link_replay_receipt_public_dict(r))
+                for r in receipts
+            ],
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/replay-jobs/enqueue",
+        response_model=AdminCortexOrgLinkReplayJobEnqueueResponse,
+    )
+    def admin_cortex_identity_org_link_replay_job_enqueue(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgLinkReplayJobEnqueueRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkReplayJobEnqueueResponse:
+        """Phase 04 Step 19 — queue org link replay / projection export job + Celery worker."""
+        _assert_tenant(db, tenant_id)
+        from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
+        from vector.domains.cortex.identity.org_link_replay_runtime import (
+            ORG_LINK_REPLAY_SCHEMA_VERSION,
+            OrgLinkReplayError,
+            create_queued_org_link_replay_job,
+            org_link_replay_job_public_dict,
+        )
+
+        try:
+            job = create_queued_org_link_replay_job(
+                db,
+                tenant_id=tenant_id,
+                job_kind=body.job_kind,
+                pinned_rule_version=body.pinned_rule_version,
+                dry_run=body.dry_run,
+                scope_json=body.scope_json,
+            )
+            db.flush()
+        except OrgLinkReplayError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        try:
+            async_result = run_org_link_replay_job_task.delay(
+                str(tenant_id),
+                body.job_kind,
+                body.pinned_rule_version,
+                body.dry_run,
+                body.scope_json,
+                str(job.id),
+            )
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"celery_enqueue_failed:{exc}",
+            ) from exc
+        job.celery_task_id = str(async_result.id)
+        db.commit()
+        db.refresh(job)
+        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{async_result.id}"
+        return AdminCortexOrgLinkReplayJobEnqueueResponse(
+            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            celery_task_id=str(async_result.id),
+            worker_task_status_path=path,
+            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/worker-tasks/{celery_task_id}",
+        response_model=AdminCortexIdentityWorkerTaskStatusResponse,
+    )
+    def admin_cortex_identity_worker_task_status(
+        tenant_id: uuid.UUID,
+        celery_task_id: str,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityWorkerTaskStatusResponse:
+        """Phase 04 Step 19 — poll Celery state for tasks bound to this tenant (replay job or dispatch row)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.worker_dispatch import (
+            build_worker_task_status_payload,
+            resolve_worker_task_binding,
+        )
+
+        try:
+            bind_kind, job_uuid = resolve_worker_task_binding(
+                db, tenant_id=tenant_id, celery_task_id=celery_task_id
+            )
+        except KeyError as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="worker_task_not_found_for_tenant") from exc
+        payload = build_worker_task_status_payload(
+            celery_task_id=celery_task_id.strip(),
+            bind_kind=bind_kind,
+            job_id=job_uuid,
+        )
+        payload["tenant_id"] = str(tenant_id)
+        return AdminCortexIdentityWorkerTaskStatusResponse.model_validate(payload)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/link-rule-versions",
+        response_model=AdminCortexLinkRuleVersionDetailResponse,
+    )
+    def admin_cortex_identity_link_rule_version_append(
+        tenant_id: uuid.UUID,
+        body: AdminCortexLinkRuleVersionCreateRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexLinkRuleVersionDetailResponse:
+        """Phase 04 Step 11 — register a frozen linkage rule manifest (semantic_version + hash)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.linkage_rules import (
+            LINK_RULE_VERSION_SCHEMA_VERSION,
+            LinkageRulesError,
+            create_link_rule_version,
+            link_rule_version_public_dict,
+        )
+
+        try:
+            row = create_link_rule_version(
+                db,
+                tenant_id=tenant_id,
+                semantic_version=body.semantic_version,
+                rules_manifest_json=body.rules_manifest_json,
+                lifecycle_state=body.lifecycle_state,
+                notes=body.notes,
+            )
+            db.commit()
+        except LinkageRulesError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexLinkRuleVersionDetailResponse(
+            link_rule_version_schema_version=LINK_RULE_VERSION_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            version=AdminCortexLinkRuleVersionItem.model_validate(link_rule_version_public_dict(row)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/link-rule-versions",
+        response_model=AdminCortexLinkRuleVersionListResponse,
+    )
+    def admin_cortex_identity_link_rule_versions_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexLinkRuleVersionListResponse:
+        """Phase 04 Step 11 — list linkage rule versions for operator readout."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.linkage_rules import (
+            LINK_RULE_VERSION_SCHEMA_VERSION,
+            link_rule_version_public_dict,
+            list_link_rule_versions,
+        )
+
+        rows = list_link_rule_versions(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexLinkRuleVersionListResponse(
+            link_rule_version_schema_version=LINK_RULE_VERSION_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            versions=[AdminCortexLinkRuleVersionItem.model_validate(link_rule_version_public_dict(r)) for r in rows],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/link-rule-versions/{rule_version_id}",
+        response_model=AdminCortexLinkRuleVersionDetailResponse,
+    )
+    def admin_cortex_identity_link_rule_version_detail(
+        tenant_id: uuid.UUID,
+        rule_version_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexLinkRuleVersionDetailResponse:
+        """Phase 04 Step 11 — one linkage rule version row."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.linkage_rules import (
+            LINK_RULE_VERSION_SCHEMA_VERSION,
+            get_link_rule_version,
+            link_rule_version_public_dict,
+        )
+
+        row = get_link_rule_version(db, tenant_id=tenant_id, rule_version_id=rule_version_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="link_rule_version_not_found")
+        return AdminCortexLinkRuleVersionDetailResponse(
+            link_rule_version_schema_version=LINK_RULE_VERSION_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            version=AdminCortexLinkRuleVersionItem.model_validate(link_rule_version_public_dict(row)),
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/primitive-instances",
+        response_model=AdminCortexOrgPrimitiveInstanceDetailResponse,
+    )
+    def admin_cortex_identity_primitive_instance_append(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgPrimitiveInstanceAppendRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgPrimitiveInstanceDetailResponse:
+        """Phase 04 Step 12 — persist execution primitive envelope (evidence-bound) on an org entity."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.execution_primitives import (
+            ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            PrimitivePersistenceError,
+            append_org_primitive_instance,
+            org_primitive_instance_public_dict,
+        )
+
+        try:
+            row = append_org_primitive_instance(
+                db,
+                tenant_id=tenant_id,
+                org_entity_id=body.org_entity_id,
+                envelope_json=body.envelope_json,
+                lifecycle_state=body.lifecycle_state,
+            )
+            db.commit()
+        except PrimitivePersistenceError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexOrgPrimitiveInstanceDetailResponse(
+            org_primitive_instance_schema_version=ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            instance=AdminCortexOrgPrimitiveInstanceItem.model_validate(org_primitive_instance_public_dict(row)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/primitive-instances",
+        response_model=AdminCortexOrgPrimitiveInstanceListResponse,
+    )
+    def admin_cortex_identity_primitive_instances_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexOrgPrimitiveInstanceListResponse:
+        """Phase 04 Step 12 — list execution primitive instances (operator inspector)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.execution_primitives import (
+            ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            list_org_primitive_instances,
+            org_primitive_instance_public_dict,
+        )
+
+        rows = list_org_primitive_instances(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexOrgPrimitiveInstanceListResponse(
+            org_primitive_instance_schema_version=ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            instances=[
+                AdminCortexOrgPrimitiveInstanceItem.model_validate(org_primitive_instance_public_dict(r)) for r in rows
+            ],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/primitive-instances/{instance_id}",
+        response_model=AdminCortexOrgPrimitiveInstanceDetailResponse,
+    )
+    def admin_cortex_identity_primitive_instance_detail(
+        tenant_id: uuid.UUID,
+        instance_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgPrimitiveInstanceDetailResponse:
+        """Phase 04 Step 12 — one execution primitive instance."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.execution_primitives import (
+            ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            get_org_primitive_instance,
+            org_primitive_instance_public_dict,
+        )
+
+        row = get_org_primitive_instance(db, tenant_id=tenant_id, instance_id=instance_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_primitive_instance_not_found")
+        return AdminCortexOrgPrimitiveInstanceDetailResponse(
+            org_primitive_instance_schema_version=ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            instance=AdminCortexOrgPrimitiveInstanceItem.model_validate(org_primitive_instance_public_dict(row)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/graph-projection",
+        response_model=AdminCortexOrgGraphProjectionResponse,
+    )
+    def admin_cortex_identity_graph_projection(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgGraphProjectionResponse:
+        """Phase 04 Step 13 — OrgGraphProjectionV1 export (deterministic JSON + SHA-256)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.projection_export import (
+            build_org_graph_projection_export_document,
+        )
+
+        doc = build_org_graph_projection_export_document(db, tenant_id=tenant_id)
+        return AdminCortexOrgGraphProjectionResponse.model_validate(doc)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/org-ambiguities",
+        response_model=AdminCortexOrgAmbiguityDetailResponse,
+    )
+    def admin_cortex_identity_org_ambiguity_append(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgAmbiguityAppendRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgAmbiguityDetailResponse:
+        """Phase 04 Step 14 — append org-scoped multiplicity ambiguity receipt."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_ambiguity import (
+            ORG_AMBIGUITY_SCHEMA_VERSION,
+            OrgAmbiguityError,
+            append_org_ambiguity_record,
+            org_ambiguity_record_public_dict,
+        )
+
+        try:
+            row = append_org_ambiguity_record(
+                db,
+                tenant_id=tenant_id,
+                org_ambiguity_class=body.org_ambiguity_class,
+                subject_key=body.subject_key,
+                involved_org_entity_ids=body.involved_org_entity_ids,
+                status=body.status,
+                evidence_json=body.evidence_json,
+                operator_note=body.operator_note,
+            )
+            db.commit()
+        except OrgAmbiguityError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexOrgAmbiguityDetailResponse(
+            org_ambiguity_schema_version=ORG_AMBIGUITY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            record=AdminCortexOrgAmbiguityItem.model_validate(org_ambiguity_record_public_dict(row)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/org-ambiguities",
+        response_model=AdminCortexOrgAmbiguityListResponse,
+    )
+    def admin_cortex_identity_org_ambiguities_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        status: Annotated[str | None, Query()] = None,
+        org_ambiguity_class: Annotated[str | None, Query()] = None,
+    ) -> AdminCortexOrgAmbiguityListResponse:
+        """Phase 04 Step 14 — list org ambiguity receipts (unresolved actors queue)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_ambiguity import (
+            ORG_AMBIGUITY_SCHEMA_VERSION,
+            list_org_ambiguity_records,
+            org_ambiguity_record_public_dict,
+        )
+
+        rows = list_org_ambiguity_records(
+            db,
+            tenant_id=tenant_id,
+            limit=limit,
+            status=status,
+            org_ambiguity_class=org_ambiguity_class,
+        )
+        return AdminCortexOrgAmbiguityListResponse(
+            org_ambiguity_schema_version=ORG_AMBIGUITY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            records=[
+                AdminCortexOrgAmbiguityItem.model_validate(org_ambiguity_record_public_dict(r)) for r in rows
+            ],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/org-ambiguities/{record_id}",
+        response_model=AdminCortexOrgAmbiguityDetailResponse,
+    )
+    def admin_cortex_identity_org_ambiguity_detail(
+        tenant_id: uuid.UUID,
+        record_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgAmbiguityDetailResponse:
+        """Phase 04 Step 14 — one org ambiguity record."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_ambiguity import (
+            ORG_AMBIGUITY_SCHEMA_VERSION,
+            get_org_ambiguity_record,
+            org_ambiguity_record_public_dict,
+        )
+
+        row = get_org_ambiguity_record(db, tenant_id=tenant_id, record_id=record_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_ambiguity_record_not_found")
+        return AdminCortexOrgAmbiguityDetailResponse(
+            org_ambiguity_schema_version=ORG_AMBIGUITY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            record=AdminCortexOrgAmbiguityItem.model_validate(org_ambiguity_record_public_dict(row)),
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/verification/run",
+        response_model=AdminCortexOrgIdentityVerificationRunResponse,
+    )
+    def admin_cortex_identity_verification_run(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgIdentityVerificationRunRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgIdentityVerificationRunResponse:
+        """Phase 04 Step 15 — Phase 04 gate slice from canonical verification + optional org ledger row."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_verification_metadata import (
+            ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
+        )
+        from vector.domains.cortex.identity.verification import run_org_identity_verification
+
+        raw = run_org_identity_verification(
+            db,
+            tenant_id=tenant_id,
+            materialization_sample_limit=body.materialization_sample_limit,
+            persist=body.persist,
+        )
+        gates = [AdminCortexCanonicalVerificationGateResult.model_validate(g) for g in raw["gates"]]
+        return AdminCortexOrgIdentityVerificationRunResponse(
+            org_identity_verification_engine_schema_version=ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
+            tenant_id=raw["tenant_id"],
+            passed=raw["passed"],
+            gates=gates,
+            evidence=raw["evidence"],
+            persisted_run_id=raw.get("persisted_run_id"),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/verification/runs",
+        response_model=AdminCortexOrgIdentityVerificationRunsListResponse,
+    )
+    def admin_cortex_identity_verification_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> AdminCortexOrgIdentityVerificationRunsListResponse:
+        """Phase 04 Step 15 — recent persisted Phase 04 verification slice runs."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_verification_metadata import (
+            ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
+        )
+        from vector.domains.cortex.identity.verification import (
+            list_org_identity_verification_runs,
+            org_verification_run_public_dict,
+        )
+
+        rows = list_org_identity_verification_runs(db, tenant_id=tenant_id, limit=limit)
+        items: list[AdminCortexOrgIdentityVerificationRunItem] = []
+        for row in rows:
+            d = org_verification_run_public_dict(row)
+            items.append(
+                AdminCortexOrgIdentityVerificationRunItem(
+                    id=d["id"],
+                    tenant_id=d["tenant_id"],
+                    engine_schema_version=d["engine_schema_version"],
+                    passed=d["passed"],
+                    gates=[AdminCortexCanonicalVerificationGateResult.model_validate(x) for x in d["gates_json"]],
+                    evidence=d["evidence_json"],
+                    created_at=d["created_at"],
+                )
+            )
+        return AdminCortexOrgIdentityVerificationRunsListResponse(
+            org_identity_verification_engine_schema_version=ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            runs=items,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/merge-queue",
+        response_model=AdminCortexMergeQueueListResponse,
+    )
+    def admin_cortex_identity_merge_queue_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> AdminCortexMergeQueueListResponse:
+        """Phase 04 Step 18 — merge proposals view (**org_merge_queue_row_v1**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.merge_governance import MERGE_GOVERNANCE_SCHEMA_VERSION
+        from vector.domains.cortex.identity.operator_console import (
+            list_org_merge_queue_rows,
+            org_merge_queue_row_v1,
+        )
+
+        merges = list_org_merge_queue_rows(db, tenant_id=tenant_id, limit=limit)
+        proposals = [org_merge_queue_row_v1(db, m) for m in merges]
+        return AdminCortexMergeQueueListResponse(
+            merge_governance_schema_version=MERGE_GOVERNANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            proposals=[AdminCortexMergeQueueRowV1.model_validate(x) for x in proposals],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/merge-queue/{merge_proposal_id}",
+        response_model=AdminCortexMergeQueueDetailResponse,
+    )
+    def admin_cortex_identity_merge_queue_detail(
+        tenant_id: uuid.UUID,
+        merge_proposal_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexMergeQueueDetailResponse:
+        """Phase 04 Step 18 — merge proposal detail (queue row + full merge ledger row)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.merge_governance import (
+            MERGE_GOVERNANCE_SCHEMA_VERSION,
+            get_org_merge,
+            merge_public_dict,
+        )
+        from vector.domains.cortex.identity.operator_console import org_merge_queue_row_v1
+
+        row = get_org_merge(db, tenant_id=tenant_id, merge_id=merge_proposal_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="merge_proposal_not_found")
+        prop = org_merge_queue_row_v1(db, row)
+        return AdminCortexMergeQueueDetailResponse(
+            merge_governance_schema_version=MERGE_GOVERNANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            proposal=AdminCortexMergeQueueRowV1.model_validate(prop),
+            merge=AdminCortexOrgMergeItem.model_validate(merge_public_dict(row)),
+        )
+
+    def _merge_queue_action(
+        tenant_id: uuid.UUID,
+        merge_proposal_id: uuid.UUID,
+        body: AdminCortexIdentityOperatorActionRequest,
+        db: Session,
+        *,
+        action: str,
+    ) -> AdminCortexOrgMergeItem:
+        from vector.domains.cortex.identity.merge_governance import merge_public_dict
+        from vector.domains.cortex.identity.operator_console import (
+            OperatorConsoleError,
+            apply_merge_queue_action,
+        )
+
+        try:
+            row = apply_merge_queue_action(
+                db,
+                tenant_id=tenant_id,
+                merge_id=merge_proposal_id,
+                action=action,
+                confirmation_phrase=body.confirmation_phrase,
+                operator_note=body.operator_note,
+            )
+            db.commit()
+        except OperatorConsoleError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexOrgMergeItem.model_validate(merge_public_dict(row))
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/merge-queue/{merge_proposal_id}/approve",
+        response_model=AdminCortexOrgMergeItem,
+    )
+    def admin_cortex_identity_merge_queue_approve(
+        tenant_id: uuid.UUID,
+        merge_proposal_id: uuid.UUID,
+        body: AdminCortexIdentityOperatorActionRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgMergeItem:
+        """Phase 04 Step 18 — approve merge proposal (metadata transition + audit)."""
+        _assert_tenant(db, tenant_id)
+        return _merge_queue_action(
+            tenant_id, merge_proposal_id, body, db, action="approve"
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/merge-queue/{merge_proposal_id}/reject",
+        response_model=AdminCortexOrgMergeItem,
+    )
+    def admin_cortex_identity_merge_queue_reject(
+        tenant_id: uuid.UUID,
+        merge_proposal_id: uuid.UUID,
+        body: AdminCortexIdentityOperatorActionRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgMergeItem:
+        _assert_tenant(db, tenant_id)
+        return _merge_queue_action(
+            tenant_id, merge_proposal_id, body, db, action="reject"
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/merge-queue/{merge_proposal_id}/defer",
+        response_model=AdminCortexOrgMergeItem,
+    )
+    def admin_cortex_identity_merge_queue_defer(
+        tenant_id: uuid.UUID,
+        merge_proposal_id: uuid.UUID,
+        body: AdminCortexIdentityOperatorActionRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgMergeItem:
+        _assert_tenant(db, tenant_id)
+        return _merge_queue_action(
+            tenant_id, merge_proposal_id, body, db, action="defer"
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/merge-queue/{merge_proposal_id}/split",
+        response_model=AdminCortexOrgMergeItem,
+    )
+    def admin_cortex_identity_merge_queue_split(
+        tenant_id: uuid.UUID,
+        merge_proposal_id: uuid.UUID,
+        body: AdminCortexIdentityOperatorActionRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgMergeItem:
+        _assert_tenant(db, tenant_id)
+        return _merge_queue_action(
+            tenant_id, merge_proposal_id, body, db, action="split"
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/ambiguity-queue",
+        response_model=AdminCortexAmbiguityQueueListResponse,
+    )
+    def admin_cortex_identity_ambiguity_queue_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    ) -> AdminCortexAmbiguityQueueListResponse:
+        """Phase 04 Step 18 — ambiguity queue rows (**org_ambiguity_queue_row_v1**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.operator_console import org_ambiguity_queue_row_v1
+        from vector.domains.cortex.identity.org_ambiguity import (
+            ORG_AMBIGUITY_SCHEMA_VERSION,
+            list_org_ambiguity_records,
+        )
+
+        rows = list_org_ambiguity_records(db, tenant_id=tenant_id, limit=limit)
+        qrows = [org_ambiguity_queue_row_v1(r) for r in rows]
+        return AdminCortexAmbiguityQueueListResponse(
+            org_ambiguity_schema_version=ORG_AMBIGUITY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            rows=[AdminCortexOrgAmbiguityQueueRowV1.model_validate(x) for x in qrows],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/ambiguity-queue/{ambiguity_id}",
+        response_model=AdminCortexOrgAmbiguityDetailResponse,
+    )
+    def admin_cortex_identity_ambiguity_queue_detail(
+        tenant_id: uuid.UUID,
+        ambiguity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgAmbiguityDetailResponse:
+        """Phase 04 Step 18 — ambiguity inspector (same contract as ``…/org-ambiguities/{id}``)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_ambiguity import (
+            ORG_AMBIGUITY_SCHEMA_VERSION,
+            get_org_ambiguity_record,
+            org_ambiguity_record_public_dict,
+        )
+
+        row = get_org_ambiguity_record(db, tenant_id=tenant_id, record_id=ambiguity_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_ambiguity_record_not_found")
+        return AdminCortexOrgAmbiguityDetailResponse(
+            org_ambiguity_schema_version=ORG_AMBIGUITY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            record=AdminCortexOrgAmbiguityItem.model_validate(org_ambiguity_record_public_dict(row)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/primitives",
+        response_model=AdminCortexPrimitiveExplorerListResponse,
+    )
+    def admin_cortex_identity_primitives_explorer_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        include_raw_envelope: Annotated[bool, Query()] = False,
+    ) -> AdminCortexPrimitiveExplorerListResponse:
+        """Phase 04 Step 18 — primitive explorer defaulting to structured rows without raw blob (**G-P04-26**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.execution_primitives import (
+            ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            list_org_primitive_instances,
+        )
+        from vector.domains.cortex.identity.operator_console import org_primitive_list_row_v1
+
+        rows = list_org_primitive_instances(db, tenant_id=tenant_id, limit=limit)
+        out = [org_primitive_list_row_v1(r, include_raw_envelope=include_raw_envelope) for r in rows]
+        return AdminCortexPrimitiveExplorerListResponse(
+            org_primitive_instance_schema_version=ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            include_raw_envelope=include_raw_envelope,
+            rows=[AdminCortexOrgPrimitiveListRowV1.model_validate(x) for x in out],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/primitives/{primitive_id}",
+        response_model=AdminCortexOrgPrimitiveInstanceDetailResponse,
+    )
+    def admin_cortex_identity_primitive_explorer_detail(
+        tenant_id: uuid.UUID,
+        primitive_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgPrimitiveInstanceDetailResponse:
+        """Phase 04 Step 18 — primitive inspector (full envelope, same as ``…/primitive-instances/{id}``)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.execution_primitives import (
+            ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            get_org_primitive_instance,
+            org_primitive_instance_public_dict,
+        )
+
+        row = get_org_primitive_instance(db, tenant_id=tenant_id, instance_id=primitive_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_primitive_instance_not_found")
+        return AdminCortexOrgPrimitiveInstanceDetailResponse(
+            org_primitive_instance_schema_version=ORG_PRIMITIVE_INSTANCE_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            instance=AdminCortexOrgPrimitiveInstanceItem.model_validate(org_primitive_instance_public_dict(row)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/projection-preview",
+        response_model=AdminCortexOrgProjectionPreviewResponse,
+    )
+    def admin_cortex_identity_projection_preview(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgProjectionPreviewResponse:
+        """Phase 04 Step 18 — graph export preview metadata only (**§14**, **G-P04-25**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.projection_export import (
+            build_org_graph_projection_preview_metadata,
+        )
+
+        raw = build_org_graph_projection_preview_metadata(db, tenant_id=tenant_id)
+        return AdminCortexOrgProjectionPreviewResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/projection-export/run",
+        response_model=AdminCortexOrgLinkReplayJobEnqueueResponse,
+    )
+    def admin_cortex_identity_projection_export_run(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkReplayJobEnqueueResponse:
+        """Phase 04 Step 19 — enqueue async OrgGraphProjectionV1 export via org link replay job pipeline."""
+        _assert_tenant(db, tenant_id)
+        from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
+        from vector.domains.cortex.identity.org_link_replay_runtime import (
+            ORG_LINK_REPLAY_SCHEMA_VERSION,
+            create_queued_org_link_replay_job,
+            org_link_replay_job_public_dict,
+        )
+
+        job = create_queued_org_link_replay_job(
+            db,
+            tenant_id=tenant_id,
+            job_kind="graph_projection_export",
+            dry_run=False,
+        )
+        db.flush()
+        try:
+            async_result = run_org_link_replay_job_task.delay(
+                str(tenant_id),
+                "graph_projection_export",
+                None,
+                False,
+                None,
+                str(job.id),
+            )
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"celery_enqueue_failed:{exc}",
+            ) from exc
+        job.celery_task_id = str(async_result.id)
+        db.commit()
+        db.refresh(job)
+        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{async_result.id}"
+        return AdminCortexOrgLinkReplayJobEnqueueResponse(
+            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            celery_task_id=str(async_result.id),
+            worker_task_status_path=path,
+            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/control-plane",
+        response_model=AdminCortexIdentityControlPlaneResponse,
+    )
+    def admin_cortex_identity_control_plane(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityControlPlaneResponse:
+        """Phase 04 Step 17 — Identity Dashboard aggregate (**identity_control_plane_v1**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.control_plane import build_identity_control_plane
+
+        raw = build_identity_control_plane(db, tenant_id=tenant_id)
+        return AdminCortexIdentityControlPlaneResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/rebuild-continuity",
+        response_model=AdminCortexIdentityContinuityRebuildResponse,
+    )
+    def admin_cortex_identity_rebuild_continuity(
+        tenant_id: uuid.UUID,
+        body: AdminCortexIdentityContinuityRebuildRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityContinuityRebuildResponse:
+        """Deterministic Phase 04 continuity rebuild: materialize drain → repair → anchor backfill → candidates."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.transform_runtime import MaterializeError
+        from vector.domains.cortex.identity.continuity_rebuild import run_identity_continuity_rebuild
+
+        try:
+            report = run_identity_continuity_rebuild(
+                db,
+                tenant_id=tenant_id,
+                bundle_id=body.bundle_id.strip(),
+                materialize_batch_limit=body.materialize_batch_limit,
+                anchor_limit=body.anchor_limit,
+                run_determinism_repair=body.run_determinism_repair,
+                dry_run=body.dry_run,
+                replay_job=None,
+            )
+            db.commit()
+        except MaterializeError as exc:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"identity_continuity_rebuild_failed:{exc}",
+            ) from exc
+        return AdminCortexIdentityContinuityRebuildResponse(rebuild=report)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/continuity-fixture-verify",
+        response_model=AdminCortexIdentityContinuityVerifyResponse,
+    )
+    def admin_cortex_identity_continuity_fixture_verify(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        sample_limit: Annotated[int, Query(ge=50, le=5000)] = 800,
+    ) -> AdminCortexIdentityContinuityVerifyResponse:
+        """Read-only: substrate row counts + raw payload continuity_fixture field hits (hostile proof)."""
+        _assert_tenant(db, tenant_id)
+        from mock_connectors.fixtures.phase04_continuity_fixtures import resolve_phase04_continuity_scenario_key
+        from vector.domains.cortex.identity.continuity_rebuild import (
+            substrate_counts,
+            verify_continuity_fixture_pressure,
+        )
+
+        counts = substrate_counts(db, tenant_id=tenant_id)
+        pressure = verify_continuity_fixture_pressure(db, tenant_id=tenant_id, sample_limit=sample_limit)
+        return AdminCortexIdentityContinuityVerifyResponse(
+            scenario_key=resolve_phase04_continuity_scenario_key(),
+            substrate_counts=counts,
+            fixture_pressure=pressure,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/debug-anchor-evidence",
+        response_model=AdminCortexIdentityContinuityEvidenceInspectResponse,
+    )
+    def admin_cortex_identity_debug_anchor_evidence(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        anchor_scan_limit: Annotated[int, Query(ge=1, le=100_000)] = 50_000,
+        sample_limit: Annotated[int, Query(ge=1, le=200)] = 30,
+        fixture_survival_sample_limit: Annotated[int, Query(ge=1, le=500)] = 40,
+    ) -> AdminCortexIdentityContinuityEvidenceInspectResponse:
+        """Read-only: where continuity join keys come from (raw vs canonical) + skip reasons + kind collapse."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.continuity_evidence_inspector import (
+            build_continuity_evidence_inspection_for_tenant,
+        )
+
+        raw = build_continuity_evidence_inspection_for_tenant(
+            db,
+            tenant_id=tenant_id,
+            anchor_scan_limit=anchor_scan_limit,
+            sample_limit=sample_limit,
+            fixture_survival_sample_limit=fixture_survival_sample_limit,
+        )
+        return AdminCortexIdentityContinuityEvidenceInspectResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/readiness-economics",
+        response_model=AdminCortexIdentityReadinessEconomicsResponse,
+    )
+    def admin_cortex_identity_readiness_economics(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityReadinessEconomicsResponse:
+        """Phase 04 Step 21 — readiness economics snapshot (**identity_readiness_economics_v1**)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.readiness_economics import (
+            build_identity_readiness_economics,
+        )
+
+        raw = build_identity_readiness_economics(db, tenant_id=tenant_id)
+        return AdminCortexIdentityReadinessEconomicsResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/certification-pack",
+        response_model=AdminCortexOrgIdentityCertificationPackResponse,
+    )
+    def admin_cortex_org_identity_certification_pack_snapshot(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        materialization_sample_limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminCortexOrgIdentityCertificationPackResponse:
+        """Phase 04 Step 22 — org identity closure certification pack (pre-archive)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_identity_certification_pack import (
+            build_org_identity_certification_pack,
+        )
+
+        raw = build_org_identity_certification_pack(
+            db,
+            tenant_id=tenant_id,
+            materialization_sample_limit=materialization_sample_limit,
+        )
+        return AdminCortexOrgIdentityCertificationPackResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/certification-pack/archive",
+        response_model=AdminCortexOrgIdentityCertificationArchiveResponse,
+    )
+    def admin_cortex_org_identity_certification_pack_archive(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgIdentityCertificationArchiveRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgIdentityCertificationArchiveResponse:
+        """Phase 04 Step 22 — persist org certification pack when all hard-fail closure rows pass."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_identity_certification_pack import (
+            ORG_IDENTITY_CERTIFICATION_PACK_SCHEMA_VERSION,
+            persist_org_identity_certification_archive,
+        )
+
+        raw = persist_org_identity_certification_archive(
+            db,
+            tenant_id=tenant_id,
+            materialization_sample_limit=body.materialization_sample_limit,
+        )
+        pack = raw["pack"]
+        db.commit()
+        return AdminCortexOrgIdentityCertificationArchiveResponse(
+            persisted=bool(raw["persisted"]),
+            passed=bool(raw["passed"]),
+            archive_id=raw.get("archive_id"),
+            org_certification_pack_schema_version=int(
+                pack.get("org_certification_pack_schema_version") or ORG_IDENTITY_CERTIFICATION_PACK_SCHEMA_VERSION
+            ),
+            tenant_id=str(tenant_id),
+            pack=pack,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/certification-pack/archives",
+        response_model=AdminCortexOrgIdentityCertificationArchivesListResponse,
+    )
+    def admin_cortex_org_identity_certification_pack_archives(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> AdminCortexOrgIdentityCertificationArchivesListResponse:
+        """Phase 04 Step 22 — recent org identity certification archives."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_identity_certification_pack import (
+            ORG_IDENTITY_CERTIFICATION_PACK_SCHEMA_VERSION,
+            list_org_identity_certification_archives,
+            org_certification_archive_public_dict,
+        )
+
+        rows = list_org_identity_certification_archives(db, tenant_id=tenant_id, limit=limit)
+        items = [
+            AdminCortexOrgIdentityCertificationArchiveItem.model_validate(org_certification_archive_public_dict(r))
+            for r in rows
+        ]
+        return AdminCortexOrgIdentityCertificationArchivesListResponse(
+            org_certification_pack_schema_version=ORG_IDENTITY_CERTIFICATION_PACK_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            archives=items,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/certification-pack/archives/{archive_id}",
+        response_model=AdminCortexOrgIdentityCertificationArchiveDetailResponse,
+    )
+    def admin_cortex_org_identity_certification_pack_archive_detail(
+        tenant_id: uuid.UUID,
+        archive_id: int,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgIdentityCertificationArchiveDetailResponse:
+        """Phase 04 Step 22 — fetch one org certification archive (full JSON)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_identity_certification_pack import (
+            get_org_identity_certification_archive,
+        )
+
+        row = get_org_identity_certification_archive(db, tenant_id=tenant_id, archive_id=archive_id)
+        if row is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Org certification archive not found.") from None
+        return AdminCortexOrgIdentityCertificationArchiveDetailResponse(
+            id=row.id,
+            tenant_id=str(row.tenant_id),
+            org_certification_pack_schema_version=row.org_certification_pack_schema_version,
+            passed=row.passed,
+            created_at=row.created_at,
+            pack=dict(row.pack_json),
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/backfill/from-canonical-anchors",
+        response_model=AdminCortexIdentityBackfillFromAnchorsResponse,
+    )
+    def admin_cortex_identity_backfill_from_canonical_anchors(
+        tenant_id: uuid.UUID,
+        body: AdminCortexIdentityBackfillFromAnchorsRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityBackfillFromAnchorsResponse:
+        """Phase 04 Step 20 — upsert org handles from Phase 03 identity anchors (candidate lane only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.backfill import (
+            run_anchor_handle_backfill,
+        )
+
+        raw = run_anchor_handle_backfill(
+            db,
+            tenant_id=tenant_id,
+            dry_run=body.dry_run,
+            anchor_limit=body.anchor_limit,
+        )
+        db.commit()
+        return AdminCortexIdentityBackfillFromAnchorsResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/backfill/runs",
+        response_model=AdminCortexIdentityBackfillRunsListResponse,
+    )
+    def admin_cortex_identity_backfill_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ) -> AdminCortexIdentityBackfillRunsListResponse:
+        """Phase 04 Step 20 — recent anchor→handle backfill audit rows."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.backfill import (
+            ORG_IDENTITY_BACKFILL_SCHEMA_VERSION,
+            list_org_identity_backfill_runs,
+            org_identity_backfill_run_public_dict,
+        )
+
+        rows = list_org_identity_backfill_runs(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexIdentityBackfillRunsListResponse(
+            org_identity_backfill_schema_version=ORG_IDENTITY_BACKFILL_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            runs=[AdminCortexIdentityBackfillRunItem.model_validate(org_identity_backfill_run_public_dict(r)) for r in rows],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/failures",
+        response_model=AdminCortexOrgFailuresResponse,
+    )
+    def admin_cortex_identity_failures(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgFailuresResponse:
+        """Phase 04 Step 16 — active org failure cases + recent org remediation validations."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.failure_remediation import (
+            ORG_FAILURE_REMEDIATION_RUNTIME_SCHEMA_VERSION,
+            org_failure_case_public_dict,
+            org_remediation_validation_public_dict,
+            sync_org_failure_cases,
+        )
+
+        raw = sync_org_failure_cases(db, tenant_id)
+        cases = [AdminCortexOrgFailureCaseItem.model_validate(org_failure_case_public_dict(c)) for c in raw["cases"]]
+        vals = [
+            AdminCortexOrgRemediationValidationItem.model_validate(org_remediation_validation_public_dict(v))
+            for v in raw["recent_remediation_validations"]
+        ]
+        return AdminCortexOrgFailuresResponse(
+            org_failure_remediation_runtime_schema_version=ORG_FAILURE_REMEDIATION_RUNTIME_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            active_failure_count=raw["active_failure_count"],
+            active_failure_classes=raw["active_failure_classes"],
+            cases=cases,
+            recent_remediation_validations=vals,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/remediation/validate",
+        response_model=AdminCortexOrgRemediationValidateResponse,
+    )
+    def admin_cortex_identity_remediation_validate(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgRemediationValidateRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgRemediationValidateResponse:
+        """Phase 04 Step 16 — policy-gated org remediation (ambiguity triage ack or org link replay retry)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.failure_remediation import (
+            validate_org_remediation,
+        )
+
+        raw = validate_org_remediation(
+            db,
+            tenant_id=tenant_id,
+            remediation_class=body.remediation_class,
+            dry_run=body.dry_run,
+            confirm_execution=body.confirm_execution,
+            failure_case_gap_id=body.failure_case_gap_id,
+            payload=body.payload,
+        )
+        return AdminCortexOrgRemediationValidateResponse(
+            tenant_id=raw["tenant_id"],
+            remediation_class=raw["remediation_class"],
+            validation=AdminCortexOrgRemediationValidationItem.model_validate(raw["validation"]),
+        )
 
     @r.post(
         "/tenants/{tenant_id}/cortex/canonical/replay-jobs/run",
@@ -2535,6 +4322,30 @@ def build_admin_router() -> APIRouter:
             evidence=raw["evidence"],
             persisted_run_id=raw.get("persisted_run_id"),
         )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canonical/verification/repair-determinism-drift",
+        response_model=AdminCortexCanonicalDeterminismRepairResponse,
+    )
+    def admin_cortex_canonical_verification_repair_determinism_drift(
+        tenant_id: uuid.UUID,
+        body: AdminCortexCanonicalDeterminismRepairRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexCanonicalDeterminismRepairResponse:
+        """Rematerialize rows that fail G-P03-01 oracle-vs-stored hash comparison (bounded scan)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.transform_runtime import (
+            repair_tenant_materialization_oracle_determinism_drift,
+        )
+
+        raw = repair_tenant_materialization_oracle_determinism_drift(
+            db,
+            tenant_id=tenant_id,
+            bundle_id=body.bundle_id,
+            scan_limit=body.scan_limit,
+            dry_run=body.dry_run,
+        )
+        return AdminCortexCanonicalDeterminismRepairResponse.model_validate(raw)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/canonical/verification/runs",
@@ -2961,16 +4772,16 @@ def build_admin_router() -> APIRouter:
         )
 
     @r.post(
-        "/tenants/{tenant_id}/cortex/ingestion/actions/flush-rerun-to-canonical",
+        "/tenants/{tenant_id}/cortex/ingestion/actions/flush-rerun-to-identity",
         response_model=AdminCortexFlushAndRerunResponse,
     )
-    def admin_cortex_flush_rerun_to_canonical(
+    def admin_cortex_flush_rerun_to_identity(
         tenant_id: uuid.UUID,
         body: AdminCortexFlushAndRerunRequest,
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexFlushAndRerunResponse:
-        """Flush tenant Cortex state, rerun all routed connectors, then enqueue canonical backlog drain."""
+        """Flush tenant Cortex state, rerun routed connectors, canonical drain, then org identity backfill."""
         _assert_tenant(db, tenant_id)
         if body.confirmation != CORTEX_FLUSH_RERUN_CONFIRM_PHRASE:
             raise HTTPException(
@@ -2997,8 +4808,10 @@ def build_admin_router() -> APIRouter:
 
         flush_summary = flush_tenant_cortex_pipeline_state(db, tenant_id=tenant_id)
 
-        from app.tasks.cortex_full_pipeline_rerun import run_cortex_flush_rerun_to_canonical_task
-        from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+        from app.tasks.cortex_full_pipeline_rerun import run_cortex_flush_rerun_to_identity_task
+        from vector.domains.cortex.canonical.transform_runtime import (
+            resolve_default_bundle_id_for_stub_transform,
+        )
 
         enqueued_connectors: list[str] = []
         orchestrator_connectors: list[dict[str, str]] = []
@@ -3021,7 +4834,7 @@ def build_admin_router() -> APIRouter:
                 ),
             )
 
-        async_result = run_cortex_flush_rerun_to_canonical_task.delay(
+        async_result = run_cortex_flush_rerun_to_identity_task.delay(
             str(tenant_id),
             resolved_bundle_id,
             orchestrator_connectors,
@@ -3032,7 +4845,7 @@ def build_admin_router() -> APIRouter:
             _logger,
             logging.WARNING,
             "admin cortex full flush+rerun enqueued",
-            task_name="admin_cortex_flush_rerun_to_canonical",
+            task_name="admin_cortex_flush_rerun_to_identity",
             phase=PHASE_STEP6,
             outcome="enqueued",
             tenant_id=str(tenant_id),

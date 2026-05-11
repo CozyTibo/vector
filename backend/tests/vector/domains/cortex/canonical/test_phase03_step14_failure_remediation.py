@@ -34,8 +34,7 @@ def test_failure_remediation_runtime_schema_version() -> None:
 
 def test_ontology_includes_failure_remediation_pointer() -> None:
     doc = build_phase03_step01_ontology_public_document()
-    assert doc["ontology_schema_version"] == 20
-    assert ONTOLOGY_SCHEMA_VERSION == 20
+    assert doc["ontology_schema_version"] == ONTOLOGY_SCHEMA_VERSION
     assert doc["failure_remediation_surface_version"] >= 1
     assert "canonical/failures" in doc["canonical_failures_route"]
     assert "remediation/validate" in doc["canonical_remediation_validate_route"]

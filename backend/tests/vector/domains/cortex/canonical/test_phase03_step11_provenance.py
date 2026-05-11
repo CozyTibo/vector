@@ -20,10 +20,9 @@ def test_sorted_unique_rule_ids() -> None:
 
 def test_ontology_includes_provenance_pointer_section() -> None:
     doc = build_phase03_step01_ontology_public_document()
-    assert doc["ontology_schema_version"] == 20
-    assert ONTOLOGY_SCHEMA_VERSION == 20
-    assert doc["implementation_step"] == 18
-    assert doc["completed_implementation_steps"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    assert doc["ontology_schema_version"] == ONTOLOGY_SCHEMA_VERSION
+    assert doc["implementation_step"] == 22
+    assert doc["completed_implementation_steps"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
     assert doc["provenance_by_raw_record_route"]
     assert doc["provenance_by_materialization_route"]
     assert doc["provenance_evidence_shapes_documented"]

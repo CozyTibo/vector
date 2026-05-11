@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
@@ -15,8 +16,14 @@ from vector.domains.cortex.canonical.canonical_verification_engine import (
     _gate_gp03_23_execution_check_lifecycle,
     run_canonical_verification,
 )
-from vector.domains.cortex.canonical.ontology import ONTOLOGY_SCHEMA_VERSION, build_phase03_step01_ontology_public_document
+from vector.domains.cortex.canonical.ontology import (
+    ONTOLOGY_SCHEMA_VERSION,
+    build_phase03_step01_ontology_public_document,
+)
 from vector.domains.cortex.canonical.transform_runtime import materialize_raw_record
+from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
+    CortexCanonicalTransformMaterialization,
+)
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
@@ -33,16 +40,57 @@ def test_verification_engine_schema_version() -> None:
 
 def test_ontology_includes_verification_engine_pointer() -> None:
     doc = build_phase03_step01_ontology_public_document()
-    assert doc["ontology_schema_version"] == 20
-    assert ONTOLOGY_SCHEMA_VERSION == 20
+    assert doc["ontology_schema_version"] == ONTOLOGY_SCHEMA_VERSION
     assert doc["verification_engine_surface_version"] >= 1
     assert "verification/run" in doc["canonical_verification_run_route"]
+    assert "repair-determinism-drift" in doc["canonical_verification_repair_determinism_route"]
     assert "G-P03-01" in doc["verification_engine_gate_ids"]
     assert "G-P03-16" in doc["verification_engine_gate_ids"]
     assert "G-P03-17" in doc["verification_engine_gate_ids"]
     assert "G-P03-21" in doc["verification_engine_gate_ids"]
     assert "G-P03-23" in doc["verification_engine_gate_ids"]
     assert "G-P03-24" in doc["verification_engine_gate_ids"]
+    assert "G-P04-08" in doc["verification_engine_gate_ids"]
+    assert "G-P04-ORG-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-LINK-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-06" in doc["verification_engine_gate_ids"]
+    assert "G-P04-04" in doc["verification_engine_gate_ids"]
+    assert "G-P04-05" in doc["verification_engine_gate_ids"]
+    assert "G-P04-CAND-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-MRG-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-13" in doc["verification_engine_gate_ids"]
+    assert "G-P04-02" in doc["verification_engine_gate_ids"]
+    assert "G-P04-HINT-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-TMP-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-11" in doc["verification_engine_gate_ids"]
+    assert "G-P04-BNDL-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-03" in doc["verification_engine_gate_ids"]
+    assert "G-P04-14" in doc["verification_engine_gate_ids"]
+    assert "G-P04-RPL-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-RULE-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-09" in doc["verification_engine_gate_ids"]
+    assert "G-P04-PRIM-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-10" in doc["verification_engine_gate_ids"]
+    assert "G-P04-EXP-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-AMB-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-12" in doc["verification_engine_gate_ids"]
+    assert "G-P04-VER-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-19" in doc["verification_engine_gate_ids"]
+    assert "G-P04-18" in doc["verification_engine_gate_ids"]
+    assert "G-P04-21" in doc["verification_engine_gate_ids"]
+    assert "G-P04-22" in doc["verification_engine_gate_ids"]
+    assert "G-P04-23" in doc["verification_engine_gate_ids"]
+    assert "G-P04-24" in doc["verification_engine_gate_ids"]
+    assert "G-P04-25" in doc["verification_engine_gate_ids"]
+    assert "G-P04-26" in doc["verification_engine_gate_ids"]
+    assert "G-P04-BF-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-ECO-01" in doc["verification_engine_gate_ids"]
+    assert "G-P04-CLOSE-01" in doc["verification_engine_gate_ids"]
+    assert doc["org_identity_verification_engine_schema_version"] >= 1
+    assert "identity/verification/run" in doc["org_identity_verification_run_route"]
+    assert doc["org_failure_remediation_surface_version"] >= 1
+    assert "identity/failures" in doc["org_failures_route"]
 
 
 @pytest.mark.integration
@@ -132,6 +180,43 @@ def test_run_canonical_verification_persists_run(
     assert "G-P03-21" in gate_ids
     assert "G-P03-23" in gate_ids
     assert "G-P03-24" in gate_ids
+    assert "G-P04-08" in gate_ids
+    assert "G-P04-ORG-01" in gate_ids
+    assert "G-P04-LINK-01" in gate_ids
+    assert "G-P04-06" in gate_ids
+    assert "G-P04-04" in gate_ids
+    assert "G-P04-05" in gate_ids
+    assert "G-P04-CAND-01" in gate_ids
+    assert "G-P04-MRG-01" in gate_ids
+    assert "G-P04-01" in gate_ids
+    assert "G-P04-13" in gate_ids
+    assert "G-P04-02" in gate_ids
+    assert "G-P04-HINT-01" in gate_ids
+    assert "G-P04-TMP-01" in gate_ids
+    assert "G-P04-11" in gate_ids
+    assert "G-P04-BNDL-01" in gate_ids
+    assert "G-P04-03" in gate_ids
+    assert "G-P04-14" in gate_ids
+    assert "G-P04-RPL-01" in gate_ids
+    assert "G-P04-RULE-01" in gate_ids
+    assert "G-P04-09" in gate_ids
+    assert "G-P04-PRIM-01" in gate_ids
+    assert "G-P04-10" in gate_ids
+    assert "G-P04-EXP-01" in gate_ids
+    assert "G-P04-AMB-01" in gate_ids
+    assert "G-P04-12" in gate_ids
+    assert "G-P04-VER-01" in gate_ids
+    assert "G-P04-19" in gate_ids
+    assert "G-P04-18" in gate_ids
+    assert "G-P04-21" in gate_ids
+    assert "G-P04-22" in gate_ids
+    assert "G-P04-23" in gate_ids
+    assert "G-P04-24" in gate_ids
+    assert "G-P04-25" in gate_ids
+    assert "G-P04-26" in gate_ids
+    assert "G-P04-BF-01" in gate_ids
+    assert "G-P04-ECO-01" in gate_ids
+    assert "G-P04-CLOSE-01" in gate_ids
 
     listed = client.get(
         f"/admin/tenants/{tenant.id}/cortex/canonical/verification/runs?limit=5",
@@ -165,7 +250,7 @@ def test_run_canonical_verification_direct_db(db_session: Session) -> None:
         persist=False,
     )
     assert out["passed"] in (True, False)
-    assert len(out["gates"]) >= 11
+    assert len(out["gates"]) >= 46
     assert out["persisted_run_id"] is None
 
 
@@ -237,3 +322,111 @@ def test_execution_check_gate_rejects_regressions_and_inconsistent_status() -> N
     gate = _gate_gp03_23_execution_check_lifecycle(_Session(), tenant_id=uuid.uuid4())
     assert gate["passed"] is False
     assert gate["detail"]["issue_count"] >= 2
+
+
+@pytest.mark.integration
+def test_admin_repair_determinism_drift_restores_verification(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    user = User(email=f"p315dr-{uuid.uuid4().hex[:8]}@example.com", full_name="P315dr User")
+    tenant = Tenant(
+        company_name="P315dr Co",
+        primary_email=user.email,
+        email_domain="example.com",
+        slug=f"p315dr-{uuid.uuid4().hex[:10]}",
+        status="active",
+        workspace_access_enabled=True,
+    )
+    db_session.add_all([user, tenant])
+    db_session.flush()
+    db_session.add(TenantMembership(tenant_id=tenant.id, user_id=user.id, role="owner"))
+    conn = TenantConnection(
+        tenant_id=tenant.id,
+        provider="slack",
+        status="active",
+        connected_by_user_id=user.id,
+    )
+    db_session.add(conn)
+    db_session.flush()
+    run = IngestionRun(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        connection_id=conn.id,
+        connector="slack",
+        source_trigger="manual_admin",
+        sync_mode="incremental",
+        replay_mode=False,
+        replay_version=1,
+        status="COMPLETED",
+        started_at=datetime.now(UTC),
+    )
+    db_session.add(run)
+    db_session.flush()
+    raw = RawIngestionRecord(
+        tenant_id=tenant.id,
+        connection_id=conn.id,
+        connector="slack",
+        resource_type="slack.message",
+        external_id="msg-dr",
+        api_endpoint="https://slack.com/api/test",
+        query_params={},
+        payload_body={"channel": "C9", "ts": "9.1"},
+        payload_hash="hash-dr",
+        http_status=200,
+        fetched_at=datetime.now(UTC),
+        run_id=run.id,
+        source_trigger="manual_admin",
+        idempotency_key="idem-dr",
+        source_identity_key="slack:slack.message:msg-dr",
+        source_revision_key="rev-dr",
+    )
+    db_session.add(raw)
+    db_session.flush()
+    materialize_raw_record(
+        db_session,
+        tenant_id=tenant.id,
+        bundle_id=_STUB_BUNDLE,
+        raw_record_id=int(raw.id),
+    )
+    db_session.commit()
+    mat = db_session.scalars(
+        select(CortexCanonicalTransformMaterialization).where(
+            CortexCanonicalTransformMaterialization.tenant_id == tenant.id,
+            CortexCanonicalTransformMaterialization.raw_record_id == int(raw.id),
+        )
+    ).one()
+    mat.logical_key_hash = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+    db_session.commit()
+
+    bad = client.post(
+        f"/admin/tenants/{tenant.id}/cortex/canonical/verification/run",
+        auth=("admin", "integration-admin-password"),
+        json={"persist": False, "materialization_sample_limit": 20},
+    )
+    assert bad.status_code == 200
+    assert bad.json()["passed"] is False
+    g01_bad = next(g for g in bad.json()["gates"] if g["id"] == "G-P03-01")
+    assert g01_bad["passed"] is False
+
+    rep = client.post(
+        f"/admin/tenants/{tenant.id}/cortex/canonical/verification/repair-determinism-drift",
+        auth=("admin", "integration-admin-password"),
+        json={"dry_run": False, "scan_limit": 50},
+    )
+    assert rep.status_code == 200
+    rep_body = rep.json()
+    assert rep_body["mismatch_count"] >= 1
+    assert rep_body["repaired_count"] >= 1
+
+    good = client.post(
+        f"/admin/tenants/{tenant.id}/cortex/canonical/verification/run",
+        auth=("admin", "integration-admin-password"),
+        json={"persist": False, "materialization_sample_limit": 20},
+    )
+    assert good.status_code == 200
+    assert good.json()["passed"] is True
+    g01_ok = next(g for g in good.json()["gates"] if g["id"] == "G-P03-01")
+    assert g01_ok["passed"] is True

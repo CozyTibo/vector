@@ -88,6 +88,8 @@ services:
     volumes:
       # Uvicorn cwd is `/app`; `Settings` loads `./.env` so Slack/GitHub/etc. apply without Compose interpolation.
       - ./.env:/app/.env:ro
+      # Normative Cortex docs (Phase 04 doc-contract tests read under DOCS/cortex/04-identity).
+      - ./DOCS:/app/DOCS:ro
       - ./backend/src:/app/src
       - ./backend/tests:/app/tests
       - ./backend/mock_connectors:/app/mock_connectors

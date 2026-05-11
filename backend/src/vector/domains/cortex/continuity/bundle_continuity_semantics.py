@@ -67,6 +67,18 @@ def validate_edge_bundle_alignment(
     return warnings
 
 
+def bundle_equivalence_declaration_surface() -> dict[str, Any]:
+    """Phase 04 Step 9 — persistence anchor for explicit cross-bundle equivalence (see identity.bundle_equivalence)."""
+    return {
+        "continuity_bundle_semantics_version": CONTINUITY_BUNDLE_SEMANTICS_VERSION,
+        "equivalence_table": "cortex_bundle_equivalence_declarations",
+        "interpretation": (
+            "Tenant-scoped declarations bind two mapping bundle pins as equivalent for org continuity; "
+            "verification gate G-P04-03 audits link metadata that names two bundles without a declaration."
+        ),
+    }
+
+
 def _bundle_from_endpoint(scope: dict[str, Any] | None) -> str | None:
     if not scope or not isinstance(scope, dict):
         return None

@@ -41,4 +41,12 @@ def test_onboarding_chat_gpt4o_keeps_tight_caps() -> None:
         )
         == 200
     )
+    assert (
+        onboarding_chat_max_completion_tokens(
+            "gpt-4o-mini",
+            intro_kind="after_role",
+            has_connectors_privacy_kb=False,
+        )
+        == 200
+    )
 

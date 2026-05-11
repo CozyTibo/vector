@@ -6,7 +6,7 @@
 
 **Upstream:** Phase 01 raw memory, Phase 02 trust/replay semantics, Phase 03 canonicalization + identity anchors (provider-scoped), Phase 3.5 continuity foundation (normalized references, edge envelopes, execution primitive envelopes, bundle semantics).
 
-**Related (same folder):** `phase-04-implementation-plan.md` (22-stage program, gates, persistence/runtime tables), `phase-04-normative-index.md` (doctrine registry + vocabulary), `phase-04-control-plane-doctrine.md` (Execution Continuity Operator Console — admin surfaces, routes, operator gates **G-P04-21–G-P04-26**), `phase-04-mock-data-strategy.md` (hostile deterministic mock data for continuity stress in dev/CI).
+**Related (same folder):** `phase-04-implementation-plan.md` (22-stage program, gates, persistence/runtime tables), `phase-04-normative-index.md` (doctrine registry + vocabulary + **P04-01 program freeze**), `phase-04-anti-goals-doctrine.md` (non-negotiable anti-goals), `phase-04-topology-vs-meaning-doctrine.md` (P04-02; **G-P04-08**, `identity.boundary_checks`), `phase-04-control-plane-doctrine.md` (Execution Continuity Operator Console — admin surfaces, routes, operator gates **G-P04-21–G-P04-26**), `phase-04-mock-data-strategy.md` (hostile deterministic mock data for continuity stress in dev/CI).
 
 ---
 

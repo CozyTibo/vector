@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { marketingBody, workspaceFlatPanel } from "../marketing/marketingStyles";
@@ -20,52 +20,99 @@ import {
   fetchOnboarding,
   fetchSlackWorkspaceMembers,
   patchOnboarding,
+  type SlackCollaboratorMember,
   type SlackWorkspaceMember,
 } from "../../lib/onboardingApi";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
+import { workspaceAccessGroupPath } from "../../lib/workspaceAccess";
 import {
   defaultTeamsFromOnboarding,
-  membersOrderedWithManagerFirst,
+  legacyVectorCompanyWideUsersFromTeams,
+  legacyVectorManagerAccessModeFromTeams,
+  teamsForOnboardingApi,
+  type ManagerAccessScope,
   type ManagerTeam,
 } from "../../lib/workspaceManagerTeams";
 import SlackUserAvatar from "./SlackUserAvatar";
 
 export type { ManagerTeam };
 
-/** Name + at least one member + manager chosen from members (same rules as save validation). */
+/** Whether a row satisfies save rules (manager set, in members, scope member counts). */
 function isTeamStructurallyComplete(team: ManagerTeam): boolean {
-  if (!team.name.trim()) {
+  if (team.manager_slack_user_id == null) {
     return false;
   }
-  if (team.members.length === 0) {
+  if (!team.members.some((m) => m.slack_user_id === team.manager_slack_user_id)) {
     return false;
   }
-  return (
-    team.manager_slack_user_id != null &&
-    team.members.some((m) => m.slack_user_id === team.manager_slack_user_id)
-  );
+  if (team.access_scope === "all") {
+    return team.members.length === 1;
+  }
+  return team.members.length >= 2;
 }
 
-/** Non-null when teams cannot be saved yet. */
-function validateTeamsForSave(teams: ManagerTeam[]): string | null {
-  for (const t of teams) {
-    if (!t.name.trim()) {
-      return "Every team needs a name before you can save.";
-    }
+/** Non-null when the manager list cannot be saved yet. */
+function validateWorkspaceAccessSave(teams: ManagerTeam[]): string | null {
+  if (teams.length === 0) {
+    return "Add at least one manager.";
   }
   for (const t of teams) {
-    if (t.members.length === 0) {
-      return "Each team needs at least one person from Slack before you can save.";
+    if (t.manager_slack_user_id == null) {
+      return "Each row needs a manager chosen from Slack.";
     }
-    const mgrOk =
-      t.manager_slack_user_id != null &&
-      t.members.some((m) => m.slack_user_id === t.manager_slack_user_id);
-    if (!mgrOk) {
-      return "Each team needs a manager chosen from its members. Use Team actions → Change team manager if needed.";
+    if (!t.members.some((m) => m.slack_user_id === t.manager_slack_user_id)) {
+      return "Each row’s manager must be included in that row’s Slack people (open Edit on the row to fix).";
+    }
+    if (!isTeamStructurallyComplete(t)) {
+      if (t.access_scope === "all") {
+        return "All access rows must include only the manager. Remove extra people or switch to scoped access.";
+      }
+      return "Scoped access needs the manager plus at least one other person in scope.";
     }
   }
   return null;
 }
+
+function managerMember(team: ManagerTeam): SlackCollaboratorMember | undefined {
+  const mgr = team.manager_slack_user_id;
+  return mgr ? team.members.find((m) => m.slack_user_id === mgr) : undefined;
+}
+
+/** Scoped rows: people in scope excluding the manager (for table “People” column). */
+function scopedMembersExcludingManager(team: ManagerTeam): SlackCollaboratorMember[] {
+  const mgr = team.manager_slack_user_id;
+  if (!mgr || team.access_scope !== "scoped") {
+    return [];
+  }
+  return team.members.filter((m) => m.slack_user_id !== mgr);
+}
+
+/** Slack picks for manager: full roster minus people who are already managers on other rows (current row’s manager stays selectable). */
+function slackCandidatesForManagerPicker(
+  roster: SlackWorkspaceMember[],
+  teams: ManagerTeam[],
+  teamId: string,
+  currentManagerId: string | null,
+): SlackWorkspaceMember[] {
+  const usedElsewhere = new Set(
+    teams
+      .filter((t) => t.id !== teamId && t.manager_slack_user_id)
+      .map((t) => t.manager_slack_user_id as string),
+  );
+  return roster.filter(
+    (u) => !usedElsewhere.has(u.id) || (currentManagerId !== null && u.id === currentManagerId),
+  );
+}
+
+/** Scoped team members only: full Slack roster minus this row’s manager and people already in scope. */
+function slackCandidatesForScopeMembers(roster: SlackWorkspaceMember[], team: ManagerTeam): SlackWorkspaceMember[] {
+  const mgr = team.manager_slack_user_id;
+  const inScope = new Set(scopedMembersExcludingManager(team).map((m) => m.slack_user_id));
+  return roster.filter((u) => (mgr == null || u.id !== mgr) && !inScope.has(u.id));
+}
+
+const rowCtaQuietClass =
+  "rounded-lg px-2.5 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm";
 
 const inputBase = `w-full rounded-lg border border-zinc-200 bg-white px-3.5 py-2.5 text-base font-medium leading-snug text-[#0F0F12] outline-none transition-[border-color,box-shadow] placeholder:text-zinc-400 ${workspaceInputFocusRing}`;
 
@@ -99,11 +146,14 @@ function SlackMemberCombobox({
   candidates,
   onPick,
   slackDirectoryEmpty,
+  placeholder = "Search Slack to add people…",
 }: {
   candidates: SlackWorkspaceMember[];
   onPick: (member: SlackWorkspaceMember) => void;
   /** True when the roster loaded and has zero people (different copy than “all on team”). */
   slackDirectoryEmpty: boolean;
+  /** Input placeholder (e.g. choose manager vs add to scope). */
+  placeholder?: string;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -149,7 +199,7 @@ function SlackMemberCombobox({
   if (candidates.length === 0) {
     return (
       <p className="mt-3 text-sm leading-snug text-zinc-500">
-        Everyone from your Slack directory is already on this team.
+        Everyone from your Slack directory is already in this group.
       </p>
     );
   }
@@ -165,7 +215,7 @@ function SlackMemberCombobox({
           type="search"
           autoComplete="off"
           spellCheck={false}
-          placeholder="Search Slack to add people…"
+          placeholder={placeholder}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -268,119 +318,6 @@ function ChevronDownIcon({ className, open }: { className?: string; open?: boole
   );
 }
 
-function ManagerPickerModal({
-  team,
-  rosterById,
-  onClose,
-  onConfirm,
-}: {
-  team: ManagerTeam;
-  rosterById: Map<string, SlackWorkspaceMember>;
-  onClose: () => void;
-  onConfirm: (slackUserId: string) => void;
-}) {
-  const titleId = useId();
-  const initial =
-    team.members.find((m) => m.slack_user_id === team.manager_slack_user_id)?.slack_user_id ??
-    team.members[0]?.slack_user_id ??
-    "";
-  const [choice, setChoice] = useState(initial);
-
-  useEffect(() => {
-    setChoice(
-      team.members.find((m) => m.slack_user_id === team.manager_slack_user_id)?.slack_user_id ??
-        team.members[0]?.slack_user_id ??
-        "",
-    );
-  }, [team.id, team.manager_slack_user_id, team.members]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const canSave = Boolean(choice && team.members.some((m) => m.slack_user_id === choice));
-
-  return (
-    <div className="fixed inset-0 z-[100]" role="presentation">
-      <button
-        type="button"
-        className="absolute inset-0 z-0 bg-zinc-900/40 backdrop-blur-[1px]"
-        aria-label="Close dialog"
-        onClick={onClose}
-      />
-      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          className="pointer-events-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]"
-        >
-          <h2 id={titleId} className="text-lg font-semibold tracking-tight text-[#0F0F12]">
-            Choose team manager
-          </h2>
-          <p className="mt-2 text-base leading-relaxed text-zinc-600">
-            Pick who leads this team. They stay listed first with the Manager badge.
-          </p>
-          <ul className="mt-4 max-h-[min(50vh,20rem)] space-y-2 overflow-y-auto">
-            {team.members.map((m) => {
-              const row = rosterById.get(m.slack_user_id);
-              const display = m.label.trim() || m.username;
-              const sel = choice === m.slack_user_id;
-              return (
-                <li key={m.slack_user_id}>
-                  <label
-                    className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
-                      sel ? "border-zinc-400 bg-zinc-100" : "border-zinc-200 hover:bg-zinc-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`mgr-${team.id}`}
-                      className="h-4 w-4 shrink-0 accent-zinc-700"
-                      checked={sel}
-                      onChange={() => setChoice(m.slack_user_id)}
-                    />
-                    <SlackUserAvatar imageUrl={row?.image_48 ?? null} name={display} size="md" />
-                    <span className="min-w-0 flex-1 text-base font-medium text-[#0F0F12]">{m.label}</span>
-                    <span className="shrink-0 text-sm text-zinc-500">@{m.username}</span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-6 flex flex-wrap justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-base font-semibold text-zinc-800 hover:bg-zinc-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={!canSave}
-              onClick={() => {
-                if (canSave) {
-                  onConfirm(choice);
-                }
-              }}
-              className={workspacePrimaryButtonBase}
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function WorkspaceManagersTab() {
   const apiBase = productApiBase();
   const qc = useQueryClient();
@@ -412,14 +349,13 @@ export default function WorkspaceManagersTab() {
 
   const [teams, setTeams] = useState<ManagerTeam[]>([]);
   const [dirty, setDirty] = useState(false);
-  /** Teams showing name field + Slack picker; incomplete teams always behave as editing. */
+  /** Row ids with the detailed form expanded (Edit / new row via Add manager). */
   const [editingTeamIds, setEditingTeamIds] = useState<Set<string>>(() => new Set());
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const saveDialogTitleId = useId();
   const teamMenuBaseId = useId();
   const [teamActionsMenuId, setTeamActionsMenuId] = useState<string | null>(null);
   const teamActionsMenuRef = useRef<HTMLDivElement | null>(null);
-  const [managerModalTeamId, setManagerModalTeamId] = useState<string | null>(null);
   const [saveValidationError, setSaveValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -428,14 +364,19 @@ export default function WorkspaceManagersTab() {
     }
     const next = defaultTeamsFromOnboarding(ob.data.answers);
     setTeams(next);
+    setEditingTeamIds(new Set());
     setDirty(false);
-    setEditingTeamIds(new Set(next.filter((t) => !isTeamStructurallyComplete(t)).map((t) => t.id)));
   }, [ob.data?.id, ob.data?.version, ob.data?.answers]);
 
   const saveMut = useMutation({
     mutationFn: async () => {
+      const apiTeams = teamsForOnboardingApi(teams);
       await patchOnboarding(apiBase, {
-        answers: { workspace_manager_teams: { teams } },
+        answers: {
+          workspace_manager_teams: { teams: apiTeams },
+          vector_manager_access_mode: legacyVectorManagerAccessModeFromTeams(teams),
+          vector_company_wide_users: legacyVectorCompanyWideUsersFromTeams(teams),
+        },
       });
     },
     onSuccess: async () => {
@@ -466,8 +407,9 @@ export default function WorkspaceManagersTab() {
       return;
     }
     const onDocPointer = (e: MouseEvent | TouchEvent) => {
-      const el = teamActionsMenuRef.current;
-      if (el && !el.contains(e.target as Node)) {
+      const t = e.target as Node;
+      const moreEl = teamActionsMenuRef.current;
+      if (moreEl && !moreEl.contains(t)) {
         setTeamActionsMenuId(null);
       }
     };
@@ -490,19 +432,12 @@ export default function WorkspaceManagersTab() {
     setSaveValidationError(null);
   }, [teams]);
 
-  useEffect(() => {
-    if (!managerModalTeamId) {
-      return;
-    }
-    const t = teams.find((x) => x.id === managerModalTeamId);
-    if (!t || t.members.length === 0) {
-      setManagerModalTeamId(null);
-    }
-  }, [managerModalTeamId, teams]);
-
   const addTeam = useCallback(() => {
     const id = crypto.randomUUID();
-    setTeams((prev) => [...prev, { id, name: "", members: [], manager_slack_user_id: null }]);
+    setTeams((prev) => [
+      ...prev,
+      { id, name: "", members: [], manager_slack_user_id: null, access_scope: "scoped" },
+    ]);
     setEditingTeamIds((prev) => new Set(prev).add(id));
     setDirty(true);
   }, []);
@@ -531,15 +466,31 @@ export default function WorkspaceManagersTab() {
         if (t.members.some((m) => m.slack_user_id === member.id)) {
           return t;
         }
+        const collab = {
+          slack_user_id: member.id,
+          username: member.username,
+          label: member.label,
+        };
+        if (t.access_scope === "scoped") {
+          if (t.manager_slack_user_id == null) {
+            return t;
+          }
+          if (member.id === t.manager_slack_user_id) {
+            return t;
+          }
+          return { ...t, members: [...t.members, collab] };
+        }
+        if (t.access_scope === "all" && t.members.length >= 1) {
+          const nextMembers = [...t.members, collab];
+          return {
+            ...t,
+            access_scope: "scoped",
+            members: nextMembers,
+            manager_slack_user_id: t.manager_slack_user_id ?? member.id,
+          };
+        }
         const wasEmpty = t.members.length === 0;
-        const nextMembers = [
-          ...t.members,
-          {
-            slack_user_id: member.id,
-            username: member.username,
-            label: member.label,
-          },
-        ];
+        const nextMembers = [...t.members, collab];
         return {
           ...t,
           members: nextMembers,
@@ -551,8 +502,72 @@ export default function WorkspaceManagersTab() {
     setDirty(true);
   }, []);
 
+  const assignManagerFromRoster = useCallback(
+    (teamId: string, member: SlackWorkspaceMember): boolean => {
+      if (teams.some((t) => t.id !== teamId && t.manager_slack_user_id === member.id)) {
+        setSaveValidationError("That Slack user is already the manager on another row.");
+        return false;
+      }
+      setSaveValidationError(null);
+      const collab: SlackCollaboratorMember = {
+        slack_user_id: member.id,
+        username: member.username,
+        label: member.label,
+      };
+      setTeams((prev) =>
+        prev.map((t) => {
+          if (t.id !== teamId) {
+            return t;
+          }
+          if (t.access_scope === "all") {
+            return {
+              ...t,
+              manager_slack_user_id: member.id,
+              members: [collab],
+            };
+          }
+          const oldMgr = t.manager_slack_user_id;
+          const rest = t.members.filter(
+            (m) =>
+              (oldMgr == null || m.slack_user_id !== oldMgr) && m.slack_user_id !== member.id,
+          );
+          return {
+            ...t,
+            manager_slack_user_id: member.id,
+            members: [collab, ...rest],
+          };
+        }),
+      );
+      setDirty(true);
+      return true;
+    },
+    [teams],
+  );
+
+  const setTeamAccessScope = useCallback((teamId: string, scope: ManagerAccessScope) => {
+    setTeams((prev) =>
+      prev.map((t) => {
+        if (t.id !== teamId) {
+          return t;
+        }
+        if (scope === "all") {
+          const mgr = t.manager_slack_user_id;
+          const row = mgr ? t.members.find((m) => m.slack_user_id === mgr) : undefined;
+          return {
+            ...t,
+            access_scope: "all",
+            members: row ? [row] : [],
+            manager_slack_user_id: row ? mgr : null,
+          };
+        }
+        return { ...t, access_scope: "scoped" };
+      }),
+    );
+    setDirty(true);
+  }, []);
+
   const removeMember = useCallback((teamId: string, slackUserId: string) => {
-    let openManagerModalFor: string | null = null;
+    let expandEditorFor: string | null = null;
     setTeams((prev) => {
       const next = prev.map((t) => {
         if (t.id !== teamId) {
@@ -562,7 +577,7 @@ export default function WorkspaceManagersTab() {
         const clearMgr = t.manager_slack_user_id === slackUserId;
         const nextMgr = clearMgr ? null : t.manager_slack_user_id;
         if (clearMgr && nextMembers.length > 0) {
-          openManagerModalFor = teamId;
+          expandEditorFor = teamId;
         }
         return {
           ...t,
@@ -570,34 +585,13 @@ export default function WorkspaceManagersTab() {
           manager_slack_user_id: nextMgr,
         };
       });
-      const updated = next.find((t) => t.id === teamId);
-      if (updated && !isTeamStructurallyComplete(updated)) {
-        queueMicrotask(() => setEditingTeamIds((e) => new Set(e).add(teamId)));
-      }
       return next;
     });
     setDirty(true);
-    if (openManagerModalFor) {
-      setManagerModalTeamId(openManagerModalFor);
+    const teamIdToExpand = expandEditorFor;
+    if (teamIdToExpand) {
+      setEditingTeamIds((prev) => new Set(prev).add(teamIdToExpand));
     }
-  }, []);
-
-  const setTeamManager = useCallback((teamId: string, slackUserId: string | null) => {
-    setTeams((prev) =>
-      prev.map((t) => {
-        if (t.id !== teamId) {
-          return t;
-        }
-        if (slackUserId === null) {
-          return { ...t, manager_slack_user_id: null };
-        }
-        if (!t.members.some((m) => m.slack_user_id === slackUserId)) {
-          return t;
-        }
-        return { ...t, manager_slack_user_id: slackUserId };
-      }),
-    );
-    setDirty(true);
   }, []);
 
   if (ob.isPending || !ob.data) {
@@ -613,7 +607,7 @@ export default function WorkspaceManagersTab() {
       <div className={`${workspaceFlatPanel} p-4 sm:p-5`}>
         <p className={`${marketingBody} text-base text-zinc-600`}>
           Connect Slack from <span className="font-medium text-zinc-800">Signals</span> to load your roster and assign
-          people to teams.
+          Vector users on this page.
         </p>
       </div>
     );
@@ -623,8 +617,14 @@ export default function WorkspaceManagersTab() {
     ? workspacePrimaryButtonBase
     : "rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-base font-semibold text-zinc-900 enabled:hover:bg-zinc-50 disabled:opacity-40";
 
-  /** One strong primary per toolbar: save when dirty, otherwise “Add team”. */
+  /** One strong primary per toolbar: save when dirty, otherwise “Add access group”. */
   const addTeamBtnClass = dirty ? workspaceSecondaryButtonBase : workspacePrimaryButtonToolbar;
+
+  const saveValidationBlock = validateWorkspaceAccessSave(teams);
+  const canSaveChanges = Boolean(dirty && !saveMut.isPending && saveValidationBlock === null);
+  /** New rows only after every existing row has a manager (empty list is allowed so the first row can be added). */
+  const canAddManagerRow =
+    !saveMut.isPending && teams.every((t) => t.manager_slack_user_id != null);
 
   return (
     <div className="space-y-4">
@@ -634,46 +634,386 @@ export default function WorkspaceManagersTab() {
         </p>
       ) : null}
 
-      {dirty ? (
-        <p
-          className="rounded-lg border border-amber-200/90 bg-amber-50 px-4 py-3 text-base leading-relaxed text-amber-950"
-          role="status"
-        >
-          You have unsaved changes. Click <span className="font-semibold">Save changes</span> to update teams for
-          everyone in this workspace—or refresh to discard edits.
-        </p>
-      ) : null}
+      <section className={workspaceFlatPanel}>
+        <header className="border-b border-zinc-100 bg-zinc-50/60 px-5 py-5 sm:px-8 sm:py-6">
+          <h2 className="text-xl font-bold tracking-tight text-zinc-900">Workspace access</h2>
+        </header>
 
-      {saveValidationError ? (
-        <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-base leading-snug text-rose-950" role="alert">
-          {saveValidationError}
-        </p>
-      ) : null}
+        <div className="space-y-8 px-5 py-6 sm:px-8 sm:py-8">
+          {saveValidationError ? (
+            <p
+              className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-base leading-snug text-rose-950"
+              role="alert"
+            >
+              {saveValidationError}
+            </p>
+          ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="min-w-0 text-xl font-bold tracking-tight text-zinc-900">Teams</h2>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <button type="button" onClick={addTeam} className={addTeamBtnClass}>
-            Add team
-          </button>
-          <button
-            type="button"
-            disabled={!dirty || saveMut.isPending}
-            onClick={() => {
-              const err = validateTeamsForSave(teams);
-              if (err) {
-                setSaveValidationError(err);
-                return;
-              }
-              setSaveValidationError(null);
-              setSaveConfirmOpen(true);
-            }}
-            className={saveBtnClass}
-          >
-            {saveMut.isPending ? "Saving…" : "Save changes"}
-          </button>
+          <div>
+            <h3 className="text-base font-semibold text-zinc-900">Managers</h3>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-600">
+              <span className="font-medium text-zinc-800">All access</span> gives that manager full org context in
+              Vector. <span className="font-medium text-zinc-800">Scoped access</span> means they only see data about the
+              people you choose for that row.
+            </p>
+
+            <div className="mt-6 space-y-6">
+              {teams.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/40 px-4 py-10 text-center sm:px-8">
+                  <p className="text-base font-medium text-zinc-800">No managers yet</p>
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Use <span className="font-medium text-zinc-800">Add manager</span> below, then fill in each row in
+                    the table.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-zinc-100">
+                  <table className="w-full min-w-0 border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 bg-zinc-50/90 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                        <th className="whitespace-nowrap px-4 py-3 sm:px-5">Manager</th>
+                        <th className="whitespace-nowrap px-4 py-3 sm:px-5">Access</th>
+                        <th className="min-w-[8rem] px-4 py-3 sm:px-5">People in scope</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-right sm:px-5">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 bg-white">
+                      {teams.map((team) => {
+                        const editing = editingTeamIds.has(team.id);
+                        const expanded = editing;
+                        const mgr = managerMember(team);
+                        const others = scopedMembersExcludingManager(team);
+                        const peopleSummary =
+                          team.access_scope === "all"
+                            ? "Full workspace"
+                            : others.length === 0
+                              ? "Manager only"
+                              : others.map((m) => m.label.trim() || m.username).join(", ");
+                        const scopeSegment = (scope: ManagerAccessScope, label: string, hint: string) => (
+                          <button
+                            key={scope}
+                            type="button"
+                            onClick={() => setTeamAccessScope(team.id, scope)}
+                            className={`flex-1 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition sm:px-4 ${
+                              team.access_scope === scope
+                                ? "border border-[#E878BE] bg-white text-zinc-900 shadow-sm ring-1 ring-[#E878BE]/25"
+                                : "border border-transparent text-zinc-600 hover:bg-white/80"
+                            }`}
+                          >
+                            <span className="block">{label}</span>
+                            <span className="mt-0.5 block text-xs font-normal leading-snug text-zinc-500">{hint}</span>
+                          </button>
+                        );
+                        const toggleRowEditor = () => {
+                          setEditingTeamIds((prev) => {
+                            const n = new Set(prev);
+                            if (n.has(team.id)) {
+                              n.delete(team.id);
+                            } else {
+                              n.add(team.id);
+                            }
+                            return n;
+                          });
+                        };
+                        return (
+                          <Fragment key={team.id}>
+                            <tr className={expanded ? "bg-zinc-50/90" : "hover:bg-zinc-50/60"}>
+                              <td className="max-w-[12rem] px-4 py-3 align-middle sm:max-w-none sm:px-5">
+                                {mgr ? (
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <SlackUserAvatar
+                                      imageUrl={rosterById.get(mgr.slack_user_id)?.image_48 ?? null}
+                                      name={mgr.label.trim() || mgr.username}
+                                      size="md"
+                                    />
+                                    <div className="min-w-0">
+                                      <p className="truncate font-semibold text-zinc-900">{mgr.label}</p>
+                                      <p className="truncate text-xs text-zinc-500">@{mgr.username}</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-zinc-400">Not set</span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 align-middle sm:px-5">
+                                <span className="text-sm font-medium text-zinc-800">
+                                  {team.access_scope === "all" ? "All access" : "Scoped"}
+                                </span>
+                              </td>
+                              <td className="max-w-[14rem] px-4 py-3 align-middle text-zinc-700 sm:max-w-md sm:px-5">
+                                <p className="line-clamp-2 text-sm leading-snug" title={peopleSummary}>
+                                  {peopleSummary}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 align-middle sm:px-5">
+                                <div className="flex flex-col items-stretch gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+                                  <div
+                                    ref={teamActionsMenuId === team.id ? teamActionsMenuRef : undefined}
+                                    className="relative flex justify-end sm:inline-flex"
+                                  >
+                                    <button
+                                      type="button"
+                                      className={`${rowCtaQuietClass} flex w-full items-center justify-center gap-1 sm:w-auto`}
+                                      aria-expanded={teamActionsMenuId === team.id}
+                                      aria-haspopup="menu"
+                                      aria-controls={
+                                        teamActionsMenuId === team.id ? `${teamMenuBaseId}-menu-${team.id}` : undefined
+                                      }
+                                      aria-label="More actions"
+                                      onClick={() => {
+                                        setTeamActionsMenuId((cur) => (cur === team.id ? null : team.id));
+                                      }}
+                                    >
+                                      More
+                                      <ChevronDownIcon
+                                        className="h-4 w-4 shrink-0 opacity-70"
+                                        open={teamActionsMenuId === team.id}
+                                      />
+                                    </button>
+                                    {teamActionsMenuId === team.id ? (
+                                      <div
+                                        id={`${teamMenuBaseId}-menu-${team.id}`}
+                                        role="menu"
+                                        aria-label="More actions"
+                                        className="absolute right-0 bottom-full z-[80] mb-1.5 min-w-[12rem] rounded-xl border border-zinc-200/90 bg-white py-1 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.2)] ring-1 ring-zinc-950/5"
+                                      >
+                                        <Link
+                                          to={workspaceAccessGroupPath(team.id)}
+                                          role="menuitem"
+                                          className="flex w-full items-center px-3 py-2.5 text-left text-base font-medium text-zinc-800 no-underline hover:bg-zinc-50"
+                                          onClick={() => setTeamActionsMenuId(null)}
+                                        >
+                                          Manager space
+                                        </Link>
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          className="flex w-full items-center px-3 py-2.5 text-left text-base font-medium text-zinc-800 hover:bg-zinc-50"
+                                          onClick={() => {
+                                            setTeamActionsMenuId(null);
+                                            toggleRowEditor();
+                                          }}
+                                        >
+                                          {editing ? "Close editor" : "Edit"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          className="flex w-full items-center px-3 py-2.5 text-left text-base font-medium text-rose-700 hover:bg-rose-50"
+                                          onClick={() => {
+                                            setTeamActionsMenuId(null);
+                                            removeTeam(team.id);
+                                          }}
+                                        >
+                                          Remove manager
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                            {expanded ? (
+                              <tr className="bg-zinc-50/80">
+                                <td colSpan={4} className="px-4 py-5 sm:px-6">
+                                  <div className="mx-auto max-w-3xl space-y-5">
+                                    <div className="rounded-xl border border-zinc-100 bg-white p-4 sm:p-5">
+                                      <p className={labelClass}>Pick Manager</p>
+                                      {team.manager_slack_user_id ? (
+                                        <ul className="mt-2 flex flex-wrap gap-2">
+                                          {(() => {
+                                            const m = team.members.find(
+                                              (x) => x.slack_user_id === team.manager_slack_user_id,
+                                            );
+                                            if (!m) {
+                                              return null;
+                                            }
+                                            const rosterRow = rosterById.get(m.slack_user_id);
+                                            const display = m.label.trim() || m.username;
+                                            return (
+                                              <li
+                                                key={m.slack_user_id}
+                                                className="inline-flex max-w-full items-center gap-2 rounded-lg bg-zinc-100 py-1.5 pl-1.5 pr-1.5 text-zinc-900"
+                                              >
+                                                <SlackUserAvatar
+                                                  imageUrl={rosterRow?.image_48 ?? null}
+                                                  name={display}
+                                                  size="md"
+                                                />
+                                                <span className="min-w-0 truncate text-base font-medium text-[#0F0F12]">
+                                                  {m.label}
+                                                </span>
+                                                <span className="shrink-0 text-sm text-zinc-500">@{m.username}</span>
+                                                <span className="shrink-0 rounded-sm bg-zinc-200/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600 sm:text-[11px]">
+                                                  Manager
+                                                </span>
+                                              </li>
+                                            );
+                                          })()}
+                                        </ul>
+                                      ) : (
+                                        <p className="mt-2 text-base text-zinc-500">Pick who leads this row.</p>
+                                      )}
+                                      {slackMembers.isPending ? (
+                                        <p className="mt-3 text-base text-zinc-500">Loading Slack directory…</p>
+                                      ) : (
+                                        <div className="mt-3">
+                                          <SlackMemberCombobox
+                                            candidates={slackCandidatesForManagerPicker(
+                                              rosterSanitized,
+                                              teams,
+                                              team.id,
+                                              team.manager_slack_user_id,
+                                            )}
+                                            slackDirectoryEmpty={rosterSanitized.length === 0}
+                                            onPick={(m) => assignManagerFromRoster(team.id, m)}
+                                            placeholder="Search Slack to choose or change manager…"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <p className={labelClass}>Scope</p>
+                                      <div
+                                        className="mt-2 flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-1.5 sm:flex-row"
+                                        role="group"
+                                        aria-label="Scope"
+                                      >
+                                        {scopeSegment("all", "All access", "Full workspace context for this manager.")}
+                                        {scopeSegment(
+                                          "scoped",
+                                          "Scoped",
+                                          "This manager only sees data about the people you select for this row.",
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label htmlFor={`team-name-${team.id}`} className={labelClass}>
+                                        Manager&apos;s team / scope <span className="font-normal text-zinc-400">(optional)</span>
+                                      </label>
+                                      <input
+                                        id={`team-name-${team.id}`}
+                                        type="text"
+                                        value={team.name}
+                                        onChange={(e) => updateTeamName(team.id, e.target.value)}
+                                        placeholder="e.g. Design leadership"
+                                        className={`${inputBase} mt-1.5`}
+                                      />
+                                    </div>
+                                    {team.access_scope === "scoped" ? (
+                                      <div>
+                                        <p className={labelClass}>Team members in scope</p>
+                                        <p className="mt-1 text-sm leading-relaxed text-zinc-500">
+                                          Whose data they can access besides their own.
+                                        </p>
+                                        {team.manager_slack_user_id == null ? (
+                                          <p className="mt-2 text-base text-zinc-500">
+                                            Choose a manager above before adding other people.
+                                          </p>
+                                        ) : scopedMembersExcludingManager(team).length === 0 ? null : (
+                                          <ul className="mt-2 flex flex-wrap gap-2">
+                                            {scopedMembersExcludingManager(team).map((m) => {
+                                              const rosterRow = rosterById.get(m.slack_user_id);
+                                              const avatarUrl = rosterRow?.image_48 ?? null;
+                                              const display = m.label.trim() || m.username;
+                                              return (
+                                                <li
+                                                  key={m.slack_user_id}
+                                                  className="inline-flex max-w-full items-center gap-2 rounded-lg bg-zinc-100 py-1.5 pl-1.5 pr-1.5 text-zinc-900"
+                                                >
+                                                  <SlackUserAvatar imageUrl={avatarUrl} name={display} size="md" />
+                                                  <span className="min-w-0 truncate text-base font-medium text-[#0F0F12]">
+                                                    {m.label}
+                                                  </span>
+                                                  <span className="shrink-0 text-sm text-zinc-500">@{m.username}</span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => removeMember(team.id, m.slack_user_id)}
+                                                    className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded text-lg leading-none text-zinc-400 hover:bg-white/85 hover:text-rose-700"
+                                                    aria-label={`Remove ${m.label} from scope`}
+                                                  >
+                                                    ×
+                                                  </button>
+                                                </li>
+                                              );
+                                            })}
+                                          </ul>
+                                        )}
+                                        {slackMembers.isPending ? (
+                                          <p className="mt-3 text-base text-zinc-500">Loading Slack directory…</p>
+                                        ) : team.manager_slack_user_id == null ? null : (
+                                          <div className="mt-3">
+                                            <SlackMemberCombobox
+                                              candidates={slackCandidatesForScopeMembers(rosterSanitized, team)}
+                                              slackDirectoryEmpty={rosterSanitized.length === 0}
+                                              onPick={(m) => addMemberFromRoster(team.id, m)}
+                                              placeholder="Search Slack to add people in scope…"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4 border-t border-zinc-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+              <p
+                className={`text-sm leading-snug sm:max-w-md ${dirty ? "font-medium text-amber-900" : "text-zinc-500"}`}
+                role={dirty ? "status" : undefined}
+              >
+                {dirty
+                  ? "Unsaved changes—save to apply for everyone in this workspace, or refresh to discard."
+                  : "Changes are local until you save."}
+              </p>
+              <div className="flex flex-wrap items-center justify-end gap-2 sm:shrink-0">
+                <button
+                  type="button"
+                  disabled={!canAddManagerRow}
+                  title={
+                    canAddManagerRow
+                      ? undefined
+                      : "Choose a Slack manager on each row before adding another."
+                  }
+                  onClick={addTeam}
+                  className={`${addTeamBtnClass} disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  Add manager
+                </button>
+                <button
+                  type="button"
+                  disabled={!canSaveChanges}
+                  title={
+                    canSaveChanges || !dirty
+                      ? undefined
+                      : saveValidationBlock ?? "Fix the manager list before saving."
+                  }
+                  onClick={() => {
+                    if (saveValidationBlock) {
+                      setSaveValidationError(saveValidationBlock);
+                      return;
+                    }
+                    setSaveValidationError(null);
+                    setSaveConfirmOpen(true);
+                  }}
+                  className={`${saveBtnClass} disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  {saveMut.isPending ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {saveConfirmOpen ? (
         <div className="fixed inset-0 z-[100]" role="presentation">
@@ -690,242 +1030,44 @@ export default function WorkspaceManagersTab() {
               aria-labelledby={saveDialogTitleId}
               className="pointer-events-auto w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]"
             >
-            <h2 id={saveDialogTitleId} className="text-lg font-semibold tracking-tight text-[#0F0F12]">
-              Save team changes?
-            </h2>
-            <p className="mt-2 text-base leading-relaxed text-zinc-600">
-              This updates team names, managers, and members for <span className="font-medium text-zinc-800">everyone</span>{" "}
-              in this workspace.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-              <button
-                type="button"
-                disabled={saveMut.isPending}
-                onClick={() => setSaveConfirmOpen(false)}
-                className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-base font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saveMut.isPending}
-                onClick={() => {
-                  const err = validateTeamsForSave(teams);
-                  if (err) {
-                    setSaveValidationError(err);
-                    setSaveConfirmOpen(false);
-                    return;
-                  }
-                  setSaveValidationError(null);
-                  saveMut.mutate();
-                }}
-                className={`${workspacePrimaryButtonBase} disabled:opacity-50`}
-              >
-                {saveMut.isPending ? "Saving…" : "Yes, save"}
-              </button>
-            </div>
+              <h2 id={saveDialogTitleId} className="text-lg font-semibold tracking-tight text-[#0F0F12]">
+                Save roster?
+              </h2>
+              <p className="mt-2 text-base leading-relaxed text-zinc-600">
+                This saves each manager&apos;s access type (all vs scoped) and Slack roster for{" "}
+                <span className="font-medium text-zinc-800">everyone</span> in this workspace.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={saveMut.isPending}
+                  onClick={() => setSaveConfirmOpen(false)}
+                  className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-base font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={saveMut.isPending}
+                  onClick={() => {
+                    const err = validateWorkspaceAccessSave(teams);
+                    if (err) {
+                      setSaveValidationError(err);
+                      setSaveConfirmOpen(false);
+                      return;
+                    }
+                    setSaveValidationError(null);
+                    saveMut.mutate();
+                  }}
+                  className={`${workspacePrimaryButtonBase} disabled:opacity-50`}
+                >
+                  {saveMut.isPending ? "Saving…" : "Yes, save"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       ) : null}
-
-      {teams.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/60 px-4 py-8 text-center text-base text-zinc-600">
-          No teams yet. Add one, then pick people from your Slack directory.
-        </p>
-      ) : (
-        <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          {teams.map((team) => {
-            const complete = isTeamStructurallyComplete(team);
-            const editing = editingTeamIds.has(team.id);
-            const showEditor = !complete || editing;
-            return (
-              <li
-                key={team.id}
-                className={`${workspaceFlatPanel} relative flex flex-col px-5 pb-5 pt-3 sm:px-6 sm:pb-6 sm:pt-3`}
-              >
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    {showEditor ? (
-                      <>
-                        <label htmlFor={`team-name-${team.id}`} className="sr-only">
-                          Team name
-                        </label>
-                        <input
-                          id={`team-name-${team.id}`}
-                          type="text"
-                          value={team.name}
-                          onChange={(e) => updateTeamName(team.id, e.target.value)}
-                          placeholder="Team name"
-                          className={inputBase}
-                        />
-                      </>
-                    ) : (
-                      <h3 className="truncate pt-1.5 text-lg font-semibold tracking-tight text-zinc-900">
-                        {team.name.trim()}
-                      </h3>
-                    )}
-                  </div>
-                  <div
-                    ref={teamActionsMenuId === team.id ? teamActionsMenuRef : undefined}
-                    className="relative z-20 shrink-0"
-                  >
-                    <button
-                      type="button"
-                      className="flex h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400"
-                      aria-expanded={teamActionsMenuId === team.id}
-                      aria-haspopup="menu"
-                      aria-controls={
-                        teamActionsMenuId === team.id ? `${teamMenuBaseId}-menu-${team.id}` : undefined
-                      }
-                      aria-label="Team actions"
-                      onClick={() =>
-                        setTeamActionsMenuId((cur) => (cur === team.id ? null : team.id))
-                      }
-                    >
-                      <ChevronDownIcon open={teamActionsMenuId === team.id} />
-                    </button>
-                    {teamActionsMenuId === team.id ? (
-                      <div
-                        id={`${teamMenuBaseId}-menu-${team.id}`}
-                        role="menu"
-                        aria-label="Team actions"
-                        className="absolute right-0 top-full z-30 mt-1.5 min-w-[14rem] rounded-xl border border-zinc-200/90 bg-white py-1 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.2)] ring-1 ring-zinc-950/5"
-                      >
-                        <Link
-                          to={`/app/teams/${team.id}`}
-                          role="menuitem"
-                          className="flex w-full items-center px-3 py-2.5 text-left text-base font-medium text-zinc-800 no-underline hover:bg-zinc-50"
-                          onClick={() => setTeamActionsMenuId(null)}
-                        >
-                          Team space
-                        </Link>
-                        {!showEditor ? (
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="flex w-full items-center px-3 py-2.5 text-left text-base font-medium text-zinc-800 hover:bg-zinc-50"
-                            onClick={() => {
-                              setTeamActionsMenuId(null);
-                              setEditingTeamIds((prev) => new Set(prev).add(team.id));
-                            }}
-                          >
-                            Edit team
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={team.members.length === 0}
-                          title={team.members.length === 0 ? "Add at least one person from Slack first" : undefined}
-                          className="flex w-full items-center px-3 py-2.5 text-left text-base font-medium text-zinc-800 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
-                          onClick={() => {
-                            if (team.members.length === 0) {
-                              return;
-                            }
-                            setTeamActionsMenuId(null);
-                            setManagerModalTeamId(team.id);
-                          }}
-                        >
-                          Change team manager
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="flex w-full items-center px-3 py-2.5 text-left text-base font-medium text-rose-700 hover:bg-rose-50"
-                          onClick={() => {
-                            setTeamActionsMenuId(null);
-                            removeTeam(team.id);
-                          }}
-                        >
-                          Remove team
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <p className={labelClass}>Members</p>
-                  {team.members.length === 0 ? (
-                    <p className="mt-2 text-base text-zinc-500">None yet.</p>
-                  ) : (
-                    <ul className="mt-2 flex flex-wrap gap-2">
-                      {membersOrderedWithManagerFirst(team).map((m) => {
-                        const rosterRow = rosterById.get(m.slack_user_id);
-                        const avatarUrl = rosterRow?.image_48 ?? null;
-                        const display = m.label.trim() || m.username;
-                        const isManager =
-                          team.manager_slack_user_id !== null &&
-                          m.slack_user_id === team.manager_slack_user_id;
-                        return (
-                          <li
-                            key={m.slack_user_id}
-                            className="inline-flex max-w-full items-center gap-2 rounded-lg bg-zinc-100 py-1.5 pl-1.5 pr-1.5 text-zinc-900"
-                          >
-                            <SlackUserAvatar imageUrl={avatarUrl} name={display} size="md" />
-                            <span className="min-w-0 truncate text-base font-medium text-[#0F0F12]">{m.label}</span>
-                            <span className="shrink-0 text-sm text-zinc-500">@{m.username}</span>
-                            {isManager ? (
-                              <span className="shrink-0 rounded-sm bg-zinc-200/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-600 sm:text-[11px]">
-                                Manager
-                              </span>
-                            ) : null}
-                            {showEditor ? (
-                              <button
-                                type="button"
-                                onClick={() => removeMember(team.id, m.slack_user_id)}
-                                className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded text-lg leading-none text-zinc-400 hover:bg-white/85 hover:text-rose-700"
-                                aria-label={`Remove ${m.label} from team`}
-                              >
-                                ×
-                              </button>
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                {showEditor ? (
-                  slackMembers.isPending ? (
-                    <p className="mt-3 text-base text-zinc-500">Loading Slack directory…</p>
-                  ) : (
-                    <SlackMemberCombobox
-                      candidates={rosterSanitized.filter(
-                        (u) => !team.members.some((m) => m.slack_user_id === u.id),
-                      )}
-                      slackDirectoryEmpty={rosterSanitized.length === 0}
-                      onPick={(m) => addMemberFromRoster(team.id, m)}
-                    />
-                  )
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {managerModalTeamId
-        ? (() => {
-            const tm = teams.find((t) => t.id === managerModalTeamId);
-            if (!tm || tm.members.length === 0) {
-              return null;
-            }
-            return (
-              <ManagerPickerModal
-                team={tm}
-                rosterById={rosterById}
-                onClose={() => setManagerModalTeamId(null)}
-                onConfirm={(id) => {
-                  setTeamManager(tm.id, id);
-                  setManagerModalTeamId(null);
-                }}
-              />
-            );
-          })()
-        : null}
     </div>
   );
 }

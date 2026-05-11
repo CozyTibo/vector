@@ -51,10 +51,9 @@ def test_build_temporal_ordering_key_orders_by_occurred_then_sequence() -> None:
 
 def test_ontology_includes_temporal_pointer_section() -> None:
     doc = build_phase03_step01_ontology_public_document()
-    assert doc["ontology_schema_version"] == 20
-    assert ONTOLOGY_SCHEMA_VERSION == 20
-    assert doc["implementation_step"] == 18
-    assert doc["completed_implementation_steps"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    assert doc["ontology_schema_version"] == ONTOLOGY_SCHEMA_VERSION
+    assert doc["implementation_step"] == 22
+    assert doc["completed_implementation_steps"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
     assert doc["temporal_supersessions_list_route"]
     assert doc["temporal_rebuild_preview_route"]
     assert doc["temporal_ordering_precedence"]

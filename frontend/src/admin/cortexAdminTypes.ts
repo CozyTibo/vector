@@ -356,6 +356,89 @@ export type CortexCanonicalCertificationArchivesList = {
   }>;
 };
 
+export type CortexOrgIdentityCertificationClosureGate = {
+  id: string;
+  name: string;
+  passed: boolean;
+  severity: string;
+  detail?: Record<string, unknown>;
+};
+
+export type CortexOrgIdentityCertificationPack = {
+  org_certification_pack_schema_version: number;
+  tenant_id: string;
+  built_at_clock: string;
+  canonical_verification_excerpt: Record<string, unknown>;
+  phase04_gate_excerpt: Record<string, unknown>;
+  identity_control_plane_excerpt: Record<string, unknown>;
+  readiness_economics_excerpt: Record<string, unknown>;
+  org_verification_last_excerpt: Record<string, unknown>;
+  doctrine_notes: Record<string, unknown>;
+  closure_gate_matrix: CortexOrgIdentityCertificationClosureGate[];
+  org_identity_certification_pack_contract: { passed: boolean; errors?: string[] };
+};
+
+export type CortexOrgIdentityCertificationArchiveResult = {
+  persisted: boolean;
+  passed: boolean;
+  archive_id: number | null;
+  org_certification_pack_schema_version: number;
+  tenant_id: string;
+  pack: Record<string, unknown>;
+};
+
+export type CortexOrgIdentityCertificationArchivesList = {
+  org_certification_pack_schema_version: number;
+  tenant_id: string;
+  archives: Array<{
+    id: number;
+    tenant_id: string;
+    org_certification_pack_schema_version: number;
+    passed: boolean;
+    created_at: string;
+  }>;
+};
+
+/** ``GET …/cortex/identity/handles`` — org_handle_list_row_v1 rows. */
+export type CortexIdentityHandleListRow = {
+  handle_id: string;
+  kind: string;
+  created_from: string;
+  persona_count: number;
+  active_links: number;
+  temporal_state: string;
+  merge_state: string;
+  last_replay: string;
+  confidence_posture: string;
+  candidate_persona_touch_count?: number;
+  candidate_any_touch_count?: number;
+  open_ambiguity_touch_count?: number;
+  entity_kind_rule?: string | null;
+};
+
+export type CortexIdentityHandlesExplorerResponse = {
+  identity_operator_console_schema_version: number;
+  tenant_id: string;
+  list_contract: string;
+  rows: CortexIdentityHandleListRow[];
+};
+
+/** ``GET …/cortex/identity/handles/{id}`` — same shape as org entity. */
+export type CortexOrgEntityItem = {
+  org_entity_runtime_schema_version: number;
+  id: string;
+  tenant_id: string;
+  entity_kind: string;
+  lifecycle_state: string;
+  superseded_by_id: string | null;
+  identity_key_fingerprint: string;
+  metadata_json: Record<string, unknown>;
+  engine_build_ref: string;
+  tombstoned_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 /** Subset of backend `health_overview` used by the control-plane admin UI. */
 export type CortexCanonicalControlPlaneHealthOverview = {
   materialization_row_count: number;

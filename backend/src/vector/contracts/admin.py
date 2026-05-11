@@ -564,13 +564,13 @@ class AdminCortexFlushAndRerunRequest(BaseModel):
 
     confirmation: str = Field(
         ...,
-        description="Must exactly match the server phrase for flush + rerun Cortex pipeline (see admin UI).",
+        description="Must exactly match the server phrase for flush + rerun through Identity (see admin UI).",
     )
     canonical_batch_limit: int = Field(
         default=500,
         ge=1,
         le=5000,
-        description="Batch size for async canonical backlog drain after full ingestion rerun enqueue.",
+        description="Batch size for canonical backlog drain inside the flush+r rerun orchestrator (before anchor backfill).",
     )
 
 
@@ -580,7 +580,10 @@ class AdminCortexFlushAndRerunResponse(BaseModel):
     accepted: bool = True
     tenant_id: uuid.UUID
     enqueued_connectors: list[str]
-    canonical_backlog_task_id: str | None = None
+    canonical_backlog_task_id: str | None = Field(
+        default=None,
+        description="Celery id for the orchestrator task (ingestion syncs + canonical drain + org identity backfill).",
+    )
     canonical_batch_limit: int
     deleted_rows_total: int
     deleted_rows_by_table: dict[str, int]
@@ -1257,6 +1260,7 @@ class AdminCortexCanonicalOntologyResponse(BaseModel):
     failure_remediation_doctrine_anchors: list[str]
     verification_engine_surface_version: int
     canonical_verification_run_route: str
+    canonical_verification_repair_determinism_route: str
     canonical_verification_runs_list_route: str
     verification_engine_gate_ids: list[str]
     verification_engine_doctrine_anchors: list[str]
@@ -1290,6 +1294,97 @@ class AdminCortexCanonicalOntologyResponse(BaseModel):
     identity_anchors_list_route: str
     identity_anchor_detail_route: str
     identity_runtime_doctrine_anchors: list[str]
+    org_entity_runtime_surface_version: int
+    org_entity_list_route: str
+    org_entity_detail_route: str
+    org_handle_explorer_list_route: str
+    org_handle_explorer_detail_route: str
+    org_entity_runtime_doctrine_anchors: list[str]
+    link_ledger_runtime_surface_version: int
+    link_ledger_list_route: str
+    link_ledger_detail_route: str
+    link_ledger_revoke_route: str
+    link_candidate_queue_route: str
+    celery_task_regenerate_link_candidates: str
+    celery_task_replay_authoritative_links: str
+    link_ledger_runtime_doctrine_anchors: list[str]
+    link_hint_bucket_route: str
+    link_temporal_timeline_route: str
+    merge_governance_runtime_surface_version: int
+    merge_ledger_list_route: str
+    merge_ledger_append_route: str
+    merge_queue_list_route: str
+    merge_queue_detail_route: str
+    merge_governance_runtime_doctrine_anchors: list[str]
+    bundle_equivalence_runtime_surface_version: int
+    bundle_equivalence_list_route: str
+    bundle_equivalence_append_route: str
+    bundle_equivalence_runtime_doctrine_anchors: list[str]
+    org_link_replay_runtime_surface_version: int
+    org_link_replay_jobs_list_route: str
+    org_link_replay_job_detail_route: str
+    org_link_replay_job_run_route: str
+    org_link_replay_job_enqueue_route: str
+    identity_worker_task_status_route: str
+    org_link_replay_drift_taxonomy: list[dict[str, Any]]
+    celery_task_run_org_link_replay_job: str
+    org_link_replay_runtime_doctrine_anchors: list[str]
+    link_rule_version_runtime_surface_version: int
+    link_rule_versions_list_route: str
+    link_rule_version_append_route: str
+    link_rule_version_detail_route: str
+    link_rule_version_runtime_doctrine_anchors: list[str]
+    execution_primitive_persistence_surface_version: int
+    org_primitive_instances_list_route: str
+    org_primitive_explorer_list_route: str
+    org_primitive_explorer_detail_route: str
+    org_primitive_instance_detail_route: str
+    org_primitive_instance_append_route: str
+    execution_primitive_persistence_doctrine_anchors: list[str]
+    org_graph_projection_export_surface_version: int
+    org_graph_projection_export_route: str
+    org_graph_projection_preview_route: str
+    org_graph_projection_export_async_run_route: str
+    org_graph_projection_export_doctrine_anchors: list[str]
+    org_ambiguity_runtime_surface_version: int
+    org_ambiguities_list_route: str
+    org_ambiguity_detail_route: str
+    org_ambiguity_queue_list_route: str
+    org_ambiguity_queue_detail_route: str
+    org_ambiguity_append_route: str
+    org_ambiguity_runtime_doctrine_anchors: list[str]
+    org_identity_verification_engine_schema_version: int
+    org_identity_verification_run_route: str
+    org_identity_verification_runs_list_route: str
+    org_identity_verification_doctrine_anchors: list[str]
+    org_identity_backfill_surface_version: int
+    org_identity_backfill_schema_version: int
+    org_identity_backfill_from_anchors_route: str
+    org_identity_backfill_runs_route: str
+    org_identity_backfill_doctrine_anchors: list[str]
+    org_failure_remediation_surface_version: int
+    org_failures_route: str
+    org_remediation_validate_route: str
+    org_failure_classes_documented: list[str]
+    org_remediation_classes_documented: list[str]
+    org_failure_remediation_doctrine_anchors: list[str]
+    identity_control_plane_surface_version: int
+    identity_control_plane_route: str
+    identity_control_plane_contract: str
+    identity_operator_console_surface_version: int
+    identity_operator_console_http_routes: list[str]
+    identity_control_plane_doctrine_anchors: list[str]
+    identity_readiness_economics_surface_version: int
+    identity_readiness_economics_schema_version: int
+    identity_readiness_economics_route: str
+    identity_readiness_economics_contract: str
+    identity_readiness_economics_doctrine_anchors: list[str]
+    org_identity_certification_pack_surface_version: int
+    org_identity_certification_pack_route: str
+    org_identity_certification_pack_archive_route: str
+    org_identity_certification_pack_archives_route: str
+    org_identity_certification_pack_archive_detail_route: str
+    org_identity_certification_pack_doctrine_anchors: list[str]
     doctrine_anchors: list[str]
 
 
@@ -1604,6 +1699,31 @@ class AdminCortexCanonicalVerificationRunResponse(BaseModel):
     persisted_run_id: int | None = None
 
 
+class AdminCortexCanonicalDeterminismRepairRequest(BaseModel):
+    """Re-scan materializations vs oracle and rematerialize mismatches (G-P03-01 drift repair)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bundle_id: str | None = None
+    scan_limit: int = Field(default=500, ge=1, le=5000)
+    dry_run: bool = False
+
+
+class AdminCortexCanonicalDeterminismRepairResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transform_runtime_schema_version: int
+    tenant_id: str
+    bundle_id_filter: str | None
+    scanned_count: int
+    mismatch_count: int
+    resolution_failed_count: int
+    repaired_count: int
+    dry_run: bool
+    mismatch_sample: list[dict[str, Any]]
+    resolution_failed_sample: list[dict[str, Any]]
+
+
 class AdminCortexCanonicalVerificationRunItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -1622,6 +1742,286 @@ class AdminCortexCanonicalVerificationRunsListResponse(BaseModel):
     canonical_verification_engine_schema_version: int
     tenant_id: str
     runs: list[AdminCortexCanonicalVerificationRunItem]
+
+
+class AdminCortexOrgIdentityVerificationRunRequest(BaseModel):
+    """Phase 04 Step 15 — org Phase 04 gate slice; mirrors canonical verification request shape."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    persist: bool = True
+    materialization_sample_limit: int = Field(default=50, ge=1, le=200)
+
+
+class AdminCortexOrgIdentityVerificationRunResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_identity_verification_engine_schema_version: int
+    tenant_id: str
+    passed: bool
+    gates: list[AdminCortexCanonicalVerificationGateResult]
+    evidence: dict[str, Any]
+    persisted_run_id: int | None = None
+
+
+class AdminCortexOrgIdentityVerificationRunItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: str
+    engine_schema_version: int
+    passed: bool
+    gates: list[AdminCortexCanonicalVerificationGateResult]
+    evidence: dict[str, Any]
+    created_at: datetime | None = None
+
+
+class AdminCortexOrgIdentityVerificationRunsListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_identity_verification_engine_schema_version: int
+    tenant_id: str
+    runs: list[AdminCortexOrgIdentityVerificationRunItem]
+
+
+OrgRemediationClass = Literal["org_ambiguity_triage_ack", "org_link_replay_retry"]
+
+
+class AdminCortexOrgFailureCaseItem(BaseModel):
+    """Phase 04 Step 16 — one active org linkage / continuity failure case."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    gap_id: str
+    tenant_id: str
+    failure_class: str
+    degradation_state: str
+    scope_kind: str
+    scope_json: dict[str, Any]
+    detail_json: dict[str, Any]
+    source: str
+    active: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class AdminCortexOrgRemediationValidationItem(BaseModel):
+    """Phase 04 Step 16 — org remediation validation ledger row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: str
+    failure_case_gap_id: str | None = None
+    remediation_class: str
+    dry_run: bool
+    confirm_execution: bool
+    payload_json: dict[str, Any]
+    result_status: str
+    result_detail_json: dict[str, Any]
+    created_at: datetime | None = None
+
+
+class AdminCortexOrgFailuresResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_failure_remediation_runtime_schema_version: int
+    tenant_id: str
+    active_failure_count: int
+    active_failure_classes: dict[str, int]
+    cases: list[AdminCortexOrgFailureCaseItem]
+    recent_remediation_validations: list[AdminCortexOrgRemediationValidationItem]
+
+
+class AdminCortexOrgRemediationValidateRequest(BaseModel):
+    """Phase 04 Step 16 — policy-gated org remediation (ambiguity ack or org link replay retry)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    remediation_class: OrgRemediationClass
+    dry_run: bool = True
+    confirm_execution: bool = False
+    failure_case_gap_id: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexOrgRemediationValidateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    remediation_class: str
+    validation: AdminCortexOrgRemediationValidationItem
+
+
+class AdminCortexIdentityControlPlaneResponse(BaseModel):
+    """Phase 04 Step 17 — **identity_control_plane_v1** aggregate (Execution Continuity Operator Console)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    identity_control_plane_runtime_schema_version: int
+    schema_version: str
+    tenant_id: str
+    computed_at: str
+    freshness_label: Literal["fresh", "stale"]
+    cards: dict[str, Any]
+    last_authoritative_replay_job: dict[str, Any] | None
+    last_candidate_regen_job: dict[str, Any] | None
+    last_continuity_rebuild_job: dict[str, Any] | None
+    verification_pointer: dict[str, Any]
+    continuity_substrate: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexIdentityContinuityRebuildRequest(BaseModel):
+    """Operator rebuild — canonical drain → anchor backfill → candidate regen (deterministic)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bundle_id: str
+    materialize_batch_limit: int = Field(default=2000, ge=1, le=2000)
+    anchor_limit: int = Field(default=5000, ge=1, le=50_000)
+    run_determinism_repair: bool = True
+    dry_run: bool = False
+
+
+class AdminCortexIdentityContinuityRebuildResponse(BaseModel):
+    """Full rebuild report (nested for OpenAPI clarity)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rebuild: dict[str, Any]
+
+
+class AdminCortexIdentityContinuityVerifyResponse(BaseModel):
+    """Fixture pressure scan + substrate counts (read-only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scenario_key: str
+    substrate_counts: dict[str, int]
+    fixture_pressure: dict[str, Any]
+
+
+class AdminCortexIdentityContinuityEvidenceInspectResponse(BaseModel):
+    """Read-only continuity evidence propagation (raw → canonical → anchor → rules), no orchestration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    continuity_evidence_inspect_schema_version: int
+    tenant_id: str
+    scenario_key: str
+    anchor_scan_limit_applied: int
+    substrate_counters: dict[str, Any]
+    anchors_primary_skip_reason_counts: dict[str, Any]
+    anchors_missing_identity_flag_counts: dict[str, Any]
+    canonical_kind_counts: dict[str, int]
+    org_entity_kind_counts: dict[str, int]
+    identity_primitive_projection_metrics: dict[str, Any] = Field(default_factory=dict)
+    rule_pack_semantic: str
+    current_engine_candidate_row_count: int
+    candidate_pair_evidence_accumulation: dict[str, Any] = Field(default_factory=dict)
+    substrate_sparse_honesty: dict[str, Any] = Field(default_factory=dict)
+    sampled_rows: list[dict[str, Any]]
+    fixture_survival_sample: list[dict[str, Any]]
+    hostile_continuity_dry_run_trace: dict[str, Any]
+    notes: list[str]
+
+
+class AdminCortexIdentityReadinessEconomicsResponse(BaseModel):
+    """Phase 04 Step 21 — **identity_readiness_economics_v1** (storage + regen/replay cost hints)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    identity_readiness_economics_schema_version: int
+    schema_version: str
+    tenant_id: str
+    computed_at: str
+    counts: dict[str, Any]
+    thresholds: dict[str, Any]
+    storage_estimate_bytes: int
+    storage_row_byte_assumptions: dict[str, int]
+    regen_replay_cost_hints: dict[str, int]
+    warnings: list[dict[str, Any]]
+    overall_posture: Literal["ok", "warn", "critical"]
+
+
+class AdminCortexOrgIdentityCertificationPackClosureGateRow(BaseModel):
+    """Phase 04 Step 22 — one org closure gate row (G-P04-CLOSE-MAP-* / G-P04-CLOSE-01)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    passed: bool
+    severity: str
+    detail: dict[str, Any]
+
+
+class AdminCortexOrgIdentityCertificationPackResponse(BaseModel):
+    """Phase 04 Step 22 — org identity closure certification pack + matrix."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_certification_pack_schema_version: int
+    tenant_id: str
+    built_at_clock: str
+    canonical_verification_excerpt: dict[str, Any]
+    phase04_gate_excerpt: dict[str, Any]
+    identity_control_plane_excerpt: dict[str, Any]
+    readiness_economics_excerpt: dict[str, Any]
+    org_verification_last_excerpt: dict[str, Any]
+    doctrine_notes: dict[str, Any]
+    closure_gate_matrix: list[AdminCortexOrgIdentityCertificationPackClosureGateRow]
+    org_identity_certification_pack_contract: dict[str, Any]
+
+
+class AdminCortexOrgIdentityCertificationArchiveRequest(BaseModel):
+    """Phase 04 Step 22 — optional tuning for certification sampling (canonical materialization window)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    materialization_sample_limit: int = 50
+
+
+class AdminCortexOrgIdentityCertificationArchiveResponse(BaseModel):
+    """Result of attempting to persist an org certification pack (requires full closure PASS)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    persisted: bool
+    passed: bool
+    archive_id: int | None
+    org_certification_pack_schema_version: int
+    tenant_id: str
+    pack: dict[str, Any]
+
+
+class AdminCortexOrgIdentityCertificationArchiveItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: str
+    org_certification_pack_schema_version: int
+    passed: bool
+    created_at: datetime
+
+
+class AdminCortexOrgIdentityCertificationArchivesListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_certification_pack_schema_version: int
+    tenant_id: str
+    archives: list[AdminCortexOrgIdentityCertificationArchiveItem]
+
+
+class AdminCortexOrgIdentityCertificationArchiveDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: str
+    org_certification_pack_schema_version: int
+    passed: bool
+    created_at: datetime
+    pack: dict[str, Any]
 
 
 class AdminCortexMaterializeTransformRequest(BaseModel):
@@ -1764,6 +2164,754 @@ class AdminCortexIdentityAnchorListResponse(BaseModel):
     identity_runtime_schema_version: int
     tenant_id: str
     anchors: list[AdminCortexIdentityAnchorItem]
+
+
+class AdminCortexOrgEntityItem(BaseModel):
+    """Phase 04 Step 3 — one tenant-scoped org handle (org entity), distinct from Phase 03 anchors."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_entity_runtime_schema_version: int
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    entity_kind: str
+    lifecycle_state: str
+    superseded_by_id: uuid.UUID | None
+    identity_key_fingerprint: str
+    metadata_json: dict[str, Any]
+    engine_build_ref: str
+    tombstoned_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class AdminCortexOrgEntityListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_entity_runtime_schema_version: int
+    tenant_id: str
+    entities: list[AdminCortexOrgEntityItem]
+
+
+class AdminCortexOrgLinkItem(BaseModel):
+    """Phase 04 Step 4 — one authoritative org-meaning link row (link ledger)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    link_ledger_runtime_schema_version: int
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    link_type: str
+    source_entity_id: uuid.UUID
+    target_entity_id: uuid.UUID
+    evidence_raw_record_ids: list[int]
+    rule_id: str | None
+    confidence_class: str
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    revoked_at: datetime | None = None
+    supersedes_link_id: uuid.UUID | None = None
+    promoted_from_candidate_id: uuid.UUID | None = None
+    promotion_policy_id: uuid.UUID | None = None
+    link_authority: str
+    link_class: str
+    metadata_json: dict[str, Any]
+    engine_build_ref: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class AdminCortexOrgLinkExplorerRowV1(BaseModel):
+    """Phase 04 Step 18 — ``org_link_list_row_v1`` contract (control plane §16.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    link_id: str
+    link_type: str
+    source_handle_id: str
+    target: str
+    target_kind: str
+    rule_version: str
+    link_layer: str
+    valid_from: str | None = None
+    valid_to: str | None = None
+    evidence_count: int
+    replay_state: str
+    drift_class: str
+
+
+class AdminCortexOrgLinkListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link_ledger_runtime_schema_version: int
+    tenant_id: str
+    links: list[AdminCortexOrgLinkItem]
+    identity_console_schema_version: int = 1
+    explorer_contract: str = "org_link_list_row_v1"
+    explorer_rows: list[AdminCortexOrgLinkExplorerRowV1] = Field(default_factory=list)
+
+
+class AdminCortexIdentityOperatorActionRequest(BaseModel):
+    """Phase 04 Step 18 — gated POST body for merge-queue actions + link revoke."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation_phrase: str
+    operator_note: str | None = None
+    command_id: str | None = Field(default=None, max_length=128)
+
+
+class AdminCortexOrgHandleListRowV1(BaseModel):
+    """§16.2 — ``org_handle_list_row_v1``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    handle_id: str
+    kind: str
+    created_from: str
+    persona_count: int
+    active_links: int
+    temporal_state: str
+    merge_state: str
+    last_replay: str
+    confidence_posture: str
+    candidate_persona_touch_count: int = 0
+    candidate_any_touch_count: int = 0
+    open_ambiguity_touch_count: int = 0
+    entity_kind_rule: str | None = None
+
+
+class AdminCortexIdentityHandlesExplorerResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    identity_operator_console_schema_version: int = 2
+    tenant_id: str
+    list_contract: str = "org_handle_list_row_v1"
+    rows: list[AdminCortexOrgHandleListRowV1]
+
+
+class AdminCortexMergeQueueRowV1(BaseModel):
+    """§16.2 — ``org_merge_queue_row_v1``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str
+    from_handle_id: str
+    to_handle_id: str
+    evidence_sources: list[str]
+    why_generated: str
+    policy_satisfied: bool
+    candidate_age: int
+    ambiguity_count: int
+    risk_class: str
+
+
+class AdminCortexMergeQueueListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    merge_governance_schema_version: int
+    tenant_id: str
+    queue_contract: str = "org_merge_queue_row_v1"
+    proposals: list[AdminCortexMergeQueueRowV1]
+
+
+class AdminCortexMergeQueueDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    merge_governance_schema_version: int
+    tenant_id: str
+    queue_contract: str = "org_merge_queue_row_v1"
+    proposal: AdminCortexMergeQueueRowV1
+    merge: AdminCortexOrgMergeItem
+
+
+class AdminCortexOrgAmbiguityQueueRowV1(BaseModel):
+    """§16.2 — ``org_ambiguity_queue_row_v1``."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    ambiguity_id: str
+    row_class: str = Field(alias="class")
+    severity: str
+    exemplar_handle_ids: list[str]
+    evidence_sample_ids: list[int]
+
+
+class AdminCortexAmbiguityQueueListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_ambiguity_schema_version: int
+    tenant_id: str
+    queue_contract: str = "org_ambiguity_queue_row_v1"
+    rows: list[AdminCortexOrgAmbiguityQueueRowV1]
+
+
+class AdminCortexOrgPrimitiveListRowV1(BaseModel):
+    """§16.2 — ``org_primitive_list_row_v1`` (optional ``envelope_json`` when flagged)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    primitive_id: str
+    primitive_kind: str
+    handle_count: int
+    evidence_count: int
+    canonical_ref_count: int
+    temporal_bounds: dict[str, Any] = Field(default_factory=dict)
+    replay_lineage: str
+    export_participation: bool
+    envelope_json: dict[str, Any] | None = None
+
+
+class AdminCortexPrimitiveExplorerListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_primitive_instance_schema_version: int
+    tenant_id: str
+    list_contract: str = "org_primitive_list_row_v1"
+    include_raw_envelope: bool = False
+    rows: list[AdminCortexOrgPrimitiveListRowV1]
+
+
+class AdminCortexOrgProjectionPreviewResponse(BaseModel):
+    """§14 — graph export preview (metadata only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    projection_preview_schema_version: int
+    projection_schema_version: int
+    tenant_id: str
+    engine_build_ref: str
+    node_counts: dict[str, int]
+    edge_counts: dict[str, Any]
+    edge_class_histogram: dict[str, int]
+    projection_hash: str
+    generated_at: str
+    replay_source: dict[str, Any]
+
+
+class AdminCortexOrgLinkTemporalStripItem(BaseModel):
+    """Phase 04 Step 8 — compact validity + revocation strip for one link row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    link_type: str
+    valid_from: str | None = None
+    valid_to: str | None = None
+    revoked_at: str | None = None
+    org_link_temporal_schema_version: int
+
+
+class AdminCortexOrgLinkTemporalTimelineResponse(BaseModel):
+    """Phase 04 Step 8 — ordered timeline strip (operator visibility)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_link_temporal_schema_version: int
+    link_ledger_runtime_schema_version: int
+    tenant_id: str
+    strips: list[AdminCortexOrgLinkTemporalStripItem]
+
+
+class AdminCortexOrgLinkCandidateRow(BaseModel):
+    """Phase 04 Step 5 — one persisted candidate link row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    batch_id: uuid.UUID
+    link_type: str
+    source_entity_id: uuid.UUID
+    target_entity_id: uuid.UUID
+    evidence_raw_record_ids: list[int]
+    rule_id: str | None
+    row_digest: str
+    created_at: datetime | None = None
+
+
+class AdminCortexOrgLinkCandidateBatchSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    rule_version: str
+    candidate_set_sha256: str
+    candidate_count: int
+    engine_build_ref: str
+    created_at: datetime | None = None
+    candidates: list[AdminCortexOrgLinkCandidateRow]
+
+
+class AdminCortexOrgLinkCandidateQueueResponse(BaseModel):
+    """Phase 04 Step 5 — sparse candidate queue (recent batches + rows)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_generation_schema_version: int
+    tenant_id: str
+    batches: list[AdminCortexOrgLinkCandidateBatchSummary]
+
+
+class AdminCortexOrgMergeCreateRequest(BaseModel):
+    """Phase 04 Step 6 — append merge ledger row (minimal approval = durable insert)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    merge_kind: Literal["human_actor_merge", "team_merge", "service_split", "compensating_merge"]
+    merge_policy_id: uuid.UUID
+    source_entity_ids: list[uuid.UUID]
+    target_entity_id: uuid.UUID
+    evidence_raw_record_ids: list[int] = Field(default_factory=list)
+    operator_user_id: uuid.UUID | None = None
+    supersedes_merge_id: uuid.UUID | None = None
+    metadata_json: dict[str, Any] | None = None
+
+
+class AdminCortexOrgMergeItem(BaseModel):
+    """Phase 04 Step 6 — one append-only org merge ledger row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    merge_kind: str
+    merge_policy_id: uuid.UUID
+    source_entity_ids: list[uuid.UUID]
+    target_entity_id: uuid.UUID
+    evidence_raw_record_ids: list[int]
+    operator_user_id: uuid.UUID | None = None
+    supersedes_merge_id: uuid.UUID | None = None
+    metadata_json: dict[str, Any]
+    engine_build_ref: str
+    created_at: datetime | None = None
+
+
+class AdminCortexOrgMergeListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    merge_governance_schema_version: int
+    tenant_id: str
+    merges: list[AdminCortexOrgMergeItem]
+
+
+class AdminCortexBundleEquivalenceDeclarationCreateRequest(BaseModel):
+    """Phase 04 Step 9 — append bundle equivalence declaration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bundle_id_a: str = Field(min_length=1, max_length=256)
+    bundle_id_b: str = Field(min_length=1, max_length=256)
+    evidence_raw_record_ids: list[int] = Field(default_factory=list)
+    metadata_json: dict[str, Any] | None = None
+
+
+class AdminCortexBundleEquivalenceDeclarationItem(BaseModel):
+    """Phase 04 Step 9 — one equivalence declaration row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bundle_equivalence_schema_version: int
+    id: str
+    tenant_id: str
+    left_bundle_id: str
+    right_bundle_id: str
+    replay_ordinal: int
+    evidence_raw_record_ids: list[int]
+    metadata_json: dict[str, Any]
+    engine_build_ref: str
+    created_at: str | None = None
+    revoked_at: str | None = None
+
+
+class AdminCortexBundleEquivalenceDeclarationListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bundle_equivalence_schema_version: int
+    tenant_id: str
+    declarations: list[AdminCortexBundleEquivalenceDeclarationItem]
+
+
+class AdminCortexOrgLinkReplayJobRunRequest(BaseModel):
+    """Phase 04 Step 10 — run one org link continuity replay / regen job (synchronous)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job_kind: Literal[
+        "authoritative_replay",
+        "candidate_regen",
+        "graph_projection_export",
+        "identity_continuity_rebuild",
+    ]
+    pinned_rule_version: str | None = Field(
+        default=None,
+        description="For candidate_regen with dry_run=false, defaults to anchor continuity semantic if omitted.",
+    )
+    dry_run: bool = Field(default=False)
+    scope_json: dict[str, Any] | None = None
+
+
+class AdminCortexOrgLinkReplayJobItem(BaseModel):
+    """Phase 04 Step 10 — one org link replay job row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_link_replay_schema_version: int
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    job_kind: str
+    pinned_rule_version: str | None = None
+    dry_run: bool
+    status: str
+    scope_json: dict[str, Any]
+    summary_json: dict[str, Any]
+    error_detail: str | None = None
+    engine_build_ref: str
+    celery_task_id: str | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class AdminCortexOrgLinkReplayJobEnqueueRequest(BaseModel):
+    """Phase 04 Step 19 — enqueue async org link replay / projection export (same shape as sync run)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job_kind: Literal[
+        "authoritative_replay",
+        "candidate_regen",
+        "graph_projection_export",
+        "identity_continuity_rebuild",
+    ]
+    pinned_rule_version: str | None = Field(
+        default=None,
+        description="For candidate_regen with dry_run=false, defaults to anchor continuity semantic if omitted.",
+    )
+    dry_run: bool = Field(default=False)
+    scope_json: dict[str, Any] | None = None
+
+
+class AdminCortexOrgLinkReplayJobEnqueueResponse(BaseModel):
+    """Phase 04 Step 19 — queued job row + Celery id for worker-task polling."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_link_replay_schema_version: int
+    tenant_id: str
+    celery_task_id: str
+    worker_task_status_path: str
+    job: AdminCortexOrgLinkReplayJobItem
+
+
+class AdminCortexIdentityWorkerTaskStatusResponse(BaseModel):
+    """Phase 04 Step 19 — Celery AsyncResult snapshot for tenant-bound tasks only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    celery_task_id: str
+    bind_source: Literal["replay_job", "dispatch"]
+    job_id: uuid.UUID | None = None
+    celery_state: str
+    ready: bool
+    result: dict[str, Any] | None = None
+    error: str | None = None
+
+
+class AdminCortexIdentityLinkCandidatesRegenerateAsyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rule_version: str = Field(min_length=1, max_length=256)
+
+
+class AdminCortexIdentityLegacyCeleryAsyncDispatchResponse(BaseModel):
+    """Phase 04 Step 19 — legacy regen/replay Celery tasks with dispatch registry row."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    identity_legacy_async_dispatch_schema_version: Literal[1] = 1
+    tenant_id: str
+    celery_task_id: str
+    task_name: str
+    worker_task_status_path: str
+
+
+class AdminCortexIdentityBackfillFromAnchorsRequest(BaseModel):
+    """Phase 04 Step 20 — bounded anchor scan for org handle backfill."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dry_run: bool = False
+    anchor_limit: int = Field(default=5_000, ge=1, le=50_000)
+
+
+class AdminCortexIdentityBackfillFromAnchorsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_identity_backfill_schema_version: int
+    tenant_id: str
+    dry_run: bool
+    anchors_scanned: int
+    entities_upserted: int
+    backfill_set_sha256: str
+    run_id: str | None = None
+    engine_build_ref: str
+    legacy_lane_org_entities_tombstoned: int = 0
+    anchors_skipped_work_object_no_primitive: int = 0
+    candidate_regeneration: dict[str, Any] | None = None
+
+
+class AdminCortexIdentityBackfillRunItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    tenant_id: str
+    dry_run: bool
+    anchors_scanned: int
+    entities_upserted: int
+    backfill_set_sha256: str
+    summary_json: dict[str, Any]
+    engine_build_ref: str
+    created_at: str | None = None
+
+
+class AdminCortexIdentityBackfillRunsListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_identity_backfill_schema_version: int
+    tenant_id: str
+    runs: list[AdminCortexIdentityBackfillRunItem]
+
+
+class AdminCortexOrgLinkReplayJobReceiptItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    job_id: uuid.UUID
+    receipt_class: str
+    detail_json: dict[str, Any]
+    created_at: datetime | None = None
+
+
+class AdminCortexOrgLinkReplayJobDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_link_replay_schema_version: int
+    tenant_id: str
+    job: AdminCortexOrgLinkReplayJobItem
+    receipts: list[AdminCortexOrgLinkReplayJobReceiptItem]
+
+
+class AdminCortexOrgLinkReplayJobListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_link_replay_schema_version: int
+    tenant_id: str
+    jobs: list[AdminCortexOrgLinkReplayJobItem]
+
+
+class AdminCortexLinkRuleVersionCreateRequest(BaseModel):
+    """Phase 04 Step 11 — register a frozen linkage rule manifest for a tenant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    semantic_version: str = Field(min_length=1, max_length=128)
+    rules_manifest_json: dict[str, Any] = Field(default_factory=dict)
+    lifecycle_state: Literal["active", "deprecated"] = "active"
+    notes: str | None = None
+
+
+class AdminCortexLinkRuleVersionItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link_rule_version_schema_version: int
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    semantic_version: str
+    rules_manifest_json: dict[str, Any]
+    manifest_sha256: str
+    lifecycle_state: str
+    notes: str | None = None
+    engine_build_ref: str
+    created_at: datetime | None = None
+
+
+class AdminCortexLinkRuleVersionListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link_rule_version_schema_version: int
+    tenant_id: str
+    versions: list[AdminCortexLinkRuleVersionItem]
+
+
+class AdminCortexLinkRuleVersionDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    link_rule_version_schema_version: int
+    tenant_id: str
+    version: AdminCortexLinkRuleVersionItem
+
+
+class AdminCortexOrgPrimitiveInstanceAppendRequest(BaseModel):
+    """Phase 04 Step 12 — persist one Phase 3.5 execution primitive envelope on an org entity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_entity_id: uuid.UUID
+    envelope_json: dict[str, Any]
+    lifecycle_state: Literal["active", "superseded", "revoked"] = "active"
+
+
+class AdminCortexOrgPrimitiveInstanceItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_primitive_instance_schema_version: int
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    org_entity_id: uuid.UUID
+    primitive_kind: str
+    primitive_key: str
+    envelope_json: dict[str, Any]
+    lifecycle_state: str
+    engine_build_ref: str
+    created_at: datetime | None = None
+
+
+class AdminCortexOrgPrimitiveInstanceListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_primitive_instance_schema_version: int
+    tenant_id: str
+    instances: list[AdminCortexOrgPrimitiveInstanceItem]
+
+
+class AdminCortexOrgPrimitiveInstanceDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_primitive_instance_schema_version: int
+    tenant_id: str
+    instance: AdminCortexOrgPrimitiveInstanceItem
+
+
+class AdminOrgGraphEntityNode(BaseModel):
+    """OrgGraphProjectionV1 — org handle node."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["org_entity"]
+    id: str
+    entity_kind: str
+    identity_key_fingerprint: str
+    lifecycle_state: str
+    tombstoned_at: str | None = None
+
+
+class AdminOrgGraphPrimitiveNode(BaseModel):
+    """OrgGraphProjectionV1 — execution primitive node (structural fields only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["org_primitive"]
+    id: str
+    org_entity_id: str
+    primitive_kind: str
+    primitive_key: str
+    lifecycle_state: str
+
+
+class AdminOrgGraphMeaningEdge(BaseModel):
+    """OrgGraphProjectionV1 — authoritative meaning link edge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["org_meaning_link"]
+    id: str
+    link_type: str
+    source_entity_id: str
+    target_entity_id: str
+    link_class: str
+    link_authority: str
+    confidence_class: str
+    evidence_raw_record_ids: list[int]
+    rule_id: str | None = None
+    valid_from: str | None = None
+    valid_to: str | None = None
+    revoked_at: str | None = None
+    supersedes_link_id: str | None = None
+    promoted_from_candidate_id: str | None = None
+    promotion_policy_id: str | None = None
+
+
+class AdminOrgGraphProjectionPayload(BaseModel):
+    """Inner OrgGraphProjectionV1 document."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    projection_schema_version: int
+    tenant_id: str
+    engine_build_ref: str
+    nodes: list[AdminOrgGraphEntityNode | AdminOrgGraphPrimitiveNode]
+    edges: list[AdminOrgGraphMeaningEdge]
+
+
+class AdminCortexOrgGraphProjectionResponse(BaseModel):
+    """Phase 04 Step 13 — deterministic org graph export for Phase 05."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_graph_projection_schema_version: int
+    tenant_id: str
+    engine_build_ref: str
+    projection: AdminOrgGraphProjectionPayload
+    stable_hash_sha256: str
+
+
+class AdminCortexOrgAmbiguityAppendRequest(BaseModel):
+    """Phase 04 Step 14 — append one org-scoped multiplicity ambiguity receipt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_ambiguity_class: str
+    subject_key: str
+    involved_org_entity_ids: list[uuid.UUID] = Field(min_length=2)
+    status: Literal["open", "acknowledged", "superseded", "void"] = "open"
+    evidence_json: dict[str, Any] = Field(default_factory=dict)
+    operator_note: str | None = None
+
+
+class AdminCortexOrgAmbiguityItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_ambiguity_schema_version: int
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    org_ambiguity_class: str
+    subject_key: str
+    status: str
+    involved_org_entity_ids: list[str]
+    evidence_json: dict[str, Any]
+    superseded_by_org_ambiguity_id: uuid.UUID | None = None
+    operator_note: str | None = None
+    engine_build_ref: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class AdminCortexOrgAmbiguityListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_ambiguity_schema_version: int
+    tenant_id: str
+    records: list[AdminCortexOrgAmbiguityItem]
+
+
+class AdminCortexOrgAmbiguityDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    org_ambiguity_schema_version: int
+    tenant_id: str
+    record: AdminCortexOrgAmbiguityItem
 
 
 class AdminCortexReplayJobRunRequest(BaseModel):

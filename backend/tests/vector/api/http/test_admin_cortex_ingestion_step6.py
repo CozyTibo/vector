@@ -668,7 +668,7 @@ def test_admin_flush_rerun_requires_exact_confirmation(
         db_session.commit()
 
         r = client.post(
-            f"/admin/tenants/{tid}/cortex/ingestion/actions/flush-rerun-to-canonical",
+            f"/admin/tenants/{tid}/cortex/ingestion/actions/flush-rerun-to-identity",
             auth=("admin", "integration-admin-password"),
             json={"confirmation": "wrong phrase"},
         )
@@ -700,16 +700,16 @@ def test_admin_flush_rerun_flushes_and_enqueues(
 
         pipeline_called: list[tuple[object, ...]] = []
         monkeypatch.setattr(
-            pipeline_tasks.run_cortex_flush_rerun_to_canonical_task,
+            pipeline_tasks.run_cortex_flush_rerun_to_identity_task,
             "delay",
             lambda *args: pipeline_called.append(args) or SimpleNamespace(id="task-full-rerun-1"),
         )
 
         r = client.post(
-            f"/admin/tenants/{tid}/cortex/ingestion/actions/flush-rerun-to-canonical",
+            f"/admin/tenants/{tid}/cortex/ingestion/actions/flush-rerun-to-identity",
             auth=("admin", "integration-admin-password"),
             json={
-                "confirmation": "FLUSH RAW DATA AND RERUN CORTEX TO CANONICAL",
+                "confirmation": "FLUSH RAW DATA AND RERUN CORTEX TO IDENTITY",
                 "canonical_batch_limit": 777,
             },
         )

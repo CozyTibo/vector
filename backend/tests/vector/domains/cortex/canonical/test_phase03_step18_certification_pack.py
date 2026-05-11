@@ -30,8 +30,7 @@ def test_certification_pack_schema_version() -> None:
 
 def test_ontology_includes_certification_pack_pointer() -> None:
     doc = build_phase03_step01_ontology_public_document()
-    assert doc["ontology_schema_version"] == 20
-    assert ONTOLOGY_SCHEMA_VERSION == 20
+    assert doc["ontology_schema_version"] == ONTOLOGY_SCHEMA_VERSION
     assert "certification-pack" in doc["canonical_certification_pack_route"]
     assert "certification-pack/archive" in doc["canonical_certification_pack_archive_route"]
 

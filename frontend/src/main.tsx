@@ -4,6 +4,19 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AdminLayout from "./admin/AdminLayout.tsx";
+import AdminCortexIdentityCertificationPage from "./admin/AdminCortexIdentityCertificationPage.tsx";
+import AdminCortexIdentityHandleDetailPage from "./admin/AdminCortexIdentityHandleDetailPage.tsx";
+import AdminCortexIdentityHandlesPage from "./admin/AdminCortexIdentityHandlesPage.tsx";
+import {
+  AdminCortexIdentityAmbiguityQueueDrillPage,
+  AdminCortexIdentityBundleEquivalenceDrillPage,
+  AdminCortexIdentityLinkCandidatesDrillPage,
+  AdminCortexIdentityLinksDrillPage,
+  AdminCortexIdentityMergeQueueDrillPage,
+  AdminCortexIdentityPrimitivesDrillPage,
+  AdminCortexIdentityReplayJobsDrillPage,
+} from "./admin/AdminCortexIdentityJsonDrillPage.tsx";
+import AdminCortexIdentityOverviewPage from "./admin/AdminCortexIdentityOverviewPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexMemoryPage from "./admin/AdminCortexMemoryPage.tsx";
 import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
@@ -72,8 +85,10 @@ createRoot(document.getElementById("root")!).render(
 
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<AppHomePage />} />
-            <Route path="/app/teams/:teamId" element={<AppTeamSpacePage />} />
-            <Route path="/app/teams" element={<AppTeamsPage />} />
+            <Route path="/app/teams/:teamId" element={<Navigate to="/app/access/:teamId" replace />} />
+            <Route path="/app/teams" element={<Navigate to="/app/access" replace />} />
+            <Route path="/app/access/:teamId" element={<AppTeamSpacePage />} />
+            <Route path="/app/access" element={<AppTeamsPage />} />
             <Route path="/app/onboarding" element={<OnboardingPage />} />
             <Route path="/app/connectors" element={<Navigate to="/app" replace />} />
             <Route path="/app/github/ingestion" element={<Navigate to="/app" replace />} />
@@ -130,10 +145,20 @@ createRoot(document.getElementById("root")!).render(
                   <Route path="certification" element={<Navigate to="advanced/certification" replace />} />
                   <Route path="control-plane" element={<Navigate to="health" replace />} />
                 </Route>
+                <Route path="entity-resolution" element={<AdminCortexIdentityOverviewPage />} />
+                <Route path="identity-certification" element={<AdminCortexIdentityCertificationPage />} />
+                <Route path="identity/handles/:handleId" element={<AdminCortexIdentityHandleDetailPage />} />
+                <Route path="identity/handles" element={<AdminCortexIdentityHandlesPage />} />
+                <Route path="identity/links" element={<AdminCortexIdentityLinksDrillPage />} />
+                <Route path="identity/link-candidates" element={<AdminCortexIdentityLinkCandidatesDrillPage />} />
+                <Route path="identity/merge-queue" element={<AdminCortexIdentityMergeQueueDrillPage />} />
+                <Route path="identity/ambiguity-queue" element={<AdminCortexIdentityAmbiguityQueueDrillPage />} />
+                <Route path="identity/replay-jobs" element={<AdminCortexIdentityReplayJobsDrillPage />} />
                 <Route
-                  path="entity-resolution"
-                  element={<AdminCortexPlaceholderPage title="Entity Resolution" />}
+                  path="identity/bundle-equivalence"
+                  element={<AdminCortexIdentityBundleEquivalenceDrillPage />}
                 />
+                <Route path="identity/primitives" element={<AdminCortexIdentityPrimitivesDrillPage />} />
                 <Route path="graph" element={<AdminCortexPlaceholderPage title="Graph" />} />
                 <Route path="memory" element={<AdminCortexMemoryPage />} />
                 <Route path="reasoning" element={<AdminCortexPlaceholderPage title="Reasoning" />} />

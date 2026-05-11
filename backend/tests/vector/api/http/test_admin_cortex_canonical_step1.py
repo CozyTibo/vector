@@ -51,8 +51,12 @@ def test_admin_cortex_canonical_ontology_ok(
     assert r.status_code == 200
     body = r.json()
     assert body["ontology_schema_version"] == ONTOLOGY_SCHEMA_VERSION
-    assert body["implementation_step"] == 18
-    assert body["completed_implementation_steps"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    assert body["org_identity_verification_engine_schema_version"] >= 1
+    assert body["org_failure_remediation_surface_version"] >= 1
+    assert body["identity_control_plane_surface_version"] >= 1
+    assert "identity/control-plane" in body["identity_control_plane_route"]
+    assert body["implementation_step"] == 22
+    assert body["completed_implementation_steps"] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
     assert body["tenant_id"] == str(tid)
     assert len(body["object_kinds"]) >= 10
     assert len(body["structural_arcs"]) >= 1

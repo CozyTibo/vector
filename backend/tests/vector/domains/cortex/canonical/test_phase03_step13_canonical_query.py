@@ -49,8 +49,7 @@ def test_anti_goals_block_query_text() -> None:
 
 def test_ontology_includes_canonical_query_pointer() -> None:
     doc = build_phase03_step01_ontology_public_document()
-    assert doc["ontology_schema_version"] == 20
-    assert ONTOLOGY_SCHEMA_VERSION == 20
+    assert doc["ontology_schema_version"] == ONTOLOGY_SCHEMA_VERSION
     assert doc["canonical_query_route"]
     assert "point_lookup_materialization" in doc["canonical_query_classes"]
     assert doc.get("failure_remediation_surface_version", 0) >= 1

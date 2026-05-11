@@ -122,6 +122,7 @@ type CanonicalOntologyPayload = {
   failure_remediation_doctrine_anchors: string[];
   verification_engine_surface_version: number;
   canonical_verification_run_route: string;
+  canonical_verification_repair_determinism_route: string;
   canonical_verification_runs_list_route: string;
   verification_engine_gate_ids: string[];
   verification_engine_doctrine_anchors: string[];
@@ -1021,6 +1022,12 @@ export default function AdminCortexCanonicalLegacyOntologyToolsPage() {
           <div className="md:col-span-2">
             <dt className="text-xs uppercase tracking-wide text-stone-500">Verification run route</dt>
             <dd className="break-all font-mono text-xs text-stone-700">{d.canonical_verification_run_route}</dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs uppercase tracking-wide text-stone-500">Determinism drift repair route</dt>
+            <dd className="break-all font-mono text-xs text-stone-700">
+              {d.canonical_verification_repair_determinism_route}
+            </dd>
           </div>
           <div className="md:col-span-2">
             <dt className="text-xs uppercase tracking-wide text-stone-500">Verification runs list route</dt>

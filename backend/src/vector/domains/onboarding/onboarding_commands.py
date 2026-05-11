@@ -310,13 +310,18 @@ def patch_onboarding(
         if body.current_step is not None or body.answers is None:
             raise OnboardingAlreadyCompletedError
         keys = set(body.answers.keys())
-        if keys != {"workspace_manager_teams"}:
+        allowed_post_onboarding = frozenset(
+            {"workspace_manager_teams", "vector_manager_access_mode", "vector_company_wide_users"}
+        )
+        if not keys or not keys.issubset(allowed_post_onboarding):
             raise OnboardingAlreadyCompletedError
         membership = tenancy_repo.get_membership_for_user_tenant(db, claims.user_id, claims.tenant_id)
         if membership is None or str(membership.role).strip().lower() != "owner":
             raise WorkspaceSettingsForbiddenError
         merged = ob_repo.deep_merge_answers_json(row.answers_json or {}, body.answers)
         ob_repo.normalize_workspace_manager_teams_in_place(merged)
+        ob_repo.normalize_vector_manager_access_mode_in_place(merged)
+        ob_repo.normalize_vector_company_wide_users_in_place(merged)
         row.answers_json = merged
         row.version = int(row.version) + 1
         db.commit()
@@ -334,6 +339,8 @@ def patch_onboarding(
         ob_repo.normalize_slack_team_members_in_place(merged)
         ob_repo.normalize_slack_watch_channels_in_place(merged)
         ob_repo.normalize_slack_introduce_managers_consent_in_place(merged)
+        ob_repo.normalize_vector_manager_access_mode_in_place(merged)
+        ob_repo.normalize_vector_company_wide_users_in_place(merged)
         row.answers_json = merged
         merged_snapshot = merged
         apply_patch_answers_to_profile_and_company(

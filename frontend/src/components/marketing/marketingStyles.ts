@@ -16,7 +16,7 @@ export const workspaceFlatPanel = "rounded-2xl border border-zinc-100 bg-white";
 /** Max width for authenticated app shell (top nav + `/app` page column). */
 export const workspaceAppShellMaxWidth = "max-w-[min(100%,80rem)]";
 
-/** Shared shell for product workspace pages (`/app`, `/app/teams`) — matches headline + panel width. */
+/** Shared shell for product workspace pages (`/app`, `/app/access`) — matches headline + panel width. */
 export const workspaceAppPageMain =
   `relative mx-auto w-full ${workspaceAppShellMaxWidth} px-6 pt-4 pb-16 sm:px-10 sm:pt-5 sm:pb-12 lg:px-12 lg:pt-6 lg:pb-14`;
 
