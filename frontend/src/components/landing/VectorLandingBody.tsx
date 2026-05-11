@@ -485,7 +485,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 <p className="sub meet-vector__support">
                   Vector connects to the tools your team uses and pushes risks, slowdowns, and concrete actions in real
                   time. Instead of chasing updates across different sources and stakeholders, Vector is guiding the next
-                  steps. You can focus on delivery while Vector executes in your tools.
+                  steps. You can focus on strategy while Vector runs delivery.
                 </p>
               </div>
               <MeetVectorIntegrationsHub />
