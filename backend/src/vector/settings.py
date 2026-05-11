@@ -277,7 +277,8 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_INGESTION_SCHEDULER_ENABLED",
         description=(
             "Phase 01 Step 2: Celery Beat dispatches scheduled sync ticks when true (requires worker "
-            "listening on cortex_live queue + migration flags routing tenants)."
+            "listening on cortex_live queue + migration flags routing tenants). "
+            "Default is false — set true in production when Beat + cortex_live workers are ready."
         ),
     )
     cortex_ingestion_scheduler_interval_seconds: int = Field(

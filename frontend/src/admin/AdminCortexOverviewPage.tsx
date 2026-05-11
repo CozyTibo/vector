@@ -189,12 +189,54 @@ export default function AdminCortexOverviewPage() {
 
   const health = useMemo(() => {
     const o = overviewQ.data;
-    if (!o) return { status: "idle", tone: "neutral" as const };
-    if (!o.global_scheduler.env_scheduler_enabled) return { status: "paused", tone: "warn" as const };
-    if (o.global_scheduler.paused_via_redis) return { status: "paused", tone: "warn" as const };
+    if (!o) {
+      return {
+        badgeText: "…",
+        tone: "neutral" as const,
+        hasFailed: false,
+        schedulerOffEnv: false,
+        operatorPaused: false,
+      };
+    }
     const hasFailed = o.connectors.some((c) => c.latest_run?.status === "FAILED");
-    if (hasFailed) return { status: "degraded", tone: "warn" as const };
-    return { status: "healthy", tone: "ok" as const };
+    const mode = o.global_scheduler.operator_mode_label;
+    const schedulerOffEnv = !o.global_scheduler.env_scheduler_enabled;
+    const operatorPaused = o.global_scheduler.paused_via_redis;
+
+    if (hasFailed) {
+      return {
+        badgeText: `Degraded · ${mode}`,
+        tone: "warn" as const,
+        hasFailed: true,
+        schedulerOffEnv,
+        operatorPaused,
+      };
+    }
+    if (schedulerOffEnv) {
+      return {
+        badgeText: mode,
+        tone: "warn" as const,
+        hasFailed: false,
+        schedulerOffEnv: true,
+        operatorPaused,
+      };
+    }
+    if (operatorPaused) {
+      return {
+        badgeText: mode,
+        tone: "warn" as const,
+        hasFailed: false,
+        schedulerOffEnv: false,
+        operatorPaused: true,
+      };
+    }
+    return {
+      badgeText: mode,
+      tone: "ok" as const,
+      hasFailed: false,
+      schedulerOffEnv: false,
+      operatorPaused: false,
+    };
   }, [overviewQ.data]);
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
@@ -248,6 +290,14 @@ export default function AdminCortexOverviewPage() {
     return Number.isFinite(ageSec) && ageSec > lagThresholdSec;
   });
 
+  const liveQueueValue =
+    o.global_scheduler.env_scheduler_enabled && !o.global_scheduler.paused_via_redis ? "active" : "inactive";
+  const liveQueueDetail = !o.global_scheduler.env_scheduler_enabled
+    ? `Beat does not enqueue: CORTEX_INGESTION_SCHEDULER_ENABLED is false in server config (defaults to false). Set it true on API + Celery Beat + workers, redeploy. Manual Ingest all connectors still queues tasks if workers listen on cortex_live. interval ${o.global_scheduler.beat_interval_seconds}s / gap ${o.global_scheduler.min_gap_seconds}s`
+    : o.global_scheduler.paused_via_redis
+      ? `Operator pause (Redis). Use Resume ingestion. interval ${o.global_scheduler.beat_interval_seconds}s / gap ${o.global_scheduler.min_gap_seconds}s`
+      : `interval ${o.global_scheduler.beat_interval_seconds}s / gap ${o.global_scheduler.min_gap_seconds}s`;
+
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -256,15 +306,26 @@ export default function AdminCortexOverviewPage() {
             <h2 className="text-lg font-semibold text-stone-900">Cortex Overview</h2>
             <p className="text-sm text-stone-600">{o.company_name}</p>
           </div>
-          <StatusBadge tone={health.tone}>{health.status}</StatusBadge>
+          <StatusBadge tone={health.tone}>{health.badgeText}</StatusBadge>
         </div>
+        {health.schedulerOffEnv ? (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            <p className="font-medium">Scheduled ingestion is off in this deployment</p>
+            <p className="mt-1 text-amber-900/95">
+              <span className="font-mono">CORTEX_INGESTION_SCHEDULER_ENABLED</span> is not true, so Celery Beat will
+              not enqueue periodic syncs. <strong>Resume ingestion</strong> only clears an operator pause in Redis —
+              it cannot turn on the env flag. Set the variable to <span className="font-mono">true</span> in your AWS
+              task/Beanstalk/env config, restart API + Beat + workers, then refresh this page.
+            </p>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {statCard("Cortex status", health.status, health.tone)}
+          {statCard("Cortex status", health.badgeText, health.tone)}
           {statCard(
             "Live queue health",
-            o.global_scheduler.env_scheduler_enabled && !o.global_scheduler.paused_via_redis ? "active" : "paused",
+            liveQueueValue,
             o.global_scheduler.env_scheduler_enabled && !o.global_scheduler.paused_via_redis ? "ok" : "warn",
-            `interval ${o.global_scheduler.beat_interval_seconds}s / gap ${o.global_scheduler.min_gap_seconds}s`,
+            liveQueueDetail,
           )}
           {statCard("Replay queue health", replayQueueValue, replayQueueTone, replayQueueDetail)}
           {statCard(
@@ -336,6 +397,7 @@ export default function AdminCortexOverviewPage() {
             type="button"
             className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-40"
             disabled={pauseMut.isPending || o.global_scheduler.paused_via_redis}
+            title="Writes operator pause to Redis; Beat skips enqueue while paused (only when scheduler env is enabled)."
             onClick={() => pauseMut.mutate(true)}
           >
             Pause ingestion
@@ -344,6 +406,11 @@ export default function AdminCortexOverviewPage() {
             type="button"
             className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 hover:bg-stone-100 disabled:opacity-40"
             disabled={pauseMut.isPending || !o.global_scheduler.paused_via_redis}
+            title={
+              o.global_scheduler.paused_via_redis
+                ? "Clear operator pause in Redis so Beat can enqueue again."
+                : "Disabled unless operator pause is active. If ingestion looks stopped but this is greyed out, the scheduler is likely off in env (CORTEX_INGESTION_SCHEDULER_ENABLED), not paused in Redis."
+            }
             onClick={() => pauseMut.mutate(false)}
           >
             Resume ingestion
