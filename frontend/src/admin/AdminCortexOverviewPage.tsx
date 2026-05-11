@@ -319,6 +319,38 @@ export default function AdminCortexOverviewPage() {
             </p>
           </div>
         ) : null}
+        {o.connectors.some((c) => c.cortex_routed) && wt.live_queue_workers === 0 ? (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-950">
+            <p className="font-medium">Blocking: nothing is consuming the cortex_live queue</p>
+            <p className="mt-1 text-red-900/95">
+              Manual <strong>Ingest all connectors</strong>, <strong>Flush + rerun to Identity</strong>, and scheduled
+              syncs all publish tasks to <span className="font-mono">cortex_live</span>. Beat runs{" "}
+              <span className="font-mono">scheduler_tick</span> on the default <span className="font-mono">vector</span>{" "}
+              queue, then enqueues work to <span className="font-mono">cortex_live</span>. If this banner shows, tasks
+              pile up in Redis and never execute — hence 0 raw rows and no completed runs, even when the UI says
+              enqueue succeeded.
+            </p>
+            <p className="mt-2 text-red-900/95">
+              {wt.worker_count === 0 ? (
+                <>
+                  <strong>No workers</strong> responded to Celery inspect. Scale or fix the worker service (same
+                  broker URL as API), then subscribe it to{" "}
+                  <span className="font-mono">vector,cortex_live,cortex_replay</span>.
+                </>
+              ) : (
+                <>
+                  You have {wt.worker_count} worker(s) but <strong>live queue: 0</strong> — they are not subscribed to{" "}
+                  <span className="font-mono">cortex_live</span>. Update the worker command (ECS task definition / Procfile)
+                  to include e.g.{" "}
+                  <span className="font-mono break-all">
+                    celery -A app.worker worker -Q vector,cortex_live,cortex_replay
+                  </span>
+                  , redeploy, and confirm this banner disappears.
+                </>
+              )}
+            </p>
+          </div>
+        ) : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {statCard("Cortex status", health.badgeText, health.tone)}
           {statCard(
