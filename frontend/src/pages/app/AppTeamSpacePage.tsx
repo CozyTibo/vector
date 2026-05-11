@@ -13,6 +13,7 @@ import SlackUserAvatar from "../../components/workspace/SlackUserAvatar";
 import { workspaceSpinnerHero } from "../../components/workspace/workspaceUiTokens";
 import { fetchOnboarding, fetchSlackWorkspaceMembers, type SlackWorkspaceMember } from "../../lib/onboardingApi";
 import { productApiBase, useProductMeQuery } from "../../lib/meApi";
+import { WORKSPACE_ACCESS_LIST_PATH } from "../../lib/workspaceAccess";
 import {
   defaultTeamsFromOnboarding,
   membersOrderedWithManagerFirst,
@@ -59,7 +60,7 @@ function SectionTitle({ children, className = "" }: { children: ReactNode; class
   return <h2 className={`text-base font-semibold tracking-tight text-zinc-900 ${className}`}>{children}</h2>;
 }
 
-/** Grouped settings — same quiet panel frame as Signals / Teams */
+/** Grouped settings — same quiet panel frame as Signals / Access */
 function SettingsColumnGroup({ title, children }: { title: string; children: ReactNode }) {
   const headingId = `settings-group-${title.replace(/\s+/g, "-").toLowerCase()}`;
   return (
@@ -155,7 +156,7 @@ export default function AppTeamSpacePage() {
     return (
       <main className={`${workspaceAppPageMain} flex flex-col items-center justify-center py-16 sm:py-20`}>
         <div className={workspaceSpinnerHero} aria-hidden />
-        <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading team…</p>
+        <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading…</p>
       </main>
     );
   }
@@ -164,7 +165,7 @@ export default function AppTeamSpacePage() {
     return (
       <main className={`${workspaceAppPageMain} flex flex-col items-center justify-center py-16 sm:py-20`}>
         <div className={workspaceSpinnerHero} aria-hidden />
-        <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading team…</p>
+        <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading…</p>
       </main>
     );
   }
@@ -172,7 +173,7 @@ export default function AppTeamSpacePage() {
   if (ob.isError) {
     return (
       <main className={workspaceAppPageMain}>
-        <p className={`${marketingBody} text-base text-red-700`}>Could not load workspace teams.</p>
+        <p className={`${marketingBody} text-base text-red-700`}>Could not load workspace access settings.</p>
       </main>
     );
   }
@@ -181,10 +182,10 @@ export default function AppTeamSpacePage() {
   const team = teamId ? teams.find((t) => t.id === teamId) : undefined;
 
   if (!team) {
-    return <Navigate to="/app/teams" replace />;
+    return <Navigate to={WORKSPACE_ACCESS_LIST_PATH} replace />;
   }
 
-  const displayName = team.name.trim() || "Team";
+  const displayName = team.name.trim() || "Access group";
 
   return (
     <main className={`${workspaceAppPageMain} space-y-10 lg:space-y-12`}>
@@ -195,8 +196,8 @@ export default function AppTeamSpacePage() {
             <span className={workspaceAppBreadcrumbSep} aria-hidden="true">
               /
             </span>
-            <Link to="/app/teams" className={workspaceAppBreadcrumbAncestorLink}>
-              Teams
+            <Link to={WORKSPACE_ACCESS_LIST_PATH} className={workspaceAppBreadcrumbAncestorLink}>
+              Access
             </Link>
             <span className={workspaceAppBreadcrumbSep} aria-hidden="true">
               /
@@ -208,9 +209,10 @@ export default function AppTeamSpacePage() {
         </nav>
 
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">{displayName} space</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">{displayName}</h1>
           <p className="mt-2 max-w-2xl text-base leading-snug text-zinc-500">
-            Define how Vector operates with your team.
+            Settings for this access group. Execution features here will respect how you scope Vector for these
+            people.
           </p>
         </div>
       </header>
@@ -270,9 +272,9 @@ export default function AppTeamSpacePage() {
 
         {/* RIGHT ~30% */}
         <aside className="lg:col-span-3">
-          <SectionTitle>Team members</SectionTitle>
+          <SectionTitle>Vector users in this group</SectionTitle>
           <div className="mt-4">
-            <p className={membersSectionLabelClass}>Members</p>
+            <p className={membersSectionLabelClass}>People</p>
             {slackMembers.isPending ? (
               <p className="mt-2 text-sm text-zinc-500">Loading Slack directory…</p>
             ) : team.members.length === 0 ? (

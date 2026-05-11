@@ -16,7 +16,7 @@ from vector.api.http.deps import (
     settings_dep,
 )
 from vector.api.http.routes.connectors.install_response import install_redirect_or_json
-from vector.domains.connectors.github.errors import (
+from vector.domains.cortex.connectors.github.errors import (
     GitHubApiError,
     GitHubConnectorNotConfiguredError,
     GitHubInstallationConflictError,
@@ -25,7 +25,7 @@ from vector.domains.connectors.github.errors import (
     GitHubUserOAuthError,
     InvalidGitHubInstallStateError,
 )
-from vector.domains.connectors.github.install_flow import (
+from vector.domains.cortex.connectors.github.install_flow import (
     complete_github_install,
     start_github_install_url,
 )

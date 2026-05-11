@@ -11,11 +11,23 @@ from sqlalchemy import asc, delete, desc, inspect, select
 from sqlalchemy.orm import Session
 
 from vector.domains.onboarding.constants import (
+    PROFILE_PHASE_CONNECTORS_INTRO,
     PROFILE_PHASE_NAME,
+    PROFILE_PHASE_SIZE,
+    PROFILE_PHASE_WEBSITE,
     STATUS_COMPLETED,
     STATUS_IN_PROGRESS,
+    STEP_ADMIN_ACCESS,
     STEP_CHAT_PROFILE,
     STEP_SCANNING,
+    STEP_SLACK_COLLABORATORS,
+    STEP_SLACK_COLLABORATORS_CONFIRM,
+    STEP_SLACK_TEAM_MEMBERS,
+    STEP_SLACK_TEAM_MEMBERS_CONFIRM,
+    STEP_SLACK_WATCH_CHANNELS,
+    STEP_SLACK_WATCH_CHANNELS_CONFIRM,
+    STEP_SLACK_STAKEHOLDERS,
+    STEP_THANK_YOU,
 )
 from vector.domains.onboarding.onboarding_flow import _first_connect_step
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
@@ -36,15 +48,31 @@ def get_onboarding_for_tenant_for_update(session: Session, tenant_id: uuid.UUID)
 
 # Historical `current_step` values that may still exist in DB rows (never valid for new PATCHes).
 _LEGACY_DB_ONBOARDING_STEPS = frozenset({"CONNECT_GITHUB", "CONNECT_LINEAR"})
-_ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder", "linear", "github"})
+_ALLOWED_CONNECT_QUEUE_IDS = frozenset({"slack", "comm_placeholder", "linear", "github", "notion"})
+
+_DEPRECATED_SLACK_TAIL_STEPS = frozenset(
+    {
+        STEP_SLACK_COLLABORATORS,
+        STEP_SLACK_COLLABORATORS_CONFIRM,
+        STEP_SLACK_TEAM_MEMBERS,
+        STEP_SLACK_TEAM_MEMBERS_CONFIRM,
+        STEP_SLACK_WATCH_CHANNELS,
+        STEP_SLACK_WATCH_CHANNELS_CONFIRM,
+        STEP_ADMIN_ACCESS,
+    }
+)
 
 
 def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
-    """Coerce legacy connector step names and strip unknown ``connect_queue`` ids."""
+    """Coerce legacy connector step names, strip unknown ``connect_queue`` ids, and skip removed UX steps."""
     if row.status == STATUS_COMPLETED:
         return
     answers = dict(row.answers_json or {})
     changed = False
+    pp = answers.get("profile_phase")
+    if isinstance(pp, str) and pp in (PROFILE_PHASE_SIZE, PROFILE_PHASE_WEBSITE):
+        answers["profile_phase"] = PROFILE_PHASE_CONNECTORS_INTRO
+        changed = True
     for key in ("connect_queue", "connect_plan"):
         raw = answers.get(key)
         if not isinstance(raw, list):
@@ -62,6 +90,21 @@ def normalize_onboarding_row_removed_steps(row: OnboardingState) -> None:
         ]
         row.current_step = _first_connect_step(allowed) if allowed else STEP_SCANNING
         changed = True
+    if row.status != STATUS_COMPLETED and row.current_step in _DEPRECATED_SLACK_TAIL_STEPS:
+        ss = answers.get("slack_stakeholders")
+        has_stakeholders = (
+            isinstance(ss, dict)
+            and isinstance(ss.get("slack_user_ids"), list)
+            and len(ss["slack_user_ids"]) > 0
+        )
+        if has_stakeholders:
+            row.status = STATUS_COMPLETED
+            row.current_step = STEP_THANK_YOU
+            row.completed_at = row.completed_at or datetime.now(UTC)
+            changed = True
+        else:
+            row.current_step = STEP_SLACK_STAKEHOLDERS
+            changed = True
     if changed:
         row.answers_json = answers
         row.version = int(row.version) + 1
@@ -315,8 +358,65 @@ def normalize_workspace_manager_teams_in_place(answers: dict[str, Any]) -> None:
         row: dict[str, Any] = {"id": tid, "name": name, "members": members_out}
         if manager_out is not None:
             row["manager_slack_user_id"] = manager_out
+        scope_raw = t.get("access_scope")
+        if scope_raw == "all":
+            row["access_scope"] = "all"
+        elif scope_raw == "scoped":
+            row["access_scope"] = "scoped"
         out_teams.append(row)
     raw["teams"] = out_teams
+
+
+_VECTOR_MANAGER_ACCESS_MODES = frozenset({"company_wide", "dedicated_users"})
+
+
+def normalize_vector_manager_access_mode_in_place(answers: dict[str, Any]) -> None:
+    """Product workspace page: company-wide vs dedicated Vector users (post-onboarding)."""
+    v = answers.get("vector_manager_access_mode")
+    if v is None:
+        return
+    if isinstance(v, str) and v in _VECTOR_MANAGER_ACCESS_MODES:
+        answers["vector_manager_access_mode"] = v
+        return
+    answers.pop("vector_manager_access_mode", None)
+
+
+def normalize_vector_company_wide_users_in_place(answers: dict[str, Any]) -> None:
+    """Slack roster rows for company-wide full access (``vector_company_wide_users.members``)."""
+    raw = answers.get("vector_company_wide_users")
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        answers.pop("vector_company_wide_users", None)
+        return
+    members = raw.get("members")
+    if not isinstance(members, list):
+        answers.pop("vector_company_wide_users", None)
+        return
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for m in members:
+        if not isinstance(m, dict):
+            continue
+        uid = m.get("slack_user_id")
+        if not isinstance(uid, str) or not uid.strip():
+            continue
+        uid = uid.strip()
+        if uid in seen:
+            continue
+        seen.add(uid)
+        un = m.get("username")
+        username = un.strip().lstrip("@") if isinstance(un, str) and un.strip() else uid
+        lab = m.get("label")
+        label = lab.strip() if isinstance(lab, str) and lab.strip() else username
+        out.append(
+            {
+                "slack_user_id": uid,
+                "username": username,
+                "label": label,
+            },
+        )
+    raw["members"] = out
 
 
 def hard_reset_onboarding_progress(session: Session, *, tenant_id: uuid.UUID) -> OnboardingState:

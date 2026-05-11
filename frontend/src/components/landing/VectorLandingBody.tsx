@@ -106,8 +106,8 @@ const FAQ_ITEMS: ReadonlyArray<{ q: string; a: ReactNode }> = [
           message that didn&apos;t get a reply, or a thread where a decision quietly shifted.
         </p>
         <p>
-          Vector reads channel content to build a real picture of coordination. It&apos;s processed
-          in-context, but never stored. Private messages are out of scope and remain private.
+          Vector reads channel content to build a real picture of coordination. Private messages are out of scope and
+          remain private.
         </p>
       </>
     ),
@@ -143,7 +143,7 @@ const IMPACT_BLOCKS = [
   {
     accent: true,
     stat: "Focus",
-    copy: "30% of your time back leading, not chasing updates.",
+    copy: "Get 30% of your week back leading, not chasing updates.",
   },
   {
     accent: false,
@@ -402,26 +402,28 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
     {
       time: "9:00",
       without:
-        "You prep your team's weekly call, gathering data from tickets, PRs, messages, hoping nothing important is missing.",
-      with: "Vector briefs the call: shipped, stuck, risks. → You lead, not chase for updates.",
+        "You're rebuilding team status from tickets, PRs, and Slack. Still not sure what actually moved versus what people said moved.",
+      with:
+        "Vector's standup digest: shipped, blocked, drifting. You run the meeting on facts, not archaeology.",
     },
     {
       time: "10:15",
       without:
-        "Rebecca's PR is not merged for days, you ping her and discover it's stuck in an endless review loop.",
-      with: "2h of strategic work. No interruptions.",
+        'A change has been "almost merged" for days; you ping around and learn it\'s waiting on a review thread nobody owns.',
+      with: "Two hours of real work. Vector already surfaced who's waiting on what.",
     },
     {
       time: "2:30",
       without:
-        "You just discovered an insane thread with 78 exchanges, it'll take a while to catch up and sort this out.",
-      with: "Escalation with context + next action. Issue unblocked fast.",
+        "A channel blew up overnight: dozens of messages, fuzzy ownership, and no obvious next step.",
+      with:
+        "Escalation shows up with context, receipts, and a concrete next action. The loop closes fast.",
     },
     {
       time: "4:40",
       without:
-        "Your boss is asking for more visibility on your team and projects so you start writing a detailed report.",
-      with: "Report ready. You review, not write.",
+        "Leadership wants visibility on the team and the roadmap, so you start manually stitching the week's story.",
+      with: "The readout is drafted. You tighten the narrative, not invent the facts.",
     },
   ] as const;
 
@@ -481,13 +483,9 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 </h2>
                 <p className="sub meet-vector__sub">Your new AI team member</p>
                 <p className="sub meet-vector__support">
-                  Vector connects to the tools your team already uses and pushes risks, slowdowns, and concrete actions
-                  to you in real time. You can approve each move in one go, without untangling every thread first.
-                </p>
-                <p className="sub meet-vector__support">
-                  Instead of chasing updates across different sources and stakeholders, Vector brings everything
-                  together so you can focus on delivery: you make the call on the next step, and it runs the
-                  follow-through in your tools.
+                  Vector connects to the tools your team uses and pushes risks, slowdowns, and concrete actions in real
+                  time. Instead of chasing updates across different sources and stakeholders, Vector is guiding the next
+                  steps. You can focus on delivery while Vector executes in your tools.
                 </p>
               </div>
               <MeetVectorIntegrationsHub />
@@ -615,11 +613,11 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 </li>
                 <li>
                   <span className="cta-num">2</span>
-                  <span className="cta-step-copy">Vector understands how your teams operates</span>
+                  <span className="cta-step-copy">Vector understands how your team operates</span>
                 </li>
                 <li>
                   <span className="cta-num">3</span>
-                  <span className="cta-step-copy">Vector gives you instant insights</span>
+                  <span className="cta-step-copy">Vector surfaces what's stuck and what to do next</span>
                 </li>
               </ol>
               <div className="cta-actions">

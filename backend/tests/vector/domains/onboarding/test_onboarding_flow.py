@@ -13,6 +13,7 @@ from vector.domains.onboarding.constants import (
     STEP_ADMIN_ACCESS,
     STEP_CHAT_PROFILE,
     STEP_CONNECT_COMMUNICATION,
+    STEP_CONNECT_ENGINEERING,
     STEP_CONNECT_PROJECT_MANAGEMENT,
     STEP_SLACK_COLLABORATORS,
     STEP_SLACK_COLLABORATORS_CONFIRM,
@@ -46,7 +47,7 @@ def test_role_typo_foundr_normalized_to_founder() -> None:
     }
     r = handle_turn(STEP_CHAT_PROFILE, "Foundr", None, a)
     assert r.answers_updates["profile"]["role"] == "Founder"
-    assert r.answers_updates["profile_phase"] == PROFILE_PHASE_SIZE
+    assert r.answers_updates["profile_phase"] == PROFILE_PHASE_CONNECTORS_INTRO
 
 
 def test_role_pure_number_does_not_advance_or_store() -> None:
@@ -62,19 +63,19 @@ def test_role_pure_number_does_not_advance_or_store() -> None:
     assert "role" in r.assistant_prompt_context["instruction"].lower()
 
 
-def test_legacy_profile_phase_website_skips_to_company_size() -> None:
-    """Stored answers from before website step removal advance to headcount."""
+def test_legacy_profile_phase_website_maps_to_connectors_intro_idle() -> None:
+    """Legacy website phase rows skip straight to connectors intro (headcount step removed)."""
     a = {
         "profile_phase": PROFILE_PHASE_WEBSITE,
         "profile": {"name": "Ada", "role": "Founder"},
         "company": {"name": "Acme"},
     }
-    r = handle_turn(STEP_CHAT_PROFILE, "12", None, a)
-    assert r.answers_updates["company"]["size"] == "12"
-    assert r.answers_updates["profile_phase"] == PROFILE_PHASE_CONNECTORS_INTRO
+    r = handle_turn(STEP_CHAT_PROFILE, "Do you read our DMs?", None, a)
+    assert r.answers_updates == {}
+    assert r.assistant_prompt_context["profile_phase"] == PROFILE_PHASE_CONNECTORS_INTRO
 
 
-def test_profile_sequence_name_through_size() -> None:
+def test_profile_sequence_name_through_role_to_connectors_intro() -> None:
     a = _base_answers()
     r1 = handle_turn(STEP_CHAT_PROFILE, "Ada", None, a)
     assert r1.next_step == STEP_CHAT_PROFILE
@@ -92,12 +93,8 @@ def test_profile_sequence_name_through_size() -> None:
     a = {**a, **r2.answers_updates}
     r3 = handle_turn(STEP_CHAT_PROFILE, "Founder", None, a)
     assert r3.answers_updates["profile"]["role"] == "Founder"
-    assert r3.answers_updates["profile_phase"] == PROFILE_PHASE_SIZE
-
-    a = {**a, **r3.answers_updates}
-    r4 = handle_turn(STEP_CHAT_PROFILE, "5-15", None, a)
-    assert r4.answers_updates["company"]["size"] == "5-15"
-    assert r4.answers_updates["profile_phase"] == PROFILE_PHASE_CONNECTORS_INTRO
+    assert r3.answers_updates["profile_phase"] == PROFILE_PHASE_CONNECTORS_INTRO
+    assert r3.assistant_prompt_context.get("connectors_intro_kind") == "after_role"
 
 
 def test_connectors_intro_question_does_not_advance_phase() -> None:
@@ -485,6 +482,21 @@ def test_connect_communication_linear_only_goes_scanning() -> None:
     r = handle_turn(STEP_CONNECT_COMMUNICATION, "go", None, a)
     assert r.next_step == STEP_SCANNING
     assert r.answers_updates["connect_queue"] == []
+
+
+def test_connect_engineering_last_github_with_slack_goes_stakeholders() -> None:
+    """When the OAuth queue empties after GitHub, Slack was already linked: go pick your Slack self."""
+    a = {
+        "connect_queue": ["github"],
+        "tools": {
+            "communication": ["slack"],
+            "pm": ["linear"],
+            "engineering": ["github"],
+        },
+    }
+    r = handle_turn(STEP_CONNECT_ENGINEERING, "linked", None, a)
+    assert r.next_step == STEP_SLACK_STAKEHOLDERS
+    assert r.answers_updates.get("connect_queue") == []
 
 
 def test_admin_access_step_stays_put() -> None:

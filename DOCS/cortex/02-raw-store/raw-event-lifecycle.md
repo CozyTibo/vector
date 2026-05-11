@@ -31,3 +31,8 @@
 - replay context tags,
 - retrieval location metadata (hot/cold),
 - lineage indexes used for replay completeness checks.
+
+## Temporal Ordering Rule
+Lifecycle retrieval must respect temporal precedence defined in `temporal-continuity-doctrine.md`:
+provider timestamp -> revision anchor -> fetched_at -> stable tie-breaker.
+Replay timestamps are lineage metadata and never primary chronology authority.

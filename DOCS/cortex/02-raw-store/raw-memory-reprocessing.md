@@ -15,6 +15,10 @@ Enable extraction/canonical/linking upgrades by re-reading immutable raw evidenc
 - reprocessing must remain replay-comparable through version metadata.
 - reprocessing scans must preserve chronological semantics.
 
+## Reprocessing Truth Boundary
+Reprocessing reinterprets preserved evidence only.
+It does not retroactively recover provider history that was never observed.
+
 ## Upgrade Support
 Supports:
 - extraction improvements,

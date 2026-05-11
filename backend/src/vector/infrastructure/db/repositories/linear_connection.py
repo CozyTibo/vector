@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_LINEAR
+from vector.domains.cortex.connectors.provider_keys import CONNECTION_PROVIDER_LINEAR
 from vector.infrastructure.db.models.linear_connection_detail import LinearConnectionDetail
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 

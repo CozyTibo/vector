@@ -51,6 +51,23 @@ class OnboardingTurnResult:
     assistant_prompt_context: dict[str, Any]
 
 
+_CONNECTORS_INTRO_AFTER_ROLE_INSTRUCTION = (
+    "They just confirmed their job role (latest user message). The UI may show one or two chat bubbles "
+    "(see format rules in your prompt tail).\n\n"
+    "Voice: casual Slack DM from a teammate you like working with. Warm, a little human, not "
+    "corporate and not a compliance readout.\n\n"
+    "Acknowledge their role in one short line, then ease into why integrations help you help them: "
+    "light signals from tools they already use, sensitive topic so keep it humble and plain language. "
+    "Reassure without lecturing: not storing or reading sensitive stuff, lightweight activity metadata, "
+    "no tool-by-tool essay.\n\n"
+    "Then in the same bubble (or second bubble if you split), chill close: wiring up takes about a minute "
+    "when they are ready, or they can ask you anything first. Mention the **I'm ready to choose tools** "
+    "tag in the chat once.\n\n"
+    "Hard rules: under 85 words across BOTH bubbles if split. No bullet lists. No em dash (U+2014). "
+    "No hyphen jammed between two words as fake punctuation (e.g. worry-I). "
+    "Do not ask for company headcount or team size."
+)
+
 _CONNECTORS_INTRO_AFTER_SIZE_INSTRUCTION = (
     "They just gave organization-wide headcount (latest user message). The UI sends this as TWO chat "
     "bubbles (see format rules in your prompt tail).\n\n"
@@ -96,6 +113,8 @@ def _norm_str(value: str) -> str:
 
 
 def _next_profile_phase(phase: str) -> str:
+    if phase == PROFILE_PHASE_SIZE:
+        return PROFILE_PHASE_CONNECTORS_INTRO
     try:
         idx = PROFILE_PHASES_ORDER.index(phase)
     except ValueError:
@@ -108,7 +127,11 @@ def _next_profile_phase(phase: str) -> str:
 def _default_profile_phase(answers: dict[str, Any]) -> str:
     raw = answers.get("profile_phase")
     if isinstance(raw, str):
+        # Legacy website step removed; skip straight to connectors intro.
         if raw == PROFILE_PHASE_WEBSITE:
+            return PROFILE_PHASE_CONNECTORS_INTRO
+        # ``size`` is no longer in PROFILE_PHASES_ORDER but answers may still carry it (tests / old rows).
+        if raw == PROFILE_PHASE_SIZE:
             return PROFILE_PHASE_SIZE
         if raw in PROFILE_PHASES_ORDER:
             return raw
@@ -296,17 +319,12 @@ def _coalesce_connect_queue(answers: dict[str, Any], tools: dict[str, list[str]]
 
 
 def _terminal_step_after_last_connector(head: str, tools: dict[str, list[str]]) -> str:
-    """Next step after popping the final item from ``connect_queue``."""
-    if head == "slack":
-        comm = tools.get("communication") or []
-        return STEP_SLACK_STAKEHOLDERS if isinstance(comm, list) and "slack" in comm else STEP_SCANNING
+    """Next step after popping the final item from ``connect_queue`` (OAuth queue is now empty)."""
     if head == "comm_placeholder":
         return STEP_SCANNING
     comm = tools.get("communication") or []
     if isinstance(comm, list) and "slack" in comm:
-        return STEP_CONNECT_COMMUNICATION
-    if isinstance(comm, list) and ("ms_teams" in comm or "discord" in comm):
-        return STEP_CONNECT_COMMUNICATION
+        return STEP_SLACK_STAKEHOLDERS
     return STEP_SCANNING
 
 
@@ -881,14 +899,19 @@ def handle_turn(
 
     merged_ans = {**answers, **merged_updates}
     if new_phase == PROFILE_PHASE_CONNECTORS_INTRO:
-        instr = _CONNECTORS_INTRO_AFTER_SIZE_INSTRUCTION
+        if phase == PROFILE_PHASE_ROLE:
+            instr = _CONNECTORS_INTRO_AFTER_ROLE_INSTRUCTION
+            intro_kind = "after_role"
+        else:
+            instr = _CONNECTORS_INTRO_AFTER_SIZE_INSTRUCTION
+            intro_kind = "after_size"
         privacy_ctx: dict[str, Any] = {
             **ctx_base,
             "profile_phase": new_phase,
             "instruction": instr,
             "pending_user_message": msg,
             "connectors_privacy_kb": CONNECTORS_PRIVACY_KNOWLEDGE_BASE,
-            "connectors_intro_kind": "after_size",
+            "connectors_intro_kind": intro_kind,
         }
     else:
         privacy_ctx = {

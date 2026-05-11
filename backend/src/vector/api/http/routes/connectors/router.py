@@ -18,7 +18,7 @@ from vector.contracts.connectors import (
     PrepareConnectorInstallBody,
     PrepareConnectorInstallResponse,
 )
-from vector.domains.connectors.runtime import all_runtimes_ordered, runtime_by_id
+from vector.domains.cortex.connectors.runtime import all_runtimes_ordered, runtime_by_id
 from vector.domains.identity_access.services.connector_install_ticket import issue_connector_install_ticket
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership

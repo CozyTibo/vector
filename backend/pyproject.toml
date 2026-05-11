@@ -49,6 +49,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
@@ -88,6 +89,21 @@ disable_error_code = ["import-untyped"]
 
 [[tool.mypy.overrides]]
 module = "app.tasks.email"
+ignore_missing_imports = true
+disable_error_code = ["import-untyped", "untyped-decorator"]
+
+[[tool.mypy.overrides]]
+module = "app.tasks.cortex_ingestion_sync"
+ignore_missing_imports = true
+disable_error_code = ["import-untyped", "untyped-decorator"]
+
+[[tool.mypy.overrides]]
+module = "app.tasks.cortex_ingestion_scheduler"
+ignore_missing_imports = true
+disable_error_code = ["import-untyped", "untyped-decorator"]
+
+[[tool.mypy.overrides]]
+module = "app.tasks.cortex_ingestion_verify"
 ignore_missing_imports = true
 disable_error_code = ["import-untyped", "untyped-decorator"]
 

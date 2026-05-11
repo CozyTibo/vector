@@ -35,6 +35,10 @@ Phase 01 owns source interaction and raw ingestion envelope production. It does 
 - Replay runs use dedicated replay queues and do not share live worker concurrency pools.
 - Envelope emission is deterministic for identical source payload + extraction version.
 
+## Organizational exhaust vs ingestion substrate
+
+Substrate architecture (**queues, replay isolation, envelope validation, raw row writes**) can be complete while **organizational exhaust** (full pagination, per-stream cursors, backfill + incremental, dominant real resource types) is not. Exhaust is normatively defined in **`phase-01-organizational-exhaust-spec.md`** and gap-tracked in `../implementation/organizational-exhaust-execution-track.md`, `../MASTER_TRACKER.md` §2.5, and `../connectors/connector-exhaust-matrix.md` — not conflated with “sync ran” or “connector connected.”
+
 ## Transaction Boundaries
 - Source fetch and raw persistence are separate transactions.
 - Checkpoint commits only after successful raw persistence ack.

@@ -1,11 +1,12 @@
 # Local mock connectors (development only)
 
-Mock HTTP server for **GitHub REST** and **Linear GraphQL** (and an optional `/linear/oauth/token` stub), plus a full **mock company dataset** used by Manager Insights mock mode (Slack, Notion, Calls payloads alongside GitHub/Linear). **Docker Compose** starts it as the **`mock-connectors`** service (`0.0.0.0:9183` in-container, port **9183** on the host). **Makefile** can run the same app on **127.0.0.1** only for a host-only backend. The Vector backend exchanges Linear OAuth codes with **real** `https://api.linear.app/oauth/token`, resolves viewer/org with **real** `https://api.linear.app/graphql`, then sends **ingestion** GraphQL to this mock when `VECTOR_USE_MOCK_CONNECTORS=true`.
+Mock HTTP server for **GitHub REST**, **Linear GraphQL**, **Notion REST subset**, **Google Calendar events subset (Calls)**, and **Slack Web API subset**, plus a full **mock company dataset** used by Manager Insights mock mode. **Docker Compose** starts it as the **`mock-connectors`** service (`0.0.0.0:9183` in-container, port **9183** on the host). **Makefile** can run the same app on **127.0.0.1** only for a host-only backend. The Vector backend exchanges Linear OAuth codes with **real** `https://api.linear.app/oauth/token`, resolves viewer/org with **real** `https://api.linear.app/graphql`, then sends **ingestion** GraphQL to this mock when `VECTOR_USE_MOCK_CONNECTORS=true`.
 
 **Do not** enable this in production, CI, or AWS. Server-side rules: `VECTOR_USE_MOCK_CONNECTORS=true` is valid only when `ENV=development`.
 
 Strategy: [`DOCS/strategy/local-mock-connectors-and-fixtures.md`](../../DOCS/strategy/local-mock-connectors-and-fixtures.md).  
-Seed audit (contents, usage, gaps): [`DOCS/strategy/mock-data-seed-audit.md`](../../DOCS/strategy/mock-data-seed-audit.md).
+Seed audit (contents, usage, gaps): [`DOCS/strategy/mock-data-seed-audit.md`](../../DOCS/strategy/mock-data-seed-audit.md).  
+**Phase 04 (identity & continuity):** hostile deterministic mock scenarios, personas, and replay-drift taxonomy — [`DOCS/cortex/04-identity/phase-04-mock-data-strategy.md`](../../DOCS/cortex/04-identity/phase-04-mock-data-strategy.md).
 
 ## Prerequisites
 
@@ -28,6 +29,9 @@ Health (host): `http://127.0.0.1:9183/health` (includes current `seed`).
 
 - GitHub-shaped routes: `http://127.0.0.1:9183/...` (same paths as `https://api.github.com/...`).
 - Linear GraphQL (used by backend in mock mode): `http://127.0.0.1:9183/linear/graphql`. Ingestion uses **`operationName`** (e.g. `LinearIngestIssues`, `LinearIngestComments`, `LinearIngestTeams`, …) matching `vector.domains.ingestion.linear_graphql_sync`. The mock also exposes `POST /linear/oauth/token` for ad-hoc testing; **ingestion uses a real Linear access token** from `api.linear.app/oauth/token` when not in mock mode.
+- Notion subset (used by backend in mock mode): `http://127.0.0.1:9183/notion/v1/search`, `/notion/v1/databases/{id}`, `/notion/v1/databases/{id}/query`, `/notion/v1/blocks/{id}/children`.
+- Calls subset (Google Calendar events): `http://127.0.0.1:9183/google-calendar/v3/calendars/{calendarId}/events`.
+- Slack subset (Web API POST methods): `http://127.0.0.1:9183/slack/api/users.list`, `conversations.list`, `conversations.history`, `conversations.replies`.
 
 ### Admin (debug)
 

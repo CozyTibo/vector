@@ -30,6 +30,12 @@ export type NotionDetails = {
   last_sync_at?: string | null;
 };
 
+export type CallsDetails = {
+  connection_id: string | null;
+  provider_email: string | null;
+  last_sync_at?: string | null;
+};
+
 export type ConnectorRow =
   | {
       provider: "github";
@@ -58,6 +64,13 @@ export type ConnectorRow =
       connector_configured: boolean;
       connected: boolean;
       details: SlackDetails | null;
+    }
+  | {
+      provider: "calls";
+      display_name: string;
+      connector_configured: boolean;
+      connected: boolean;
+      details: CallsDetails | null;
     };
 
 export type ConnectorsResponse = { items: ConnectorRow[] };

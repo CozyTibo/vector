@@ -31,7 +31,7 @@ def onboarding_chat_max_completion_tokens(
     m = (model or "").strip().lower()
     if m.startswith("gpt-5"):
         return 4096
-    if intro_kind == "after_size":
+    if intro_kind in ("after_size", "after_role"):
         return 200
     if intro_kind == "qa" and has_connectors_privacy_kb:
         return 320

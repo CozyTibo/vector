@@ -88,8 +88,11 @@ services:
     volumes:
       # Uvicorn cwd is `/app`; `Settings` loads `./.env` so Slack/GitHub/etc. apply without Compose interpolation.
       - ./.env:/app/.env:ro
+      # Normative Cortex docs (Phase 04 doc-contract tests read under DOCS/cortex/04-identity).
+      - ./DOCS:/app/DOCS:ro
       - ./backend/src:/app/src
       - ./backend/tests:/app/tests
+      - ./backend/mock_connectors:/app/mock_connectors
       - ./backend/alembic:/app/alembic
       - ./backend/pyproject.toml:/app/pyproject.toml
       - ./backend/README.md:/app/README.md
@@ -152,6 +155,7 @@ services:
       - ./secrets:/run/secrets:ro
     command: >
       celery -A app.worker worker --loglevel=info
+      -Q vector,cortex_live,cortex_replay
 
   celery-beat:
     build:

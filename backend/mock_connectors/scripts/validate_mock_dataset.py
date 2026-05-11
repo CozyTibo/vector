@@ -15,6 +15,7 @@ if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
 from mock_connectors.fixtures import cortex_capability_scenarios as ccs  # noqa: E402
+from mock_connectors.fixtures import phase04_continuity_fixtures as p4c  # noqa: E402
 from mock_connectors.fixtures import seed_config as sc  # noqa: E402
 from mock_connectors.fixtures.company_generator import (  # noqa: E402
     dataset_to_json_dict,
@@ -173,6 +174,28 @@ def _check_execution_stories(linear: dict[str, Any], gh: dict[str, Any]) -> list
     return errs
 
 
+def _check_phase04_continuity_fixture(data: dict[str, Any], linear: dict[str, Any]) -> list[str]:
+    errs: list[str] = []
+    cf = data.get("continuity_fixture")
+    if not isinstance(cf, dict):
+        errs.append("continuity_fixture missing or not an object")
+        return errs
+    if cf.get("schema_version") != p4c.PHASE04_MOCK_FIXTURE_SCHEMA_VERSION:
+        errs.append("continuity_fixture.schema_version must be phase04_mock_fixture_v1")
+    sk = cf.get("scenario_key")
+    if not isinstance(sk, str) or sk not in p4c.PHASE04_SCENARIO_KEYS:
+        errs.append("continuity_fixture.scenario_key must be a registered Phase 04 scenario key")
+    users = linear.get("users") if isinstance(linear.get("users"), list) else []
+    alex_linear = sum(
+        1
+        for u in users
+        if isinstance(u, dict) and str(u.get("displayName") or "").strip() == "Alex"
+    )
+    if alex_linear < 2:
+        errs.append("Phase04 hostile identity slice expects >=2 Linear users with displayName 'Alex'")
+    return errs
+
+
 def _check_connector_depth(data: dict[str, Any]) -> list[str]:
     errs: list[str] = []
     gh = data.get("github") if isinstance(data.get("github"), dict) else {}
@@ -184,6 +207,9 @@ def _check_connector_depth(data: dict[str, Any]) -> list[str]:
         errs.append("github pull_request_reviews depth too low (<20)")
     if len(gh.get("issue_comments", [])) < 30:
         errs.append("github issue_comments depth too low (<30)")
+    repo_n = len(gh.get("repos", [])) if isinstance(gh.get("repos"), list) else 0
+    if len(gh.get("releases", [])) < max(repo_n, 1):
+        errs.append("github releases depth too low (expected at least one per repo)")
 
     if not slack_events:
         errs.append("slack_events missing")
@@ -198,6 +224,8 @@ def _check_connector_depth(data: dict[str, Any]) -> list[str]:
         errs.append("notion databases depth too low (<3)")
     if len(notion.get("database_rows", [])) < 20:
         errs.append("notion database_rows depth too low (<20)")
+    if len(notion.get("blocks", [])) < 20:
+        errs.append("notion blocks depth too low (<20)")
     if len(notion.get("comments", [])) < 20:
         errs.append("notion comments depth too low (<20)")
     if len(notion.get("relations", [])) < 5:
@@ -239,6 +267,7 @@ def main() -> int:
             linear, gh, slack_events, calls, notion
         )
     )
+    errs.extend(_check_phase04_continuity_fixture(data, linear))
 
     if len(gh["repos"]) < sc.TARGET_REPOSITORIES // 2:
         errs.append(f"repo count low: {len(gh['repos'])}")

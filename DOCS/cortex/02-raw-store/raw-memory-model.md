@@ -23,7 +23,15 @@ Raw memory must optimize for:
 - historical durability,
 - deterministic retrieval,
 - version-aware reprocessing,
-- replay completeness verification.
+- replay equivalence verification over preserved evidence.
 
 ## Trust Boundary
 Raw memory is evidence truth, not semantic truth. Semantic truth is downstream and must always reference raw evidence.
+
+## Out-of-Scope Enforcement
+Phase 02 raw memory model must not include:
+- canonical entity fields,
+- identity-linking decisions,
+- graph edges/semantics,
+- inferred ownership/causality,
+- AI-generated interpretation artifacts.

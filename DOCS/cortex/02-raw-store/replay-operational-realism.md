@@ -25,6 +25,10 @@
 - replay job lineage keys are required for deterministic diagnostics,
 - index bloat risk is real if replay and forensic indexes are both expanded blindly.
 
+## Realism Boundary
+Operational replay protects deterministic reinterpretation of preserved evidence.
+It is not a mechanism for reconstructing provider history that was never captured.
+
 ## Tenant Isolation Requirements
 - per-tenant replay concurrency caps,
 - tenant-fair scheduling to avoid noisy-neighbor replay starvation,

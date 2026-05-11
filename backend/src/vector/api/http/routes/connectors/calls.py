@@ -11,13 +11,13 @@ from sqlalchemy.orm import Session
 
 from vector.api.http.deps import connector_install_claims_dependency, get_db, settings_dep
 from vector.api.http.routes.connectors.install_response import install_redirect_or_json
-from vector.domains.connectors.calls.errors import (
+from vector.domains.cortex.connectors.calls.errors import (
     CallsConnectorNotConfiguredError,
     CallsInstallStateMembershipError,
     CallsOAuthError,
     InvalidCallsOAuthStateError,
 )
-from vector.domains.connectors.calls.oauth_flow import complete_calls_oauth, start_calls_oauth_url
+from vector.domains.cortex.connectors.calls.oauth_flow import complete_calls_oauth, start_calls_oauth_url
 from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims

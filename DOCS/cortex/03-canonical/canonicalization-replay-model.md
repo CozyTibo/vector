@@ -1,5 +1,7 @@
 # Canonicalization Replay Model
 
+> **Normative supersession:** Use `phase-03-replay-versioning-doctrine.md` for Phase 03 replay/idempotency/rebuild semantics. This file is retained as a short summary.
+
 ## Replay Objective
 Regenerate canonical outputs from raw substrate with deterministic comparability.
 

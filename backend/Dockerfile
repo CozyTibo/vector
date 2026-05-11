@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
+# Test-only / dev dataset helpers imported as top-level `mock_connectors` by pytest (see tests/conftest.py).
+COPY mock_connectors ./mock_connectors
 
 ENV PYTHONPATH=/app/src
 ENV PYTHONDONTWRITEBYTECODE=1

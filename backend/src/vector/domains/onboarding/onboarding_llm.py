@@ -62,6 +62,8 @@ def _effective_profile_phase(answers_json: dict[str, Any]) -> str:
     raw = answers_json.get("profile_phase")
     if isinstance(raw, str):
         if raw == PROFILE_PHASE_WEBSITE:
+            return PROFILE_PHASE_CONNECTORS_INTRO
+        if raw == PROFILE_PHASE_SIZE:
             return PROFILE_PHASE_SIZE
         if raw in PROFILE_PHASES_ORDER:
             return raw
@@ -256,6 +258,20 @@ def _fallback_connectors_intro_after_size_bubbles() -> list[str]:
     ]
 
 
+def _fallback_connectors_intro_after_role_bubbles() -> list[str]:
+    """Two chat bubbles after role (no headcount): quick ack, then connectors + CTA."""
+    return [
+        "Great, that helps me picture how you show up day to day.",
+        (
+            "Quick note before we pick tools.\n\n"
+            "I pick up light signals from the stuff your team already uses so I can stay oriented "
+            "without digging into sensitive content. Think lightweight activity and metadata, not "
+            "your backlog or a copy of Slack.\n\n"
+            "When you are ready, tap **I'm ready to choose tools** in the chat and we will wire things up."
+        ),
+    ]
+
+
 def split_connectors_intro_after_size(text: str) -> list[str]:
     """Split model output into two UI bubbles (first \\n\\n only)."""
     t = text.strip()
@@ -266,6 +282,19 @@ def split_connectors_intro_after_size(text: str) -> list[str]:
     rest = rest.strip()
     if not first or not rest:
         return [t] if t else _fallback_connectors_intro_after_size_bubbles()
+    return [first, rest]
+
+
+def split_connectors_intro_after_role(text: str) -> list[str]:
+    """Split model output into two UI bubbles (first \\n\\n only). Same shape as after-size."""
+    t = text.strip()
+    if "\n\n" not in t:
+        return [t] if t else _fallback_connectors_intro_after_role_bubbles()
+    first, rest = t.split("\n\n", 1)
+    first = first.strip()
+    rest = rest.strip()
+    if not first or not rest:
+        return [t] if t else _fallback_connectors_intro_after_role_bubbles()
     return [first, rest]
 
 
@@ -286,6 +315,8 @@ def generate_onboarding_reply(
     if not cfg.openai_api_key.strip():
         if intro_kind == "after_size":
             return _finalize_assistant_segments(_fallback_connectors_intro_after_size_bubbles())
+        if intro_kind == "after_role":
+            return _finalize_assistant_segments(_fallback_connectors_intro_after_role_bubbles())
         return _finalize_assistant_segments(
             [_fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)]
         )
@@ -358,6 +389,17 @@ def generate_onboarding_reply(
             "Second block should feel like a chill Slack message from a coworker, not a policy memo. "
             "Obey the word cap in the instruction above."
         )
+    if intro_kind == "after_role":
+        tail += (
+            "\n\n## Format (this turn only: two chat bubbles)\n"
+            "The UI shows your reply as TWO separate messages. First paragraph: one short sentence "
+            "that acknowledges their role (no headcount, no org size). Then a blank line, then the "
+            "rest in the second block. The app splits on the first double newline only. "
+            "The first line of the second block must bridge from that ack into how integrations help "
+            "you help them (privacy-light, plain language). "
+            "Second block should feel like a chill Slack message from a coworker, not a policy memo. "
+            "Obey the word cap in the instruction above."
+        )
 
     revision_extra = ""
     if assistant_prompt_context.get("tools_selection_revision"):
@@ -423,6 +465,8 @@ Readable summary:
         )
         if intro_kind == "after_size":
             return _finalize_assistant_segments(_fallback_connectors_intro_after_size_bubbles())
+        if intro_kind == "after_role":
+            return _finalize_assistant_segments(_fallback_connectors_intro_after_role_bubbles())
         return _finalize_assistant_segments(
             [_fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)]
         )
@@ -438,9 +482,13 @@ Readable summary:
         )
         if intro_kind == "after_size":
             return _finalize_assistant_segments(_fallback_connectors_intro_after_size_bubbles())
+        if intro_kind == "after_role":
+            return _finalize_assistant_segments(_fallback_connectors_intro_after_role_bubbles())
         return _finalize_assistant_segments(
             [_fallback_reply(step, answers_json, last_user_message, assistant_prompt_context)]
         )
     if intro_kind == "after_size":
         return _finalize_assistant_segments(split_connectors_intro_after_size(text))
+    if intro_kind == "after_role":
+        return _finalize_assistant_segments(split_connectors_intro_after_role(text))
     return _finalize_assistant_segments([text])

@@ -16,7 +16,7 @@ Final implementation-readiness check for the raw organizational memory layer wit
 | Observability completeness | Pass With Caveats | Required metrics/gates are defined; production thresholds will need calibration. |
 
 ## Determination
-**READY WITH CAVEATS**
+**READY FOR IMPLEMENTATION (GOVERNED; CALIBRATION PENDING)**
 
 ## Why Not "NOT READY"
 - No foundational architectural gap blocks implementation.
@@ -27,9 +27,20 @@ Final implementation-readiness check for the raw organizational memory layer wit
 - Replay economics at very large windows remain modeled, not measured.
 - Archive rehydration throughput and replay concurrency behavior remain unproven until runtime.
 - Query plan stability under high fanout history windows requires production-like load tests.
+- Trust-state threshold values and binary gate tolerances require runtime calibration before closure.
 
 ## Required Discipline During Implementation
 1. Ship replay scope controls and quotas in first implementation slice.
 2. Instrument query classes before optimization.
 3. Validate archival rehydration SLOs with staged load tests.
 4. Keep index set minimal and query-owned, then tune from observed pressure.
+5. Enforce binary closure gates (`binary-closure-gates.md`) before declaring phase closure.
+
+## Confidence (Pre-Implementation)
+**9.2 / 10**
+
+Rationale:
+- doctrine ownership is now explicit (`normative-index.md`),
+- trust/degradation/replay/reconstruction semantics are explicit,
+- closure is binary-gated and fail-closed,
+- remaining uncertainty is calibration, not architectural ambiguity.

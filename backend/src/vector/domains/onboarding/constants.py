@@ -6,7 +6,7 @@ from __future__ import annotations
 STEP_CHAT_PROFILE = "CHAT_PROFILE"
 
 # Connector OAuth screens (order is driven by `connect_queue` in answers).
-# Typical queue: Linear (PM) → GitHub (engineering) → Slack or Teams/Discord placeholder.
+# Typical queue: Slack → Linear and/or Notion (PM) → GitHub (engineering); Teams/Discord use a placeholder.
 STEP_CONNECT_PROJECT_MANAGEMENT = "CONNECT_PROJECT_MANAGEMENT"
 STEP_CONNECT_ENGINEERING = "CONNECT_ENGINEERING"
 # Communication phase: Slack OAuth; legacy rows may still have ``comm_placeholder`` in ``connect_queue``.
@@ -76,7 +76,6 @@ PROFILE_PHASES_ORDER: tuple[str, ...] = (
     PROFILE_PHASE_NAME,
     PROFILE_PHASE_ORG,
     PROFILE_PHASE_ROLE,
-    PROFILE_PHASE_SIZE,
     PROFILE_PHASE_CONNECTORS_INTRO,
     PROFILE_PHASE_TOOLS,
     PROFILE_PHASE_DONE,

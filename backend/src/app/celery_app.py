@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import os
+from datetime import timedelta
 
 from celery import Celery
 from celery.signals import worker_process_init
@@ -62,6 +63,12 @@ celery_app = Celery(
     include=[
         "app.tasks.email",
         "app.tasks.onboarding_activation_task",
+        "app.tasks.cortex_ingestion_sync",
+        "app.tasks.cortex_ingestion_scheduler",
+        "app.tasks.cortex_ingestion_verify",
+        "app.tasks.cortex_canonical_materialize_backlog",
+        "app.tasks.cortex_full_pipeline_rerun",
+        "app.tasks.cortex_org_link_jobs",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -73,13 +80,40 @@ celery_app.conf.result_serializer = "json"
 celery_app.conf.imports = (
     "app.tasks.email",
     "app.tasks.onboarding_activation_task",
+    "app.tasks.cortex_ingestion_sync",
+    "app.tasks.cortex_ingestion_scheduler",
+    "app.tasks.cortex_ingestion_verify",
+    "app.tasks.cortex_canonical_materialize_backlog",
+    "app.tasks.cortex_full_pipeline_rerun",
+    "app.tasks.cortex_org_link_jobs",
 )
+
+# Phase 01 Step 2–3: live lane vs replay lane (orchestration-model.md, replay-strategy.md).
+celery_app.conf.task_routes = {
+    "vector.cortex.ingestion.run_sync": {"queue": "cortex_live"},
+    "vector.cortex.ingestion.run_sync_replay": {"queue": "cortex_replay"},
+}
+
+_tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "300"))
+_tick_seconds = max(60, _tick_seconds)
+celery_app.conf.beat_schedule = {
+    "cortex-ingestion-scheduler-tick": {
+        "task": "vector.cortex.ingestion.scheduler_tick",
+        "schedule": timedelta(seconds=_tick_seconds),
+    },
+}
 
 
 def _register_tasks() -> None:
     """Import task modules so they bind to ``celery_app``."""
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")
+    importlib.import_module("app.tasks.cortex_ingestion_sync")
+    importlib.import_module("app.tasks.cortex_ingestion_scheduler")
+    importlib.import_module("app.tasks.cortex_ingestion_verify")
+    importlib.import_module("app.tasks.cortex_canonical_materialize_backlog")
+    importlib.import_module("app.tasks.cortex_full_pipeline_rerun")
+    importlib.import_module("app.tasks.cortex_org_link_jobs")
 
 
 _register_tasks()
@@ -90,3 +124,9 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     """Prefork children must bind task modules to the app (avoids unregistered-task KeyError)."""
     importlib.import_module("app.tasks.email")
     importlib.import_module("app.tasks.onboarding_activation_task")
+    importlib.import_module("app.tasks.cortex_ingestion_sync")
+    importlib.import_module("app.tasks.cortex_ingestion_scheduler")
+    importlib.import_module("app.tasks.cortex_ingestion_verify")
+    importlib.import_module("app.tasks.cortex_canonical_materialize_backlog")
+    importlib.import_module("app.tasks.cortex_full_pipeline_rerun")
+    importlib.import_module("app.tasks.cortex_org_link_jobs")

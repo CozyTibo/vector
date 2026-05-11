@@ -11,8 +11,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
-from vector.domains.connectors.github.http_client import GitHubUserTokenExchange
-from vector.domains.connectors.github.install_state import create_install_state_token
+from vector.domains.cortex.connectors.github.http_client import GitHubUserTokenExchange
+from vector.domains.cortex.connectors.github.install_state import create_install_state_token
 from vector.domains.identity_access.services.session_jwt import issue_session_token
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.tenant import Tenant
@@ -218,7 +218,7 @@ def test_github_callback_persists_connection(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    from vector.domains.connectors.github import install_flow
+    from vector.domains.cortex.connectors.github import install_flow
 
     pem = _rsa_pem()
     monkeypatch.setenv("SECRET_KEY", "unit-test-secret-key-min-32-characters-long!")

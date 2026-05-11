@@ -8,7 +8,7 @@ import { workspaceAuthGateLink, workspaceNavLinkCurrent, workspaceNavLinkRest } 
 type Props = {
   email?: string;
   onLogout?: () => void;
-  /** When false, hide workspace nav links (Signals, Teams), e.g. during onboarding. */
+  /** When false, hide workspace nav links (Signals, Access), e.g. during onboarding. */
   showConnectors?: boolean;
 };
 
@@ -114,7 +114,7 @@ function AccountMenu({ onLogout }: { onLogout: () => void }) {
 export default function PublicNav({ email, onLogout, showConnectors = false }: Props) {
   const loc = useLocation();
   const onSignals = loc.pathname === "/app";
-  const onTeams = loc.pathname === "/app/teams" || loc.pathname.startsWith("/app/teams/");
+  const onAccess = loc.pathname === "/app/access" || loc.pathname.startsWith("/app/access/");
 
   return (
     <header className="relative z-40 border-b border-zinc-200/90 bg-[#FFFFFF]/95 backdrop-blur-md">
@@ -138,8 +138,8 @@ export default function PublicNav({ email, onLogout, showConnectors = false }: P
               <Link to="/app" className={onSignals ? workspaceNavLinkCurrent : workspaceNavLinkRest}>
                 Signals
               </Link>
-              <Link to="/app/teams" className={onTeams ? workspaceNavLinkCurrent : workspaceNavLinkRest}>
-                Teams
+              <Link to="/app/access" className={onAccess ? workspaceNavLinkCurrent : workspaceNavLinkRest}>
+                Access
               </Link>
             </>
           ) : null}

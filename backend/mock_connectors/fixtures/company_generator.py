@@ -9,6 +9,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from mock_connectors.fixtures import cortex_capability_scenarios as ccs
+from mock_connectors.fixtures import phase04_continuity_fixtures as p4c
+from mock_connectors.fixtures import phase04_org_recurrence_topology as p4ort
 from mock_connectors.fixtures import execution_chaos as ex_chaos
 from mock_connectors.fixtures import execution_stories as ex
 from mock_connectors.fixtures import nexora_content as nx
@@ -178,6 +180,13 @@ def _assert_no_github_activity_for_linear_only_users(
         if login in skip:
             msg = f"linear-only user {login} must not open GitHub issues"
             raise AssertionError(msg)
+    for rel in gh_pkg.get("releases") or []:
+        if not isinstance(rel, dict):
+            continue
+        login = rel.get("author", {}).get("login")
+        if login in skip:
+            msg = f"linear-only user {login} must not publish GitHub releases"
+            raise AssertionError(msg)
 
 
 @dataclass
@@ -203,6 +212,7 @@ def generate_dataset(seed: int) -> MockDataset:
     repos = _build_repos(seed, users)
     linear_pkg = _build_linear(seed, rng, users, repos, t0, end)
     gh_pkg = _build_github(seed, rng, users, repos, linear_pkg, t0, end)
+    _inject_phase04_github_pull_request_continuity(gh_pkg, seed=seed)
     _assert_no_github_activity_for_linear_only_users(users, gh_pkg)
     slack_events = _build_slack(seed, users, linear_pkg, t0, end)
     notion_pkg = _build_notion(seed, users, linear_pkg, slack_events, t0, end)
@@ -228,6 +238,14 @@ def generate_dataset(seed: int) -> MockDataset:
         slack_events,
         notion_pkg,
         calls_pkg,
+    )
+    p04_recurrence = p4ort.apply_org_recurrence_cross_tool_surface(
+        seed=seed,
+        users=users,
+        github=gh_pkg,
+        linear=linear_pkg,
+        slack_events=slack_events,
+        t0=t0,
     )
     cc_errs = ccs.validate_cortex_capability_dataset_strength(
         linear_pkg, gh_pkg, slack_events, calls_pkg, notion_pkg
@@ -259,6 +277,7 @@ def generate_dataset(seed: int) -> MockDataset:
             "cortex_capability_scenarios": ccs.cortex_capability_scenario_tags(),
             "cortex_capability_evidence": cc_evidence,
             "execution_chaos_tags": chaos_tags,
+            "p04_org_recurrence_topology": p04_recurrence,
         },
     )
 
@@ -277,6 +296,7 @@ def dataset_to_json_dict(ds: MockDataset) -> dict[str, Any]:
         "edges": ds.edges,
         "pattern_coverage": ds.pattern_coverage,
         "meta": ds.meta,
+        "continuity_fixture": p4c.build_continuity_fixture_sidecar(seed=ds.seed),
     }
 
 
@@ -566,6 +586,22 @@ def _build_linear(
             },
         )
 
+    project_updates: list[dict[str, Any]] = []
+    for pi, proj in enumerate(projects):
+        pu_ts = t0 + timedelta(hours=pi + 3)
+        iso_c = _iso(pu_ts)
+        iso_u = _iso(pu_ts + timedelta(hours=1))
+        project_updates.append(
+            {
+                "id": _u(seed, "project_update", proj["id"]),
+                "body": f"## {proj['name']}\n\nWeekly digest: scope stable; blockers tracked as issues.",
+                "createdAt": iso_c,
+                "updatedAt": iso_u,
+                "url": f"https://linear.app/project/{proj['id']}/update/{pi}",
+                "project": {"id": proj["id"], "name": proj["name"]},
+            },
+        )
+
     epics: list[dict[str, Any]] = []
     for i in range(sc.TARGET_EPICS):
         eid = _u(seed, "epic", str(i))
@@ -770,6 +806,7 @@ def _build_linear(
         issue = {
             "id": iid,
             "identifier": identifier,
+            "url": f"https://linear.app/{team['key']}/{identifier}",
             "title": title,
             "description": desc,
             "priority": priority,
@@ -797,6 +834,19 @@ def _build_linear(
             else {"nodes": []},
             "metadata": meta,
             "github_pr_number": None,
+            "attachments": {
+                "nodes": (
+                    [
+                        {
+                            "id": _u(seed, "att", iid),
+                            "title": "spec.pdf",
+                            "url": f"https://linear.app/attachments/{iid}",
+                        }
+                    ]
+                    if i % 19 == 0
+                    else []
+                ),
+            },
             "_pattern_flags": [],
             "_issue_index": i,
         }
@@ -1075,6 +1125,7 @@ def _build_linear(
         "cycles": cycles,
         "labels": labels,
         "initiatives": initiatives,
+        "projectUpdates": project_updates,
         "users": [
             {
                 "id": u["linear_user_id"],
@@ -1433,6 +1484,27 @@ def _build_github(
             },
         )
 
+    releases_gh: list[dict[str, Any]] = []
+    rel_seq = 0
+    for repo in repos:
+        for rel_idx in range(2):
+            releases_gh.append(
+                {
+                    "id": 800000 + rel_seq,
+                    "node_id": f"REL_{rel_seq}",
+                    "tag_name": f"mock-rel-{repo['full_name'].replace('/', '-')}-{rel_idx}",
+                    "name": f"Mock release {rel_idx}",
+                    "body": "Automated mock release for connector exhaust.",
+                    "draft": False,
+                    "prerelease": bool(rel_idx % 2),
+                    "created_at": _iso(t0 + timedelta(days=rel_seq % 20)),
+                    "published_at": _iso(t0 + timedelta(days=rel_seq % 20, hours=2)),
+                    "author": gh_user_blob(gh_users[rel_seq % len(gh_users)]),
+                    "repository": {"id": repo["id"], "full_name": repo["full_name"]},
+                }
+            )
+            rel_seq += 1
+
     # Multi-repo: same Linear key, two PRs in different repos (pattern: multi_repo_change)
     if len(linear_issues) > 50:
         ident = linear_issues[50]["identifier"]
@@ -1533,9 +1605,11 @@ def _build_github(
         "pull_requests": prs,
         "pull_request_reviews": pr_reviews,
         "issues": issues_gh,
+        "releases": releases_gh,
         "issue_comments": issue_comments,
         "commits": commits_out,
         "pr_commits": pr_commits_map,
+        "issue_timelines": {},
         "installation_token": "mock-gh-install-token-vector",
     }
 
@@ -1576,7 +1650,11 @@ def _build_slack(
             "linear_issue_id": None,
             "pattern": "discussion_drift",
             "reactions": [{"name": "eyes", "count": 2}, {"name": "white_check_mark", "count": 1}],
-            "metadata": {"scenario": "discussion_drift", "source": "channel_message"},
+            "metadata": {
+                "scenario": "discussion_drift",
+                "source": "channel_message",
+                "continuity_fixture": {"cluster_key": "p04md_hostile_cluster_alpha", "family": "P04MD-A03"},
+            },
         },
         {
             "id": _u(seed, "slack", "2"),
@@ -1599,7 +1677,11 @@ def _build_slack(
             "linear_issue_id": None,
             "pattern": "cross_tool_ping",
             "reactions": [{"name": "thread", "count": 1}],
-            "metadata": {"scenario": "cross_tool_ping", "source": "channel_message"},
+            "metadata": {
+                "scenario": "cross_tool_ping",
+                "source": "channel_message",
+                "continuity_fixture": {"cluster_key": "p04md_hostile_cluster_alpha", "family": "P04MD-A03"},
+            },
         },
     ]
     if bundle:
@@ -1713,7 +1795,38 @@ def _build_slack(
                     "metadata": {"scenario": ev.get("metadata", {}).get("scenario"), "source": "message_deleted"},
                 }
             )
+    p4c.extend_slack_events_for_hostile_identity_continuity(enriched, seed=seed, users=users, t0=t0)
     return sorted(enriched, key=lambda e: str(e.get("updated_at") or e.get("ts")))
+
+
+def _inject_phase04_github_pull_request_continuity(gh_pkg: dict[str, Any], *, seed: int) -> None:
+    """Tag a small slice of PR payloads so anchor continuity can cross-link with Slack hostile fixtures."""
+    prs = gh_pkg.get("pull_requests")
+    if not isinstance(prs, list) or not prs:
+        return
+    shared_subject = "p04:cross_tool_morgan_split_identity_bundle"
+    stable_acc = f"p04_hostile_stable_account_{seed % 10009:05d}"
+    n = 0
+    for pr in prs:
+        if not isinstance(pr, dict):
+            continue
+        user = pr.get("user")
+        login = str(user.get("login") or "") if isinstance(user, dict) else ""
+        if login != "thagler":
+            continue
+        md = dict(pr.get("metadata") or {})
+        md["continuity_fixture"] = {
+            "cluster_key": "p04md_hostile_cluster_alpha",
+            "link_subject": shared_subject,
+            "stable_account_key": stable_acc,
+            "ambiguity_cohort_key": "p04_hostile_cross_bundle_handles",
+            "org_ambiguity_class": "handle_collision_unresolved",
+            "family": "P04MD-H01",
+        }
+        pr["metadata"] = md
+        n += 1
+        if n >= 5:
+            break
 
 
 def _build_edges(
@@ -1751,6 +1864,7 @@ def _build_notion(
     pages: list[dict[str, Any]] = []
     databases: dict[str, dict[str, Any]] = {}
     database_rows: list[dict[str, Any]] = []
+    notion_blocks: list[dict[str, Any]] = []
     notion_comments: list[dict[str, Any]] = []
     relations: list[dict[str, Any]] = []
     issues = linear_pkg.get("issues", [])
@@ -1871,6 +1985,44 @@ def _build_notion(
                 "snippet": f"Thread summary: {str(ev.get('text', ''))[:180]}",
             }
         )
+    parent_candidates = [p.get("id") for p in pages[:18] if isinstance(p.get("id"), str)]
+    parent_candidates.extend(
+        [r.get("id") for r in database_rows[:18] if isinstance(r.get("id"), str)]
+    )
+    for i, parent_id in enumerate(parent_candidates):
+        block_id = _u(seed, "notion", "block", str(i))
+        notion_blocks.append(
+            {
+                "id": block_id,
+                "parent_id": parent_id,
+                "type": "paragraph",
+                "has_children": i % 5 == 0,
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "plain_text": f"Execution note block {i + 1} for parent {parent_id[:8]}."
+                        }
+                    ]
+                },
+            }
+        )
+        if i % 5 == 0:
+            child_id = _u(seed, "notion", "block-child", str(i))
+            notion_blocks.append(
+                {
+                    "id": child_id,
+                    "parent_id": block_id,
+                    "type": "bulleted_list_item",
+                    "has_children": False,
+                    "bulleted_list_item": {
+                        "rich_text": [
+                            {
+                                "plain_text": "Follow-up child block preserving deterministic parent/child structure."
+                            }
+                        ]
+                    },
+                }
+            )
     return {
         "workspace": {
             "id": _u(seed, "notion", "workspace"),
@@ -1879,6 +2031,7 @@ def _build_notion(
         },
         "databases": databases,
         "database_rows": database_rows,
+        "blocks": notion_blocks,
         "comments": notion_comments,
         "relations": relations,
         "search_result_count": len(pages),
@@ -1892,6 +2045,7 @@ def _build_notion(
             "linear_comment_inputs": len(linear_comments),
             "databases": len(databases),
             "database_rows": len(database_rows),
+            "blocks": len(notion_blocks),
             "relations": len(relations),
         },
     }

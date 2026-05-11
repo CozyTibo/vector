@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from vector.domains.connectors.provider_keys import CONNECTION_PROVIDER_SLACK
+from vector.domains.cortex.connectors.provider_keys import CONNECTION_PROVIDER_SLACK
 from vector.infrastructure.db.models.slack_connection_detail import SlackConnectionDetail
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 

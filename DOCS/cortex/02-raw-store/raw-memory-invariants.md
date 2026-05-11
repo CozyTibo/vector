@@ -1,36 +1,16 @@
 # Raw Memory Invariants
 
-## Invariant 1: Raw Payload Immutability
-- meaning: payload blob is append-only.
-- replay implications: baseline replay trust.
-- downstream dependencies: canonical/reasoning provenance.
-- corruption symptoms: payload hash drift.
-- verification expectation: immutable-row mutation checks.
+## Invariant Contract Table
 
-## Invariant 2: Provenance Reconstructability
-- meaning: raw record has sufficient provenance bootstrap fields.
-- replay implications: replay equivalence proof possible.
-- downstream dependencies: evidence chains.
-- corruption symptoms: missing provenance refs.
-- verification expectation: non-null provenance integrity scans.
+| Invariant | Meaning | Runtime Check Type | Fail State |
+| --------- | ------- | ------------------ | ---------- |
+| I1 Raw payload immutability | Raw evidence rows are append-only and non-mutating. | hash drift checks + immutable-row mutation probes | corrupted |
+| I2 Provenance reconstructability | Required provenance bootstrap fields are present and linked. | provenance continuity scans | lineage-incomplete / continuity-broken |
+| I3 Source identity + revision preservation | Source identity/revision anchors are preserved as observed. | identity/revision continuity checks | degraded / continuity-broken |
+| I4 Replay lineage durability | Replay metadata persists and is queryable for replay diagnostics. | replay lineage linkage checks | replay-diverged / lineage-incomplete |
+| I5 Deterministic retrieval | Same fixed scope/boundary yields stable evidence ordering/set. | repeatability/replay determinism checks | replay-diverged |
+| I6 Temporal ordering determinism | Ordering precedence rules are applied consistently. | temporal ordering validation | reconstruction-limited / degraded |
 
-## Invariant 3: Source Identity Preservation
-- meaning: source ids/revisions preserved as observed.
-- replay implications: deterministic dedupe and replay windowing.
-- downstream dependencies: change lineage and correction handling.
-- corruption symptoms: identity collisions or missing revisions.
-- verification expectation: identity uniqueness + conflict probes.
-
-## Invariant 4: Replay Lineage Durability
-- meaning: replay metadata persists and remains queryable.
-- replay implications: trusted reprocessing history.
-- downstream dependencies: divergence diagnosis.
-- corruption symptoms: orphan replay records.
-- verification expectation: replay coverage and linkage audits.
-
-## Invariant 5: Deterministic Raw Retrieval
-- meaning: same query scope returns stable evidence set under fixed snapshot.
-- replay implications: deterministic reconstruction.
-- downstream dependencies: reproducible canonicalization reruns.
-- corruption symptoms: unstable scan coverage.
-- verification expectation: repeatability checks on replay scans.
+## Invariant Scope Rule
+Invariants apply to preserved evidence semantics only.
+They are not semantic-intelligence invariants.

@@ -3,6 +3,14 @@
 ## Preservation Objective
 Keep provenance continuity intact across replay, archival, evolution, and reprocessing.
 
+## Provenance Truth Boundary
+Provenance in Phase 02 proves chain-of-observation continuity:
+- where evidence came from,
+- when it was captured,
+- under which run/replay context it persisted.
+
+It does not prove semantic correctness of downstream interpretation.
+
 ## Must-Preserve Provenance Fields
 - provenance chain id,
 - source reference ids,
@@ -25,3 +33,7 @@ Reference: `../01-ingestion/raw-envelope-contract-stability.md`.
 
 ## Non-Negotiable Rule
 Any operation that removes provenance continuity is considered a critical architecture violation.
+
+## Representation of Gaps
+When provenance is incomplete or damaged, the system must preserve explicit gap markers rather than silently implying continuity.
+No best-effort inferred lineage may be presented as guaranteed provenance in Phase 02.

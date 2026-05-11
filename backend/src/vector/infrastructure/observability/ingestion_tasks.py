@@ -14,6 +14,9 @@ PHASE_SWEEP = "sweep"
 PHASE_STEP1 = "step1"
 PHASE_STEP2 = "step2"
 PHASE_STEP3 = "step3"
+PHASE_STEP4 = "step4"
+PHASE_STEP5 = "step5"
+PHASE_STEP6 = "step6"
 
 
 def log_ingestion_event(

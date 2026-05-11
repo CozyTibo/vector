@@ -1,0 +1,98 @@
+openapi: 3.0.3
+info:
+  title: Cortex Identity Admin (Phase 04 Operator Console)
+  version: "1.0"
+  description: >
+    Appendix B inventory for `phase-04-control-plane-doctrine.md` §15–§16 (P04-18)
+    plus Step 19 worker enqueue + poll routes (P04-19).
+    Base path prefix `/admin/tenants/{tenant_id}/cortex/identity`.
+servers:
+  - url: /admin/tenants/{tenant_id}/cortex/identity
+    variables:
+      tenant_id:
+        default: "{tenant_id}"
+paths:
+  /handles:
+    get:
+      summary: Handles explorer (org_handle_list_row_v1)
+  /handles/{handle_id}:
+    get:
+      summary: Handle inspector
+  /links:
+    get:
+      summary: Link ledger + explorer filters (org_link_list_row_v1)
+  /links/{link_id}:
+    get:
+      summary: Link inspector
+  /links/{link_id}/revoke:
+    post:
+      summary: Soft revoke link (confirmation phrase required)
+  /merge-queue:
+    get:
+      summary: Merge proposals (org_merge_queue_row_v1)
+  /merge-queue/{merge_proposal_id}:
+    get:
+      summary: Merge proposal detail
+  /merge-queue/{merge_proposal_id}/approve:
+    post:
+      summary: Approve merge proposal
+  /merge-queue/{merge_proposal_id}/reject:
+    post:
+      summary: Reject merge proposal
+  /merge-queue/{merge_proposal_id}/defer:
+    post:
+      summary: Defer merge proposal
+  /merge-queue/{merge_proposal_id}/split:
+    post:
+      summary: Split / compensating-path request
+  /ambiguity-queue:
+    get:
+      summary: Ambiguity queue rows (org_ambiguity_queue_row_v1)
+  /ambiguity-queue/{ambiguity_id}:
+    get:
+      summary: Ambiguity detail
+  /primitives:
+    get:
+      summary: Primitive explorer list (default without raw envelope)
+  /primitives/{primitive_id}:
+    get:
+      summary: Primitive inspector (full envelope)
+  /projection-preview:
+    get:
+      summary: Graph export preview metadata only (G-P04-25)
+  /projection-export/run:
+    post:
+      summary: Enqueue async full graph projection export (org link replay job_kind graph_projection_export)
+  /replay-jobs/enqueue:
+    post:
+      summary: Enqueue org link replay / regen / graph export job (Celery + replay_jobs row)
+  /worker-tasks/{celery_task_id}:
+    get:
+      summary: Poll Celery task state when bound to tenant (replay job celery_task_id or dispatch registry)
+  /link-candidates/regenerate-async:
+    post:
+      summary: Enqueue legacy regenerate_link_candidates Celery task + dispatch row
+  /authoritative-replay-async:
+    post:
+      summary: Enqueue legacy replay_authoritative_links Celery task + dispatch row
+  /backfill/from-canonical-anchors:
+    post:
+      summary: Backfill org entities from Phase 03 canonical identity anchors (candidate lane only, P04-20)
+  /backfill/runs:
+    get:
+      summary: List recent anchor→handle backfill audit rows
+  /readiness-economics:
+    get:
+      summary: Identity readiness economics snapshot (identity_readiness_economics_v1, P04-21)
+  /certification-pack:
+    get:
+      summary: Org identity closure certification pack (P04-22)
+  /certification-pack/archive:
+    post:
+      summary: Persist org certification pack when closure matrix passes (P04-22)
+  /certification-pack/archives:
+    get:
+      summary: List recent org certification archives
+  /certification-pack/archives/{archive_id}:
+    get:
+      summary: Fetch one org certification archive by id

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 
 from sqlalchemy import create_engine
@@ -32,6 +33,7 @@ def get_engine() -> Any:
     return _engine
 
 
+@contextmanager
 def session_scope() -> Generator[Session, None, None]:
     _configure_engine()
     assert _session_factory is not None

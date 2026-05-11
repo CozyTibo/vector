@@ -19,7 +19,7 @@ export default function AppTeamsPage() {
         className={`${workspaceAppPageMain} flex flex-col items-center justify-center py-16 sm:py-20`}
       >
         <div className={workspaceSpinnerHero} aria-hidden />
-        <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading teams…</p>
+        <p className={`${marketingBody} mt-4 text-center text-sm text-zinc-600`}>Loading access…</p>
       </main>
     );
   }
@@ -45,7 +45,7 @@ export default function AppTeamsPage() {
                 e.preventDefault();
               }}
             >
-              Teams
+              Access
             </a>
           </h1>
         </nav>
