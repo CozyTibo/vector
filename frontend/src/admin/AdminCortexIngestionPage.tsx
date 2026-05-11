@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { adminFetch, adminJson } from "../lib/adminFetch";
@@ -205,6 +205,7 @@ export default function AdminCortexIngestionPage() {
   const [rawResourceType, setRawResourceType] = useState("");
   const [rawSearch, setRawSearch] = useState("");
   const [rawIncludeHealth, setRawIncludeHealth] = useState(false);
+  const [expandedRawId, setExpandedRawId] = useState<number | null>(null);
 
   const overviewQ = useQuery({
     queryKey: ["admin-cortex-overview", tenantId],
@@ -614,6 +615,7 @@ export default function AdminCortexIngestionPage() {
             <table className="min-w-full text-xs">
               <thead className="bg-stone-50 text-left text-stone-700">
                 <tr>
+                  <th className="px-2 py-1 w-24">payload</th>
                   <th className="px-2 py-1">fetched_at</th>
                   <th className="px-2 py-1">resource_type</th>
                   <th className="px-2 py-1">external_id</th>
@@ -624,17 +626,66 @@ export default function AdminCortexIngestionPage() {
                 </tr>
               </thead>
               <tbody>
-                {(rawQ.data?.items ?? []).map((row) => (
-                  <tr key={row.id} className="border-t border-stone-100">
-                    <td className="px-2 py-1">{new Date(row.fetched_at).toLocaleString()}</td>
-                    <td className="px-2 py-1 font-mono">{row.resource_type}</td>
-                    <td className="px-2 py-1">{row.external_id}</td>
-                    <td className="px-2 py-1 font-mono">{row.source_identity_key ?? "n/a"}</td>
-                    <td className="px-2 py-1 font-mono">{row.source_revision_key ?? "n/a"}</td>
-                    <td className="px-2 py-1">{row.replay_job_id ? "replay" : "live"}</td>
-                    <td className="px-2 py-1">{row.http_status}</td>
-                  </tr>
-                ))}
+                {(rawQ.data?.items ?? []).map((row) => {
+                  const expanded = expandedRawId === row.id;
+                  const qpKeys = Object.keys(row.query_params ?? {});
+                  const payloadKeys = Object.keys(row.payload_body ?? {});
+                  return (
+                    <Fragment key={row.id}>
+                      <tr className="border-t border-stone-100">
+                        <td className="px-2 py-1 align-top">
+                          <button
+                            type="button"
+                            className="rounded border border-stone-300 bg-white px-2 py-0.5 text-[11px] text-stone-800 hover:bg-stone-50"
+                            onClick={() => setExpandedRawId(expanded ? null : row.id)}
+                          >
+                            {expanded ? "hide" : "show"}
+                          </button>
+                        </td>
+                        <td className="px-2 py-1">{new Date(row.fetched_at).toLocaleString()}</td>
+                        <td className="px-2 py-1 font-mono">{row.resource_type}</td>
+                        <td className="px-2 py-1">{row.external_id}</td>
+                        <td className="px-2 py-1 font-mono">{row.source_identity_key ?? "n/a"}</td>
+                        <td className="px-2 py-1 font-mono">{row.source_revision_key ?? "n/a"}</td>
+                        <td className="px-2 py-1">{row.replay_job_id ? "replay" : "live"}</td>
+                        <td className="px-2 py-1">{row.http_status}</td>
+                      </tr>
+                      {expanded ? (
+                        <tr className="border-t border-stone-100 bg-stone-50/80">
+                          <td className="px-2 py-2 align-top text-stone-700" colSpan={8}>
+                            <div className="space-y-2 text-[11px]">
+                              {row.api_endpoint ? (
+                                <p>
+                                  <span className="font-semibold text-stone-900">api_endpoint</span>{" "}
+                                  <span className="break-all font-mono">{row.api_endpoint}</span>
+                                </p>
+                              ) : null}
+                              {qpKeys.length > 0 ? (
+                                <div>
+                                  <p className="font-semibold text-stone-900">query_params</p>
+                                  <pre className="mt-1 max-h-40 overflow-auto rounded border border-stone-200 bg-white p-2 font-mono text-[10px] leading-relaxed whitespace-pre-wrap break-all">
+                                    {JSON.stringify(row.query_params, null, 2)}
+                                  </pre>
+                                </div>
+                              ) : null}
+                              <div>
+                                <p className="font-semibold text-stone-900">
+                                  payload_body{" "}
+                                  <span className="font-normal text-stone-500">
+                                    ({payloadKeys.length} top-level key{payloadKeys.length === 1 ? "" : "s"})
+                                  </span>
+                                </p>
+                                <pre className="mt-1 max-h-96 overflow-auto rounded border border-stone-200 bg-white p-2 font-mono text-[10px] leading-relaxed whitespace-pre-wrap break-all">
+                                  {JSON.stringify(row.payload_body ?? {}, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
