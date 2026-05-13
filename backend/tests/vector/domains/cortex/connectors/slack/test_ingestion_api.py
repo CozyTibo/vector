@@ -54,6 +54,7 @@ def test_iter_conversations_history_pages_uses_next_cursor(monkeypatch: Any) -> 
     assert calls[0]["oldest"] == "1714000000.000000"
     assert "cursor" not in calls[0]
     assert calls[1]["cursor"] == "c1"
+    assert "oldest" not in calls[1]
 
 
 def test_iter_conversations_replies_pages_passes_thread_context(monkeypatch: Any) -> None:
@@ -103,3 +104,52 @@ def test_iter_conversations_replies_pages_passes_thread_context(monkeypatch: Any
     assert calls[0]["ts"] == "1715000000.000100"
     assert "cursor" not in calls[0]
     assert calls[1]["cursor"] == "r1"
+    assert "oldest" not in calls[1]
+
+
+def test_iter_conversations_replies_pages_omits_oldest_when_paginating(monkeypatch: Any) -> None:
+    calls: list[dict[str, Any]] = []
+    payloads = [
+        {
+            "ok": True,
+            "messages": [{"ts": "1715000002.000100"}],
+            "response_metadata": {"next_cursor": "r1"},
+            "has_more": True,
+        },
+        {
+            "ok": True,
+            "messages": [{"ts": "1715000003.000100"}],
+            "response_metadata": {"next_cursor": ""},
+            "has_more": False,
+        },
+    ]
+
+    def _fake_post(
+        token: str,
+        method: str,
+        *,
+        json_body: dict[str, Any],
+        api_base: str | None = None,
+        timeout: float = 60.0,
+    ) -> dict[str, Any]:
+        del api_base, timeout
+        assert method == "conversations.replies"
+        calls.append(dict(json_body))
+        return payloads.pop(0)
+
+    monkeypatch.setattr(ingestion_api, "slack_web_api_post", _fake_post)
+    list(
+        ingestion_api.iter_conversations_replies_pages(
+            "xoxb-test",
+            channel="C123",
+            thread_ts="1715000000.000100",
+            limit=200,
+            max_pages=4,
+            oldest="1714000000.000000",
+        )
+    )
+
+    assert calls[0]["oldest"] == "1714000000.000000"
+    assert "cursor" not in calls[0]
+    assert calls[1]["cursor"] == "r1"
+    assert "oldest" not in calls[1]

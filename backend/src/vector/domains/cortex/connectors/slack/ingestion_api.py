@@ -169,13 +169,17 @@ def conversations_history_page(
 ) -> dict[str, Any]:
     body: dict[str, Any] = {"channel": channel, "limit": min(limit, 1000)}
     if cursor:
+        # Slack returns ``invalid_arguments`` if ``cursor`` is combined with
+        # ``oldest`` / ``latest`` / ``inclusive`` on the same request; the cursor
+        # already encodes pagination state from the prior call.
         body["cursor"] = cursor
-    if oldest:
-        body["oldest"] = oldest
-    if latest:
-        body["latest"] = latest
-    if inclusive:
-        body["inclusive"] = True
+    else:
+        if oldest:
+            body["oldest"] = oldest
+        if latest:
+            body["latest"] = latest
+        if inclusive:
+            body["inclusive"] = True
     data = slack_web_api_post(token, "conversations.history", json_body=body, api_base=api_base)
     if not data.get("ok"):
         raise SlackWebApiError(str(data.get("error", "conversations.history_failed")))
@@ -234,12 +238,13 @@ def conversations_replies_page(
     body: dict[str, Any] = {"channel": channel, "ts": thread_ts, "limit": min(limit, 1000)}
     if cursor:
         body["cursor"] = cursor
-    if oldest:
-        body["oldest"] = oldest
-    if latest:
-        body["latest"] = latest
-    if inclusive:
-        body["inclusive"] = True
+    else:
+        if oldest:
+            body["oldest"] = oldest
+        if latest:
+            body["latest"] = latest
+        if inclusive:
+            body["inclusive"] = True
     data = slack_web_api_post(token, "conversations.replies", json_body=body, api_base=api_base)
     if not data.get("ok"):
         raise SlackWebApiError(str(data.get("error", "conversations.replies_failed")))
