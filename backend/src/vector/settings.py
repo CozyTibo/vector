@@ -282,7 +282,7 @@ class Settings(BaseSettings):
         ),
     )
     cortex_ingestion_scheduler_interval_seconds: int = Field(
-        default=300,
+        default=1800,
         ge=60,
         validation_alias="CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS",
         description=(
