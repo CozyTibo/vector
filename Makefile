@@ -15,7 +15,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build build-backend up down logs logs-frontend restart install life reinstall migrate migrate-down migrate-repair migrate-repair-test migrate-new migrate-test seed-basic-tenant db-schema routes db-psql db-psql-test db-drop shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-restart celery-inspect redis-monitor celery-logs
+.PHONY: help setup build build-backend up down logs logs-frontend restart install life reinstall migrate migrate-down migrate-repair migrate-repair-test migrate-new migrate-test seed-basic-tenant db-schema routes octs-openapi db-psql db-psql-test db-drop shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-restart celery-inspect redis-monitor celery-logs
 
 mock-help:
 	@$(MAKE) -f Makefile.mock help-mock
@@ -38,6 +38,7 @@ help:
 	@echo "  make seed-basic-tenant  Dev DB: create tenant from SEED_* if slug missing"
 	@echo "  make db-schema       Rails-style schema snapshot to artifacts/ (stack must be up)"
 	@echo "  make routes          list HTTP routes (grouped by tag)"
+	@echo "  make octs-openapi   regenerate Phase 05 OCTS walk OpenAPI (RULE API-0)"
 	@echo "  make db-psql         psql on dev DB"
 	@echo "  make db-psql-test    psql on test DB"
 	@echo "  make db-drop         DROP + recreate empty dev DB $(POSTGRES_DB), then run make migrate"
@@ -135,6 +136,10 @@ db-schema: $(DOTENV)
 
 routes: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m vector.scripts.list_routes
+
+# Phase 05 **RULE API-0** — regenerate ``DOCS/cortex/05-traversal/schemas/generated/octs-walk-api-v1.openapi.json``.
+octs-openapi: $(DOTENV) build-backend
+	$(COMPOSE) run --rm -v "$(CURDIR)/DOCS:/app/DOCS:rw" $(BACKEND_SERVICE) python -m vector.scripts.generate_octs_walk_openapi
 
 db-psql: $(DOTENV)
 	$(COMPOSE) exec $(POSTGRES_SERVICE) psql -U "$(POSTGRES_USER)" -d "$(POSTGRES_DB)"

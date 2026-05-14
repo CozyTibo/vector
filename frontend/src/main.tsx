@@ -37,6 +37,7 @@ import AdminCortexCanonicalReplayTabPage from "./admin/AdminCortexCanonicalRepla
 import AdminCortexCanonicalRuntimePage from "./admin/AdminCortexCanonicalRuntimePage.tsx";
 import AdminCortexCanonicalStabilizationPage from "./admin/AdminCortexCanonicalStabilizationPage.tsx";
 import AdminCortexCanonicalVerificationTabPage from "./admin/AdminCortexCanonicalVerificationTabPage.tsx";
+import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
 import AdminCortexVerificationPage from "./admin/AdminCortexVerificationPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
@@ -159,7 +160,7 @@ createRoot(document.getElementById("root")!).render(
                   element={<AdminCortexIdentityBundleEquivalenceDrillPage />}
                 />
                 <Route path="identity/primitives" element={<AdminCortexIdentityPrimitivesDrillPage />} />
-                <Route path="graph" element={<AdminCortexPlaceholderPage title="Graph" />} />
+                <Route path="graph" element={<AdminCortexGraphPage />} />
                 <Route path="memory" element={<AdminCortexMemoryPage />} />
                 <Route path="reasoning" element={<AdminCortexPlaceholderPage title="Reasoning" />} />
                 <Route path="retrieval" element={<AdminCortexPlaceholderPage title="Retrieval" />} />

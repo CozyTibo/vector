@@ -118,3 +118,5 @@ Anti-goal enforcement is **hash-stable**: forbidden content **MUST NOT** appear 
 - Schema tests + **forbidden key** regression suite.  
 - Golden walk fixtures proving **reject** paths for illegal payloads.  
 - Cross-phase import gate ensuring **topology** never enters hashed walk body.
+
+**Reference implementation (P05-03):** `vector.domains.cortex.traversal.anti_goals` — `validate_octs_canonical_json_mapping_no_cognition_leakage`, `list_forbidden_cognition_key_violations`, `verify_gp05_anti01_forbidden_cognition_keys_static`, `verify_gp05_anti02_traversal_ingress_no_phase03_tokens_static` (reuses P04 export token scan for **G-P05-ANTI-02**).

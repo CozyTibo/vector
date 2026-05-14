@@ -1,0 +1,32 @@
+[
+  {
+    "valid_from_unix_ns": 10,
+    "valid_to_unix_ns": 20,
+    "graph_as_of_unix_ns": 10,
+    "eligible": true
+  },
+  {
+    "valid_from_unix_ns": 10,
+    "valid_to_unix_ns": 20,
+    "graph_as_of_unix_ns": 19,
+    "eligible": true
+  },
+  {
+    "valid_from_unix_ns": 10,
+    "valid_to_unix_ns": 20,
+    "graph_as_of_unix_ns": 20,
+    "eligible": false
+  },
+  {
+    "valid_from_unix_ns": null,
+    "valid_to_unix_ns": 100,
+    "graph_as_of_unix_ns": 50,
+    "eligible": true
+  },
+  {
+    "valid_from_unix_ns": null,
+    "valid_to_unix_ns": null,
+    "graph_as_of_unix_ns": 50,
+    "eligible": true
+  }
+]

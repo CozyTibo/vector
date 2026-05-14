@@ -95,3 +95,17 @@ Canonical adjacency list format: `{"nodes": [...], "adj": {...}}` with sorted ke
 ## 13. CI oracle expectations
 
 Rebuild-from-empty + compare hash; partial build injection must not publish.
+
+---
+
+## 14. Reference implementation (runtime)
+
+- **Module:** `vector.domains.cortex.traversal.derived_index_contract` (re-exported from `vector.domains.cortex.traversal`).
+- **Hashing:** `compute_index_content_hash_v1` / `canonical_derived_index_artifact_json_bytes_v1` implement **RULE DI-01** with preamble **`DERIVED_INDEX_CANON_VERSION`** (per index replay doctrine §8).
+- **Lineage:** `list_fs_di01_derived_edge_lineage_violations` (**FS-DI-01**); full-artifact validation via `validate_derived_index_artifact_contract_v1` (temporal anchor law on `materialized_for_anchor` when present).
+- **Epoch monotonicity:** `list_fs_di03_index_epoch_regression_violations` (**FS-DI-03**).
+- **Publish barrier:** `validate_publish_barrier_record_v1` (**FS-DI-02** slice — no partial publish).
+- **Stale reads:** `validate_stale_derived_read_policy_v1` (**RULE DI-02** — strict `ONLINE_OBSERVED` default).
+- **Static gates:** **G-P05-IDX-01** (`verify_gp05_idx01_index_content_hash_stability_static`), **G-P05-IDX-02** (`verify_gp05_idx02_lineage_completeness_static`).
+- **Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/derived_index/`.
+- **Pytest:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step13_derived_index_contract.py`.

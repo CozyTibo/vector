@@ -1,0 +1,14 @@
+{
+  "walk_execution_strategy": "ONLINE_OBSERVED",
+  "exploration_mode": false,
+  "walk_policy": {
+    "max_hops": 40,
+    "max_frontier": 64,
+    "max_edges_visited": 500,
+    "max_wall_ms": 100,
+    "hop_class_allowlist": ["org.handle_links_canonical"],
+    "tie_break": ["fingerprint", "org_link_id"],
+    "respect_validity": true,
+    "policy_version": 1
+  }
+}

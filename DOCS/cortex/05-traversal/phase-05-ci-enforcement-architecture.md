@@ -39,16 +39,16 @@ Make **`G-P05-***` mechanically enforceable** with **zero** ambiguous ownership:
 - **Runtime:** `pytest -q tests/vector/domains/cortex/traversal/test_octs_stage_a.py` (exact path when package exists).
 
 **STAGE-B — Unit oracles (blocking PR):**  
-- **`G-P05-MG-01`**, **`G-P05-POL-01`**, **`G-P05-HASH-01`**, **`G-P05-HR-01`**, **`G-P05-DIAG-01`**, fingerprint recompute, policy hash golden.
+- **`G-P05-MG-01`**, **`G-P05-POL-01`**, **`G-P05-HASH-01`**, **`G-P05-HR-01`**, **`G-P05-DIAG-01`**, **`G-P05-IDX-01`**, **`G-P05-IDX-02`**, **`G-P05-JOB-01`**, **`G-P05-JOB-02`**, **`G-P05-EQUIV-01`**, **`G-P05-WES-01`**, **`G-P05-WES-02`**, **`G-P05-RT-01`**, **`G-P05-RT-02`**, fingerprint recompute, policy hash golden.
 
 **STAGE-C — Replay vectors (blocking PR on OCTS paths):**  
-- **`G-P05-REPLAY-WALK-02`**, **`G-P05-REPLAY-IDX-01`**, **`G-P05-TEMP-01`**, **`G-P05-TEMP-02`**, **`G-P05-OVD-01`**, **`G-P05-EXP-01`**.
+- **`G-P05-REPLAY-WALK-02`**, **`G-P05-REPLAY-IDX-01`**, **`G-P05-REPLAY-IDX-02`** (static double-run + corrupt-lineage gates in `index_replay_contract` + golden derived artifact), **`G-P05-TEMP-01`**, **`G-P05-TEMP-02`**, **`G-P05-OVD-01`**, **`G-P05-EXP-01`**.
 
 **STAGE-D — Integration HTTP (blocking merge to main):**  
-- **`G-P05-API-01`**, **`G-P05-API-02`**, **`G-P05-IDEM-01`**, **`G-P05-EXP-02`**, **`G-P05-CP-01`**, **`G-P05-JOB-01`** (FSM table-driven).
+- **`G-P05-API-01`**, **`G-P05-API-02`**, **`G-P05-API-03`** (OpenAPI artifact + admin traversal integration tests + sync walk limit static gate), **`G-P05-IDEM-01`**, **`G-P05-EXP-02`**, **`G-P05-CP-01`**.
 
 **STAGE-E — Nightly (blocking release / `release` branch only):**  
-- **`G-P05-REPLAY-WALK-01`** (sampled archive), **`G-P05-EQUIV-02`**, **`G-P05-RT-01`** long-run, **`G-P05-ECO-01`**.
+- **`G-P05-REPLAY-WALK-01`** (sampled archive), **`G-P05-EQUIV-02`**, **`G-P05-RT-01`** extended / large-graph stress (beyond the PR static 100× harness), **`G-P05-ECO-01`**, **`G-P05-ECO-02`**, **`G-P05-ECO-03`**.
 
 **STAGE-Z — Closure bundle (blocking tag `octs-v*`):**  
 - **`G-P05-CLOSE-01`** runs **after** STAGE-A–D all green on the **same** commit SHA; **MUST** load certification pack bytes per `phase-05-certification-pack-format.md`.
@@ -121,7 +121,9 @@ waivers:
 | ------- | ------- |
 | `canonicalization/` | JCS+NFC golden pairs |
 | `walks/` | Full walk request/response golden |
+| `walk_execution_strategy/` | **G-P05-EQUIV-01** / **G-P05-WES-01** / **G-P05-WES-02** — fast-path hash equivalence + policy/strategy gates (**P05-15**) |
 | `indexes/` | Derived index rebuild golden |
+| `index_build_job/` | Index build job FSM audit golden (**P05-14**) |
 | `manifests/` | Ordered file list + `sha256` per file for pack tests |
 
 **Promotion rules:**  

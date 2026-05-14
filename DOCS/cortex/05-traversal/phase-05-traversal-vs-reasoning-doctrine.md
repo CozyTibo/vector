@@ -109,3 +109,9 @@ OpenAPI for walk APIs **MUST** be **generated** from **`DOCS/cortex/05-traversal
 
 - Contract tests verifying **closed enum** exhaustiveness.  
 - Fuzzing canonical JSON decoder with random keys → 100% reject in strict mode.
+
+**Reference implementation (P05-05):** `vector.domains.cortex.traversal.traversal_vs_reasoning` —
+`validate_walk_result_hash_body_tvr_strict_v1` (**G-P05-TVR-01** strict hash-body closure),
+`validate_oct_walk_request_v1` / `verify_gp05_schema01_oct_walk_request_v1_static` (**G-P05-SCHEMA-01**),
+golden fixture `octs_golden_vectors/v1/walks/walk_request_minimal_v1.json`. Runtime depends on
+``jsonschema`` (see ``backend/pyproject.toml``).

@@ -6,7 +6,7 @@ const CORTEX_SECTIONS: Array<{ key: string; label: string; enabled: boolean }> =
   { key: "canonical", label: "Canonical", enabled: true },
   { key: "entity-resolution", label: "Identity", enabled: true },
   { key: "identity-certification", label: "Identity certification", enabled: true },
-  { key: "graph", label: "Graph", enabled: false },
+  { key: "graph", label: "Graph", enabled: true },
   { key: "memory", label: "Memory", enabled: true },
   { key: "reasoning", label: "Reasoning", enabled: false },
   { key: "retrieval", label: "Retrieval", enabled: false },

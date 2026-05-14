@@ -107,3 +107,13 @@ Define the **canonical walk result** as a citeable **evidence object**: stable J
 ## 13. CI oracle expectations
 
 Golden files under `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/walks/` with expected hashes; differential tests for omission rules.
+
+---
+
+## 14. Reference implementation (runtime)
+
+- **Module:** `vector.domains.cortex.traversal.walk_result_contract` (re-exported from `vector.domains.cortex.traversal`).
+- **Diagnostics:** `validate_walk_result_hash_body_contract_v1` delegates termination / `diagnostics` / **FS-WD-03** path coherence to `walk_diagnostics_contract` (**P05-12**) before hop receipt validation.
+- **Static gates:** **G-P05-HASH-01** (`verify_gp05_hash01_walk_result_hash_recompute_static`), **G-P05-HASH-02** (`verify_gp05_hash02_telemetry_separation_static`).
+- **Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/walks/` (`hash_body_minimal_v1.json`, `walk_result_hash_expected_v1.txt`, `hash_body_nested_telemetry_bad_v1.json`, `walk_response_telemetry_variants_v1.json`).
+- **Pytest:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step09_walk_result_contract.py`.

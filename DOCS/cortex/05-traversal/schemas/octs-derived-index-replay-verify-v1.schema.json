@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vector.dev/cortex/octs/derived-index-replay-verify/v1",
+  "title": "OCTSDerivedIndexReplayVerifyV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifact"],
+  "properties": {
+    "artifact": {
+      "type": "object",
+      "description": "Derived index artifact per derived-index contract (materialized_for_anchor or epoch + nodes + adj + derived_edges)."
+    },
+    "expected_index_content_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Optional strict pin: must equal recomputed index_content_hash (IRJ / Step 20)."
+    }
+  }
+}

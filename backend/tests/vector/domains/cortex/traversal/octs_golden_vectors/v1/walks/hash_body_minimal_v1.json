@@ -1,0 +1,17 @@
+{
+  "octs_schema_version": 1,
+  "temporal_anchor": {
+    "tenant_id": "00000000-0000-0000-0000-000000000001",
+    "export_id": "00000000-0000-0000-0000-000000000002",
+    "export_sequence": 1,
+    "projection_content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "snapshot_unix_ns": { "unix_ns": 1700000000000000000 },
+    "graph_as_of_unix_ns": { "unix_ns": 1700000000000000000 }
+  },
+  "policy_hash": "sha256:0a019d9573b832db2162d75f144dad559265ce7abbcfb946aaef5bc57ca6f669",
+  "start_node_ids": ["00000000-0000-0000-0000-000000000003"],
+  "termination_reason": "budget_exhausted",
+  "hop_receipts": [],
+  "execution_path_contains_derived": false,
+  "path_edge_fingerprints_ordered": []
+}

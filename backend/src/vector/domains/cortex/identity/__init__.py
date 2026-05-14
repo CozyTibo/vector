@@ -14,7 +14,7 @@ Step 11 (P04-11): linkage rule versions (frozen manifests) + candidate batch pin
 Step 12 (P04-12): execution primitive instances on org entities; gates G-P04-09 / G-P04-PRIM-01.
 Step 13 (P04-13): OrgGraphProjectionV1 export + stable hash; gates G-P04-10 / G-P04-EXP-01.
 Step 14 (P04-14): org ambiguity / multiplicity records; gates G-P04-AMB-01 / G-P04-12.
-Step 15 (P04-15): org verification slice + G-P04-VER-01 + optional ``cortex_org_verification_runs``; ``identity.verification``.
+Step 15 (P04-15): org verification slice + G-P04-VER-01 + optional ``cortex_org_verification_runs``; ``identity.verification`` (+ Phase **05** Step **23** optional **``org_graph_traversal``** OCTS slice via ``VECTOR_OCTS_TENANT_VERIFICATION_SLICE``).
 Step 16 (P04-16): org failure registry + remediation ledger + G-P04-19; ``identity.failure_remediation``.
 Step 17 (P04-17): identity control-plane aggregate + G-P04-18 / G-P04-21; ``identity.control_plane``.
 """

@@ -113,3 +113,14 @@ Integration: exploration walk invisible to default aggregate queries in control 
 **RULE EX-P6 — Replay exclusion:** Certification pack builder **`G-P05-CLOSE-01`** **MUST** reject any exploration walk bytes under authoritative manifest path (see `phase-05-certification-pack-format.md` §8).
 
 **RULE EX-P7 — Authority downgrade:** Any API that accepts exploration results for operator viewing **MUST** set HTTP header **`X-OCTS-Authority: non-authoritative`** on responses.
+
+---
+
+## 15. Reference implementation (runtime)
+
+- **Module:** `vector.domains.cortex.traversal.exploration_mode_contract` (re-exported from `vector.domains.cortex.traversal`).
+- **Hash body:** `validate_exploration_hash_body_invariants_v1` is invoked from `validate_walk_result_hash_body_contract_v1` (after hop receipt checks, before TVR strict closure). Canonical JSON normalization omits ``non_authoritative: false`` and ``execution_partition: "authoritative"`` per **§8** omission table alignment with **RULE EX-01**.
+- **Static gates:** **G-P05-EXP-01** (`verify_gp05_exp01_walk_request_explicit_exploration_mode_static`), **G-P05-EXP-02** (`verify_gp05_exp02_authoritative_table_rejects_exploration_partition_static`).
+- **Helpers:** `exploration_partition_id_v1`, `validate_row_destination_exploration_law_v1`, `assert_redis_cache_key_namespace_v1`, table/queue/cache/OTEL/codec constants (**RULE EX-P1..P5** naming anchors for migrations + workers).
+- **Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/exploration/`.
+- **Pytest:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step11_exploration_mode_contract.py`.

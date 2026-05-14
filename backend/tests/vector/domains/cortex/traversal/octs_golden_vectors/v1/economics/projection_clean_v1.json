@@ -1,0 +1,5 @@
+{
+  "hub_walk_worst_case_cost_ms": 120,
+  "node_out_degrees": [0, 1, 2, 3],
+  "projection_content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

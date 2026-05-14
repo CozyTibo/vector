@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION: Final[int] = 1
+ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION: Final[int] = 2
 
 
 def build_org_identity_verification_pointer_section() -> dict[str, Any]:
@@ -18,5 +18,6 @@ def build_org_identity_verification_pointer_section() -> dict[str, Any]:
         ),
         "org_identity_verification_doctrine_anchors": [
             "DOCS/cortex/04-identity/phase-04-verification-gates-doctrine.md",
+            "DOCS/cortex/05-traversal/phase-05-tenant-verification-integration.md",
         ],
     }

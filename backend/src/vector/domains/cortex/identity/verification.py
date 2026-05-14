@@ -2,6 +2,10 @@
 
 Reuses ``run_canonical_verification`` as the single execution engine; filters to ``G-P04-*`` gates
 for tenant-scoped audits and optional ``cortex_org_verification_runs`` persistence.
+
+Phase 05 Step **23** optionally attaches the **``org_graph_traversal``** OCTS structural slice +
+``octs_slice_hash`` to verification evidence when ``VECTOR_OCTS_TENANT_VERIFICATION_SLICE`` is set
+(see ``vector.domains.cortex.traversal.tenant_verification_slice``).
 """
 
 from __future__ import annotations
@@ -85,6 +89,13 @@ def run_org_identity_verification(
     )
     p04_gates = phase04_identity_gate_slice(list(full.get("gates") or []))
     p04_passed = all(g.get("passed") for g in p04_gates if g.get("severity") == "hard_fail")
+    from vector.domains.cortex.traversal.tenant_verification_slice import (
+        build_org_graph_traversal_verification_slice_v1,
+        compute_octs_slice_hash_v1,
+        octs_tenant_verification_slice_enabled_v1,
+    )
+
+    octs_slice_on = octs_tenant_verification_slice_enabled_v1()
     evidence: dict[str, Any] = {
         **(full.get("evidence") if isinstance(full.get("evidence"), dict) else {}),
         "canonical_verification_engine_schema_version": full.get("canonical_verification_engine_schema_version"),
@@ -92,26 +103,41 @@ def run_org_identity_verification(
         "full_verification_gate_count": len(full.get("gates") or []),
         "full_verification_passed": bool(full.get("passed")),
     }
-    out: dict[str, Any] = {
-        "org_identity_verification_engine_schema_version": ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
-        "tenant_id": str(tenant_id),
-        "passed": p04_passed,
-        "gates": p04_gates,
-        "evidence": evidence,
-        "persisted_run_id": None,
-    }
+
+    persisted_run_id: int | None = None
     if persist:
         row = CortexOrgVerificationRun(
             tenant_id=tenant_id,
             engine_schema_version=ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
             passed=p04_passed,
             gates_json=p04_gates,
-            evidence_json=evidence,
+            evidence_json=dict(evidence),
         )
         session.add(row)
         session.flush()
-        out["persisted_run_id"] = row.id
-    return out
+        persisted_run_id = row.id
+        if octs_slice_on:
+            slice_body = build_org_graph_traversal_verification_slice_v1(
+                session, tenant_id=tenant_id, verification_run_id=str(row.id)
+            )
+            evidence["org_graph_traversal"] = slice_body
+            evidence["octs_slice_hash"] = compute_octs_slice_hash_v1(slice_body)
+            row.evidence_json = dict(evidence)
+    elif octs_slice_on:
+        slice_body = build_org_graph_traversal_verification_slice_v1(
+            session, tenant_id=tenant_id, verification_run_id=None
+        )
+        evidence["org_graph_traversal"] = slice_body
+        evidence["octs_slice_hash"] = compute_octs_slice_hash_v1(slice_body)
+
+    return {
+        "org_identity_verification_engine_schema_version": ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
+        "tenant_id": str(tenant_id),
+        "passed": p04_passed,
+        "gates": p04_gates,
+        "evidence": evidence,
+        "persisted_run_id": persisted_run_id,
+    }
 
 
 def list_org_identity_verification_runs(

@@ -16,6 +16,7 @@ from vector.domains.cortex.identity.verification import (
     run_org_identity_verification,
     verify_gp04_ver01_phase04_catalog_coherence_static,
 )
+from vector.domains.cortex.traversal.tenant_verification_slice import VECTOR_OCTS_TENANT_VERIFICATION_SLICE_ENV
 
 
 def test_phase04_normative_numbered_registry() -> None:
@@ -104,3 +105,44 @@ def test_admin_org_identity_verification_persist(
     lst = listed.json()
     assert lst["runs"]
     assert lst["runs"][0]["id"] == body["persisted_run_id"]
+
+
+@pytest.mark.integration
+def test_admin_org_identity_verification_includes_octs_slice_when_env_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
+    monkeypatch.setenv(VECTOR_OCTS_TENANT_VERIFICATION_SLICE_ENV, "1")
+    from vector.infrastructure.db.models.membership import TenantMembership
+    from vector.infrastructure.db.models.tenant import Tenant
+    from vector.infrastructure.db.models.user import User
+
+    user = User(email=f"p415octs-{uuid.uuid4().hex[:8]}@example.com", full_name="P415octs")
+    tenant = Tenant(
+        company_name="P415octs Co",
+        primary_email=user.email,
+        email_domain="example.com",
+        slug=f"p415octs-{uuid.uuid4().hex[:10]}",
+        status="active",
+        workspace_access_enabled=True,
+    )
+    db_session.add_all([user, tenant])
+    db_session.flush()
+    db_session.add(TenantMembership(tenant_id=tenant.id, user_id=user.id, role="owner"))
+    db_session.commit()
+
+    r = client.post(
+        f"/admin/tenants/{tenant.id}/cortex/identity/verification/run",
+        auth=("admin", "integration-admin-password"),
+        json={"persist": False, "materialization_sample_limit": 10},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["org_identity_verification_engine_schema_version"] == ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION
+    ev = body["evidence"]
+    assert "org_graph_traversal" in ev
+    assert ev["org_graph_traversal"]["tenant_id"] == str(tenant.id)
+    assert ev["org_graph_traversal"]["verification_run_id"] is None
+    assert "octs_slice_hash" in ev

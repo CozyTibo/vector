@@ -99,3 +99,13 @@ Canonical hop receipt keys sorted; `evidence_envelope` nested object sorted.
 ## 13. CI oracle expectations
 
 Property: ∀ hops, fingerprint recomputes; revisit policy matrix fully covered.
+
+---
+
+## 14. Reference implementation (runtime)
+
+- **Module:** `vector.domains.cortex.traversal.hop_receipt_contract` (re-exported from `vector.domains.cortex.traversal`).
+- **Static gates:** **G-P05-HR-01** (`verify_gp05_hr01_fingerprint_recompute_from_envelope_static`), **G-P05-HR-02** (`verify_gp05_hr02_dangling_org_link_rejected_static`).
+- **Walk result integration:** `validate_walk_result_hash_body_contract_v1` calls `validate_hop_receipt_list_for_hash_body_v1` when `hop_receipts` is non-empty (dangling enforcement requires caller-supplied pinned links + policy; hash-body-only validation skips dangling). Optional ``skip_reason`` on each receipt is validated when present (**P05-12** / **FS-WD-01**).
+- **Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/hop_receipts/`.
+- **Pytest:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step10_hop_receipt_contract.py`.

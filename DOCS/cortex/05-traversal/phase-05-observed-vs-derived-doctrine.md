@@ -117,3 +117,5 @@ Canonical ordering of hop receipts: **ascending `hop_sequence` (0-based integer)
 
 - Property tests: observed-only walk stable hash across JVM/Python reorderings.  
 - Mutation tests: flipping `provenance_class` without binding **must** fail gate.
+
+**Reference implementation (P05-02):** `vector.domains.cortex.traversal.observed_vs_derived` — `validate_hop_receipt_observed_derived`, `validate_walk_observed_derived_consistency`, `verify_gp05_ovd01_observed_hop_bindings_static`, `verify_gp05_ovd02_strategy_and_derived_flags_static`.

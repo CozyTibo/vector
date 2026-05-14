@@ -1,0 +1,152 @@
+{
+  "projection_schema_version": 1,
+  "tenant_id": "00000000-0000-0000-0000-000000000000",
+  "engine_build_ref": "octs-runtime-execution-star-v1",
+  "nodes": [
+    {
+      "kind": "org_entity",
+      "id": "11111111-1111-1111-1111-111111111111",
+      "entity_kind": "human_actor",
+      "identity_key_fingerprint": "hub",
+      "lifecycle_state": "active",
+      "tombstoned_at": null
+    },
+    {
+      "kind": "org_entity",
+      "id": "22222222-2222-2222-2222-222222222222",
+      "entity_kind": "human_actor",
+      "identity_key_fingerprint": "s1",
+      "lifecycle_state": "active",
+      "tombstoned_at": null
+    },
+    {
+      "kind": "org_entity",
+      "id": "33333333-3333-3333-3333-333333333333",
+      "entity_kind": "human_actor",
+      "identity_key_fingerprint": "s2",
+      "lifecycle_state": "active",
+      "tombstoned_at": null
+    },
+    {
+      "kind": "org_entity",
+      "id": "44444444-4444-4444-4444-444444444444",
+      "entity_kind": "human_actor",
+      "identity_key_fingerprint": "s3",
+      "lifecycle_state": "active",
+      "tombstoned_at": null
+    },
+    {
+      "kind": "org_entity",
+      "id": "55555555-5555-5555-5555-555555555555",
+      "entity_kind": "human_actor",
+      "identity_key_fingerprint": "s4",
+      "lifecycle_state": "active",
+      "tombstoned_at": null
+    },
+    {
+      "kind": "org_entity",
+      "id": "66666666-6666-6666-6666-666666666666",
+      "entity_kind": "human_actor",
+      "identity_key_fingerprint": "s5",
+      "lifecycle_state": "active",
+      "tombstoned_at": null
+    }
+  ],
+  "edges": [
+    {
+      "kind": "org_meaning_link",
+      "id": "10000000-0000-0000-0000-000000000001",
+      "link_type": "org.handle_links_canonical",
+      "source_entity_id": "11111111-1111-1111-1111-111111111111",
+      "target_entity_id": "22222222-2222-2222-2222-222222222222",
+      "link_class": "authoritative",
+      "link_authority": "authoritative",
+      "confidence_class": "declared",
+      "evidence_raw_record_ids": [1],
+      "rule_id": null,
+      "valid_from": null,
+      "valid_to": null,
+      "revoked_at": null,
+      "supersedes_link_id": null,
+      "promoted_from_candidate_id": null,
+      "promotion_policy_id": null,
+      "link_row_stable_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    },
+    {
+      "kind": "org_meaning_link",
+      "id": "10000000-0000-0000-0000-000000000002",
+      "link_type": "org.handle_links_canonical",
+      "source_entity_id": "11111111-1111-1111-1111-111111111111",
+      "target_entity_id": "33333333-3333-3333-3333-333333333333",
+      "link_class": "authoritative",
+      "link_authority": "authoritative",
+      "confidence_class": "declared",
+      "evidence_raw_record_ids": [1],
+      "rule_id": null,
+      "valid_from": null,
+      "valid_to": null,
+      "revoked_at": null,
+      "supersedes_link_id": null,
+      "promoted_from_candidate_id": null,
+      "promotion_policy_id": null,
+      "link_row_stable_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    },
+    {
+      "kind": "org_meaning_link",
+      "id": "10000000-0000-0000-0000-000000000003",
+      "link_type": "org.handle_links_canonical",
+      "source_entity_id": "11111111-1111-1111-1111-111111111111",
+      "target_entity_id": "44444444-4444-4444-4444-444444444444",
+      "link_class": "authoritative",
+      "link_authority": "authoritative",
+      "confidence_class": "declared",
+      "evidence_raw_record_ids": [1],
+      "rule_id": null,
+      "valid_from": null,
+      "valid_to": null,
+      "revoked_at": null,
+      "supersedes_link_id": null,
+      "promoted_from_candidate_id": null,
+      "promotion_policy_id": null,
+      "link_row_stable_id": "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    },
+    {
+      "kind": "org_meaning_link",
+      "id": "10000000-0000-0000-0000-000000000004",
+      "link_type": "org.handle_links_canonical",
+      "source_entity_id": "11111111-1111-1111-1111-111111111111",
+      "target_entity_id": "55555555-5555-5555-5555-555555555555",
+      "link_class": "authoritative",
+      "link_authority": "authoritative",
+      "confidence_class": "declared",
+      "evidence_raw_record_ids": [1],
+      "rule_id": null,
+      "valid_from": null,
+      "valid_to": null,
+      "revoked_at": null,
+      "supersedes_link_id": null,
+      "promoted_from_candidate_id": null,
+      "promotion_policy_id": null,
+      "link_row_stable_id": "dddddddd-dddd-dddd-dddd-dddddddddddd"
+    },
+    {
+      "kind": "org_meaning_link",
+      "id": "10000000-0000-0000-0000-000000000005",
+      "link_type": "org.handle_links_canonical",
+      "source_entity_id": "11111111-1111-1111-1111-111111111111",
+      "target_entity_id": "66666666-6666-6666-6666-666666666666",
+      "link_class": "authoritative",
+      "link_authority": "authoritative",
+      "confidence_class": "declared",
+      "evidence_raw_record_ids": [1],
+      "rule_id": null,
+      "valid_from": null,
+      "valid_to": null,
+      "revoked_at": null,
+      "supersedes_link_id": null,
+      "promoted_from_candidate_id": null,
+      "promotion_policy_id": null,
+      "link_row_stable_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+    }
+  ]
+}

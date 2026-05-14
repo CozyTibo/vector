@@ -93,3 +93,21 @@ N/A at runtime level except emitted artifacts follow walk result contract.
 ## 13. CI oracle expectations
 
 Large fixture graphs; property tests for cycle + budget interactions.
+
+---
+
+## 14. Reference implementation (**P05-16**)
+
+**Package:** `vector.domains.cortex.traversal.runtime_execution_model`.
+
+| Surface | Role |
+| ------- | ---- |
+| `path_context_id_v1` | Deterministic opaque id from the ordered path prefix (terminology §3). |
+| `run_reference_frontier_walk_v1` | Single-threaded BFS-style walk: neighbors sorted by `compute_edge_fingerprint_v1` (**REM-01**), cycle handling (**REM-02**), `max_frontier` / `max_edges_visited` / `max_hops` budgets (**FS-REM-02**), result scanned for **FS-REM-01** keys. |
+| `list_fs_rem01_reference_walk_artifact_forbidden_keys_v1` | Deep key scan for concurrency-style forbidden markers in any emitted JSON-shaped artifact. |
+| `verify_gp05_rt01_engine_determinism_static` | **G-P05-RT-01** — loads `octs_golden_vectors/v1/runtime_execution/determinism_inner_v1.json`, runs the reference simulation **100×**, compares canonical JSON bytes; fails on **FS-REM-01** hits in the result. |
+| `verify_gp05_rt02_frontier_cap_budget_static` | **G-P05-RT-02** — `star_frontier_cap_inner_v1.json` with `max_frontier=2`; expects `termination_reason=budget_exhausted`, bounded frontier peak, ≥1 hop. |
+
+**Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/runtime_execution/`.
+
+**Tests:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step16_runtime_execution_model.py`.

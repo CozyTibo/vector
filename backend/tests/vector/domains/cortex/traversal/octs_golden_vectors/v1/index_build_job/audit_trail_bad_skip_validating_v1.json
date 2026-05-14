@@ -1,0 +1,13 @@
+{
+  "events": [
+    { "to_state": "QUEUED" },
+    { "to_state": "BUILDING" },
+    { "to_state": "VALIDATING", "validation_passed": false },
+    { "to_state": "PUBLISHING" },
+    {
+      "to_state": "COMMITTED",
+      "index_epoch": 3,
+      "output_index_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

@@ -4909,4 +4909,8 @@ def build_admin_router() -> APIRouter:
         )
         return AdminCortexSchedulerPauseResponse(paused_via_redis=body.paused)
 
+    from vector.api.http.routes.admin_octs_walks import register_octs_walk_traversal_routes
+
+    register_octs_walk_traversal_routes(r)
+
     return r

@@ -159,3 +159,18 @@ Hop receipts **MUST** copy **`valid_from_unix_ns`**, **`valid_to_unix_ns`** (or 
 ## 13. CI oracle expectations
 
 Golden anchors under `octs_golden_vectors/v1/temporal/`; property tests for `export_sequence` monotonicity with rollback.
+
+---
+
+## 14. Reference implementation (P05-07)
+
+**Python (runtime + CI static gates):** `vector.domains.cortex.traversal.temporal_walk`
+
+- `validate_temporal_anchor_invariants_v1`, `temporal_anchor_canonical_json_bytes_v1` (**§3.1**, **§8**, **RULE TW-02**)
+- `org_link_eligible_half_open_unix_ns_v1` (half-open on **unix_ns**; open upper bound **UINT64_MAX** per §3.6)
+- `list_export_sequence_monotonicity_violations_v1`, `linearized_export_sequence_commits_v1` (**TA-01**, **RULE CONC-01** model)
+- `list_superseded_link_still_present_violations_v1` (**RULE SUP-01**)
+- `verify_gp05_temp01_sequence_validity_supersession_static` (**G-P05-TEMP-01**)
+- `verify_gp05_temp02_anchor_roundtrip_and_concurrency_static` (**G-P05-TEMP-02**)
+
+Golden vectors: `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/temporal/`.

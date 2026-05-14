@@ -119,6 +119,7 @@ def validate_org_graph_projection_v1_shape(projection: dict[str, Any]) -> list[s
             "link_authority",
             "confidence_class",
             "evidence_raw_record_ids",
+            "link_row_stable_id",
         ):
             if f not in e:
                 errors.append(f"edge_{i}_missing_{f}")
@@ -130,11 +131,22 @@ def validate_org_graph_projection_v1_shape(projection: dict[str, Any]) -> list[s
                 errors.append(f"edge_{i}_evidence_not_sorted")
         elif "evidence_raw_record_ids" in e:
             errors.append(f"edge_{i}_evidence_not_list")
+        sid = e.get("link_row_stable_id")
+        if sid is not None and (not isinstance(sid, str) or not sid.strip()):
+            errors.append(f"edge_{i}_link_row_stable_id_invalid")
 
-    node_ids_in_order = [str(n["id"]) for n in nodes if isinstance(n, dict) and isinstance(n.get("id"), str)]
+    node_ids_in_order = [
+        str(n["id"])
+        for n in nodes
+        if isinstance(n, dict) and isinstance(n.get("id"), str)
+    ]
     if sorted(node_ids_in_order) != node_ids_in_order:
         errors.append("nodes_not_sorted_by_id")
-    edge_ids_in_order = [str(e["id"]) for e in edges if isinstance(e, dict) and isinstance(e.get("id"), str)]
+    edge_ids_in_order = [
+        str(e["id"])
+        for e in edges
+        if isinstance(e, dict) and isinstance(e.get("id"), str)
+    ]
     if sorted(edge_ids_in_order) != edge_ids_in_order:
         errors.append("edges_not_sorted_by_id")
 
@@ -205,6 +217,7 @@ def build_org_graph_projection_v1(
     for lk in links:
         ev = [int(x) for x in (lk.evidence_raw_record_ids or [])]
         ev.sort()
+        promo = str(lk.promotion_policy_id) if lk.promotion_policy_id else None
         edges.append(
             {
                 "kind": "org_meaning_link",
@@ -224,7 +237,8 @@ def build_org_graph_projection_v1(
                 "promoted_from_candidate_id": (
                     str(lk.promoted_from_candidate_id) if lk.promoted_from_candidate_id else None
                 ),
-                "promotion_policy_id": str(lk.promotion_policy_id) if lk.promotion_policy_id else None,
+                "promotion_policy_id": promo,
+                "link_row_stable_id": str(lk.id),
             }
         )
     edges.sort(key=lambda x: str(x["id"]))
@@ -238,7 +252,9 @@ def build_org_graph_projection_v1(
     }
 
 
-def build_org_graph_projection_export_document(db: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
+def build_org_graph_projection_export_document(
+    db: Session, *, tenant_id: uuid.UUID
+) -> dict[str, Any]:
     """Outer document: inner projection + stable_hash_sha256 (admin / handoff)."""
     inner = build_org_graph_projection_v1(db, tenant_id=tenant_id)
     h = org_graph_projection_stable_hash_sha256(inner)
@@ -268,7 +284,9 @@ PROJECTION_PREVIEW_TOP_LEVEL_KEYS: Final[frozenset[str]] = frozenset(
 )
 
 
-def build_org_graph_projection_preview_metadata(db: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
+def build_org_graph_projection_preview_metadata(
+    db: Session, *, tenant_id: uuid.UUID
+) -> dict[str, Any]:
     """§14 / **G-P04-25** — counts + hashes only (no neighbor lists / full edge arrays)."""
     inner = build_org_graph_projection_v1(db, tenant_id=tenant_id)
     nodes = inner.get("nodes") or []
@@ -303,7 +321,10 @@ def build_org_graph_projection_preview_metadata(db: Session, *, tenant_id: uuid.
         "tenant_id": str(tenant_id),
         "engine_build_ref": inner.get("engine_build_ref"),
         "node_counts": dict(sorted(node_counts.items())),
-        "edge_counts": {"total": len(edges), "by_class": dict(sorted(edge_class_histogram.items()))},
+        "edge_counts": {
+            "total": len(edges),
+            "by_class": dict(sorted(edge_class_histogram.items())),
+        },
         "edge_class_histogram": dict(sorted(edge_class_histogram.items())),
         "projection_hash": h,
         "generated_at": datetime.now(tz=UTC).isoformat(),
@@ -314,12 +335,17 @@ def build_org_graph_projection_preview_metadata(db: Session, *, tenant_id: uuid.
     }
 
 
-def verify_gp04_25_projection_preview_shape_static(payload: dict[str, Any]) -> dict[str, Any]:
+def verify_gp04_25_projection_preview_shape_static(payload: object) -> dict[str, Any]:
     """Static / tenant helper for **G-P04-25**."""
     errors: list[str] = []
     if not isinstance(payload, dict):
         errors.append("preview_not_object")
-        return {"id": "G-P04-25-shape", "passed": False, "severity": "hard_fail", "detail": {"errors": errors}}
+        return {
+            "id": "G-P04-25-shape",
+            "passed": False,
+            "severity": "hard_fail",
+            "detail": {"errors": errors},
+        }
     keys = set(payload.keys())
     if not keys.issubset(PROJECTION_PREVIEW_TOP_LEVEL_KEYS):
         errors.append(f"unexpected_keys:{sorted(keys - PROJECTION_PREVIEW_TOP_LEVEL_KEYS)}")
@@ -419,6 +445,7 @@ def verify_gp04_exp01_export_hash_determinism_static() -> dict[str, Any]:
                 "supersedes_link_id": None,
                 "promoted_from_candidate_id": None,
                 "promotion_policy_id": None,
+                "link_row_stable_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
             }
         ],
     }
@@ -442,7 +469,9 @@ def verify_gp04_exp01_export_hash_determinism_static() -> dict[str, Any]:
     return {"passed": passed, "detail": {"errors": errors}}
 
 
-def verify_org_graph_projection_twice_same_hash(db: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
+def verify_org_graph_projection_twice_same_hash(
+    db: Session, *, tenant_id: uuid.UUID
+) -> dict[str, Any]:
     """Recompute tenant export twice; hashes must match."""
     a = build_org_graph_projection_export_document(db, tenant_id=tenant_id)
     b = build_org_graph_projection_export_document(db, tenant_id=tenant_id)

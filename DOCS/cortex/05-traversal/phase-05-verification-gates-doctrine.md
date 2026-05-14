@@ -35,6 +35,7 @@ Enumerate **CI-enforceable** oracles that **mechanically reject** constitutional
 | **G-P05-HASH-01** | Walk hash recompute | Golden JSON → hash. |
 | **G-P05-HASH-02** | Telemetry separation | Telemetry mutation does not change hash. |
 | **G-P05-SCHEMA-01** | JSON Schema closure | Request/response validate against `schemas/*.schema.json`. |
+| **G-P05-TVR-01** | Hash-body strict closure | Walk `hash_body` unknown keys rejected + **G-P05-ANTI-01** key scan. |
 | **G-P05-ANTI-01** | Forbidden cognition keys | Pattern scan on canonical bodies. |
 | **G-P05-OVD-01** | Observed binding | Observed hops have authority_binding. |
 | **G-P05-OVD-02** | Derived flags | Derived execution sets flags in result body. |
@@ -61,12 +62,16 @@ Enumerate **CI-enforceable** oracles that **mechanically reject** constitutional
 | **G-P05-REPLAY-IDX-01** | Index double-run | Hash match. |
 | **G-P05-REPLAY-IDX-02** | Lineage corruption | Deterministic fail. |
 | **G-P05-EQUIV-01** | Fast-path online | Same hash. |
+| **G-P05-WES-01** | Strategy in policy hash | ``walk_execution_strategy`` merged into ``policy_hash`` inputs. |
+| **G-P05-WES-02** | Forbidden optimizations | **FS-WES-03** marker keys absent under ``hash_body``. |
 | **G-P05-EQUIV-02** | Nightly dual strategy | `warn` on PR; `hard_fail` on `release/*` per CI arch. |
 | **G-P05-EQUIV-03** | No floats in canonical | Static scan. |
 | **G-P05-RANK-01** | Rank-forbidden scan | Reject score-like numeric maps on edges in OCTS tables/APIs. |
 | **G-P05-TVER-01** | Tenant slice schema | Golden aggregate JSON for `org_graph_traversal` slice. |
 | **G-P05-CP-01** | Control plane RBAC | Route matrix deny-by-default. |
 | **G-P05-ECO-01** | Max out-degree | Hostile hub fixture threshold. |
+| **G-P05-ECO-02** | Synthetic walk wall budget | Hub worst-case walk cost ms ≤ ``async_walk_max_wall_ms`` table. |
+| **G-P05-ECO-03** | Derived index bytes / edge | Canonical derived artifact UTF-8 bytes per edge ≤ table. |
 | **G-P05-MIG-01** | Schema bundle hash | Alembic heads + schema files digest matches manifest. |
 | **G-P05-LEGAL-01** | Active P0 empty | `phase-05-spec-gap-matrix.md` §Active P0 must be empty before STAGE-Z. |
 | **G-P05-ENG-01** | Engine id | `engine_build_id` matches embedded git metadata. |

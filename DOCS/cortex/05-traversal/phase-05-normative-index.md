@@ -13,7 +13,7 @@
 
 | Field | Value |
 | ----- | ----- |
-| **PHASE05_PROGRAM_FREEZE_VERSION** | `1` — MUST match runtime constant `vector.domains.cortex.traversal.normative.PHASE05_PROGRAM_FREEZE_VERSION` when OCTS package ships. |
+| **PHASE05_PROGRAM_FREEZE_VERSION** | `1` — MUST match runtime constant `vector.domains.cortex.traversal.normative.PHASE05_PROGRAM_FREEZE_VERSION` (shipped **P05-01**). |
 | **Scope** | Normative index; vocabulary; document hierarchy; **FF-0..FF-5** freeze bundle definitions; canonical JSON profile; **edge_fingerprint** law; **walk_result_hash** / **policy_hash** boundary rules; step program **1–26**. |
 | **Constitutional boundary** | OCTS is **traversal + continuity + replay + provenance substrate** only — see `phase-05-anti-goals-doctrine.md`. |
 
@@ -149,7 +149,7 @@ Phase 05 is **constitutionally complete** (doctrine + enforcement design) when *
 2. **Replay integrity matrix** (`phase-05-replay-integrity-matrix.md`) has **no** open **P0** gaps.  
 3. **Corruption vectors** (`phase-05-corruption-vectors.md`) each have **detection + prevention + CI** rows.  
 4. **Gap matrix** (`phase-05-spec-gap-matrix.md`) §**Active P0** is **empty** (constitutional doctrine closure); waivers only via `waivers/verification_waivers.yaml`.  
-5. **`MASTER_TRACKER.md`** §Phase 05 **Doctrine strength** row reads **Frozen**; **CI execution** and **production runtime** remain honest **Not started** / **Blocked** until code ships — see tracker’s Phase 05 layer table.
+5. **`MASTER_TRACKER.md`** §Phase 05 **Doctrine strength** row reads **Frozen**; **CI execution** reflects **Partial** pytest wiring until the full **`G-P05-*`** catalog is green; **production runtime** remains **Blocked** until code ships — see tracker’s Phase 05 layer table.
 
 **Runtime “Frozen”** additionally requires migrations, worker idempotency keys, and admin routes per steps **16–26** as implemented.
 
@@ -197,7 +197,7 @@ All paths under `DOCS/cortex/05-traversal/`.
 | `phase-05-ci-enforcement-architecture.md` | **G-P05-*** CI topology, stages, waivers |
 | `phase-05-runtime-legality-matrix.md` | When runtime is legal; forbidden deployments |
 | `phase-05-certification-pack-format.md` | **OCTS-CERT-PACK-1** archive law |
-| `schemas/` | JSON Schema — authoritative request/response shapes |
+| `schemas/` | JSON Schema — **`octs-walk-request-v1`**, **`octs-walk-policy-v1`**, authoritative request/response shapes |
 | `waivers/verification_waivers.yaml` | Time-bounded gate waivers |
 | `phase-05-spec-gap-matrix.md` | Amendments + residual **P2** only |
 | `phase-05-replay-integrity-matrix.md` | Replay laws |

@@ -99,3 +99,16 @@ Diagnostics objects: keys sorted; only enums + integers + fingerprints allowed �
 ## 13. CI oracle expectations
 
 Every enum value has fixture walk; unknown enum rejected at API.
+
+---
+
+## 14. Reference implementation (runtime)
+
+- **Module:** `vector.domains.cortex.traversal.walk_diagnostics_contract` (re-exported from `vector.domains.cortex.traversal`).
+- **Schema (OpenAPI source):** `DOCS/cortex/05-traversal/schemas/octs-walk-diagnostics-enums-v1.schema.json` — authoritative enum lists for code generation; **G-P05-DIAG-01** compares Python allowlists to this file.
+- **Hash body:** `validate_walk_diagnostics_hash_body_contract_v1` is invoked from `validate_walk_result_hash_body_contract_v1` (after **FS-WR-03**, before hop receipt list validation). **RULE WD-01** rejects non-empty `diagnostics` on `budget_exhausted`. **FS-WD-03** requires `path_edge_fingerprints_ordered` length to match `hop_receipts` when `termination_reason=target_reached` and receipts are non-empty. `cycle_cut` / `invalid_edge_at_t` require the corresponding closed `diagnostics` shapes.
+- **Hop receipts:** optional `skip_reason` is validated in `validate_hop_receipt_list_contract_v1` when present (**FS-WD-01**).
+- **Cycle multiset:** `compute_cycle_fingerprint_v1` uses `canonical_diagnostic_multiset_fingerprints_v1` then SHA-256 over canonical JSON bytes (**§7**).
+- **Static gates:** **G-P05-DIAG-01** (`verify_gp05_diag01_enum_exhaustiveness_vs_schema_static`), **G-P05-DIAG-02** (`verify_gp05_diag02_cycle_fingerprint_golden_static`).
+- **Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/diagnostics/`.
+- **Pytest:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step12_walk_diagnostics_contract.py`.

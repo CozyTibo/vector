@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.identity.anchor_continuity_candidates import (
+    _DEFAULT_MANIFEST,
     ANCHOR_CONTINUITY_RULE_SEMANTIC,
     RULE_CONTINUITY_FIXTURE_CLUSTER,
     RULE_EMAIL_EXACT,
@@ -25,7 +26,6 @@ from vector.domains.cortex.identity.anchor_continuity_candidates import (
     RULE_GITHUB_LOGIN,
     RULE_LINEAR_USER_ID,
     RULE_SLACK_USER_ID,
-    _DEFAULT_MANIFEST,
     _continuity_fixture_dict,
     _display_name,
     _email_for_rule,
@@ -37,13 +37,13 @@ from vector.domains.cortex.identity.anchor_continuity_candidates import (
     build_anchor_continuity_candidate_rows,
     continuity_identity_signals_for_anchor,
 )
-from vector.domains.cortex.identity.continuity_candidate_evidence_accumulation import (
-    accumulate_candidate_pair_evidence,
-)
 from vector.domains.cortex.identity.anchor_projection import (
     legacy_org_handle_lane_eligible,
     org_entity_id_for_anchor_row,
     provider_login_for_kind_resolution,
+)
+from vector.domains.cortex.identity.continuity_candidate_evidence_accumulation import (
+    accumulate_candidate_pair_evidence,
 )
 from vector.domains.cortex.identity.entity_kind_mapping import resolve_org_entity_kind_for_anchor
 from vector.domains.cortex.identity.identity_primitive_projection import (
@@ -52,7 +52,9 @@ from vector.domains.cortex.identity.identity_primitive_projection import (
     org_entity_id_for_identity_primitive,
     resolve_org_entity_kind_for_identity_primitive,
 )
-from vector.infrastructure.db.models.cortex_canonical_identity_anchor import CortexCanonicalIdentityAnchor
+from vector.infrastructure.db.models.cortex_canonical_identity_anchor import (
+    CortexCanonicalIdentityAnchor,
+)
 from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
     CortexCanonicalTransformMaterialization,
 )
@@ -588,9 +590,6 @@ def build_continuity_evidence_inspection(
         for f in flags:
             missing_flag_counts[f] += 1
 
-        if dry_raw is None and signals.get("continuity_fixture"):
-            dry_anchor, dry_raw = a, raw
-
         if len(sampled_rows) < samp:
             mat = mat_by_id.get(a.materialization_id) if a.materialization_id else None
             emitted = dict(mat.emitted_snapshot_json) if mat is not None else {}
@@ -693,6 +692,17 @@ def build_continuity_evidence_inspection(
         ).all():
             cand_raw_by_id[int(rr.id)] = rr
     pair_evidence_accumulation = accumulate_candidate_pair_evidence(candidate_rows, raw_by_id=cand_raw_by_id)
+
+    for a in anchors:
+        raw = raw_by_id.get(int(a.raw_record_id))
+        if raw is None:
+            continue
+        sig2 = continuity_identity_signals_for_anchor(anchor=a, raw=raw)
+        if sig2.get("continuity_fixture") is None:
+            continue
+        if int(raw.id) in cand_raw_ids:
+            dry_anchor, dry_raw = a, raw
+            break
 
     sparse_honesty = {
         "schema_version": "p04.substrate_sparse_honesty.v1",
@@ -830,7 +840,9 @@ def build_continuity_evidence_inspection_for_tenant(
     fixture_survival_sample_limit: int = 40,
 ) -> dict[str, Any]:
     """Wrapper that attaches ``scenario_key`` for admin responses."""
-    from mock_connectors.fixtures.phase04_continuity_fixtures import resolve_phase04_continuity_scenario_key
+    from mock_connectors.fixtures.phase04_continuity_fixtures import (
+        resolve_phase04_continuity_scenario_key,
+    )
 
     core = build_continuity_evidence_inspection(
         db,

@@ -97,3 +97,5 @@ Import bundle canonicalization **MUST** follow Phase 04 export rules. OCTS **MUS
 
 - Fixture projection with known edges; gate proves no extra edges.  
 - Regression: attempt to traverse `candidate` authority → **hard fail**.
+
+**Reference implementation (P05-04):** `vector.domains.cortex.traversal.graph_import_boundary` — `list_oct_graph_import_violations`, `validate_oct_traversal_import_projection`, `validate_inner_projection_matches_stable_hash`, `validate_temporal_anchor_has_projection_content_hash`, `verify_gp05_import01_traversable_subset_authoritative_static`, `verify_gp05_import02_forbidden_ingress_tokens_static`. Phase **04** export builder emits **`link_row_stable_id`** on each edge (same stable row identity as `id`).

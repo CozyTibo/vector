@@ -97,3 +97,18 @@ Job status API returns canonical sorted JSON per normative index.
 ## 13. CI oracle expectations
 
 Lease contention tests; kill -9 worker mid-build → recovery to `FAILED` or resume deterministic.
+
+---
+
+## 14. Reference implementation (runtime)
+
+- **Module:** `vector.domains.cortex.traversal.index_build_job_contract` (re-exported from `vector.domains.cortex.traversal`).
+- **FSM:** `validate_index_build_job_state_transition_v1`, `validate_index_build_job_state_sequence_v1`, `validate_index_build_completion_events_v1` (linear `to_state` chain plus **FS-IBJ-01** — successful `VALIDATING` before first `PUBLISHING` when terminal state is `COMMITTED`).
+- **Idempotency:** `compute_index_build_idempotency_key_v1` (**RULE IBJ-02** — canonical JSON array over tenant UUID, projection hash, rule id, target schema version).
+- **Leases:** `list_rule_ibj01_simultaneous_building_lease_violations` (**RULE IBJ-01**).
+- **Epoch integrity:** `list_fs_ibj02_duplicate_committed_epoch_different_hash_violations` (**FS-IBJ-02**).
+- **Shadow visibility:** `validate_fs_ibj03_shadow_store_visibility_v1` (**FS-IBJ-03**).
+- **Receipts:** `validate_index_build_job_receipt_v1` (§7 — `input_projection_hash`, `output_index_hash`, `index_epoch`; hashes via `derived_index_contract.assert_index_content_hash_string_v1`).
+- **Static gates:** **G-P05-JOB-01** (`verify_gp05_job01_index_build_fsm_illegal_transitions_static`), **G-P05-JOB-02** (`verify_gp05_job02_validating_publish_audit_static`).
+- **Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/index_build_job/`.
+- **Pytest:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step14_index_build_job_contract.py`.

@@ -96,3 +96,17 @@ Any hop via materialized edge **MUST** mark `provenance_class=derived` and inclu
 ## 13. CI oracle expectations
 
 Dual-run harness in `phase-05-traversal-equivalence-doctrine.md` referenced from CI job graph.
+
+---
+
+## 14. Reference implementation (runtime)
+
+- **Module:** `vector.domains.cortex.traversal.walk_execution_strategy_contract` (re-exported from `vector.domains.cortex.traversal`).
+- **Policy hash / strategy:** **RULE WES-01** — ``walk_execution_strategy`` is merged into ``policy_hash`` material via ``walk_policy.walk_policy_merged_for_hash_v1`` / ``compute_policy_hash_v1``; static **G-P05-WES-01** (`verify_gp05_wes01_strategy_affects_policy_hash_static`).
+- **Pinned epoch:** **FS-WES-01** — ``validate_fs_wes01_materialized_requires_pinned_index_epoch_v1`` (``pinned_index_epoch`` on anchor or under ``extension``); extension key order **§8** via ``validate_temporal_anchor_extension_sorted_keys_v1``.
+- **Hybrid thresholds:** ``validate_hybrid_policy_integer_threshold_for_strategy_v1`` (**WES §3** — ``hybrid_switch_at_index_epoch`` int); wired into ``validate_walk_policy_for_request_v1`` after JSON Schema.
+- **Fast-path equivalence:** **RULE WES-02** / **FS-WES-02** — ``validate_fast_path_equivalence_record_v1``; golden **G-P05-EQUIV-01** (`verify_gp05_equiv01_fast_path_online_equivalence_static`).
+- **Materialized hop provenance:** ``validate_materialized_adjacency_hop_receipt_v1`` (**§7** — ``via_materialized_adjacency`` ⇒ ``materialized_edge_record_id``).
+- **Forbidden optimizations:** **FS-WES-03** — ``list_fs_wes03_forbidden_optimization_keys_under_hash_body_v1`` + static **G-P05-WES-02** (`verify_gp05_wes03_forbidden_optimization_hash_body_scan_static`).
+- **Fixtures:** `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/walk_execution_strategy/`.
+- **Pytest:** `backend/tests/vector/domains/cortex/traversal/test_phase05_step15_walk_execution_strategy_contract.py`.

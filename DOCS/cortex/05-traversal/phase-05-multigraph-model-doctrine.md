@@ -101,3 +101,19 @@ Canonical node id: export string **as-is** after NFC normalization.
 ## 13. CI oracle expectations
 
 Golden traversal tests on **parallel edge** fixtures; failure injection for duplicate fingerprint.
+
+---
+
+## 14. Reference implementation (P05-06)
+
+**Python (runtime + CI static gates):** `vector.domains.cortex.traversal.multigraph_model`
+
+- `compute_edge_fingerprint_v1` (**INVARIANT EFP-01**, `sha256:` + 64 hex)
+- `neighbor_expansion_fingerprints_ordered_v1` (**RULE MG-01**)
+- `canonical_diagnostic_multiset_fingerprints_v1` (**RULE MG-02**)
+- `edge_eligible_at_t_as_of_unix_ns` and filtering before ordering (**§6**)
+- `list_fs_mg01_duplicate_fingerprint_violations` (**FS-MG-01**)
+- `verify_gp05_mg01_neighbor_order_golden_static` (**G-P05-MG-01**)
+- `verify_gp05_mg02_fingerprint_uniqueness_static` (**G-P05-MG-02**)
+
+Golden vectors: `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/multigraph/`.

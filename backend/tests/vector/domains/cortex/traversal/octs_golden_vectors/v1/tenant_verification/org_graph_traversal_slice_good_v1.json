@@ -1,0 +1,10 @@
+{
+  "index_lag_epochs": 0,
+  "last_gate_bundle_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "last_index_epoch": 0,
+  "octs_program_freeze_version": 1,
+  "org_graph_traversal_slice_schema_version": 1,
+  "tenant_id": "00000000-0000-0000-0000-000000000001",
+  "verification_run_id": "42",
+  "walk_queue_depth": 0
+}

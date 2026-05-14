@@ -1,6 +1,6 @@
 # Phase 05 — Walk API contracts
 
-**Normative steps:** **17**, **18**. **Freeze bundle:** **FF-5**.  
+**Normative steps:** **17**, **18**, **19**, **20** (index replay HTTP shares traversal prefix). **Freeze bundle:** **FF-5**.  
 **Depends on:** `phase-05-walk-result-contract.md`, `phase-05-idempotency-and-retry-doctrine.md`, `phase-05-exploration-mode-doctrine.md`, `phase-05-temporal-walk-doctrine.md`.
 
 ---
@@ -109,6 +109,25 @@ HTTP golden files; latency budget tests for sync caps.
 | `max_hops` | 32 |
 | `max_edges_visited` | 10_000 |
 | `max_wall_ms` | 150 |
-| Response JSON bytes | 256 KiB |
+| Request JSON bytes (sync POST body, canonical UTF-8) | 256 KiB |
+| Response JSON bytes (sync completed GET/POST, canonical UTF-8) | 256 KiB |
 
 **MUST** return **413** or **`walk_too_large`** when exceeded — engine **MUST NOT** partially return.
+
+---
+
+## 14. Reference implementation (**P05-17** / **P05-18** / **P05-19** / **P05-20**)
+
+**JSON Schema:** `DOCS/cortex/05-traversal/schemas/octs-walk-request-v1.schema.json` — `temporal_anchor` **or** `inherit_walk_id` required (**anyOf**); optional **`expected_walk_result_hash`** (strict pin vs source **`walk_result_hash`**); **Step 19** resolves **`inherit_walk_id`** against the in-memory walk store and pins **`temporal_anchor`** from the completed parent when omitted on the wire.
+
+**OpenAPI (generated):** `DOCS/cortex/05-traversal/schemas/generated/octs-walk-api-v1.openapi.json` — regenerate with `make octs-openapi` (`python -m vector.scripts.generate_octs_walk_openapi`).
+
+**Python:** `vector.domains.cortex.traversal.walk_api_contract` — canonical API error bodies (**RULE API-ERR**), stub completed walk payload builder (**`OCTS_STUB_ENGINE_BUILD_ID`** + replay lineage telemetry when **Step 19** applies), in-memory store, **G-P05-API-01** / **G-P05-API-02** / **G-P05-API-03** static gates; canonical UTF-8 byte measurement helpers + **FS-API-01** violation lists for sync request/response caps (**Step 18**).
+
+**Replay resolution:** `vector.domains.cortex.traversal.walk_replay_contract` — **`prepare_effective_oct_walk_request_v1`**, **`verify_oct_walk_replay_stub_inherit_resolution_static`** (local gate **`octs-walk-replay-stub-inherit-v1`**); errors **`source_walk_not_found`** (**404**), **`source_walk_not_replayable`**, **`replay_input_mismatch`**, **`replay_anchor_mismatch`**, **`replay_hash_mismatch`**.
+
+**Doctrine constants:** `vector.domains.cortex.traversal.walk_policy` — `SYNC_MAX_*` caps including **`SYNC_MAX_REQUEST_JSON_BYTES`** / **`SYNC_MAX_RESPONSE_JSON_BYTES`** (256 KiB each).
+
+**Admin HTTP:** `vector.api.http.routes.admin_octs_walks` — `POST/GET …/cortex/traversal/walks`, `POST …/cancel`, **Step 20** `POST …/cortex/traversal/derived-index/replay-verify` (**`phase-05-index-replay-doctrine.md`**); `async=1` → **202** + `job_id` (sync-only request/response byte caps **not** applied); sync path enforces policy caps + JSON caps → **413** `walk_too_large` with **no** partial success body on violation; completed GET/replay/idempotent POST paths re-check response size; **Step 19** inherit replay runs on the resolved effective request after parent lookup.
+
+**Tests:** `test_phase05_step17_walk_api_contracts.py`, `test_phase05_step18_sync_walk_limits.py`, `test_phase05_step19_walk_replay.py`, `test_phase05_step20_index_replay.py`, `test_admin_octs_walks_step17.py`.

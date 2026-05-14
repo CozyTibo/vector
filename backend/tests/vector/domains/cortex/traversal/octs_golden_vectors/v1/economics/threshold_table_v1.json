@@ -1,0 +1,6 @@
+{
+  "async_walk_max_wall_ms": 10000,
+  "derived_index_max_bytes_per_edge": 262144,
+  "octs_economics_threshold_table_version": 1,
+  "octs_max_out_degree": 16
+}

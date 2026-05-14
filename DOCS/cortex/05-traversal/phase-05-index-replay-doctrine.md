@@ -91,3 +91,19 @@ Canonical derived artifact format version `DERIVED_INDEX_CANON_VERSION` in hash 
 ## 13. CI oracle expectations
 
 Large synthetic graph rebuild under memory cap; compare hashes across OS.
+
+---
+
+## 14. Reference implementation (**P05-20** stub)
+
+**Python:** `vector.domains.cortex.traversal.index_replay_contract` — **G-P05-REPLAY-IDX-01** (double-run hash equality on golden derived artifact), **G-P05-REPLAY-IDX-02** (empty lineage → deterministic failure), **FS-IRJ-02** node-universe compare helper, JSON Schema load/validate for replay-verify envelopes.
+
+**Derived index core:** `vector.domains.cortex.traversal.derived_index_contract` — `compute_index_content_hash_v1`, `DERIVED_INDEX_CANON_VERSION` (**§8**).
+
+**JSON Schema:** `DOCS/cortex/05-traversal/schemas/octs-derived-index-replay-verify-v1.schema.json`.
+
+**Admin HTTP:** `POST /admin/tenants/{tenant_id}/cortex/traversal/derived-index/replay-verify` on `vector.api.http.routes.admin_octs_walks` — optional **`expected_index_content_hash`** strict pin (**409** `index_replay_hash_mismatch`).
+
+**OpenAPI:** `schemas/generated/octs-walk-api-v1.openapi.json` (generator includes this path; **RULE API-0**).
+
+**Tests:** `test_phase05_step20_index_replay.py`, `test_admin_octs_walks_step17.py` (replay-verify integration).

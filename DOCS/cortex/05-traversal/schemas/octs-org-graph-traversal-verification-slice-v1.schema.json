@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vector.local/schemas/octs-org-graph-traversal-verification-slice-v1.schema.json",
+  "title": "OCTS org_graph_traversal tenant verification slice (v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "org_graph_traversal_slice_schema_version",
+    "tenant_id",
+    "verification_run_id",
+    "octs_program_freeze_version",
+    "last_index_epoch",
+    "index_lag_epochs",
+    "walk_queue_depth",
+    "last_gate_bundle_sha256"
+  ],
+  "properties": {
+    "org_graph_traversal_slice_schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verification_run_id": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "string", "minLength": 1, "maxLength": 64 }
+      ]
+    },
+    "octs_program_freeze_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "last_index_epoch": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "index_lag_epochs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "walk_queue_depth": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "last_gate_bundle_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

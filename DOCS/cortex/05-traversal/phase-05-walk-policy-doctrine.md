@@ -105,3 +105,16 @@ Policy **MAY** include `respect_validity: true` (default **true**); when false, 
 ## 13. CI oracle expectations
 
 Golden `policy_hash` vectors; mutation tests on tie-break order affecting expansion.
+
+---
+
+## 14. Reference implementation (P05-08)
+
+**Python (runtime + CI static gates):** `vector.domains.cortex.traversal.walk_policy`
+
+- JSON Schema **`DOCS/cortex/05-traversal/schemas/octs-walk-policy-v1.schema.json`** — `validate_oct_walk_policy_v1_jsonschema`
+- `compute_policy_hash_v1` / `walk_policy_canonical_json_bytes_for_hash_v1` (**§8**; merges `walk_execution_strategy` into hash material; strips `human_label` / `*_telemetry`)
+- `validate_walk_policy_for_request_v1`, `list_walk_policy_sync_cap_violations_v1` — **G-P05-POL-02** sync caps (`SYNC_MAX_HOPS`, `SYNC_MAX_EDGES_VISITED`, `SYNC_MAX_WALL_MS` per walk API §Sync limits)
+- `verify_gp05_pol01_walk_policy_schema_and_hash_static` (**G-P05-POL-01**), `verify_gp05_pol02_sync_caps_reject_static` (**G-P05-POL-02**)
+
+Golden vectors: `backend/tests/vector/domains/cortex/traversal/octs_golden_vectors/v1/walk_policy/`.

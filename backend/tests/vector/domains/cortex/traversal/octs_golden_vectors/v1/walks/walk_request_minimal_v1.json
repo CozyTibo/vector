@@ -1,0 +1,23 @@
+{
+  "temporal_anchor": {
+    "tenant_id": "00000000-0000-0000-0000-000000000001",
+    "export_id": "00000000-0000-0000-0000-000000000002",
+    "export_sequence": 0,
+    "projection_content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "snapshot_unix_ns": { "unix_ns": 1 },
+    "graph_as_of_unix_ns": { "unix_ns": 1 }
+  },
+  "walk_policy": {
+    "max_hops": 8,
+    "max_frontier": 64,
+    "max_edges_visited": 500,
+    "max_wall_ms": 100,
+    "hop_class_allowlist": ["org.handle_links_canonical"],
+    "tie_break": ["fingerprint", "org_link_id"],
+    "respect_validity": true,
+    "policy_version": 1
+  },
+  "start_node_ids": ["00000000-0000-0000-0000-000000000003"],
+  "walk_execution_strategy": "ONLINE_OBSERVED",
+  "exploration_mode": false
+}

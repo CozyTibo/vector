@@ -5,11 +5,14 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "temporal_anchor",
     "walk_policy",
     "start_node_ids",
     "walk_execution_strategy",
     "exploration_mode"
+  ],
+  "anyOf": [
+    { "required": ["temporal_anchor"] },
+    { "required": ["inherit_walk_id"] }
   ],
   "properties": {
     "temporal_anchor": {
@@ -54,6 +57,11 @@
     },
     "exploration_mode": { "type": "boolean" },
     "pinned_index_epoch": { "type": "integer", "minimum": 0 },
-    "inherit_walk_id": { "type": "string", "format": "uuid" }
+    "inherit_walk_id": { "type": "string", "format": "uuid" },
+    "expected_walk_result_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Optional strict replay pin (**WRJ**): must equal the source walk walk_result_hash."
+    }
   }
 }

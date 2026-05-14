@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vector.dev/cortex/octs/walk-diagnostics-enums/v1",
+  "title": "OCTSWalkDiagnosticsEnumsV1",
+  "description": "Closed enums for walk termination and hop skip reasons (Phase 05 Step 12). OpenAPI MUST be generated from these definitions per phase-05-traversal-vs-reasoning-doctrine.md.",
+  "$defs": {
+    "termination_reason_v1": {
+      "type": "string",
+      "enum": [
+        "target_reached",
+        "budget_exhausted",
+        "empty_frontier",
+        "cycle_cut",
+        "invalid_edge_at_t",
+        "policy_rejected",
+        "error_internal",
+        "dangling_evidence",
+        "import_hash_mismatch"
+      ]
+    },
+    "skip_reason_v1": {
+      "type": "string",
+      "enum": [
+        "not_in_allowlist",
+        "filtered_by_authority",
+        "invalid_at_t",
+        "deduped_revisit_forbidden"
+      ]
+    }
+  }
+}
