@@ -1,0 +1,3 @@
+# OCTS gate waivers — time-bounded only. Empty = no waivers.
+# Schema: see phase-05-ci-enforcement-architecture.md §5
+waivers: []
