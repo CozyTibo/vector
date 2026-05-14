@@ -1,4 +1,4 @@
-"""Background orchestration for tenant-scoped Cortex flush + rerun through Phase 04 Identity."""
+"""Tenant-scoped Cortex flush + rerun: P04 identity substrate then P05 graph projection ingress."""
 
 from __future__ import annotations
 
@@ -6,14 +6,8 @@ import uuid
 from typing import Any
 
 from app.celery_app import celery_app
-from vector.domains.cortex.canonical.transform_runtime import (
-    drain_stub_materialize_backlog,
-    repair_tenant_materialization_oracle_determinism_drift,
-)
-from vector.domains.cortex.identity.continuity_rebuild import (
-    finalize_identity_substrate_operator_audit,
-    run_identity_handles_and_candidates_refresh,
-    substrate_counts,
+from vector.domains.cortex.ingestion.post_ingestion_substrate_refresh import (
+    run_post_ingestion_substrate_refresh,
 )
 from vector.domains.cortex.ingestion.sync_context import IngestionSyncContext
 from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
@@ -30,7 +24,7 @@ def run_cortex_flush_rerun_to_identity_task(
     connectors: list[dict[str, str]],
     batch_limit: int,
 ) -> dict[str, Any]:
-    """Run connector syncs, canonical backlog drain, then anchor → org entity backfill (P04-20)."""
+    """Ingest syncs, canonical drain, identity audit, then Phase 05 org graph projection export."""
     tid = uuid.UUID(tenant_id)
     settings = get_settings()
     sync_results: list[dict[str, Any]] = []
@@ -73,45 +67,36 @@ def run_cortex_flush_rerun_to_identity_task(
                         "error": str(exc),
                     }
                 )
-        canonical_summary = drain_stub_materialize_backlog(
+        substrate = run_post_ingestion_substrate_refresh(
             session,
+            settings,
             tenant_id=tid,
             bundle_id=bundle_id.strip(),
-            connector=None,
-            resource_type=None,
             batch_limit=batch_limit,
-        )
-        repair_scan = min(5000, max(200, int(batch_limit) * 4))
-        determinism_repair = repair_tenant_materialization_oracle_determinism_drift(
-            session,
-            tenant_id=tid,
-            bundle_id=bundle_id.strip(),
-            scan_limit=repair_scan,
-            dry_run=False,
-        )
-        counts_before_identity = substrate_counts(session, tenant_id=tid)
-        identity_continuity_substrate = run_identity_handles_and_candidates_refresh(
-            session,
-            tenant_id=tid,
-            dry_run=False,
-            anchor_limit=5_000,
-        )
-        substrate_audit_report, substrate_audit_job_id = finalize_identity_substrate_operator_audit(
-            session,
-            tenant_id=tid,
-            bundle_id=bundle_id.strip(),
-            substrate=identity_continuity_substrate,
-            substrate_trigger="cortex_flush_rerun",
-            counts_before=counts_before_identity,
+            identity_substrate_trigger="cortex_flush_rerun",
         )
         return {
             "tenant_id": tenant_id,
             "bundle_id": bundle_id.strip(),
             "sync_results": sync_results,
-            "canonical_summary": canonical_summary,
-            "determinism_repair": determinism_repair,
-            "identity_continuity_substrate": identity_continuity_substrate,
-            "identity_substrate_audit": substrate_audit_report,
-            "identity_substrate_audit_replay_job_id": str(substrate_audit_job_id),
-            "identity_backfill_summary": identity_continuity_substrate,
+            "canonical_summary": substrate.get("canonical_summary"),
+            "determinism_repair": substrate.get("determinism_repair"),
+            "identity_continuity_substrate": substrate.get("identity_continuity_substrate"),
+            "identity_substrate_audit": substrate.get("identity_substrate_audit"),
+            "identity_substrate_audit_replay_job_id": substrate.get(
+                "identity_substrate_audit_replay_job_id"
+            ),
+            "identity_backfill_summary": substrate.get("identity_continuity_substrate"),
+            "phase05_graph_projection_export_job_id": substrate.get(
+                "phase05_graph_projection_export_job_id"
+            ),
+            "phase05_graph_projection_stable_hash_sha256": substrate.get(
+                "phase05_graph_projection_stable_hash_sha256"
+            ),
+            "phase05_org_graph_traversal_verification_slice": substrate.get(
+                "phase05_org_graph_traversal_verification_slice"
+            ),
+            "phase05_org_graph_traversal_slice_hash": substrate.get(
+                "phase05_org_graph_traversal_slice_hash"
+            ),
         }

@@ -446,10 +446,12 @@ export function distributeEdgesToTopologyLayers(
   const layerIndex = (e: EdgeProvenance): number => {
     if (e.edge_type === "continuity_ledger") return 0;
     if (e.edge_type === "execution_reference") return 1;
-    if (e.edge_type === "dependency_bridge") return 2;
+    // Export / closure chain (policy), excluding ledger rows already classified above.
+    if (e.derivation_policy === "continuity_reconstruction") return 6;
+    if (e.edge_type === "dependency_bridge") return 4;
     if (e.edge_type === "replay_projection") return 3;
     if (e.edge_type === "temporal_cooccurrence") return 5;
-    return 4;
+    return 2;
   };
 
   const buckets = layerNames.map(() => ({

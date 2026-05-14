@@ -1,9 +1,189 @@
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { adminJson } from "../lib/adminFetch";
+import type {
+  CortexCanonicalControlPlane,
+  CortexOverview,
+  CortexRawStats,
+} from "./cortexAdminTypes";
+import { formatRelativeAge } from "./cortexAdminTypes";
 import type { GraphForensicView, SnapshotCardTier } from "./graph/graphControlPlaneTypes";
 import { GRAPH_FORENSIC_VIEWS, getGraphControlPlaneMock } from "./graph/graphControlPlaneMock";
 import { StatusBadge } from "./ui/StatusBadge";
+
+/** Hours — last raw fetch or completed sync run newer than this reads as “current ingestion”. */
+const INGESTION_FRESH_OK_HOURS = 72;
+/** Beyond this age, ingestion is explicitly “stale” for the badge (still shows relative time). */
+const INGESTION_STALE_WARN_HOURS = 168;
+
+function parseIsoMs(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+function latestIngestionActivityMs(overview: CortexOverview | undefined, raw: CortexRawStats | undefined): number | null {
+  let max: number | null = null;
+  for (const r of raw?.connector_rollups ?? []) {
+    const m = parseIsoMs(r.newest_fetched_at);
+    if (m != null) max = max == null ? m : Math.max(max, m);
+  }
+  for (const c of overview?.connectors ?? []) {
+    const lr = c.latest_run;
+    if (!lr?.finished_at) continue;
+    const st = (lr.status ?? "").toUpperCase();
+    if (st === "COMPLETED" || st === "SUCCESS") {
+      const m = parseIsoMs(lr.finished_at);
+      if (m != null) max = max == null ? m : Math.max(max, m);
+    }
+  }
+  return max;
+}
+
+function routedIngestionFailed(overview: CortexOverview | undefined): boolean {
+  return Boolean(overview?.connectors.some((c) => c.cortex_routed && c.latest_run?.status === "FAILED"));
+}
+
+type LiveBadgeTone = "ok" | "warn" | "bad" | "neutral";
+
+function ingestionFreshnessBadge(args: {
+  overview: CortexOverview | undefined;
+  raw: CortexRawStats | undefined;
+  loading: boolean;
+  error: boolean;
+}): { tone: LiveBadgeTone; title: string; body: string } {
+  if (args.loading && !args.overview && !args.raw) {
+    return { tone: "neutral", title: "Checking ingestion…", body: "Loading raw + connector overview." };
+  }
+  if (args.error) {
+    return {
+      tone: "warn",
+      title: "Ingestion signal unavailable",
+      body: "Could not load ingestion endpoints — refresh or open Ingestion for detail.",
+    };
+  }
+  const failed = routedIngestionFailed(args.overview);
+  const latestMs = latestIngestionActivityMs(args.overview, args.raw);
+  if (latestMs == null) {
+    return {
+      tone: failed ? "bad" : "warn",
+      title: failed ? "Ingestion not healthy" : "No recent ingestion timestamps",
+      body: failed
+        ? "At least one routed connector shows a FAILED sync run."
+        : "No newest_fetched_at on raw rollups and no completed sync runs — tenant may be idle or not yet ingesting.",
+    };
+  }
+  const ageHours = (Date.now() - latestMs) / 3_600_000;
+  const rel = formatRelativeAge(new Date(latestMs).toISOString());
+  if (failed) {
+    return {
+      tone: "bad",
+      title: "Ingestion degraded",
+      body: `Latest successful activity ${rel}, but a routed connector shows FAILED — reconcile on Ingestion.`,
+    };
+  }
+  if (ageHours <= INGESTION_FRESH_OK_HOURS) {
+    return {
+      tone: "ok",
+      title: "Up to date with latest ingested data",
+      body: `Latest raw fetch or completed sync activity ${rel} — within ${INGESTION_FRESH_OK_HOURS}h window.`,
+    };
+  }
+  if (ageHours <= INGESTION_STALE_WARN_HOURS) {
+    return {
+      tone: "warn",
+      title: "Ingestion aging",
+      body: `Last activity ${rel} — older than ${INGESTION_FRESH_OK_HOURS}h but inside ${INGESTION_STALE_WARN_HOURS}h watch window.`,
+    };
+  }
+  return {
+    tone: "bad",
+    title: "Ingestion stale vs expectation",
+    body: `Last activity ${rel} — beyond ${INGESTION_STALE_WARN_HOURS}h; confirm schedulers and connectors.`,
+  };
+}
+
+function pipelineConsistencyBadge(args: {
+  overview: CortexOverview | undefined;
+  cp: CortexCanonicalControlPlane | undefined;
+  loading: boolean;
+  error: boolean;
+}): { tone: LiveBadgeTone; title: string; body: string } {
+  if (args.loading && !args.cp) {
+    return { tone: "neutral", title: "Checking substrate…", body: "Loading canonical control plane." };
+  }
+  if (args.error || !args.cp) {
+    return {
+      tone: "warn",
+      title: "Consistency signal incomplete",
+      body: "Canonical control plane did not load — open Canonical health for authoritative checks.",
+    };
+  }
+  const h = args.cp.health_overview;
+  const worker = args.overview?.worker_telemetry;
+  const dup = args.overview?.duplicate_prevention;
+
+  const badReasons: string[] = [];
+  const warnReasons: string[] = [];
+
+  if (h.active_canonical_failure_count > 0) {
+    badReasons.push(`${h.active_canonical_failure_count} active canonical failure case(s)`);
+  }
+  if (!args.cp.verification_checklist.passed) {
+    badReasons.push("canonical verification checklist not passing");
+  }
+  if (h.replay_dependency_cycle_detected) {
+    badReasons.push("replay dependency cycle detected");
+  }
+  if (h.last_verification_passed === false) {
+    badReasons.push("last verification run failed");
+  }
+
+  if (worker && worker.status !== "ok") {
+    warnReasons.push(`workers: ${worker.status}`);
+  }
+  if (dup && dup.status === "warn") {
+    warnReasons.push("duplicate prevention warn");
+  }
+  if (dup && dup.status === "unavailable") {
+    warnReasons.push("duplicate prevention unavailable");
+  }
+  if (h.verification_freshness_label === "stale") {
+    warnReasons.push("verification ledger marked stale");
+  }
+  if (h.ambiguity_explosion_warn) {
+    warnReasons.push("ambiguity explosion warning");
+  }
+  if ((h.ambiguity_open_count ?? 0) > 0) {
+    warnReasons.push(`${h.ambiguity_open_count} open ambiguities`);
+  }
+  if (routedIngestionFailed(args.overview)) {
+    warnReasons.push("ingestion run FAILED on a routed connector");
+  }
+
+  if (badReasons.length > 0) {
+    return {
+      tone: "bad",
+      title: "Substrate not in normal range",
+      body: badReasons.join(" · "),
+    };
+  }
+  if (warnReasons.length > 0) {
+    return {
+      tone: "warn",
+      title: "Operating with attention items",
+      body: warnReasons.join(" · "),
+    };
+  }
+  return {
+    tone: "ok",
+    title: "Consistent / behaving normally",
+    body:
+      "Workers healthy, duplicate prevention clear, no active canonical failures, verification checklist passing, no replay dependency cycle — canonical control plane snapshot.",
+  };
+}
 
 function overallTone(s: string): "ok" | "warn" | "bad" | "neutral" {
   if (s === "healthy") return "ok";
@@ -130,6 +310,50 @@ export default function AdminCortexGraphPage() {
   const [explorerQuery, setExplorerQuery] = useState("");
   const [explorerView, setExplorerView] = useState<GraphForensicView>("path");
 
+  const qOverview = useQuery({
+    queryKey: ["admin-cortex-overview", tenantId],
+    queryFn: () => adminJson<CortexOverview>(`/admin/tenants/${tenantId}/cortex/ingestion`),
+    enabled: Boolean(tenantId),
+  });
+  const qRaw = useQuery({
+    queryKey: ["admin-cortex-raw-stats", tenantId],
+    queryFn: () => adminJson<CortexRawStats>(`/admin/tenants/${tenantId}/cortex/ingestion/raw-stats`),
+    enabled: Boolean(tenantId),
+  });
+  const qCp = useQuery({
+    queryKey: ["admin-cortex-canonical-control-plane", tenantId],
+    queryFn: () =>
+      adminJson<CortexCanonicalControlPlane>(`/admin/tenants/${tenantId}/cortex/canonical/control-plane`),
+    enabled: Boolean(tenantId),
+  });
+
+  const ingestLoading = qOverview.isPending || qRaw.isPending;
+  const ingestError = qOverview.isError || qRaw.isError;
+  const canonLoading = qCp.isPending;
+  const canonError = qCp.isError;
+
+  const liveIngestion = useMemo(
+    () =>
+      ingestionFreshnessBadge({
+        overview: qOverview.data,
+        raw: qRaw.data,
+        loading: ingestLoading,
+        error: ingestError,
+      }),
+    [qOverview.data, qRaw.data, ingestLoading, ingestError],
+  );
+
+  const liveConsistency = useMemo(
+    () =>
+      pipelineConsistencyBadge({
+        overview: qOverview.data,
+        cp: qCp.data,
+        loading: canonLoading,
+        error: canonError,
+      }),
+    [qOverview.data, qCp.data, canonLoading, canonError],
+  );
+
   const primaryCards = snapshotCardsByTier(data.snapshot.cards, "primary");
   const secondaryCards = snapshotCardsByTier(data.snapshot.cards, "secondary");
   const operationalCards = snapshotCardsByTier(data.snapshot.cards, "operational");
@@ -152,6 +376,64 @@ export default function AdminCortexGraphPage() {
             <p className="mt-2 text-xs text-stone-500">
               Walk substrate snapshot as of {data.snapshot.updatedAt} (mock payload until API routes land).
             </p>
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-950">
+              <p className="font-semibold text-amber-950">Operator notice — this tab is not wired to live substrate</p>
+              <p className="mt-1 leading-relaxed text-amber-900/95">
+                Every card, table, and forensic line here is a <span className="font-medium">deterministic demo</span>{" "}
+                derived only from the tenant id in the URL. It does <span className="font-medium">not</span> read raw
+                memory, canonical rows, identity org links, Celery{" "}
+                <span className="font-mono">flush_rerun_to_identity</span> (through Phase 05 projection), or admin OCTS
+                walk APIs — so <span className="font-medium">Flush + rerun through Phase 05 will not change these numbers</span>.
+                To verify a real rerun: check{" "}
+                <Link className="font-medium text-amber-950 underline" to={`/admin/tenants/${tenantId}/cortex/canonical/health`}>
+                  Canonical health
+                </Link>
+                ,{" "}
+                <Link className="font-medium text-amber-950 underline" to={`/admin/tenants/${tenantId}/cortex/ingestion`}>
+                  Ingestion / replay jobs
+                </Link>
+                , and org-link replay jobs for <span className="font-mono">graph_projection_export</span> (Phase 05
+                ingress receipt).
+              </p>
+            </div>
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-xs text-emerald-950">
+              <p className="font-semibold text-emerald-950">Live tenant signals (API-backed, not the demo walk)</p>
+              <p className="mt-1 leading-relaxed text-emerald-900/95">
+                These two badges read the same ingestion and canonical control-plane JSON as the rest of Cortex admin.
+                They describe <span className="font-medium">real pipeline state</span>, not the deterministic Graph tab
+                mock above.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-md border border-emerald-200/80 bg-white/90 p-3 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge tone={liveIngestion.tone === "neutral" ? "neutral" : liveIngestion.tone}>
+                      {liveIngestion.title}
+                    </StatusBadge>
+                    <Link
+                      className="text-[11px] font-medium text-emerald-900 underline"
+                      to={`/admin/tenants/${tenantId}/cortex/ingestion`}
+                    >
+                      Ingestion →
+                    </Link>
+                  </div>
+                  <p className="mt-2 leading-relaxed text-stone-700">{liveIngestion.body}</p>
+                </div>
+                <div className="rounded-md border border-emerald-200/80 bg-white/90 p-3 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge tone={liveConsistency.tone === "neutral" ? "neutral" : liveConsistency.tone}>
+                      {liveConsistency.title}
+                    </StatusBadge>
+                    <Link
+                      className="text-[11px] font-medium text-emerald-900 underline"
+                      to={`/admin/tenants/${tenantId}/cortex/canonical/health`}
+                    >
+                      Canonical health →
+                    </Link>
+                  </div>
+                  <p className="mt-2 leading-relaxed text-stone-700">{liveConsistency.body}</p>
+                </div>
+              </div>
+            </div>
           </div>
           <div className="flex flex-col items-end gap-1">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">Walk substrate status</span>

@@ -564,13 +564,16 @@ class AdminCortexFlushAndRerunRequest(BaseModel):
 
     confirmation: str = Field(
         ...,
-        description="Must exactly match the server phrase for flush + rerun through Identity (see admin UI).",
+        description="Must exactly match the server phrase for flush + rerun through Phase 05 (see admin UI).",
     )
     canonical_batch_limit: int = Field(
         default=500,
         ge=1,
         le=5000,
-        description="Batch size for canonical backlog drain inside the flush+r rerun orchestrator (before anchor backfill).",
+        description=(
+            "Batch size for canonical backlog drain inside the flush+rerun orchestrator "
+            "(before identity refresh and Phase 05 graph projection export)."
+        ),
     )
 
 
@@ -582,7 +585,10 @@ class AdminCortexFlushAndRerunResponse(BaseModel):
     enqueued_connectors: list[str]
     canonical_backlog_task_id: str | None = Field(
         default=None,
-        description="Celery id for the orchestrator task (ingestion syncs + canonical drain + org identity backfill).",
+        description=(
+            "Celery id for the orchestrator task (ingestion syncs + canonical drain + identity substrate + "
+            "Phase 05 org graph projection export)."
+        ),
     )
     canonical_batch_limit: int
     deleted_rows_total: int

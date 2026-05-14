@@ -286,7 +286,7 @@ CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE = "RESUME ALL SCHEDULED CORTEX INGESTION"
 CORTEX_RAW_MEMORY_DELETE_CONFIRM_PHRASE = "APPLY RAW MEMORY RETENTION DELETION"
 CORTEX_MANUAL_SYNC_CONFIRM_PHRASE = "RUN MANUAL CORTEX INGESTION SYNC"
 CORTEX_REPLAY_CONFIRM_PHRASE = "RUN CORTEX INGESTION REPLAY JOB"
-CORTEX_FLUSH_RERUN_CONFIRM_PHRASE = "FLUSH RAW DATA AND RERUN CORTEX TO IDENTITY"
+CORTEX_FLUSH_RERUN_CONFIRM_PHRASE = "FLUSH RAW DATA AND RERUN CORTEX THROUGH PHASE 05"
 
 
 def _enqueue_cortex_poll_sync(connector_id: str) -> Callable[..., None]:
@@ -4781,7 +4781,7 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexFlushAndRerunResponse:
-        """Flush tenant Cortex state, rerun routed connectors, canonical drain, then org identity backfill."""
+        """Flush tenant Cortex state, rerun routed connectors, canonical drain, identity substrate, then Phase 05 projection."""
         _assert_tenant(db, tenant_id)
         if body.confirmation != CORTEX_FLUSH_RERUN_CONFIRM_PHRASE:
             raise HTTPException(
@@ -4844,7 +4844,7 @@ def build_admin_router() -> APIRouter:
         log_ingestion_event(
             _logger,
             logging.WARNING,
-            "admin cortex full flush+rerun enqueued",
+            "admin cortex full flush+rerun enqueued (through Phase 05 projection)",
             task_name="admin_cortex_flush_rerun_to_identity",
             phase=PHASE_STEP6,
             outcome="enqueued",

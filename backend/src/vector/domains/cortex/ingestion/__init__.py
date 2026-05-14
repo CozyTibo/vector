@@ -1,5 +1,13 @@
 """Cortex Phase 01 — ingestion lifecycle (runs, raw rows, checkpoints)."""
 
+from vector.domains.cortex.ingestion.execution_reconstruction_contracts import (
+    EXECUTION_RECONSTRUCTION_CONTRACT_VERSION,
+    assert_conversation_execution_event,
+    build_minimal_conversation_execution_event,
+    derive_conversation_execution_event_id,
+    derive_deterministic_id,
+    validate_conversation_execution_event,
+)
 from vector.domains.cortex.ingestion.raw_envelope_contract import (
     EnvelopeContractViolation,
     core_envelope_fields,
@@ -57,9 +65,15 @@ from vector.domains.cortex.ingestion.raw_memory_enforcement import (
 
 __all__ = [
     "EnvelopeContractViolation",
+    "EXECUTION_RECONSTRUCTION_CONTRACT_VERSION",
     "IngestionSyncContext",
+    "assert_conversation_execution_event",
+    "build_minimal_conversation_execution_event",
     "core_envelope_fields",
+    "derive_conversation_execution_event_id",
+    "derive_deterministic_id",
     "execute_connector_sync",
+    "validate_conversation_execution_event",
     "validate_raw_payload_for_persistence",
     "verify_ingestion_run",
     "verify_tenant_ingestion_invariants",

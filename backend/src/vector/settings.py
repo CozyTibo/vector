@@ -307,6 +307,24 @@ class Settings(BaseSettings):
             "and attach the report to the task response (disable in hot paths if needed)."
         ),
     )
+    cortex_post_ingestion_substrate_refresh_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED",
+        description=(
+            "After each successful live incremental sync, enqueue substrate refresh: canonical drain, "
+            "identity audit, Phase 05 graph export (``vector`` queue). False = raw-only ingestion."
+        ),
+    )
+    cortex_post_ingestion_canonical_batch_limit: int = Field(
+        default=400,
+        ge=1,
+        le=2000,
+        validation_alias="CORTEX_POST_INGESTION_CANONICAL_BATCH_LIMIT",
+        description=(
+            "Per-batch row limit passed to drain_stub_materialize_backlog during post-ingestion "
+            "substrate refresh (same scale as admin flush canonical_batch_limit default)."
+        ),
+    )
     cortex_raw_memory_enforcement_mode: str = Field(
         default="progressive",
         validation_alias="CORTEX_RAW_MEMORY_ENFORCEMENT_MODE",

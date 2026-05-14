@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from app.celery_app import celery_app
@@ -10,8 +11,38 @@ from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
 
+_LOGGER = logging.getLogger(__name__)
+
 _TASK_RUN_SYNC = "vector.cortex.ingestion.run_sync"
 _TASK_RUN_REPLAY = "vector.cortex.ingestion.run_sync_replay"
+
+
+def _maybe_enqueue_post_ingestion_substrate_refresh(
+    *,
+    tenant_id: uuid.UUID,
+    sync_result: dict[str, object],
+    sync_mode: str,
+) -> None:
+    """Enqueue substrate refresh after a successful live incremental sync (``vector`` queue)."""
+    settings = get_settings()
+    if not settings.cortex_post_ingestion_substrate_refresh_enabled:
+        return
+    if sync_mode != "incremental":
+        return
+    if sync_result.get("status") != "completed":
+        return
+    from app.tasks.cortex_post_ingestion_substrate_refresh import (
+        run_cortex_post_ingestion_substrate_refresh_task,
+    )
+
+    run_cortex_post_ingestion_substrate_refresh_task.apply_async(
+        kwargs={
+            "tenant_id": str(tenant_id),
+            "batch_limit": settings.cortex_post_ingestion_canonical_batch_limit,
+        },
+        queue="vector",
+    )
+    _LOGGER.info("post_ingestion_substrate_refresh_enqueued tenant_id=%s", tenant_id)
 
 
 @celery_app.task(name=_TASK_RUN_SYNC, queue="cortex_live")
@@ -31,7 +62,7 @@ def run_cortex_connector_sync_task(
     )
     settings = get_settings()
     with session_scope() as session:
-        return execute_connector_sync(
+        out = execute_connector_sync(
             session,
             settings,
             tenant_id=tid,
@@ -40,6 +71,12 @@ def run_cortex_connector_sync_task(
             ingestion_sync_context=ctx,
             connection_id=uuid.UUID(connection_id) if connection_id else None,
         )
+    _maybe_enqueue_post_ingestion_substrate_refresh(
+        tenant_id=tid,
+        sync_result=out,
+        sync_mode=sync_mode,
+    )
+    return out
 
 
 @celery_app.task(name=_TASK_RUN_REPLAY, queue="cortex_replay")

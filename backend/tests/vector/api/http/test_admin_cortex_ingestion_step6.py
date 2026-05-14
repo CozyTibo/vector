@@ -709,7 +709,7 @@ def test_admin_flush_rerun_flushes_and_enqueues(
             f"/admin/tenants/{tid}/cortex/ingestion/actions/flush-rerun-to-identity",
             auth=("admin", "integration-admin-password"),
             json={
-                "confirmation": "FLUSH RAW DATA AND RERUN CORTEX TO IDENTITY",
+                "confirmation": "FLUSH RAW DATA AND RERUN CORTEX THROUGH PHASE 05",
                 "canonical_batch_limit": 777,
             },
         )
