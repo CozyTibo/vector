@@ -20,3 +20,7 @@ Never emit `chronology_strict` if any pairwise comparison remains undefined with
 ## Receipts
 
 Every resolution emits `reasoning_chronology_receipt` delta or append‑only correction row.
+
+## Bridge
+
+Projected **`chronology_legality_class`** and forbidden tuples: [`chronology-replay-legality-state-machine.md`](./chronology-replay-legality-state-machine.md).

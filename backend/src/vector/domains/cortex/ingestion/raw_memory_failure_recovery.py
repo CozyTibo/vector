@@ -37,8 +37,7 @@ def _gap_id(*parts: str) -> str:
 
 
 def _upsert_case(session: Session, case: dict[str, Any]) -> None:
-    tbl = RawMemoryFailureCase.__table__
-    ins = pg_insert(tbl).values(**case)
+    ins = pg_insert(RawMemoryFailureCase).values(**case)
     session.execute(
         ins.on_conflict_do_update(
             index_elements=["gap_id"],
@@ -100,43 +99,43 @@ def sync_raw_memory_failure_cases(session: Session, tenant_id: uuid.UUID) -> dic
     )
     live_rows = [row for row in rows if row.replay_job_id is None]
     first_contract_match_fetched_at = _contract_cutover_anchor(live_rows)
-    for row in rows:
-        body = dict(row.payload_body) if isinstance(row.payload_body, dict) else {}
-        if canonical_payload_hash(body) == row.payload_hash:
+    for raw_row in rows:
+        body = dict(raw_row.payload_body) if isinstance(raw_row.payload_body, dict) else {}
+        if canonical_payload_hash(body) == raw_row.payload_hash:
             continue
         # Backward compatibility with pre-step15 rows using old hash/idempotency semantics.
         if (
-            row.replay_job_id is None
+            raw_row.replay_job_id is None
             and first_contract_match_fetched_at is not None
-            and row.fetched_at < first_contract_match_fetched_at
+            and raw_row.fetched_at < first_contract_match_fetched_at
         ):
             continue
         gid = _gap_id(
             "payload_mutation_corruption",
             str(tenant_id),
-            str(row.connection_id),
-            row.connector,
-            row.resource_type,
-            row.source_identity_key,
-            str(row.id),
+            str(raw_row.connection_id),
+            raw_row.connector,
+            raw_row.resource_type,
+            raw_row.source_identity_key,
+            str(raw_row.id),
         )
         detected[gid] = {
             "gap_id": gid,
             "tenant_id": tenant_id,
             "failure_class": "payload_mutation_corruption",
             "gap_type": "corrupted_evidence_window",
-            "scope_connector": row.connector,
-            "scope_resource_type": row.resource_type,
-            "scope_source_identity_key": row.source_identity_key,
-            "window_from": row.fetched_at,
-            "window_to": row.fetched_at,
+            "scope_connector": raw_row.connector,
+            "scope_resource_type": raw_row.resource_type,
+            "scope_source_identity_key": raw_row.source_identity_key,
+            "window_from": raw_row.fetched_at,
+            "window_to": raw_row.fetched_at,
             "source": "integrity_scan",
             "trust_state_impact": "corrupted",
             "recoverability_class": "non_recoverable",
             "recovery_status": "pending",
             "last_validation_at": None,
             "active": True,
-            "detail": {"raw_id": row.id, "reason": "payload_hash_mismatch"},
+            "detail": {"raw_id": raw_row.id, "reason": "payload_hash_mismatch"},
             "created_at": now,
             "updated_at": now,
         }
@@ -157,15 +156,15 @@ def sync_raw_memory_failure_cases(session: Session, tenant_id: uuid.UUID) -> dic
         )
         for r in rev_rows
     }
-    for row in rev_rows:
-        prev = row.supersedes_source_revision_key
+    for rev_row in rev_rows:
+        prev = rev_row.supersedes_source_revision_key
         if not prev:
             continue
         key = (
-            row.connection_id,
-            row.connector,
-            row.resource_type,
-            row.source_identity_key,
+            rev_row.connection_id,
+            rev_row.connector,
+            rev_row.resource_type,
+            rev_row.source_identity_key,
             prev,
         )
         if key in rev_keyset:
@@ -173,11 +172,11 @@ def sync_raw_memory_failure_cases(session: Session, tenant_id: uuid.UUID) -> dic
         gid = _gap_id(
             "lineage_discontinuity",
             str(tenant_id),
-            str(row.connection_id),
-            row.connector,
-            row.resource_type,
-            row.source_identity_key,
-            row.source_revision_key,
+            str(rev_row.connection_id),
+            rev_row.connector,
+            rev_row.resource_type,
+            rev_row.source_identity_key,
+            rev_row.source_revision_key,
             prev,
         )
         detected[gid] = {
@@ -185,11 +184,11 @@ def sync_raw_memory_failure_cases(session: Session, tenant_id: uuid.UUID) -> dic
             "tenant_id": tenant_id,
             "failure_class": "lineage_discontinuity",
             "gap_type": "lineage_break_window",
-            "scope_connector": row.connector,
-            "scope_resource_type": row.resource_type,
-            "scope_source_identity_key": row.source_identity_key,
-            "window_from": row.fetched_at,
-            "window_to": row.fetched_at,
+            "scope_connector": rev_row.connector,
+            "scope_resource_type": rev_row.resource_type,
+            "scope_source_identity_key": rev_row.source_identity_key,
+            "window_from": rev_row.fetched_at,
+            "window_to": rev_row.fetched_at,
             "source": "integrity_scan",
             "trust_state_impact": "continuity-broken",
             "recoverability_class": "recoverable",
@@ -197,7 +196,7 @@ def sync_raw_memory_failure_cases(session: Session, tenant_id: uuid.UUID) -> dic
             "last_validation_at": None,
             "active": True,
             "detail": {
-                "source_revision_key": row.source_revision_key,
+                "source_revision_key": rev_row.source_revision_key,
                 "missing_superseded_revision_key": prev,
             },
             "created_at": now,
@@ -277,27 +276,27 @@ def sync_raw_memory_failure_cases(session: Session, tenant_id: uuid.UUID) -> dic
             )
         ).all()
     )
-    for row in cold_rows:
-        if row.archive_pointer and row.archived_at is not None:
+    for cat_row in cold_rows:
+        if cat_row.archive_pointer and cat_row.archived_at is not None:
             continue
-        gid = _gap_id("archival_pointer_corruption", str(tenant_id), str(row.raw_id))
+        gid = _gap_id("archival_pointer_corruption", str(tenant_id), str(cat_row.raw_id))
         detected[gid] = {
             "gap_id": gid,
             "tenant_id": tenant_id,
             "failure_class": "archival_pointer_corruption",
             "gap_type": "corrupted_evidence_window",
-            "scope_connector": row.connector,
-            "scope_resource_type": row.resource_type,
-            "scope_source_identity_key": row.source_identity_key,
-            "window_from": row.archived_at,
-            "window_to": row.archived_at,
+            "scope_connector": cat_row.connector,
+            "scope_resource_type": cat_row.resource_type,
+            "scope_source_identity_key": cat_row.source_identity_key,
+            "window_from": cat_row.archived_at,
+            "window_to": cat_row.archived_at,
             "source": "integrity_scan",
             "trust_state_impact": "degraded",
             "recoverability_class": "recoverable",
             "recovery_status": "pending",
             "last_validation_at": None,
             "active": True,
-            "detail": {"raw_id": row.raw_id},
+            "detail": {"raw_id": cat_row.raw_id},
             "created_at": now,
             "updated_at": now,
         }
@@ -314,12 +313,12 @@ def sync_raw_memory_failure_cases(session: Session, tenant_id: uuid.UUID) -> dic
         ).all()
     )
     resolved = 0
-    for row in existing_active:
-        if row.gap_id in detected:
+    for case_row in existing_active:
+        if case_row.gap_id in detected:
             continue
-        row.active = False
-        row.recovery_status = "resolved"
-        row.updated_at = now
+        case_row.active = False
+        case_row.recovery_status = "resolved"
+        case_row.updated_at = now
         resolved += 1
     session.flush()
 

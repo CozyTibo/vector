@@ -21,3 +21,7 @@
 ## Constitutional boundary (one sentence)
 
 Phase **06** may only add **derivable structure already implicit in evidence + frozen rules** — never **new facts** from semantics.
+
+## Normative registries (post‑hardening)
+
+Concrete edge kinds, ambiguity ids, policy digests, and permutation profiles are **only** those defined in **`DOCS/cortex/reasoning/`** registry docs — this anti‑goals doc does not enumerate them (avoid drift).

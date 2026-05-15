@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
+
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vector.infrastructure.db.base import Base
+
+if TYPE_CHECKING:
+    from vector.infrastructure.db.models.cortex_mapping_bundle import CortexMappingBundle
 
 class CortexMappingBundleCompatibilityEdge(Base):
     __tablename__ = "cortex_mapping_bundle_compatibility"

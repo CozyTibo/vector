@@ -21,3 +21,7 @@ Implicit transition from silence to “cancelled” without explicit evidence or
 ## Alignment
 
 Maps to `ExecutionThreadState` fields and `CommitmentLifecycleState` transitions without inventing new lifecycle enums silently.
+
+## Related
+
+[`silence-causality-law.md`](./silence-causality-law.md) · [`tcre-causal-edge-registry-v1.md`](./tcre-causal-edge-registry-v1.md)

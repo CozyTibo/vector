@@ -37,8 +37,7 @@ def _tenant_trust_state(db: Session, *, tenant_id: uuid.UUID) -> str | None:
 
 
 def _upsert_failure_case(session: Session, case: dict[str, Any]) -> None:
-    tbl = CortexCanonicalFailureCase.__table__
-    ins = pg_insert(tbl).values(**case)
+    ins = pg_insert(CortexCanonicalFailureCase).values(**case)
     session.execute(
         ins.on_conflict_do_update(
             index_elements=["gap_id"],

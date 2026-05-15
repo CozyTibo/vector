@@ -6,7 +6,9 @@ import uuid
 from typing import Any
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.dml import UpdateBase
 
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.cortex_canonical_ambiguity_lifecycle_event import (
@@ -89,6 +91,13 @@ from vector.infrastructure.db.models.raw_memory_trust_state import RawMemoryTrus
 from vector.infrastructure.db.models.raw_memory_trust_transition import RawMemoryTrustTransition
 
 
+def _dml_rowcount(session: Session, stmt: UpdateBase) -> int:
+    """Row count for DELETE/UPDATE."""
+    res = session.execute(stmt)
+    assert isinstance(res, CursorResult)
+    return int(res.rowcount or 0)
+
+
 def _flush_phase04_org_identity_tables(session: Session, *, tenant_id: uuid.UUID) -> dict[str, int]:
     """Delete tenant-scoped Phase 04 org identity / operator-console rows (FK-safe order)."""
     deleted: dict[str, int] = {}
@@ -98,100 +107,106 @@ def _flush_phase04_org_identity_tables(session: Session, *, tenant_id: uuid.UUID
         ).all()
     )
     if job_ids:
-        r = session.execute(
-            delete(CortexOrgLinkReplayJobReceipt).where(CortexOrgLinkReplayJobReceipt.job_id.in_(job_ids))
+        deleted["cortex_org_link_replay_job_receipts"] = _dml_rowcount(
+            session,
+            delete(CortexOrgLinkReplayJobReceipt).where(
+                CortexOrgLinkReplayJobReceipt.job_id.in_(job_ids),
+            ),
         )
-        deleted["cortex_org_link_replay_job_receipts"] = int(r.rowcount or 0)
     else:
         deleted["cortex_org_link_replay_job_receipts"] = 0
-    r = session.execute(
+    deleted["cortex_org_link_replay_jobs"] = _dml_rowcount(
+        session,
         delete(CortexOrgLinkReplayJob).where(CortexOrgLinkReplayJob.tenant_id == tenant_id),
     )
-    deleted["cortex_org_link_replay_jobs"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_identity_celery_dispatches"] = _dml_rowcount(
+        session,
         delete(CortexIdentityCeleryDispatch).where(
             CortexIdentityCeleryDispatch.tenant_id == tenant_id,
         ),
     )
-    deleted["cortex_identity_celery_dispatches"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_identity_console_audits"] = _dml_rowcount(
+        session,
         delete(CortexOrgIdentityConsoleAudit).where(
             CortexOrgIdentityConsoleAudit.tenant_id == tenant_id,
         ),
     )
-    deleted["cortex_org_identity_console_audits"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_certification_archives"] = _dml_rowcount(
+        session,
         delete(CortexOrgCertificationArchive).where(
             CortexOrgCertificationArchive.tenant_id == tenant_id,
         ),
     )
-    deleted["cortex_org_certification_archives"] = int(r.rowcount or 0)
-    r = session.execute(
-        delete(CortexOrgVerificationRun).where(CortexOrgVerificationRun.tenant_id == tenant_id)
+    deleted["cortex_org_verification_runs"] = _dml_rowcount(
+        session,
+        delete(CortexOrgVerificationRun).where(CortexOrgVerificationRun.tenant_id == tenant_id),
     )
-    deleted["cortex_org_verification_runs"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_remediation_validations"] = _dml_rowcount(
+        session,
         delete(CortexOrgRemediationValidation).where(
             CortexOrgRemediationValidation.tenant_id == tenant_id,
         ),
     )
-    deleted["cortex_org_remediation_validations"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_failure_cases"] = _dml_rowcount(
+        session,
         delete(CortexOrgFailureCase).where(CortexOrgFailureCase.tenant_id == tenant_id),
     )
-    deleted["cortex_org_failure_cases"] = int(r.rowcount or 0)
     session.execute(
         update(CortexOrgAmbiguityRecord)
         .where(CortexOrgAmbiguityRecord.tenant_id == tenant_id)
         .values(superseded_by_org_ambiguity_id=None)
     )
-    r = session.execute(
-        delete(CortexOrgAmbiguityRecord).where(CortexOrgAmbiguityRecord.tenant_id == tenant_id)
+    deleted["cortex_org_ambiguity_records"] = _dml_rowcount(
+        session,
+        delete(CortexOrgAmbiguityRecord).where(CortexOrgAmbiguityRecord.tenant_id == tenant_id),
     )
-    deleted["cortex_org_ambiguity_records"] = int(r.rowcount or 0)
-    r = session.execute(
-        delete(CortexOrgPrimitiveInstance).where(CortexOrgPrimitiveInstance.tenant_id == tenant_id)
+    deleted["cortex_org_primitive_instances"] = _dml_rowcount(
+        session,
+        delete(CortexOrgPrimitiveInstance).where(CortexOrgPrimitiveInstance.tenant_id == tenant_id),
     )
-    deleted["cortex_org_primitive_instances"] = int(r.rowcount or 0)
-    r = session.execute(delete(CortexOrgLink).where(CortexOrgLink.tenant_id == tenant_id))
-    deleted["cortex_org_links"] = int(r.rowcount or 0)
-    r = session.execute(
-        delete(CortexOrgLinkCandidate).where(CortexOrgLinkCandidate.tenant_id == tenant_id)
+    deleted["cortex_org_links"] = _dml_rowcount(
+        session,
+        delete(CortexOrgLink).where(CortexOrgLink.tenant_id == tenant_id),
     )
-    deleted["cortex_org_link_candidates"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_link_candidates"] = _dml_rowcount(
+        session,
+        delete(CortexOrgLinkCandidate).where(CortexOrgLinkCandidate.tenant_id == tenant_id),
+    )
+    deleted["cortex_org_link_candidate_batches"] = _dml_rowcount(
+        session,
         delete(CortexOrgLinkCandidateBatch).where(
             CortexOrgLinkCandidateBatch.tenant_id == tenant_id,
         ),
     )
-    deleted["cortex_org_link_candidate_batches"] = int(r.rowcount or 0)
     session.execute(
         update(CortexOrgMerge)
         .where(CortexOrgMerge.tenant_id == tenant_id)
         .values(supersedes_merge_id=None),
     )
-    r = session.execute(
+    deleted["cortex_org_merges"] = _dml_rowcount(
+        session,
         delete(CortexOrgMerge).where(CortexOrgMerge.tenant_id == tenant_id),
     )
-    deleted["cortex_org_merges"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_merge_policies"] = _dml_rowcount(
+        session,
         delete(CortexOrgMergePolicy).where(CortexOrgMergePolicy.tenant_id == tenant_id),
     )
-    deleted["cortex_org_merge_policies"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_link_promotion_policies"] = _dml_rowcount(
+        session,
         delete(CortexOrgLinkPromotionPolicy).where(
             CortexOrgLinkPromotionPolicy.tenant_id == tenant_id,
         ),
     )
-    deleted["cortex_org_link_promotion_policies"] = int(r.rowcount or 0)
-    r = session.execute(
+    deleted["cortex_org_identity_backfill_runs"] = _dml_rowcount(
+        session,
         delete(CortexOrgIdentityBackfillRun).where(
             CortexOrgIdentityBackfillRun.tenant_id == tenant_id,
         ),
     )
-    deleted["cortex_org_identity_backfill_runs"] = int(r.rowcount or 0)
-    r = session.execute(delete(CortexOrgEntity).where(CortexOrgEntity.tenant_id == tenant_id))
-    deleted["cortex_org_entities"] = int(r.rowcount or 0)
+    deleted["cortex_org_entities"] = _dml_rowcount(
+        session,
+        delete(CortexOrgEntity).where(CortexOrgEntity.tenant_id == tenant_id),
+    )
     session.flush()
     return deleted
 
@@ -229,8 +244,10 @@ def flush_tenant_cortex_pipeline_state(
     )
     deleted_by_table: dict[str, int] = {}
     for table_name, model in delete_plan:
-        result = session.execute(delete(model).where(model.tenant_id == tenant_id))
-        deleted_by_table[table_name] = int(result.rowcount or 0)
+        deleted_by_table[table_name] = _dml_rowcount(
+            session,
+            delete(model).where(model.tenant_id == tenant_id),
+        )
     org_deleted = _flush_phase04_org_identity_tables(session, tenant_id=tenant_id)
     deleted_by_table.update(org_deleted)
     session.flush()

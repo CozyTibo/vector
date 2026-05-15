@@ -181,8 +181,10 @@ from vector.domains.cortex.identity.failure_remediation import (
     validate_org_remediation,
     verify_gp04_19_org_failure_registry_sync,
 )
-from vector.domains.cortex.identity.verification import (
+from vector.domains.cortex.identity.org_verification_metadata import (
     ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,
+)
+from vector.domains.cortex.identity.verification import (
     PHASE04_NORMATIVE_NUMBERED_GATE_IDS,
     list_org_identity_verification_runs,
     org_verification_run_public_dict,

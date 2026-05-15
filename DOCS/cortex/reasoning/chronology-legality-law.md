@@ -2,7 +2,9 @@
 
 **Status:** constitutional law.
 
-## Legality classes
+---
+
+## 1. Legality classes
 
 | Class | Meaning |
 |-------|---------|
@@ -11,10 +13,22 @@
 | `chronology_unresolved` | Evidence conflict or missing anchor — no total order claim. |
 | `chronology_degraded` | Skew / late arrival flagged — bounded derivations only per matrix. |
 
-## Downstream gates
+---
 
-When `chronology_unresolved` or `chronology_degraded`, causal chain depth **MUST** cap at policy `max_causal_hops_degraded` and emit **degradation receipt**.
+## 2. Downstream gates
 
-## Alignment
+When `chronology_unresolved` or `chronology_degraded`, causal chain depth **MUST** cap at **`max_causal_hops_degraded`** from the active [`reasoning-policy-pack-v1.md`](./reasoning-policy-pack-v1.md) and emit **`CD‑CHRON`** on outputs.
 
-Must interoperate with `TemporalAnchorChain.replay_safe_ordering` and Phase **05** temporal walk doctrine without contradiction.
+---
+
+## 3. Alignment and bridge (authoritative)
+
+**Substrate field:** `TemporalAnchorChain.replay_safe_ordering` ∈ {`strict`,`partial`,`unresolved`} per **`execution_reconstruction_contracts.py`**.  
+**Phase 06 projection:** `chronology_legality_class` — **only** via [`chronology-replay-legality-state-machine.md`](./chronology-replay-legality-state-machine.md).  
+**Forbidden tuples and receipts:** defined there — this law **does not** duplicate the matrix.
+
+---
+
+## 4. Related
+
+[`temporal-reasoning-doctrine.md`](./temporal-reasoning-doctrine.md) · [`temporal-conflict-resolution-law.md`](./temporal-conflict-resolution-law.md)

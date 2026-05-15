@@ -33,8 +33,7 @@ def _gap_id(*parts: str) -> str:
 
 
 def _upsert_org_failure_case(session: Session, case: dict[str, Any]) -> None:
-    tbl = CortexOrgFailureCase.__table__
-    ins = pg_insert(tbl).values(**case)
+    ins = pg_insert(CortexOrgFailureCase).values(**case)
     session.execute(
         ins.on_conflict_do_update(
             index_elements=["gap_id"],

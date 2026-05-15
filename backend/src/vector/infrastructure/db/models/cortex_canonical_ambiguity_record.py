@@ -12,6 +12,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vector.infrastructure.db.base import Base
 
+if TYPE_CHECKING:
+    from vector.infrastructure.db.models.cortex_canonical_ambiguity_lifecycle_event import (
+        CortexCanonicalAmbiguityLifecycleEvent,
+    )
+
 class CortexCanonicalAmbiguityRecord(Base):
     """One ambiguity receipt; lifecycle transitions update status (no row deletion)."""
 

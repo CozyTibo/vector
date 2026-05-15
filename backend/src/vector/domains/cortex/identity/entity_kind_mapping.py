@@ -7,7 +7,7 @@ Uses explicit (``connector``, ``canonical_object_kind``) tables plus conservativ
 from __future__ import annotations
 
 import re
-from typing import Final
+from typing import Any, Final
 
 from vector.domains.cortex.identity.org_entities import OrgEntityKind
 

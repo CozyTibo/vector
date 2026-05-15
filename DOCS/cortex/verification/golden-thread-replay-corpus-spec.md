@@ -79,10 +79,11 @@ Each case’s **raw evidence bundle** may combine, under explicit `source_system
 | `expected_negative_signals` | List of `{ "signal_kind", "signal_id_or_derivation_key" }`. |
 | `expected_continuity_windows` | Intervals / bridge ids per continuity law doc. |
 | `expected_chronology_windows` | `ExecutionChronologyWindow` / `ExecutionInteractionWindow` expectations. |
-| `expected_causal_chains` | Ordered `ExecutionCoordinationEdge` expectations (`edge_kind`, endpoints). |
-| `expected_degradation_classes` | Strings aligned with operator substrate (e.g. `stale_verification`, `replay_skew`) — **enumerated in corpus schema**, not free text. |
+| `expected_causal_chains` | Ordered **`ExecutionCoordinationEdge`** expectations (`edge_kind`, endpoints) — **substrate** coordination topology. |
+| `expected_tcre_causal_chains` | *(Optional, Phase **06**)* — expectations over **`causal_chain_id`** / sorted **`tcre_causal_edge_id`** per [`../reasoning/deterministic-causal-chain-spec.md`](../reasoning/deterministic-causal-chain-spec.md). |
+| `expected_degradation_classes` | **Canonical `CD‑*`** codes per [`../reasoning/causal-degradation-spec.md`](../reasoning/causal-degradation-spec.md) §3 aliases — **enumerated in corpus schema**, not free text. |
 | `expected_replay_legality_state` | One of §5 classes. |
-| `expected_ambiguity_classes` | Bounded ambiguity buckets (e.g. `ownership_parallel_assignees`, `chronology_partial_order`). |
+| `expected_ambiguity_classes` | **`AMB‑*`** ids per [`../reasoning/ambiguity-registry-v1.md`](../reasoning/ambiguity-registry-v1.md) §3 aliases — **not** free‑text placeholders. |
 
 ---
 
@@ -185,6 +186,8 @@ Implementation **must** remain bounded, deterministic, and CI-friendly — no or
 
 | Document | Relationship |
 |----------|----------------|
+| [`../reasoning/ambiguity-registry-v1.md`](../reasoning/ambiguity-registry-v1.md) | Canonical **`AMB‑*`** ids for `expected_ambiguity_classes` when Phase **06** / TCRE cases apply. |
+| [`../reasoning/causal-degradation-spec.md`](../reasoning/causal-degradation-spec.md) | Canonical **`CD‑*`** + corpus alias table for `expected_degradation_classes`. |
 | [`../continuity/conflict-resolution-doctrine.md`](../continuity/conflict-resolution-doctrine.md) | Contradictions inside corpus cases. |
 | [`../continuity/cross-system-continuity-law.md`](../continuity/cross-system-continuity-law.md) | Lawful cross-system rows in corpus bundles. |
 | [`../ingestion/execution-reduction-doctrine.md`](../ingestion/execution-reduction-doctrine.md) | Reducer constitutional rules. |

@@ -1,29 +1,38 @@
 # Phase 06 — Specification gap matrix (TCRE)
 
-**Status:** normative **shell** — tracker may reference this path; **doctrine is not closed** until **Active P0** and **Active P1** remain empty after a hostile‑review pass on **`MASTER_TRACKER.md` §3 Phase 06 Steps 1–12** and corresponding normative files.  
-**Role:** Same constitutional function as **[`../05-traversal/phase-05-spec-gap-matrix.md`](../05-traversal/phase-05-spec-gap-matrix.md)** — track **P0** / **P1** holes that block **`Frozen` (doctrine)** promotion for a step or slice. **Semantic / probabilistic / embedding** gaps are **out of scope** by construction; file those under product scope, not here.
+**Status:** normative — **Active P0** empty; **constitutional doctrine `Frozen (doctrine)`** for Phase **06** Steps **1–35** as of **`P06-FINAL-FREEZE-2026-05-13`** (chronology closure, default policy fixture, harness alignment, implementation handoff). **Active P0** MUST remain empty unless a regression reopens a constitutional hole.  
+**Role:** Same constitutional function as **[`../05-traversal/phase-05-spec-gap-matrix.md`](../05-traversal/phase-05-spec-gap-matrix.md)** — track **P0** / **P1** holes that block **`Frozen` (doctrine)** promotion for a step or slice.
 
-**Normative program:** [`phase-06-normative-index.md`](./phase-06-normative-index.md).
+**Normative program:** [`phase-06-normative-index.md`](./phase-06-normative-index.md).  
+**Changelog:** [`PHASE06_CONSTITUTIONAL_CHANGELOG.md`](./PHASE06_CONSTITUTIONAL_CHANGELOG.md).  
+**Implementation contract:** [`PHASE06_IMPLEMENTATION_HANDOFF.md`](./PHASE06_IMPLEMENTATION_HANDOFF.md).
 
 ---
 
 ## Active P0
 
-*(none — **MUST** remain empty unless a hostile review discovers a constitutional hole in temporal–causal **execution reconstruction** law. Any new row requires owner, freeze impact, and tracker link before merge.)*
+*(none — cleared `P06-HARDEN-2026-05-13`; freeze pass `P06-FINAL-FREEZE-2026-05-13` — no new P0.)*
 
 ---
 
 ## Active P1
 
-*(none — semantic ambiguity in *spec text* that does not block freeze but must be tracked — same rule as Phase 05.)*
+| ID | Topic | Owner |
+| -- | ----- | ----- |
+| **GAP‑P1‑P06‑01** | Full **STAGE‑A…Z** row mapping for every **`G‑P06‑*`** vs Phase **05** CI arch doc | CI / doctrine |
+| **GAP‑P1‑P06‑02** | Operator **replay debugger** canonical diff (structural JSON vs hash‑only) | Admin spec |
 
 ---
 
-## Resolved P0 (reference — append only)
+## Resolved P0 (reference — do not delete)
 
 | ID | Was | Resolution document / section |
 | -- | --- | ------------------------------ |
-| *(none yet)* | | |
+| **GAP‑P06‑P0‑01** | Causal edge vocabulary split vs `CoordinationEdgeKind` | [`tcre-causal-edge-registry-v1.md`](./tcre-causal-edge-registry-v1.md) Option **A** + updates to [`causal-reconstruction-doctrine.md`](./causal-reconstruction-doctrine.md), [`deterministic-causal-chain-spec.md`](./deterministic-causal-chain-spec.md), [`execution-causality-constraints.md`](./execution-causality-constraints.md) |
+| **GAP‑P06‑P0‑02** | `replay_safe_ordering` vs `chronology_*` vs replay posture | [`chronology-replay-legality-state-machine.md`](./chronology-replay-legality-state-machine.md) + [`chronology-legality-law.md`](./chronology-legality-law.md) + [`temporal-reasoning-doctrine.md`](./temporal-reasoning-doctrine.md) |
+| **GAP‑P06‑P0‑03** | Breakpoint multiset nondeterminism | [`causal-breakpoint-detection-spec.md`](./causal-breakpoint-detection-spec.md) §3–§6 |
+| **GAP‑P06‑P0‑04** | Placeholder ambiguity vs corpus strings | [`ambiguity-registry-v1.md`](./ambiguity-registry-v1.md) + [`bounded-ambiguity-law.md`](./bounded-ambiguity-law.md) + [`../verification/golden-thread-replay-corpus-spec.md`](../verification/golden-thread-replay-corpus-spec.md) §3.2 |
+| **GAP‑P06‑P0‑05** | Unmaterialized caps (`max_causal_hops_degraded`, transitive limits) | [`reasoning-policy-pack-v1.md`](./reasoning-policy-pack-v1.md) |
 
 ---
 
@@ -31,25 +40,25 @@
 
 | ID | Topic | Owner |
 | -- | ----- | ----- |
-| *(none yet)* | | |
+| **GAP‑P2‑P06‑01** | Operator replay debugger **structural JSON diff** canonicalization | Admin spec |
+| **GAP‑P2‑P06‑02** | **`G‑P06‑POL‑01`** / other gates **pytest** wiring | Runtime (explicitly out of doctrine scope) |
 
 ---
 
 ## Strength legend
 
-Mirrors **`../05-traversal/phase-05-spec-gap-matrix.md`** §Strength legend — **Frozen** here means no **Active P0/P1** touching the cited slice. **Runtime** / **`G-P06-*`** execution is tracked in [`reasoning-runtime-legality-matrix.md`](./reasoning-runtime-legality-matrix.md) and [`reasoning-verification-harness-spec.md`](./reasoning-verification-harness-spec.md).
+Mirrors **`../05-traversal/phase-05-spec-gap-matrix.md`** §Strength legend — **Frozen (doctrine)** here means the Phase **06** normative texts + canonical fixtures are closed for implementation (**no Active P0**); **`G‑P06‑*`** pytest wiring is **not** required for that label (**CI implemented** is separate); **runtime implemented** means shipped workers/APIs; **production‑certified** means **`reasoning-runtime-legality-matrix.md`** + operator closure milestones for the deployment class. Details: [`PHASE06_IMPLEMENTATION_HANDOFF.md`](./PHASE06_IMPLEMENTATION_HANDOFF.md).
 
 ---
 
-## Per-step doctrine strength (placeholder)
-
-Populate after first closure pass — mirror §3 Phase 06 step table (`MASTER_TRACKER.md`).
+## Per-step doctrine strength (post‑hardening snapshot)
 
 | Step band | Default doctrine state | Notes |
 | --------- | ------------------------ | ----- |
-| 1–12 | **Target first `Frozen (doctrine)` band** | Temporal + chronology + cross‑system time |
-| 13–28 | TBD | Causal + proof + degradation |
-| 29–35 | TBD | Harness + control plane + closure |
+| 1–30 | **`Frozen (doctrine)`** | Registries, state machine, default policy fixture, replay laws, harness predicate text |
+| 31–35 | **Strong** (doctrine text) / **Partial** (CI + tenant economics + closure pack **execution**) | **Active P1** only for STAGE row map; closure pack parity still unwired |
+
+**Implementation authorization (constitutional):** Reducer, replay harness, runtime, and admin/control-plane **coding** MAY proceed under owner docs + [`PHASE06_IMPLEMENTATION_HANDOFF.md`](./PHASE06_IMPLEMENTATION_HANDOFF.md), subject to the **OCTS Steps 19–23** structural gate in [`phase-06-normative-index.md`](./phase-06-normative-index.md) for first **runtime package** integration.
 
 ---
 
@@ -59,6 +68,7 @@ Amendments **MUST** append a row:
 
 | Date | ID | Change | Approver |
 | ---- | -- | ------ | -------- |
+| 2026‑05‑13 | **P06‑FINAL‑FREEZE‑2026‑05‑13** | Doctrine freeze candidate: **CHRON‑FORB‑1** closure via projection + default pack; registry xref; **`ReasoningPolicyPackV1_Default`**; **`PHASE06_IMPLEMENTATION_HANDOFF.md`**; tracker + harness alignment | Program lead |
 
 ---
 

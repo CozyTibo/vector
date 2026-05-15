@@ -8,6 +8,10 @@ from __future__ import annotations
 from typing import Any
 
 
+def _as_dict(v: Any) -> dict[str, Any]:
+    return v if isinstance(v, dict) else {}
+
+
 def _actor_fields(actor: Any) -> dict[str, Any]:
     out: dict[str, Any] = {}
     if not isinstance(actor, dict):
@@ -163,7 +167,7 @@ def extract_github_timeline_mutations(payload: dict[str, Any]) -> list[dict[str,
             _append("reviewer_removal_mutation", ordinal, fld)
             ordinal += 1
     elif ev == "reviewed":
-        rev = te.get("review") if isinstance(te.get("review"), dict) else {}
+        rev = _as_dict(te.get("review"))
         fld = dict(base_ctx)
         rid = rev.get("id")
         if rid is not None:
@@ -178,7 +182,7 @@ def extract_github_timeline_mutations(payload: dict[str, Any]) -> list[dict[str,
         _append("review_state_mutation", ordinal, fld)
         ordinal += 1
     elif ev == "review_dismissed":
-        dr = te.get("dismissed_review") if isinstance(te.get("dismissed_review"), dict) else {}
+        dr = _as_dict(te.get("dismissed_review"))
         fld = dict(base_ctx)
         rid = dr.get("review_id")
         if rid is not None:
@@ -268,19 +272,19 @@ def extract_github_timeline_mutations(payload: dict[str, Any]) -> list[dict[str,
         pass
 
     # CI / delivery linkage — only explicit nested objects with stable ids
-    wf = te.get("workflow_run") if isinstance(te.get("workflow_run"), dict) else {}
+    wf = _as_dict(te.get("workflow_run"))
     wf_id = wf.get("id")
     if wf_id is not None:
         fld = dict(base_ctx)
         fld["github_workflow_run_id"] = wf_id
         _append("execution_link_mutation", ordinal, fld)
         ordinal += 1
-    cr = te.get("check_run") if isinstance(te.get("check_run"), dict) else {}
+    cr = _as_dict(te.get("check_run"))
     cr_id = cr.get("id")
     if cr_id is not None:
         fld = dict(base_ctx)
         fld["github_check_run_id"] = cr_id
-        suite = cr.get("check_suite") if isinstance(cr.get("check_suite"), dict) else {}
+        suite = _as_dict(cr.get("check_suite"))
         sid = suite.get("id")
         if sid is not None:
             fld["github_check_suite_id"] = sid
@@ -290,7 +294,7 @@ def extract_github_timeline_mutations(payload: dict[str, Any]) -> list[dict[str,
             fld["github_check_run_external_ref"] = f"{fn.strip()}:{head_sha.strip()}:check:{cr_id}"
         _append("execution_link_mutation", ordinal, fld)
         ordinal += 1
-    dep = te.get("deployment") if isinstance(te.get("deployment"), dict) else {}
+    dep = _as_dict(te.get("deployment"))
     dep_id = dep.get("id")
     if dep_id is not None:
         fld = dict(base_ctx)

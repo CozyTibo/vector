@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, delete, select, update
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
@@ -46,7 +46,7 @@ def apply_raw_memory_retention_policy(
         if archive_ids:
             for rid in archive_ids:
                 session.execute(
-                    RawMemoryArchiveCatalog.__table__.update()
+                    update(RawMemoryArchiveCatalog)
                     .where(
                         RawMemoryArchiveCatalog.tenant_id == tenant_id,
                         RawMemoryArchiveCatalog.raw_id == rid,
@@ -88,7 +88,7 @@ def apply_raw_memory_retention_policy(
                     )
                 )
             session.execute(
-                RawIngestionRecord.__table__.delete().where(
+                delete(RawIngestionRecord).where(
                     and_(RawIngestionRecord.tenant_id == tenant_id, RawIngestionRecord.id.in_(delete_ids))
                 )
             )

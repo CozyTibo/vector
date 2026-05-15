@@ -864,14 +864,19 @@ class Settings(BaseSettings):
         return bool(self.smtp_host.strip() and self.email_from_address.strip())
 
 
-def get_settings() -> Settings:
-    """Build from current environment. Not cached — a stale `@lru_cache` hid edits to `.env`
-    until process restart; connector OAuth looked \"not configured\" after adding Slack keys."""
-    return Settings()
+class _GetSettings:
+    """Callable settings accessor (tests call ``cache_clear()`` between env changes)."""
+
+    __slots__ = ()
+
+    def __call__(self) -> Settings:
+        """Build from current environment (not cached — avoids stale reads of ``.env``)."""
+        return Settings()
+
+    def cache_clear(self) -> None:
+        """No-op: settings are rebuilt on each ``__call__``."""
+
+    __name__ = "get_settings"
 
 
-def _noop_settings_cache_clear() -> None:
-    """Tests call `get_settings.cache_clear()` between env changes; caching was removed."""
-
-
-get_settings.cache_clear = _noop_settings_cache_clear  # type: ignore[attr-defined]
+get_settings = _GetSettings()
