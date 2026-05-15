@@ -4,7 +4,7 @@
 - **Architecture maturity:** Core foundation defined across Phases 01-04 and 10; storage/queryability challenge pass added.
 - **Ingestion vs exhaust (non‑negotiable distinction):** **Substrate** (runs, replay lanes, envelope validation, checkpoint storage, admin triggers, verification jobs) is **not** Phase 01 success. **Phase 01 success** = **full raw organizational exhaust** per `DOCS/cortex/01-ingestion/phase-01-organizational-exhaust-spec.md` (pagination, per-stream cursors, backfill + incremental, replay semantics, exit criteria). Do not treat “sync ran,” “scope_ping rows exist,” or “integration connected” as exhaust progress. Deep exhaust is tracked in **§2.5**, `organizational-exhaust-execution-track.md`, `connector-exhaust-matrix.md`, `exhaust_coverage_registry.py`, and admin raw aggregates.
 - **Implementation stage:** Phase 01 Steps **0–16** = ingestion substrate + checkpoint spine + connector depth + admin exhaust proof + verification gate + live-lane logical idempotency lock + runtime correctness hardening — **Yes (Phase 01 complete)**.
-- **Current focus:** Phase **05** OCTS — **Step 26 (closure + certification)** **shipped** (see §3 Phase 05 row **26**): **`certification_pack`** (**`OCTS-CERT-PACK-1`** — **`build_oct_cert_pack_v1`**, **`verify_oct_cert_pack_v1`**, schema bundle hash, deterministic inner digest); **`G-P05-CLOSE-01`** wired last in **STAGE-Z** via **`verify_gp05_close01_oct_cert_pack_static`**; pytest **`test_phase05_step26_certification_pack.py`**. **Next:** **Phase 06** temporal & causal reasoning — first tracker row when that phase’s execution table is next in program order. **Steps 1–26** are implemented in **`vector.domains.cortex.traversal`** + **`identity.verification`** + admin traversal routes + pytest; **FF-2** / **FF-3** are **code-backed**; **FF-4** normative bundle (**Steps 1–15**) is **code-backed**; **FF-5** includes **`G-P05-CLOSE-01`** + cert pack closure in code; production runtime remains **blocked** until **`phase-05-runtime-legality-matrix.md`** prerequisites + **FF-4** implementation sign-off for materialization paths; legacy **`05-graph/*`** is **SUPERSEDED** (non-normative). Phase **04** soak / hostile-mock stress remains parallel.
+- **Current focus:** Phase **05** OCTS — **Step 26** shipped; **Phase 06** constitutional program **opened**: normative tree **`DOCS/cortex/reasoning/`** (temporal–causal **execution reconstruction** — **not** AI reasoning). Runtime Phase **06** remains **spec‑first** until doctrine **Frozen** per §3. **Steps 1–26** OCTS in **`vector.domains.cortex.traversal`** + admin + pytest; **FF-2** / **FF-3** code-backed; **FF-4** / **FF-5** as before; production OCTS **Blocked** on **`phase-05-runtime-legality-matrix.md`** + **FF-4**; legacy **`05-graph/*`** **SUPERSEDED**. Phase **04** soak / hostile-mock stress remains parallel.
 - **Total phases:** 10.
 - **Current blockers:** Phase 01 hard blockers cleared; remaining work is post-closure soak/scale confidence and later-phase architecture. (Cortex ingestion routing defaults **on**; use `CORTEX_CONNECTOR_MIGRATION_*=false` only to opt out.)
 - **Next major milestone:** Phase **05** OCTS — ship **`vector.domains.cortex.traversal`** + **`hard_fail`** **`G-P05-*`** CI execution + **FF-4** sign-off before index materialization; **FF-5** path now includes shipped **`OCTS-CERT-PACK-1`** + **`G-P05-CLOSE-01`** (static closure gate). Normative tree: **`DOCS/cortex/05-traversal/`**. Phase **04** **OrgGraphProjectionV1** + graph boundary remain authoritative ingress.
@@ -17,7 +17,7 @@
 | 03 | Canonicalization | Deterministic structural projection from raw memory to canonical primitives (mapping system + replay/provenance + verification split across **Steps 1–18**) | **Steps 1–18 shipped:** Steps **1–17** as before + **Step 18** `canonical_certification_pack.py` (`CERTIFICATION_PACK_SCHEMA_VERSION`), Alembic **`20260508_0050`** (**`cortex_canonical_certification_archives`**), admin **`GET .../certification-pack`**, **`POST .../certification-pack/archive`**, **`GET .../certification-pack/archives`**, **`GET .../certification-pack/archives/{id}`**, merged ontology certification pointers + closure doctrine anchors, verification gate **G-P03-21**, Canonical UI certification route + nav; tests `test_phase03_step18_certification_pack.py`. Doctrine: `phase-03-closure-gates-doctrine.md`, `phase-03-canonical-control-plane-doctrine.md`. | Strong (Doctrine + **18-stage program locked**) | **Yes (Caveats)** — Phase **03** operator closure track **complete**; soak/scale + organizational exhaust caveats remain (§2.5 / §2.6) |
 | 04 | Identity & Linking | Organizational continuity layer: org handles, link ledger, merge governance, replay-safe candidates vs authoritative semantics; **Execution Continuity Operator Console** (`phase-04-control-plane-doctrine.md`); **hostile mock continuity** fixtures (`phase-04-mock-data-strategy.md` + `mock_connectors` implementation) | **Architecture + 22-stage program** + **P04-01–P04-22 shipped** (through **org identity certification pack** + **`cortex_org_certification_archives`** + **G-P04-CLOSE-01** + economics + anchor backfill + operator console) + mock strategy (`04-identity/*`, `vector.domains.cortex.identity`) | Strong (program + closure doctrine **Shipped**) | **No** (phase) — **Steps 1–22:** **Yes** (operator program complete); organizational **exhaust** depth remains §2.5 |
 | 05 | Organizational Continuity Traversal Substrate (OCTS) | **Replay-safe bounded graph walks** over Phase 04 authoritative org continuity: deterministic traversal contracts, temporal walk semantics, hop receipts + telemetry, derived index replay, verification gates (**G-P05-***), operator control plane — **not** knowledge graph, retrieval, reasoning, synthesis, causal inference, or graph-as-identity-authority | **Program** locked in tracker + **normative doctrine** in **`DOCS/cortex/05-traversal/`**; runtime **`vector.domains.cortex.traversal`** **Partial** (Steps **1–26** implemented + pytest + admin traversal API through **G-P05-*** catalog PR bundle + **tenant org_graph_traversal** verification slice + engine identity + index replay verify stub + **Steps 24–25** control plane + readiness economics receipts + **Step 26** **`OCTS-CERT-PACK-1`** / **G-P05-CLOSE-01**) | **Doctrine: Frozen** · **Replay law: Strong** · **CI law (topology): Strong** · **CI execution: Partial** (Steps **1–26** walk/index/equivalence/**G-P05-*** catalog + tenant slice + control plane + economics **STAGE-E** + **STAGE-Z** closure gate + static gates) · **Production runtime: Blocked** (see §3 Phase 05 table) | **Partial** — normative **closure readiness: Complete** at spec layer; **No** production runtime until **FF-4** + implementation satisfies **`phase-05-runtime-legality-matrix.md`** |
-| 06 | Temporal & Causal Reasoning | Reconstruct causality and temporal organizational logic | Not Started | Incomplete | No |
+| 06 | Temporal & causal execution reconstruction | **Deterministic** temporal ordering + **evidence‑bounded causal chains** over Phases **01–04** replay‑safe exhaust and **Phase 05** OCTS receipts — **not** LLM reasoning, embeddings, probabilistic inference, agents, or semantic cognition | **Constitutional program** in **`DOCS/cortex/reasoning/`** (tracker §3 **Steps 1–35** — **spec + doctrine first**); future runtime package name **TBD** (placeholder: `vector.domains.cortex.reasoning`) | **Strong** — normative index, anti‑goals, temporal/causal/provenance/replay/ambiguity laws, harness + legality matrix + admin control plane + receipt specs **landed** (spec pass); **Frozen (doctrine)** pending hostile‑review closure + reasoning gap matrix **empty** | **No** — **spec‑first**; **Ready** only after **Steps 1–27** doctrine **Frozen** + **`reasoning-runtime-legality-matrix.md`** predicates satisfied for intended deployment class |
 | 07 | Retrieval & Query Engine | Operationalize high-signal cognition retrieval | Not Started | Incomplete | No |
 | 08 | Synthesis & Intelligence Layer | Generate bounded intelligence from reconstructable memory | Not Started | Incomplete | No |
 | 09 | Operational Intelligence Products | Deliver operator-facing cognition workflows | Not Started | Incomplete | No |
@@ -78,7 +78,7 @@
 
 No phase is **complete** until its **last numbered step** in this tracker ships **both** production runtime **and** a **strong admin / control plane update** for that same phase.
 
-- **Scope:** Default rule is Phases **03–10 Step 6** where a phase uses the legacy 6-step template. **Phase 03 exception:** Phase 03 runs **Steps 1–18** (granular canonical runtime program); **operator/admin closure + operational certification** must ship through **Steps 16–18** (control plane, stabilization/proof, closure certification)—see Phase 03 tracker rows. **Phase 04 exception:** Phase 04 runs **Steps 1–22** (organizational continuity program **P04-01–P04-22**); **operator/admin closure + certification** must ship through **Steps 17–22** (control plane, API, worker jobs, migrations/backfill, stabilization/economics, closure pack)—see Phase 04 tracker rows. **Phase 05 exception:** Phase 05 runs **Steps 1–26** (traversal substrate program); **operator/admin closure + certification** must ship through **Steps 24–26** (control plane aggregate, readiness/economics pass, closure + certification pack)—see Phase 05 tracker rows. **Phase 02 exception:** Step **9** is the dedicated **Runtime Memory Control Plane**, Step **10** establishes baseline closure gate runtime, and Steps **11–16** complete stabilization/proof before final closure confidence. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
+- **Scope:** Default rule is Phases **03–10 Step 6** where a phase uses the legacy 6-step template. **Phase 03 exception:** Phase 03 runs **Steps 1–18** (granular canonical runtime program); **operator/admin closure + operational certification** must ship through **Steps 16–18** (control plane, stabilization/proof, closure certification)—see Phase 03 tracker rows. **Phase 04 exception:** Phase 04 runs **Steps 1–22** (organizational continuity program **P04-01–P04-22**); **operator/admin closure + certification** must ship through **Steps 17–22** (control plane, API, worker jobs, migrations/backfill, stabilization/economics, closure pack)—see Phase 04 tracker rows. **Phase 05 exception:** Phase 05 runs **Steps 1–26** (traversal substrate program); **operator/admin closure + certification** must ship through **Steps 24–26** (control plane aggregate, readiness/economics pass, closure + certification pack)—see Phase 05 tracker rows. **Phase 06 exception:** Phase 06 runs **Steps 1–35** (temporal–causal **execution reconstruction** substrate — **not** AI reasoning); **operator/admin closure + certification** must ship through **Steps 29–35** (verification harness, **Reasoning Control Plane** surfaces, runtime legality matrix, tenant verification slice + readiness economics, closure + **`G-P06-CLOSE-01`** + certification pack parity)—see Phase 06 tracker rows. **Phase 02 exception:** Step **9** is the dedicated **Runtime Memory Control Plane**, Step **10** establishes baseline closure gate runtime, and Steps **11–16** complete stabilization/proof before final closure confidence. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
 - **“Strong admin update” means at minimum:**
   1. **Visibility** — Operator UI reflects *this phase’s* new reality: health signals, lag/backlog, failure classes, and (where applicable) replay / reprocess / provenance context—not only raw logs.
   2. **Actions** — At least one **primary**, policy-gated operator control for that phase (manual trigger, scoped replay/reprocess, safe pause/resume, cohort toggle, etc.) with clear **scope, queue lane, and expected impact** before execution.
@@ -89,6 +89,7 @@ No phase is **complete** until its **last numbered step** in this tracker ships 
 **Status Legend**
 - **Spec Accuracy:** `Not Started` | `Intent` (tracker row only; not independently implementable) | `Partial` | `Defined` | `Strong` | `Strong (Caveats)` | `Frozen` (constitutionally complete + CI oracles) | `Ready To Start`
 - **Phase 05 (OCTS) — Spec strength:** the §3 Phase 05 step table column **Spec strength** uses **only** these labels: **`Weak`** | **`Partial`** | **`Strong (Caveats)`** | **`Strong`** | **`Frozen`**. **`Weak`** = not safe to implement from; holes dominate. **`Partial`** = that step still has an **Active P0** in **`phase-05-spec-gap-matrix.md`** *or* the slice is under-specified for hostile review. **`Strong (Caveats)`** = legacy label — **MUST NOT** appear for new edits once a slice is doctrine-closed; retained only if an **Active P1** row explicitly targets that step. **`Strong`** = internally tight narrative but not yet elevated to constitutional closure artifacts (**OCTS-CANON-1**, temporal anchor law, CI arch cross-links). **`Frozen` (doctrine)** = **no Active P0/P1** for that step; required cross-doc laws cited; hostile-replay review ready — **does not** imply **`G-P05-*`** pytest is wired (**CI execution** is tracked separately in the Phase 05 narrative block). **`Frozen` (runtime)** = doctrine **Frozen** + required **`hard_fail`** **`G-P05-*`** implemented for that surface + **FF-5** / closure where applicable. Phases **01–04, 06+** keep using the general **`Spec Accuracy`** line above (`Not Started` … `Frozen`).
+- **Phase 06 (TCRE) — Spec strength:** the §3 Phase **06** step table **Spec strength** column uses the **same** labels as Phase **05** (`Weak` … **`Frozen` (runtime)`**); **P0/P1** promotion discipline is tracked in **[`reasoning/reasoning-spec-gap-matrix.md`](reasoning/reasoning-spec-gap-matrix.md)**.
 - **Implemented:** `No` | `In Progress` | `Yes`
 
 ### Phase 01 — Ingestion
@@ -341,29 +342,88 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 - Ship **`vector.domains.cortex.traversal`** + migrations + workers + admin routes; wire **`hard_fail`** **`G-P05-*`** per CI arch doc.
 - Obtain **FF-4** sign-off before index materialization / scale coding; **FF-5** before operator certification closure runtime.
 - Phase **04** export + graph boundary remain hard upstream dependencies.
-- Phase **06** remains blocked until OCTS **replay + verification + tenant slice** exist per Steps **19–23** (walk results as citeable **structural** evidence only).
+- Phase **06** **runtime** remains blocked until OCTS **Steps 19–23** minimum (walk replay + verification + tenant slice — citeable **structural** evidence) **and** Phase **06** **Steps 1–4** doctrine **Frozen** (`DOCS/cortex/reasoning/` §3).
 
 **Confidence:** **Program structure: High**; **Doctrine (Steps 1–26): Frozen**; **Replay law: Strong**; **CI law: Strong**; **CI pytest execution: Partial** (Steps **1–26**); **Production runtime: Blocked** (legality matrix + **FF-4** + code)
 
 ---
 
-### Phase 06 — Temporal & Causal Reasoning
-| Step # | Step | Description | Spec Accuracy | Implemented |
-| ------ | ---- | ----------- | ------------- | ----------- |
-| 1 | Temporal reasoning model | Define temporal reasoning primitives | Not Started | No |
-| 2 | Causal reconstruction model | Define causality inference boundaries | Not Started | No |
-| 3 | Reasoning provenance model | Define explainable reasoning evidence chains | Not Started | No |
-| 4 | Replay-aware reasoning model | Define reasoning replay consistency semantics | Not Started | No |
-| 5 | Failure/uncertainty model | Define reasoning uncertainty and conflict handling | Not Started | No |
-| 6 | Runtime implementation + admin closure | Deliver runtime **and** operator-grade admin for this phase: visibility, scoped safe actions, verification that the phase is healthy (see **Terminal step — admin & operator closure** above). | Not Started | No |
+### Phase 06 — Temporal & causal execution reconstruction (TCRE)
+
+**Normative tree:** **`DOCS/cortex/reasoning/`** — entrypoint **[`phase-06-normative-index.md`](reasoning/phase-06-normative-index.md)** (`PHASE06_PROGRAM_FREEZE_VERSION` target, **FF‑P06‑0..5** bundles). **Non‑normative naming:** tracker title uses **TCRE** to stress **execution reconstruction**, not “AI reasoning.”
+
+**Normative intent:** Deterministic **temporal ordering** + **evidence‑bounded causal chains** over replay‑safe organizational exhaust (Phases **01–04**) and **OCTS structural receipts** (Phase **05**) — outputs restricted to **receipted artifacts**, **legality classes**, **degradation topology**, and **operator‑inspectable lineage** per **[`phase-06-anti-goals-doctrine.md`](reasoning/phase-06-anti-goals-doctrine.md)**.
+
+**Upstream dependencies:** `execution_reconstruction_contracts.py`; Phase **05** walk / replay / tenant verification slice; Phase **04** org continuity + projection export; Phase **03** canonical materializations; Phase **02** raw memory trust gates.
+
+**Spec strength column** (Phase 06): uses the same vocabulary as Phase **05** (`Weak` … `Frozen`); see **Status Legend** §3.
+
+| Step # | Step | Normative doctrine | Description | **Spec strength** | **Implemented** |
+| ------ | ---- | ------------------- | ----------- | ------------- | ----------- |
+| 1 | Normative index + program freeze | [`phase-06-normative-index.md`](reasoning/phase-06-normative-index.md) | Step↔doctrine map; **FF‑P06‑0..5** bundles; vocabulary; dependency gate on OCTS **19–23** | Strong | **No** — doctrine only |
+| 2 | Anti‑goals + forbidden cognition | [`phase-06-anti-goals-doctrine.md`](reasoning/phase-06-anti-goals-doctrine.md) | Embeddings/LLM/agents/similarity ban; constitutional boundary sentence | Strong | **No** |
+| 3 | Observed vs derived boundary | [`execution-causality-constraints.md`](reasoning/execution-causality-constraints.md) | Allowed derivation sources vs forbidden “implied cause” | Strong | **No** |
+| 4 | Upstream continuity law | [`organizational-continuity-reasoning.md`](reasoning/organizational-continuity-reasoning.md) | Phase **04** links/projection as evidence; candidate/hint rules | Strong | **No** |
+| 5 | Temporal reasoning substrate | [`temporal-reasoning-doctrine.md`](reasoning/temporal-reasoning-doctrine.md) | Intervals, anchors, stitching, degradation — no invented time | Strong | **No** |
+| 6 | Chronology legality | [`chronology-legality-law.md`](reasoning/chronology-legality-law.md) | `chronology_strict` / `partial` / `unresolved` / `degraded` | Strong | **No** |
+| 7 | Temporal anchor resolution | [`temporal-anchor-resolution-spec.md`](reasoning/temporal-anchor-resolution-spec.md) | Normalization + ordering keys + resolution receipts | Strong | **No** |
+| 8 | Interval continuity + half‑open closure | [`temporal-reasoning-doctrine.md`](reasoning/temporal-reasoning-doctrine.md) §Outputs | Obligation/silence windows; `derivation_rule_id` on all intervals | Strong | **No** |
+| 9 | Replay chronology semantics | [`replay-aware-reasoning-law.md`](reasoning/replay-aware-reasoning-law.md) | Permutation + async obligations for reasoning reducers | Strong | **No** |
+| 10 | Late‑arrival + skew legality | [`temporal-conflict-resolution-law.md`](reasoning/temporal-conflict-resolution-law.md) | Non‑rewrite law; export vs observed conflicts | Strong | **No** |
+| 11 | Chronology degradation propagation | [`causal-degradation-spec.md`](reasoning/causal-degradation-spec.md) (`CD‑CHRON`) | Caps + receipts when chronology weak | Strong | **No** |
+| 12 | Cross‑system time reconciliation | [`cross-system-causal-continuity.md`](reasoning/cross-system-causal-continuity.md) + [`chronology-legality-law.md`](reasoning/chronology-legality-law.md) | Skew flags; bridge strength minimums | Strong | **No** |
+| 13 | Causal interval closure | [`deterministic-causal-chain-spec.md`](reasoning/deterministic-causal-chain-spec.md) | Half‑open causal influence intervals | Strong | **No** |
+| 14 | Causal reconstruction substrate | [`causal-reconstruction-doctrine.md`](reasoning/causal-reconstruction-doctrine.md) | Evidence‑bounded edges; closed `edge_kind` enum intent | Strong | **No** |
+| 15 | Deterministic causal chains | [`deterministic-causal-chain-spec.md`](reasoning/deterministic-causal-chain-spec.md) | `causal_chain_id` hashing; acyclicity default | Strong | **No** |
+| 16 | Escalation / dependency / blocker propagation | [`causal-reconstruction-doctrine.md`](reasoning/causal-reconstruction-doctrine.md) + [`execution-causality-constraints.md`](reasoning/execution-causality-constraints.md) | Propagation tables (spec intent) | Strong | **No** |
+| 17 | Ownership continuity in causal graphs | [`organizational-continuity-reasoning.md`](reasoning/organizational-continuity-reasoning.md) | Authoritative-only edges for ownership causality | Strong | **No** |
+| 18 | Commitment‑derived causality | [`causal-reconstruction-doctrine.md`](reasoning/causal-reconstruction-doctrine.md) | Lifecycle transitions drive lawful causal links only | Strong | **No** |
+| 19 | Negative‑signal causality | [`causal-reconstruction-doctrine.md`](reasoning/causal-reconstruction-doctrine.md) | Absence‑as‑evidence edges (`NegativeExecutionSignal`) | Strong | **No** |
+| 20 | Causal legality classes | [`execution-causality-constraints.md`](reasoning/execution-causality-constraints.md) | `causal_legality` enum family (freeze at implementation) | Partial | **No** |
+| 21 | Replay‑safe reasoning posture | [`replay-aware-reasoning-law.md`](reasoning/replay-aware-reasoning-law.md) | Evidence bundle hash + rule pack + permutation profile law | Strong | **No** |
+| 22 | Ambiguity propagation (causal) | [`bounded-ambiguity-law.md`](reasoning/bounded-ambiguity-law.md) | AMB‑S1 survivability; blocking matrix | Strong | **No** |
+| 23 | Unverifiable / degraded causality | [`causal-degradation-spec.md`](reasoning/causal-degradation-spec.md) | `CD‑*` codes + monotonicity | Strong | **No** |
+| 24 | Reasoning provenance law | [`reasoning-provenance-law.md`](reasoning/reasoning-provenance-law.md) | Mandatory fields: provenance, legality, confidence, ambiguity, continuity, replay, degradation | Strong | **No** |
+| 25 | Reasoning receipts + artifacts | [`reasoning-receipts-and-proof-artifacts.md`](reasoning/reasoning-receipts-and-proof-artifacts.md) | Receipt types; canonical JSON hashing | Strong | **No** |
+| 26 | Temporal / causal replay proofs | [`replay-equivalence-reasoning-spec.md`](reasoning/replay-equivalence-reasoning-spec.md) | **G‑P06‑REPLAY‑01** double‑run intent; walk hash lineage | Strong | **No** |
+| 27 | Causal drift proofs | [`causal-degradation-spec.md`](reasoning/causal-degradation-spec.md) | Drift receipt linkage to chain ids | Strong | **No** |
+| 28 | Proof bundle composition | [`reasoning-receipts-and-proof-artifacts.md`](reasoning/reasoning-receipts-and-proof-artifacts.md) §Hashing | Inner digest law (mirror OCTS cert pack style) | Partial | **No** |
+| 29 | **G‑P06‑*** verification harness | [`reasoning-verification-harness-spec.md`](reasoning/reasoning-verification-harness-spec.md) | Gate catalog shell; STAGE narrative; severities | Strong | **No** |
+| 30 | Golden corpus binding | [`reasoning-verification-harness-spec.md`](reasoning/reasoning-verification-harness-spec.md) + [`../verification/golden-thread-replay-corpus-spec.md`](../verification/golden-thread-replay-corpus-spec.md) | Constitutional replay corpus alignment | Partial | **No** |
+| 31 | CI enforcement architecture (Phase 06) | [`reasoning-verification-harness-spec.md`](reasoning/reasoning-verification-harness-spec.md) §Staging | **`hard_fail`** / `warn_only` policy table — implementation mirrors **P05** CI arch | Partial | **No** |
+| 32 | **Reasoning Control Plane** (admin) | [`reasoning-admin-control-plane-spec.md`](reasoning/reasoning-admin-control-plane-spec.md) | Mandatory operator surfaces: health strip, temporal/causal/replay/chronology debuggers, receipts explorer, degradation + contradiction topology, replay pressure | Strong | **No** |
+| 33 | Runtime legality matrix | [`reasoning-runtime-legality-matrix.md`](reasoning/reasoning-runtime-legality-matrix.md) | **R‑LEG‑01..05** predicates; forbidden deployments | Strong | **No** |
+| 34 | Tenant verification slice + readiness economics | [`reasoning-verification-harness-spec.md`](reasoning/reasoning-verification-harness-spec.md) + [`reasoning-admin-control-plane-spec.md`](reasoning/reasoning-admin-control-plane-spec.md) | **`org_graph_reasoning`** (name TBD) aggregate + economics probes — mirror **P05** Steps **23–25** | Partial | **No** |
+| 35 | Closure + certification (**G‑P06‑CLOSE‑01**) | [`reasoning-verification-harness-spec.md`](reasoning/reasoning-verification-harness-spec.md) §Gate catalog | Certification pack parity + operator program freeze (**FF‑P06‑5**) | Partial | **No** |
+| — | *Shared* | [`reasoning-idempotency-and-retry-doctrine.md`](reasoning/reasoning-idempotency-and-retry-doctrine.md) | Job + API idempotency keys for reasoning replay lanes — ties to Phase **05** idempotency spirit; keys freeze at implementation | Partial | **No** |
 
 ### Missing / Incomplete
-- Entire phase specification pending.
+
+- **Runtime package** (`vector.domains.cortex.reasoning` **TBD**): migrations, workers, HTTP, pytest — **all not started** (constitutionally **blocked** until **Frozen** doctrine + OCTS gate).
+- **Reasoning spec gap matrix:** **[`reasoning/reasoning-spec-gap-matrix.md`](reasoning/reasoning-spec-gap-matrix.md)** — **shell** present; **Active P0/P1** MUST stay empty through first hostile review on Steps **1–12** (regressions only thereafter).
+- **Golden vectors on disk** for TCRE — **not started** (harness spec only).
+- **Waiver YAML** for Phase **06** gates — **not started**.
 
 ### Implementation Blockers
-- Depends on **Phase 05** (**Steps 1–23** minimum): replay-safe traversal substrate, walk receipts, hop telemetry contracts, and **G-P05-*** verification slice so temporal/causal reasoning cannot smuggle graph semantics without explicit Phase 06 doctrines.
 
-**Confidence:** Experimental
+- **Hard dependency:** Phase **05** OCTS **Steps 19–23** minimum (walk replay / index replay slice / tenant verification integration) — citeable **structural** evidence only.
+- **Doctrine dependency:** Phase **06** **Steps 1–4** must reach **`Frozen` (doctrine)** before any runtime coding (`reasoning/` index + anti‑goals + execution constraints + continuity handoff).
+- **Cross‑phase:** Phase **04** hostile‑mock stress + projection export jobs must remain trustworthy upstreams.
+- **Legality:** **`reasoning-runtime-legality-matrix.md`** predicates **R‑LEG‑01..05** must be satisfied (or explicitly waived) before production reasoning workers.
+
+### Replay / equivalence milestones (spec)
+
+- **M1:** `replay-equivalence-reasoning-spec.md` law adopted (walk hash lineage mandatory).  
+- **M2:** **G‑P06‑REPLAY‑01** double‑run definition frozen.  
+- **M3:** Async permutation independence obligations written for reasoning jobs (mirror **L‑EQ‑02**).
+
+### Operator closure milestones (spec)
+
+- **O1:** `reasoning-admin-control-plane-spec.md` surface checklist complete (this pass: **draft Strong**).  
+- **O2:** Dangerous actions + RBAC cross‑refs to `10-admin/*` complete.  
+- **O3:** Forensic debugger views defined (no product graph exploration).
+
+**Confidence:** **Program structure: High (spec)**; **Doctrine Steps 1–29: Strong** on paper; **Steps 30–35: Partial** until gap matrix + golden vectors + waiver discipline exist; **Runtime: Blocked**; overall **Experimental → Defined** at tracker layer after this pass
 
 ---
 
@@ -382,6 +442,7 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 
 ### Implementation Blockers
 - Needs Phase **05** derived-index + walk contracts (**Steps 13–17**) and **Step 25** readiness gates; finalized storage/queryability technology remains **non-normative in tracker** until those contracts freeze.
+- Any retrieval feature claiming **temporal–causal substrate** must wait on Phase **06** **`DOCS/cortex/reasoning/`** doctrine **Frozen** (minimum **Steps 1–12**) + OCTS replay slice (**P05** **19–23**).
 
 **Confidence:** Experimental
 
@@ -450,7 +511,7 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 - **Completed (Step 0–6, Phase 01 substrate):** Step 5 as before. **Step 6:** operator ingestion control plane — `vector.domains.cortex.ingestion.admin_overview`, `vector.infrastructure.cortex_scheduler_pause`, admin API under `/admin/tenants/{id}/cortex/ingestion` (+ **exhaust-coverage**, **raw-stats**, per-connector **raw-records** browse, actions + global scheduler pause), frontend **Cortex ingestion** tab (substrate + **declared exhaust** panel + ingested-data tabs for **current shallow / partial** streams only), `connector_sync` enqueue for all five connectors; tests `test_step2_scheduler` (Redis pause path), `test_admin_cortex_ingestion_step6` (integration).
 - **Current goal:** Phase **05** OCTS — **`DOCS/cortex/05-traversal/`** doctrine **Frozen** at spec layer; implement **`vector.domains.cortex.traversal`** + **`G-P05-*`** pytest per **`phase-05-ci-enforcement-architecture.md`**; tracker authority §3 **Steps 1–26**; keep Phase **02** verification green in CI/admin.
 - **Parallel:** migration flags and operator soak continue; Phase 01 closure criteria are already met.
-- **Next planned implementation entry:** **Phase 06** temporal & causal reasoning — first execution rows when that phase is opened on the tracker (**Phase 05** Steps **1–26** are **implemented** at static gates + pytest + admin traversal slice, including **`OCTS-CERT-PACK-1`** + **`G-P05-CLOSE-01`**). **FF-4** + **`phase-05-runtime-legality-matrix.md`** before production materialization; Phase **04** operator sign-off on hostile-mock / exhaust caveats as needed.
+- **Next planned implementation entry:** **Phase 06** TCRE — **`DOCS/cortex/reasoning/`** Steps **1–35** tracker‑decomposed (**spec‑first**); first **code** rows open only after **Steps 1–4** doctrine **`Frozen` (doctrine)** + OCTS **Steps 19–23** satisfied + gap matrix hostile‑review pass (no **Active P0** for Steps **1–12**). **FF‑4** + **`phase-05-runtime-legality-matrix.md`** remain gating **production OCTS**; Phase **04** hostile‑mock / exhaust caveats parallel.
 
 ## 5) Implementation Readiness
 | Phase | Architecture | Verification | Ready For Coding |
@@ -460,13 +521,14 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 | 03 | Steps **1–11** runtime shipped (transform + lineage confidence + ambiguity + identity + replay + provenance + admin) | Partial | **Yes (Caveats)** |
 | 04 | Complete | Partial | Almost |
 | 05 | **Doctrine: Frozen**; **Replay law: Strong**; **CI law: Strong**; **CI pytest: Partial** (Steps **1–26**); **Runtime: Partial** (contracts + gates + admin traversal stub through **G-P05-*** catalog PR bundle + **tenant org_graph_traversal** slice + engine identity + index replay verify + **Steps 24–26** control plane + readiness economics + **`OCTS-CERT-PACK-1`** closure) / production **Blocked** | **`G-P05-*`** catalog + topology **normative** — **pytest enforcement partial** (Steps **1–26** wired static **G-P05-*** + HTTP slice + **G-P05-TVER-01** / **STAGE-Z** + **G-P05-CP-01** / **STAGE-D** + **G-P05-ECO-01..03** / **STAGE-E** + **G-P05-CLOSE-01**) | **Partial** — **spec** hostile-review **complete**; **No** full production runtime until **FF-4** + implementation + legality matrix |
-| 06 | Not Started | Not Started | No |
+| 06 | **Strong** (constitutional spec tree `reasoning/`); runtime **Not Started** | Harness + legality matrix + control plane **specified**; **G‑P06‑*** CI **Not Started** | **No** — doctrine + tracker only (this pass) |
 | 07 | Not Started | Not Started | No |
 | 08 | Not Started | Not Started | No |
 | 09 | Not Started | Not Started | No |
 | 10 | Complete | Partial | Almost |
 
 ## 6) Current Architecture Gaps
+- Phase **06** **`reasoning/`** runtime absent by design until doctrine **Frozen** + OCTS replay slice ready — temporal–causal **execution reconstruction** must not ship as an implicit side channel in other phases.
 - Large-scale replay economics and replay contention behavior still theoretical.
 - Temporal lineage and deep provenance traversal costs not yet empirically validated.
 - Identity linkage ambiguity backlog operations are not yet operationally tested.
@@ -482,7 +544,7 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 
 ## 8) Future Phases Roadmap
 - **05 — Organizational Continuity Traversal Substrate (OCTS):** Bounded deterministic walks + temporal semantics + receipts + replay + **G-P05-*** gates + operator control plane (**Steps 1–26**); not knowledge graph / retrieval / reasoning.
-- **06 — Temporal & Causal Reasoning:** Causal reconstruction over temporal organizational memory.
+- **06 — Temporal & causal execution reconstruction (TCRE):** Deterministic temporal–causal **execution reconstruction** over replay‑safe exhaust + OCTS receipts — **not** AI reasoning; normative **`DOCS/cortex/reasoning/`**; tracker Steps **1–35**.
 - **07 — Retrieval & Query Engine:** High-signal retrieval with provenance and temporal grounding.
 - **08 — Synthesis & Intelligence Layer:** Bounded intelligence outputs from reconstructable evidence.
 - **09 — Operational Intelligence Products:** Human-facing operational cognition workflows.
@@ -491,5 +553,6 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 ## 9) Document Usage Rules
 - This file is operational tracking only; deep specs remain in phase folders.
 - Keep entries one-line and status-driven; avoid architecture duplication.
+- Deep specs for Phase **06** live under **`DOCS/cortex/reasoning/`** (see §3 Phase **06** table links).
 - Update statuses, gaps, blockers, and confidence on every major architecture change.
 - Use this file as the first-read command center before opening deep docs.

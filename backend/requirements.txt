@@ -24,3 +24,6 @@ uvicorn[standard]>=0.32
 # Used by `make test` / `make test-unit` (docker compose run … pytest).
 pytest>=8
 pytest-asyncio>=0.24
+# Static analysis (`make mypy` / `make lint` / `make fmt` — same backend image as CI-style checks).
+mypy>=1.13
+ruff>=0.8

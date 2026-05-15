@@ -169,13 +169,13 @@ test-unit: $(DOTENV) build-backend
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration"
 
 mypy: $(DOTENV)
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) mypy
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m mypy
 
 lint: $(DOTENV)
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) ruff check src tests
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m ruff check src tests
 
 fmt: $(DOTENV)
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) ruff format src tests
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m ruff format src tests
 
 check: mypy lint test
 	@echo "check: OK"
