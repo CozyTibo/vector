@@ -206,3 +206,13 @@ def test_state_machine_doc_references_projection() -> None:
 def test_default_pack_path_resolves() -> None:
     p = default_reasoning_policy_pack_path()
     assert p.name == "ReasoningPolicyPackV1_Default.json"
+    assert p == p.resolve()
+    assert "reasoning" in p.parts and "fixtures" in p.parts
+
+
+def test_default_pack_path_prefers_package_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Production images ship the pack under ``vector/.../reasoning/fixtures`` (no DOCS mount)."""
+    monkeypatch.delenv("VECTOR_REASONING_POLICY_PACK_PATH", raising=False)
+    p = default_reasoning_policy_pack_path()
+    assert p.name == "ReasoningPolicyPackV1_Default.json"
+    assert p.parent.name == "fixtures"

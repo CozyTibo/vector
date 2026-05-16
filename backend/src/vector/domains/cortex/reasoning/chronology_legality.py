@@ -9,9 +9,15 @@ Normative:
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final, cast
+
+_REASONING_POLICY_PACK_ENV: Final[str] = "VECTOR_REASONING_POLICY_PACK_PATH"
+_PACKAGE_DEFAULT_POLICY_PACK_PATH: Final[Path] = (
+    Path(__file__).resolve().parent / "fixtures" / "ReasoningPolicyPackV1_Default.json"
+)
 
 PHASE06_CHRONOLOGY_LEGALITY_RUNTIME_SCHEMA_VERSION: Final[int] = 1
 
@@ -199,7 +205,25 @@ def should_emit_cd_chron_from_policy(
 
 
 def default_reasoning_policy_pack_path(start: Path | None = None) -> Path:
-    """Resolve ``ReasoningPolicyPackV1_Default.json`` from a checkout root."""
+    """Resolve ``ReasoningPolicyPackV1_Default.json`` for runtime and tests.
+
+    Resolution order:
+    1. ``VECTOR_REASONING_POLICY_PACK_PATH`` when set and readable
+    2. Package fixture shipped with the backend image (production default)
+    3. Monorepo ``DOCS/cortex/reasoning/fixtures/…`` when present (local dev / full checkout)
+    """
+    env_path = os.environ.get(_REASONING_POLICY_PACK_ENV, "").strip()
+    if env_path:
+        pinned = Path(env_path)
+        if pinned.is_file():
+            return pinned
+        raise ChronologyLegalityError(
+            f"{_REASONING_POLICY_PACK_ENV} is set but not a readable file: {env_path}"
+        )
+
+    if _PACKAGE_DEFAULT_POLICY_PACK_PATH.is_file():
+        return _PACKAGE_DEFAULT_POLICY_PACK_PATH
+
     root_start = start or Path(__file__).resolve()
     for root in [root_start, *root_start.parents]:
         candidate = (
@@ -208,7 +232,8 @@ def default_reasoning_policy_pack_path(start: Path | None = None) -> Path:
         if candidate.is_file():
             return candidate
     raise ChronologyLegalityError(
-        "Could not locate DOCS/cortex/reasoning/fixtures/ReasoningPolicyPackV1_Default.json"
+        "Could not locate ReasoningPolicyPackV1_Default.json "
+        f"(checked package fixture {_PACKAGE_DEFAULT_POLICY_PACK_PATH} and DOCS tree)"
     )
 
 

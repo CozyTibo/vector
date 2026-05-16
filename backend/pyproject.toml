@@ -47,6 +47,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "vector.infrastructure.email" = ["assets/*.png", "templates/**/*.j2"]
+"vector.domains.cortex.reasoning" = ["fixtures/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
