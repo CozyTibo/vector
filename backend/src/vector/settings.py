@@ -311,8 +311,19 @@ class Settings(BaseSettings):
         default=True,
         validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED",
         description=(
-            "After each successful live incremental sync, enqueue substrate refresh: canonical drain, "
-            "identity audit, Phase 05 graph export (``vector`` queue). False = raw-only ingestion."
+            "After scheduled live incremental ingestion, enqueue substrate refresh: full canonical "
+            "backlog drain (batched loop), identity audit, Phase 05 graph export (``vector`` queue). "
+            "False = raw-only ingestion."
+        ),
+    )
+    cortex_post_ingestion_substrate_refresh_debounce_seconds: int = Field(
+        default=300,
+        ge=30,
+        le=3600,
+        validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_DEBOUNCE_SECONDS",
+        description=(
+            "Seconds after the last sync completion (or scheduler tick) before substrate refresh runs. "
+            "Resets on each incremental sync so multi-connector tenants get one coalesced refresh."
         ),
     )
     cortex_post_ingestion_canonical_batch_limit: int = Field(

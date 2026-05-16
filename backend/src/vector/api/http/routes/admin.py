@@ -56,17 +56,18 @@ from vector.contracts.admin import (
     AdminCortexConnectorRawRecordsResponse,
     AdminCortexFlushAndRerunRequest,
     AdminCortexFlushAndRerunResponse,
+    AdminSubstrateCompletenessLedgerResponse,
     AdminCortexIdentityAnchorItem,
     AdminCortexIdentityAnchorListResponse,
     AdminCortexIdentityBackfillFromAnchorsRequest,
     AdminCortexIdentityBackfillFromAnchorsResponse,
     AdminCortexIdentityBackfillRunItem,
     AdminCortexIdentityBackfillRunsListResponse,
-    AdminCortexIdentityControlPlaneResponse,
+    AdminCortexIdentityContinuityEvidenceInspectResponse,
     AdminCortexIdentityContinuityRebuildRequest,
     AdminCortexIdentityContinuityRebuildResponse,
     AdminCortexIdentityContinuityVerifyResponse,
-    AdminCortexIdentityContinuityEvidenceInspectResponse,
+    AdminCortexIdentityControlPlaneResponse,
     AdminCortexIdentityHandlesExplorerResponse,
     AdminCortexIdentityLegacyCeleryAsyncDispatchResponse,
     AdminCortexIdentityLinkCandidatesRegenerateAsyncRequest,
@@ -162,6 +163,19 @@ from vector.contracts.admin import (
     AdminCortexRawMemoryRetentionApplyRequest,
     AdminCortexRawMemoryRetentionApplyResponse,
     AdminCortexRawMemoryTrustStateResponse,
+    AdminCortexReasoningControlPlaneResponse,
+    AdminCortexReasoningCertificationPackSnapshotResponse,
+    AdminCortexReasoningReconstructionEnqueueRequest,
+    AdminCortexReasoningReconstructionEnqueueResponse,
+    AdminCortexReasoningReconstructionJobDetailResponse,
+    AdminCortexReasoningReconstructionJobItem,
+    AdminCortexReasoningReadinessEconomicsResponse,
+    AdminCortexReasoningJobOperatorViewResponse,
+    AdminCortexReasoningReplayDiffResponse,
+    AdminCortexReasoningReplayTwinResponse,
+    AdminCortexReasoningRuntimeHealthResponse,
+    AdminCortexReasoningRuntimeLegalityMatrixResponse,
+    AdminCortexReasoningTenantVerificationSliceResponse,
     AdminCortexReplayJobDetailResponse,
     AdminCortexReplayJobItem,
     AdminCortexReplayJobListResponse,
@@ -1456,6 +1470,21 @@ def build_admin_router() -> APIRouter:
         return AdminCortexIngestionOverviewResponse.model_validate(raw)
 
     @r.get(
+        "/tenants/{tenant_id}/cortex/substrate-completeness",
+        response_model=AdminSubstrateCompletenessLedgerResponse,
+    )
+    def admin_cortex_substrate_completeness(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminSubstrateCompletenessLedgerResponse:
+        """Substrate completeness ledger — deterministic pipeline accounting (read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.completeness import build_substrate_completeness_ledger_v1
+
+        raw = build_substrate_completeness_ledger_v1(db, tenant_id=tenant_id)
+        return AdminSubstrateCompletenessLedgerResponse.model_validate(raw)
+
+    @r.get(
         "/tenants/{tenant_id}/cortex/ingestion/exhaust-coverage",
         response_model=AdminCortexIngestionExhaustCoverageResponse,
     )
@@ -1883,6 +1912,253 @@ def build_admin_router() -> APIRouter:
 
         raw = build_canonical_control_plane(db, tenant_id)
         return AdminCortexCanonicalControlPlaneResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/control-plane",
+        response_model=AdminCortexReasoningControlPlaneResponse,
+    )
+    def admin_cortex_reasoning_control_plane(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningControlPlaneResponse:
+        """Phase 06 Step 32 — TCRE operator control-plane surface catalog (substrate, read-only v1)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.reasoning_control_plane import (
+            build_reasoning_control_plane_catalog_v1,
+        )
+
+        raw = build_reasoning_control_plane_catalog_v1(tenant_id=tenant_id)
+        return AdminCortexReasoningControlPlaneResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime-legality-matrix",
+        response_model=AdminCortexReasoningRuntimeLegalityMatrixResponse,
+    )
+    def admin_cortex_reasoning_runtime_legality_matrix(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningRuntimeLegalityMatrixResponse:
+        """Phase 06 Step 33 — **R‑LEG‑01..05** matrix catalog (substrate, read-only v1)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.reasoning_runtime_legality_matrix import (
+            build_reasoning_runtime_legality_matrix_catalog_v1,
+        )
+
+        raw = build_reasoning_runtime_legality_matrix_catalog_v1(tenant_id=tenant_id)
+        return AdminCortexReasoningRuntimeLegalityMatrixResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/tenant-verification-slice",
+        response_model=AdminCortexReasoningTenantVerificationSliceResponse,
+    )
+    def admin_cortex_reasoning_tenant_verification_slice(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        verification_run_id: Annotated[str | None, Query(alias="verification_run_id")] = None,
+    ) -> AdminCortexReasoningTenantVerificationSliceResponse:
+        """Phase 06 Step 34 — **org_graph_reasoning** bounded verification slice (read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.reasoning_tenant_verification_slice import (
+            build_org_graph_reasoning_verification_slice_v1,
+        )
+
+        raw = build_org_graph_reasoning_verification_slice_v1(
+            db,
+            tenant_id=tenant_id,
+            verification_run_id=verification_run_id,
+        )
+        return AdminCortexReasoningTenantVerificationSliceResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/readiness-economics",
+        response_model=AdminCortexReasoningReadinessEconomicsResponse,
+    )
+    def admin_cortex_reasoning_readiness_economics(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        probe_profile: Annotated[str | None, Query(alias="probe_profile")] = None,
+    ) -> AdminCortexReasoningReadinessEconomicsResponse:
+        """Phase 06 Step 34 — readiness / economics receipt over golden-thread manifest (read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.reasoning_readiness_economics import (
+            ProbeProfileV1,
+            build_reasoning_readiness_economics_receipt_v1,
+        )
+
+        raw_profile = (probe_profile or "clean").strip().lower()
+        if raw_profile in ("", "clean"):
+            profile: ProbeProfileV1 = "clean"
+        elif raw_profile == "hostile":
+            profile = "hostile"
+        else:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="reasoning_readiness_economics_bad_probe_profile",
+            ) from None
+        raw = build_reasoning_readiness_economics_receipt_v1(
+            tenant_id=tenant_id,
+            profile=profile,
+        )
+        return AdminCortexReasoningReadinessEconomicsResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/certification-pack",
+        response_model=AdminCortexReasoningCertificationPackSnapshotResponse,
+    )
+    def admin_cortex_reasoning_certification_pack_snapshot(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningCertificationPackSnapshotResponse:
+        """Phase 06 Step 35 — TCRE certification pack snapshot (closure pipeline; read-only)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.reasoning_certification_pack import (
+            build_reasoning_certification_pack_snapshot_v1,
+        )
+
+        raw = build_reasoning_certification_pack_snapshot_v1(tenant_id=tenant_id)
+        return AdminCortexReasoningCertificationPackSnapshotResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime/health",
+        response_model=AdminCortexReasoningRuntimeHealthResponse,
+    )
+    def admin_cortex_reasoning_runtime_health(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningRuntimeHealthResponse:
+        """Phase 06 RUNTIME-01 — live TCRE reconstruction health."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.runtime import build_reasoning_runtime_health_v1
+
+        return AdminCortexReasoningRuntimeHealthResponse.model_validate(
+            build_reasoning_runtime_health_v1(db, tenant_id=tenant_id)
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime/jobs",
+        response_model=list[AdminCortexReasoningReconstructionJobItem],
+    )
+    def admin_cortex_reasoning_runtime_jobs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    ) -> list[AdminCortexReasoningReconstructionJobItem]:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.runtime import list_reconstruction_jobs_v1
+
+        rows = list_reconstruction_jobs_v1(db, tenant_id=tenant_id, limit=limit)
+        return [AdminCortexReasoningReconstructionJobItem.model_validate(r) for r in rows]
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime/jobs/{job_id}",
+        response_model=AdminCortexReasoningReconstructionJobDetailResponse,
+    )
+    def admin_cortex_reasoning_runtime_job_detail(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningReconstructionJobDetailResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.runtime.reasoning_runtime_orchestrator import (
+            get_reconstruction_job_detail_v1,
+        )
+
+        raw = get_reconstruction_job_detail_v1(db, tenant_id=tenant_id, job_id=job_id)
+        if raw is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="tcre_reconstruction_job_not_found")
+        return AdminCortexReasoningReconstructionJobDetailResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime/jobs/{job_id}/operator-view",
+        response_model=AdminCortexReasoningJobOperatorViewResponse,
+    )
+    def admin_cortex_reasoning_runtime_job_operator_view(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningJobOperatorViewResponse:
+        """Phase 06 RUNTIME-02 — deterministic operator explanations for a job."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.runtime.operator_views import build_job_operator_view_v1
+
+        raw = build_job_operator_view_v1(db, tenant_id=tenant_id, job_id=job_id)
+        if raw is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="tcre_reconstruction_job_not_found")
+        return AdminCortexReasoningJobOperatorViewResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime/jobs/{job_id}/replay-diff",
+        response_model=AdminCortexReasoningReplayDiffResponse,
+    )
+    def admin_cortex_reasoning_runtime_job_replay_diff(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningReplayDiffResponse:
+        """Phase 06 RUNTIME-02 — structural replay twin diff for a reconstruct job."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.runtime.operator_views import (
+            build_operator_replay_diff_for_job_v1,
+        )
+
+        try:
+            raw = build_operator_replay_diff_for_job_v1(db, tenant_id=tenant_id, job_id=job_id)
+        except ValueError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="tcre_reconstruction_job_not_found") from None
+        return AdminCortexReasoningReplayDiffResponse.model_validate(
+            {"job_id": str(job_id), **raw}
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime/reconstruct",
+        response_model=AdminCortexReasoningReconstructionEnqueueResponse,
+    )
+    def admin_cortex_reasoning_runtime_reconstruct(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        body: AdminCortexReasoningReconstructionEnqueueRequest,
+    ) -> AdminCortexReasoningReconstructionEnqueueResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.runtime import enqueue_reconstruction_job_v1
+
+        scope: dict[str, Any] = {}
+        if body.materialization_limit is not None:
+            scope["materialization_limit"] = body.materialization_limit
+        if body.bundle_id:
+            scope["bundle_id"] = body.bundle_id
+        if body.octs_walk_id:
+            scope["octs_walk_id"] = body.octs_walk_id
+        if body.octs_strict_binding:
+            scope["octs_strict_binding"] = True
+        raw = enqueue_reconstruction_job_v1(
+            db,
+            tenant_id=tenant_id,
+            scope=scope,
+            dry_run=body.dry_run,
+            run_sync=body.run_sync,
+        )
+        db.commit()
+        return AdminCortexReasoningReconstructionEnqueueResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/reasoning/runtime/jobs/{job_id}/replay-twin",
+        response_model=AdminCortexReasoningReplayTwinResponse,
+    )
+    def admin_cortex_reasoning_runtime_replay_twin(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexReasoningReplayTwinResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.reasoning.runtime import compare_replay_twin_for_job_v1
+
+        raw = compare_replay_twin_for_job_v1(
+            db,
+            tenant_id=tenant_id,
+            source_job_id=job_id,
+        )
+        db.commit()
+        return AdminCortexReasoningReplayTwinResponse.model_validate(raw)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/canonical/coverage-matrix",
@@ -3664,7 +3940,9 @@ def build_admin_router() -> APIRouter:
         """Deterministic Phase 04 continuity rebuild: materialize drain → repair → anchor backfill → candidates."""
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.canonical.transform_runtime import MaterializeError
-        from vector.domains.cortex.identity.continuity_rebuild import run_identity_continuity_rebuild
+        from vector.domains.cortex.identity.continuity_rebuild import (
+            run_identity_continuity_rebuild,
+        )
 
         try:
             report = run_identity_continuity_rebuild(
@@ -3700,7 +3978,10 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexIdentityContinuityVerifyResponse:
         """Read-only: substrate row counts + raw payload continuity_fixture field hits (hostile proof)."""
         _assert_tenant(db, tenant_id)
-        from mock_connectors.fixtures.phase04_continuity_fixtures import resolve_phase04_continuity_scenario_key
+        from mock_connectors.fixtures.phase04_continuity_fixtures import (
+            resolve_phase04_continuity_scenario_key,
+        )
+
         from vector.domains.cortex.identity.continuity_rebuild import (
             substrate_counts,
             verify_continuity_fixture_pressure,
@@ -4912,5 +5193,9 @@ def build_admin_router() -> APIRouter:
     from vector.api.http.routes.admin_octs_walks import register_octs_walk_traversal_routes
 
     register_octs_walk_traversal_routes(r)
+
+    from vector.api.http.routes.admin_cortex_retrieval import register_cortex_retrieval_routes
+
+    register_cortex_retrieval_routes(r)
 
     return r

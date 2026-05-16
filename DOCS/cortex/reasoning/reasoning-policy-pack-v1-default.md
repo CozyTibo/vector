@@ -13,7 +13,7 @@
 |------|-------|
 | **Fixture file** | [`fixtures/ReasoningPolicyPackV1_Default.json`](./fixtures/ReasoningPolicyPackV1_Default.json) |
 | **`tcre_policy_pack_id`** | `ReasoningPolicyPackV1_Default` |
-| **`tcre_policy_pack_version`** | `1` (integer in JSON) |
+| **`tcre_policy_pack_version`** | `2` (integer in JSON) |
 | **`TCRE_POLICY_PACK_DEFAULT_ID`** | Same string as `tcre_policy_pack_id` (implementation constant name **TBD**). |
 
 ---
@@ -26,7 +26,7 @@ Let **`canonical_body`** be the UTF‑8 encoding of **`json.dumps(obj, sort_keys
 **`TCRE_REASONING_POLICY_PACK_V1_DEFAULT_DIGEST`** (hex):
 
 ```
-c9de1d518ec536e261cde218f843e9e39ef3cdfe79b6c0964b5c270f59774fbd
+d48f77eb363cc2828b7af5351365d3e96dc5e1b4464c5fa1b6a5d6c56590f470
 ```
 
 **Amendment law:** Any change to the fixture **MUST** bump **`tcre_policy_pack_version`**, recompute digest, update this section, append [`PHASE06_CONSTITUTIONAL_CHANGELOG.md`](./PHASE06_CONSTITUTIONAL_CHANGELOG.md), and pass tracker review.
@@ -54,7 +54,7 @@ The fixture implements [`reasoning-policy-pack-v1.md`](./reasoning-policy-pack-v
 
 ## 4. Verifier obligations
 
-- **`G‑P06‑POL‑01`:** Parse fixture → canonical re‑serialize → **`sha256` MUST equal** **`TCRE_REASONING_POLICY_PACK_V1_DEFAULT_DIGEST`** when pack id is default and version is `1`.  
+- **`G‑P06‑POL‑01`:** Parse fixture → canonical re‑serialize → **`sha256` MUST equal** **`TCRE_REASONING_POLICY_PACK_V1_DEFAULT_DIGEST`** when pack id is default and version is `2`.  
 - **`G‑P06‑CHRON‑01`:** For each legal snapshot key, **`ChronologyLegalityProjectionV1`** lookup **MUST** return the **`chronology_legality_class`** in the matching row (see state machine §2.1).
 
 ---

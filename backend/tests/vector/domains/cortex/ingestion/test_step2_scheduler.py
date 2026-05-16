@@ -79,13 +79,31 @@ def test_scheduler_tick_passes_connection_scope_to_sync_task(monkeypatch: pytest
     monkeypatch.setattr(sched_mod, "session_scope", _fake_session_scope)
     monkeypatch.setattr("app.tasks.cortex_ingestion_sync.run_cortex_connector_sync_task", _DummyTask())
 
+    refresh_calls: list[uuid.UUID] = []
+
+    def _fake_schedule(
+        *,
+        tenant_id: uuid.UUID,
+        settings: object,
+        reason: str,
+    ) -> dict[str, object]:
+        refresh_calls.append(tenant_id)
+        return {"scheduled": True, "reason": reason}
+
+    monkeypatch.setattr(
+        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.schedule_post_ingestion_substrate_refresh",
+        _fake_schedule,
+    )
+
     get_settings.cache_clear()
     try:
         out = sched_mod.tick_cortex_ingestion_scheduler()
         assert out["enqueued"] == 1
+        assert out.get("substrate_refresh_scheduled") == 1
         assert len(calls) == 1
         args, queue = calls[0]
         assert queue == "cortex_live"
         assert args == [str(tid), "slack", "scheduled_lane", "incremental", str(cid)]
+        assert refresh_calls == [tid]
     finally:
         get_settings.cache_clear()

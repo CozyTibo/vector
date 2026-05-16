@@ -16,7 +16,11 @@ from typing import Any, Final, Mapping
 
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.traversal.walk_api_contract import octs_walk_api_memory_store_v1
+from vector.domains.cortex.traversal.runtime.durable_walk_store import resolve_octs_walk_store_v1
+from vector.domains.cortex.traversal.walk_api_contract import (
+    WalkApiRecordV1,
+    octs_walk_api_memory_store_v1,
+)
 
 OCTS_TRAVERSAL_CONTROL_PLANE_SCHEMA_VERSION: Final[int] = 1
 OCTS_TRAVERSAL_CONTROL_PLANE_CONTRACT: Final[str] = "octs_traversal_control_plane_v1"
@@ -69,22 +73,34 @@ def _snapshot_unix_ns_from_request(body: Mapping[str, Any]) -> int | None:
     return None
 
 
+def _list_walk_records_for_control_plane_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> list[WalkApiRecordV1]:
+    """Process-local stub walks plus durable rows (deduped by ``walk_id``)."""
+    records = list(octs_walk_api_memory_store_v1().list_walk_records_for_tenant_v1(tenant_id))
+    seen = {r.walk_id for r in records}
+    for rec in resolve_octs_walk_store_v1(session).list_walk_records_for_tenant_v1(tenant_id):
+        if rec.walk_id not in seen:
+            records.append(rec)
+            seen.add(rec.walk_id)
+    records.sort(key=lambda r: str(r.walk_id))
+    return records
+
+
 def build_octs_traversal_control_plane_v1(
     _session: Session,
     *,
     tenant_id: uuid.UUID,
     include_exploration: bool | None = None,
 ) -> dict[str, Any]:
-    """Structural aggregate: traversal queue, abort-class counts, ``max_hops`` histogram (**integers only**).
-
-    ``_session`` reserved for future durable store reads.
-    """
+    """Structural aggregate: traversal queue, abort-class counts, ``max_hops`` histogram (**integers only**)."""
     if include_exploration is None:
         include_exploration = octs_control_plane_show_exploration_v1()
 
     now = datetime.now(tz=UTC)
-    store = octs_walk_api_memory_store_v1()
-    records = store.list_walk_records_for_tenant_v1(tenant_id)
+    records = _list_walk_records_for_control_plane_v1(_session, tenant_id=tenant_id)
 
     queue_rows: list[dict[str, Any]] = []
     budget_hist: dict[str, int] = {}

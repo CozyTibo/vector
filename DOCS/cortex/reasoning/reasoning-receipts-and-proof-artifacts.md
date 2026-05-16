@@ -9,6 +9,7 @@
 | Receipt | Payload sketch |
 |---------|----------------|
 | `reasoning_chronology_receipt` | Hash of anchor chain snapshot + **`replay_safe_ordering`** + projected **`chronology_legality_class`** + **`reasoning_rule_pack_id`** + **`tcre_policy_bundle_digest`** (see [`chronology-replay-legality-state-machine.md`](./chronology-replay-legality-state-machine.md)). |
+| `reasoning_temporal_anchor_resolution_receipt` | Sorted anchor resolution keys per **`temporal_anchor_resolution_order_v1`**, declared **`replay_safe_ordering`**, **`chain_id`**, schema version (see [`temporal-anchor-resolution-spec.md`](./temporal-anchor-resolution-spec.md)). |
 | `reasoning_causal_receipt` | Hash of sorted **`tcre_causal_edge_id`** + sorted **`CD‑*`** list + **`causal_legality_class`**. |
 | `reasoning_replay_receipt` | Input artifact hashes + **`reasoning_replay_permutation_v1`** payload + walk/index hashes + output hash. |
 | `reasoning_ambiguity_receipt` | Sorted **`ambiguity_class_id`** (`AMB‑*`) + blocked derivation rules hash. |

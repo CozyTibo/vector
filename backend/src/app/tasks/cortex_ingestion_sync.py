@@ -23,26 +23,20 @@ def _maybe_enqueue_post_ingestion_substrate_refresh(
     sync_result: dict[str, object],
     sync_mode: str,
 ) -> None:
-    """Enqueue substrate refresh after a successful live incremental sync (``vector`` queue)."""
-    settings = get_settings()
-    if not settings.cortex_post_ingestion_substrate_refresh_enabled:
-        return
+    """Schedule debounced substrate refresh after a successful live incremental sync."""
     if sync_mode != "incremental":
         return
     if sync_result.get("status") != "completed":
         return
-    from app.tasks.cortex_post_ingestion_substrate_refresh import (
-        run_cortex_post_ingestion_substrate_refresh_task,
+    from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
+        schedule_post_ingestion_substrate_refresh,
     )
 
-    run_cortex_post_ingestion_substrate_refresh_task.apply_async(
-        kwargs={
-            "tenant_id": str(tenant_id),
-            "batch_limit": settings.cortex_post_ingestion_canonical_batch_limit,
-        },
-        queue="vector",
+    schedule_post_ingestion_substrate_refresh(
+        tenant_id=tenant_id,
+        settings=get_settings(),
+        reason="incremental_sync_complete",
     )
-    _LOGGER.info("post_ingestion_substrate_refresh_enqueued tenant_id=%s", tenant_id)
 
 
 @celery_app.task(name=_TASK_RUN_SYNC, queue="cortex_live")

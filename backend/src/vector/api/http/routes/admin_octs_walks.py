@@ -51,9 +51,9 @@ from vector.domains.cortex.traversal.walk_api_contract import (
     completed_sync_walk_api_public_document_v1,
     list_fs_api01_sync_request_json_cap_violations_v1,
     list_fs_api01_sync_response_json_cap_violations_v1,
-    octs_walk_api_memory_store_v1,
     sync_walk_policy_cap_errors_for_api_v1,
 )
+from vector.domains.cortex.traversal.runtime.durable_walk_store import resolve_octs_walk_store_v1
 from vector.domains.cortex.traversal.walk_policy import (
     WalkPolicyInvariantError,
     validate_walk_policy_for_request_v1,
@@ -116,7 +116,7 @@ def register_octs_walk_traversal_routes(router: APIRouter) -> None:
         except TraversalReasoningBoundaryError:
             return _api_err(status.HTTP_400_BAD_REQUEST, "walk_request_schema")
 
-        store = octs_walk_api_memory_store_v1()
+        store = resolve_octs_walk_store_v1(db)
         try:
             effective, replay_lineage = prepare_effective_oct_walk_request_v1(
                 body, tenant_id=tenant_id, store=store
@@ -234,6 +234,7 @@ def register_octs_walk_traversal_routes(router: APIRouter) -> None:
             request_body=dict(effective),
             walk_payload=payload,
             idempotency_key=idem,
+            replay_lineage=replay_lineage,
         )
         return _poll_walk_or_sync_response_cap_v1(rec)
 
@@ -319,7 +320,7 @@ def register_octs_walk_traversal_routes(router: APIRouter) -> None:
         bad = _assert_tenant_or_error(db, tenant_id)
         if bad is not None:
             return bad
-        rec = octs_walk_api_memory_store_v1().get(tenant_id, walk_id)
+        rec = resolve_octs_walk_store_v1(db).get(tenant_id, walk_id)
         if rec is None:
             return _api_err(status.HTTP_404_NOT_FOUND, "walk_not_found")
         return _poll_walk_or_sync_response_cap_v1(rec)
@@ -333,7 +334,7 @@ def register_octs_walk_traversal_routes(router: APIRouter) -> None:
         bad = _assert_tenant_or_error(db, tenant_id)
         if bad is not None:
             return bad
-        store = octs_walk_api_memory_store_v1()
+        store = resolve_octs_walk_store_v1(db)
         rec = store.get(tenant_id, walk_id)
         if rec is None:
             return _api_err(status.HTTP_404_NOT_FOUND, "walk_not_found")

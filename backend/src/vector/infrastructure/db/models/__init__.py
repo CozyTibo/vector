@@ -19,6 +19,13 @@ from vector.infrastructure.db.models.cortex_link_rule_version import CortexLinkR
 from vector.infrastructure.db.models.cortex_org_link import CortexOrgLink
 from vector.infrastructure.db.models.cortex_org_link_replay_job import CortexOrgLinkReplayJob
 from vector.infrastructure.db.models.cortex_org_link_replay_job_receipt import CortexOrgLinkReplayJobReceipt
+from vector.infrastructure.db.models.cortex_artifact_lineage_edge import CortexArtifactLineageEdge
+from vector.infrastructure.db.models.cortex_octs_durable_walk_record import CortexOctsDurableWalkRecord
+from vector.infrastructure.db.models.cortex_octs_traversal_receipt import CortexOctsTraversalReceipt
+from vector.infrastructure.db.models.cortex_octs_traversal_replay_archive import CortexOctsTraversalReplayArchive
+from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
+from vector.infrastructure.db.models.cortex_tcre_reconstruction_artifact import CortexTcreReconstructionArtifact
+from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import CortexTcreReconstructionJob
 from vector.infrastructure.db.models.cortex_org_link_candidate import CortexOrgLinkCandidate
 from vector.infrastructure.db.models.cortex_org_link_candidate_batch import CortexOrgLinkCandidateBatch
 from vector.infrastructure.db.models.cortex_org_link_promotion_policy import CortexOrgLinkPromotionPolicy
@@ -93,6 +100,13 @@ __all__ = [
     "CortexOrgLink",
     "CortexOrgLinkReplayJob",
     "CortexOrgLinkReplayJobReceipt",
+    "CortexArtifactLineageEdge",
+    "CortexOctsDurableWalkRecord",
+    "CortexOctsTraversalReceipt",
+    "CortexOctsTraversalReplayArchive",
+    "CortexRetrievalIndexEntry",
+    "CortexTcreReconstructionArtifact",
+    "CortexTcreReconstructionJob",
     "CortexOrgLinkCandidate",
     "CortexOrgLinkCandidateBatch",
     "CortexOrgLinkPromotionPolicy",

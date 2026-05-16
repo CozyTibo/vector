@@ -3,20 +3,58 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.traversal.runtime.durable_walk_store import OctsWalkApiDurableStore
 from vector.domains.cortex.traversal.traversal_control_plane import (
     VECTOR_OCTS_CONTROL_PLANE_SHOW_EXPLORATION_ENV,
     build_octs_traversal_control_plane_v1,
     verify_gp05_cp01_traversal_control_plane_rbac_static,
     verify_octs_traversal_control_plane_v1_shape,
 )
-from vector.domains.cortex.traversal.walk_api_contract import (
-    build_stub_completed_walk_payload_v1,
-    octs_walk_api_memory_store_v1,
-)
+from vector.domains.cortex.traversal.walk_api_contract import build_stub_completed_walk_payload_v1
+
+
+def _tenant_id(db_session: Session) -> uuid.UUID:
+    from vector.infrastructure.db.models.membership import TenantMembership
+    from vector.infrastructure.db.models.tenant import Tenant
+    from vector.infrastructure.db.models.user import User
+
+    user = User(email=f"p524-{uuid.uuid4().hex[:10]}@example.com", full_name="P524")
+    tenant = Tenant(
+        company_name="P524 Co",
+        primary_email=user.email,
+        email_domain="example.com",
+        slug=f"p524-{uuid.uuid4().hex[:8]}",
+        status="active",
+        workspace_access_enabled=True,
+    )
+    db_session.add_all([user, tenant])
+    db_session.flush()
+    db_session.add(TenantMembership(tenant_id=tenant.id, user_id=user.id, role="owner"))
+    db_session.flush()
+    return tenant.id
+
+
+def _seed_completed_walk(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    walk_id: uuid.UUID,
+    request_body: dict[str, Any],
+    walk_payload: dict[str, Any],
+) -> None:
+    OctsWalkApiDurableStore(session).insert_completed_sync(
+        tenant_id=tenant_id,
+        walk_id=walk_id,
+        request_body=request_body,
+        walk_payload=walk_payload,
+        idempotency_key=None,
+    )
+    session.flush()
 
 
 def test_gp05_cp01_static_passes() -> None:
@@ -36,7 +74,7 @@ def test_build_control_plane_empty_queue(db_session: Session) -> None:
 
 def test_fs_cp02_exploration_hidden_by_default(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(VECTOR_OCTS_CONTROL_PLANE_SHOW_EXPLORATION_ENV, raising=False)
-    tid = uuid.uuid4()
+    tid = _tenant_id(db_session)
     body = {
         "temporal_anchor": {
             "tenant_id": str(tid),
@@ -62,12 +100,12 @@ def test_fs_cp02_exploration_hidden_by_default(db_session: Session, monkeypatch:
     }
     walk_id = uuid.uuid4()
     payload = build_stub_completed_walk_payload_v1(body, tenant_id=tid)
-    octs_walk_api_memory_store_v1().insert_completed_sync(
+    _seed_completed_walk(
+        db_session,
         tenant_id=tid,
         walk_id=walk_id,
         request_body=dict(body),
         walk_payload=payload,
-        idempotency_key=None,
     )
     hidden = build_octs_traversal_control_plane_v1(db_session, tenant_id=tid, include_exploration=False)
     assert hidden["traversal_queue"] == []
@@ -80,7 +118,7 @@ def test_fs_cp02_exploration_hidden_by_default(db_session: Session, monkeypatch:
 
 
 def test_abort_classes_from_completed_stub(db_session: Session) -> None:
-    tid = uuid.uuid4()
+    tid = _tenant_id(db_session)
     body = {
         "temporal_anchor": {
             "tenant_id": str(tid),
@@ -106,12 +144,12 @@ def test_abort_classes_from_completed_stub(db_session: Session) -> None:
     }
     walk_id = uuid.uuid4()
     payload = build_stub_completed_walk_payload_v1(body, tenant_id=tid)
-    octs_walk_api_memory_store_v1().insert_completed_sync(
+    _seed_completed_walk(
+        db_session,
         tenant_id=tid,
         walk_id=walk_id,
         request_body=dict(body),
         walk_payload=payload,
-        idempotency_key=None,
     )
     doc = build_octs_traversal_control_plane_v1(db_session, tenant_id=tid, include_exploration=True)
     assert doc["abort_classes"].get("budget_exhausted") == 1

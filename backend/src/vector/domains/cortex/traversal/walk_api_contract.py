@@ -40,6 +40,19 @@ OCTS_STUB_ENGINE_BUILD_ID: Final[str] = "octs.walk.stub.v1"
 WalkApiStatusV1 = Literal["queued", "running", "completed", "failed", "cancelled"]
 
 
+def resolve_engine_build_ref_for_persist_v1() -> str:
+    """Pinned ``engine_build_id`` when configured; else stub ref (async accept / CI)."""
+    from vector.domains.cortex.traversal.traversal_equivalence_contract import (
+        OctsEngineIdentityError,
+        resolve_oct_engine_build_id_v1,
+    )
+
+    try:
+        return resolve_oct_engine_build_id_v1()
+    except OctsEngineIdentityError:
+        return OCTS_STUB_ENGINE_BUILD_ID
+
+
 def _repo_root_with_oct_schemas() -> Path:
     start = Path(__file__).resolve()
     for root in [start, *start.parents]:
@@ -349,6 +362,7 @@ class OctsWalkApiMemoryStore:
         request_body: dict[str, Any],
         walk_payload: dict[str, Any],
         idempotency_key: str | None,
+        replay_lineage: dict[str, Any] | None = None,
     ) -> WalkApiRecordV1:
         rec = WalkApiRecordV1(
             walk_id=walk_id,

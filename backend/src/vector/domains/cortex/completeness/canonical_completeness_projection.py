@@ -1,0 +1,87 @@
+"""Canonical materialization completeness (raw → canonical lineage accounting)."""
+
+from __future__ import annotations
+
+import uuid
+from collections import Counter
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from vector.domains.cortex.completeness._completeness_common import build_stage_envelope_v1, pct
+from vector.infrastructure.db.models.cortex_canonical_failure_case import CortexCanonicalFailureCase
+from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
+    CortexCanonicalTransformMaterialization,
+)
+from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
+
+
+def project_canonical_completeness_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    raw_total = int(
+        session.scalar(
+            select(func.count())
+            .select_from(RawIngestionRecord)
+            .where(RawIngestionRecord.tenant_id == tenant_id)
+        )
+        or 0
+    )
+    mat_total = int(
+        session.scalar(
+            select(func.count())
+            .select_from(CortexCanonicalTransformMaterialization)
+            .where(CortexCanonicalTransformMaterialization.tenant_id == tenant_id)
+        )
+        or 0
+    )
+    failures = list(
+        session.scalars(
+            select(CortexCanonicalFailureCase).where(
+                CortexCanonicalFailureCase.tenant_id == tenant_id,
+                CortexCanonicalFailureCase.active.is_(True),
+            )
+        ).all()
+    )
+    failure_classes = Counter(c.failure_class for c in failures)
+    omission_classes: dict[str, int] = dict(failure_classes)
+    unsupported = int(omission_classes.get("unsupported_payload", 0))
+    parse_failed = int(omission_classes.get("parse_failure", 0))
+    schema_drift = int(omission_classes.get("schema_drift_detected", 0))
+
+    unmaterialized = max(0, raw_total - mat_total)
+    if unmaterialized and "reconstruction_skipped_by_policy" not in omission_classes:
+        omission_classes["canonical_backlog_unmaterialized"] = unmaterialized
+
+    degraded = len(failures)
+    substrate_state = "critical" if raw_total > 0 and mat_total == 0 else (
+        "degraded" if failures or unmaterialized > raw_total * 0.05 else "healthy"
+    )
+    replay_posture = "partial" if failures else ("stable" if mat_total else "unknown")
+
+    return build_stage_envelope_v1(
+        stage_id="canonical",
+        label="Canonical",
+        total_objects=raw_total,
+        processed_count=mat_total,
+        degraded_count=degraded,
+        unresolved_count=unmaterialized,
+        omitted_count=unsupported + parse_failed,
+        intentionally_excluded_count=unsupported,
+        replay_posture=replay_posture,
+        substrate_state=substrate_state,
+        drift_warnings=[f"{schema_drift} schema_drift case(s)"] if schema_drift else [],
+        omission_classes=omission_classes,
+        detail_route=f"/admin/tenants/{tenant_id}/cortex/canonical",
+        metrics={
+            "raw_count": raw_total,
+            "canonicalized_count": mat_total,
+            "unsupported_count": unsupported,
+            "parse_failed_count": parse_failed,
+            "schema_drift_count": schema_drift,
+            "conversion_percent": pct(mat_total, raw_total if raw_total else 1),
+        },
+    )

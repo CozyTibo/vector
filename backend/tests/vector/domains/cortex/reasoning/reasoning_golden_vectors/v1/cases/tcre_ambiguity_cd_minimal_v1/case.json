@@ -1,0 +1,28 @@
+{
+  "corpus_case_id": "tcre_ambiguity_cd_minimal_v1",
+  "expected_ambiguity_classes": [
+    "chronology_partial_order",
+    "AMB\u2011NONE"
+  ],
+  "expected_degradation_classes": [
+    "CD-CONT",
+    "chronology_cap_applied"
+  ],
+  "expected_replay_legality_state": "replay_equivalent",
+  "expected_tcre_causal_chains": [
+    {
+      "tcre_causal_edge_id": "tcre_edge_fixture_alpha_v1"
+    }
+  ],
+  "raw_evidence_bundle_refs": [
+    {
+      "kind": "fixture_file",
+      "ref": "shared/minimal_raw_stub.json"
+    }
+  ],
+  "reconstruction_version": "tcre_reasoning_fixture_v2026_05_13",
+  "replay_ordering": "strict_ts",
+  "source_systems": [
+    "slack"
+  ]
+}

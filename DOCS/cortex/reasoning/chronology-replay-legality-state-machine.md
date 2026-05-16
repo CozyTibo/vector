@@ -69,7 +69,7 @@ Let **`C`** be the **`chronology_legality_class`** after §2.1 (and §2.2 if app
 
 ## 4. Illustrative lawful outputs (non‑authoritative)
 
-Typical outputs under the **default** pack include: **`(strict, chronology_strict)`**, **`(strict, chronology_degraded)`** when any reason flag is true, **`(partial, chronology_partial)`** / **`(partial, chronology_degraded)`**, **`(unresolved, chronology_unresolved)`**. **Authoritative values** are always **§2.1 row lookup**.
+Typical outputs under the **default** pack include: **`(strict, chronology_strict)`**, **`(strict, chronology_degraded)`** when **`skew_detected`** is true, **`(strict, chronology_partial)`** when late/export flags apply without skew, **`(partial, chronology_partial)`** / **`(partial, chronology_degraded)`**, **`(unresolved, chronology_unresolved)`**. **Authoritative values** are always **§2.1 row lookup**.
 
 ---
 

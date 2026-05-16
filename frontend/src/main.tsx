@@ -21,6 +21,20 @@ import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexMemoryPage from "./admin/AdminCortexMemoryPage.tsx";
 import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
 import AdminCortexPlaceholderPage from "./admin/AdminCortexPlaceholderPage.tsx";
+import AdminCortexReasoningCertificationPackPage from "./admin/AdminCortexReasoningCertificationPackPage.tsx";
+import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
+import AdminCortexReasoningJobsPage from "./admin/AdminCortexReasoningJobsPage.tsx";
+import AdminCortexReasoningLayout from "./admin/AdminCortexReasoningLayout.tsx";
+import AdminCortexReasoningLegalityPage from "./admin/AdminCortexReasoningLegalityPage.tsx";
+import AdminCortexReasoningOverviewPage from "./admin/AdminCortexReasoningOverviewPage.tsx";
+import AdminCortexRetrievalContinuityPage from "./admin/AdminCortexRetrievalContinuityPage.tsx";
+import AdminCortexRetrievalLayout from "./admin/AdminCortexRetrievalLayout.tsx";
+import AdminCortexRetrievalLegalityPage from "./admin/AdminCortexRetrievalLegalityPage.tsx";
+import AdminCortexRetrievalLineagePage from "./admin/AdminCortexRetrievalLineagePage.tsx";
+import AdminCortexRetrievalOverviewPage from "./admin/AdminCortexRetrievalOverviewPage.tsx";
+import AdminCortexTraversalControlPlanePage from "./admin/AdminCortexTraversalControlPlanePage.tsx";
+import AdminCortexTraversalLayout from "./admin/AdminCortexTraversalLayout.tsx";
+import AdminCortexTraversalOverviewPage from "./admin/AdminCortexTraversalOverviewPage.tsx";
 import AdminCortexCanonicalAmbiguitiesPage from "./admin/AdminCortexCanonicalAmbiguitiesPage.tsx";
 import AdminCortexCanonicalCertificationPage from "./admin/AdminCortexCanonicalCertificationPage.tsx";
 import AdminCortexCanonicalCoveragePage from "./admin/AdminCortexCanonicalCoveragePage.tsx";
@@ -161,9 +175,27 @@ createRoot(document.getElementById("root")!).render(
                 />
                 <Route path="identity/primitives" element={<AdminCortexIdentityPrimitivesDrillPage />} />
                 <Route path="graph" element={<AdminCortexGraphPage />} />
+                <Route path="traversal" element={<AdminCortexTraversalLayout />}>
+                  <Route index element={<AdminCortexTraversalOverviewPage />} />
+                  <Route path="control-plane" element={<AdminCortexTraversalControlPlanePage />} />
+                </Route>
                 <Route path="memory" element={<AdminCortexMemoryPage />} />
-                <Route path="reasoning" element={<AdminCortexPlaceholderPage title="Reasoning" />} />
-                <Route path="retrieval" element={<AdminCortexPlaceholderPage title="Retrieval" />} />
+                <Route path="reasoning" element={<AdminCortexReasoningLayout />}>
+                  <Route index element={<AdminCortexReasoningOverviewPage />} />
+                  <Route path="jobs" element={<AdminCortexReasoningJobsPage />} />
+                  <Route path="jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
+                  <Route path="legality" element={<AdminCortexReasoningLegalityPage />} />
+                  <Route
+                    path="certification-pack"
+                    element={<AdminCortexReasoningCertificationPackPage />}
+                  />
+                </Route>
+                <Route path="retrieval" element={<AdminCortexRetrievalLayout />}>
+                  <Route index element={<AdminCortexRetrievalOverviewPage />} />
+                  <Route path="legality" element={<AdminCortexRetrievalLegalityPage />} />
+                  <Route path="lineage" element={<AdminCortexRetrievalLineagePage />} />
+                  <Route path="continuity" element={<AdminCortexRetrievalContinuityPage />} />
+                </Route>
                 <Route path="synthesis" element={<AdminCortexPlaceholderPage title="Synthesis" />} />
                 <Route path="verification" element={<AdminCortexVerificationPage />} />
                 <Route path="settings-debug" element={<AdminCortexPlaceholderPage title="Settings / Debug" />} />

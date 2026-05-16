@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any, Final
 
-from vector.domains.cortex.traversal.walk_api_contract import OctsWalkApiMemoryStore
+from vector.domains.cortex.traversal.runtime.durable_walk_store import OctsWalkStoreProtocol
 
 OCTS_WALK_REPLAY_RESOLUTION_SCHEMA_VERSION: Final[int] = 1
 
@@ -46,7 +46,7 @@ def prepare_effective_oct_walk_request_v1(
     body: Mapping[str, Any],
     *,
     tenant_id: uuid.UUID,
-    store: OctsWalkApiMemoryStore,
+    store: OctsWalkStoreProtocol,
 ) -> tuple[dict[str, Any], dict[str, str] | None]:
     """Return ``(effective_request, replay_lineage)`` for ``build_stub_completed_walk_payload_v1``.
 

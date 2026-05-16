@@ -19,8 +19,15 @@
 
 | ID | Topic | Owner |
 | -- | ----- | ----- |
-| **GAP‑P1‑P06‑01** | Full **STAGE‑A…Z** row mapping for every **`G‑P06‑*`** vs Phase **05** CI arch doc | CI / doctrine |
 | **GAP‑P1‑P06‑02** | Operator **replay debugger** canonical diff (structural JSON vs hash‑only) | Admin spec |
+
+---
+
+## Resolved P1 (reference — do not delete)
+
+| ID | Was | Resolution |
+| -- | --- | ---------- |
+| **GAP‑P1‑P06‑01** | Full **STAGE‑A…Z** row mapping for every **`G‑P06‑*`** vs Phase **05** CI arch doc | Shipped **`vector.domains.cortex.reasoning.reasoning_ci_enforcement_architecture`** (**P06‑31**): `reasoning_gp06_ci_full_stage_row_map_v1`, `verify_gp06_cia01`..`cia08`, topology runners; mirrors **Phase 05** doc anchor `phase-05-ci-enforcement-architecture.md` |
 
 ---
 
@@ -56,7 +63,7 @@ Mirrors **`../05-traversal/phase-05-spec-gap-matrix.md`** §Strength legend — 
 | Step band | Default doctrine state | Notes |
 | --------- | ------------------------ | ----- |
 | 1–30 | **`Frozen (doctrine)`** | Registries, state machine, default policy fixture, replay laws, harness predicate text |
-| 31–35 | **Strong** (doctrine text) / **Partial** (CI + tenant economics + closure pack **execution**) | **Active P1** only for STAGE row map; closure pack parity still unwired |
+| 31–35 | **Strong** (doctrine text) / **Partial** (CI + tenant economics + closure pack **execution**) | **GAP‑P1‑P06‑01** (STAGE row map) **closed** in **P06‑31**; closure pack parity still unwired |
 
 **Implementation authorization (constitutional):** Reducer, replay harness, runtime, and admin/control-plane **coding** MAY proceed under owner docs + [`PHASE06_IMPLEMENTATION_HANDOFF.md`](./PHASE06_IMPLEMENTATION_HANDOFF.md), subject to the **OCTS Steps 19–23** structural gate in [`phase-06-normative-index.md`](./phase-06-normative-index.md) for first **runtime package** integration.
 

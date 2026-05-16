@@ -93,9 +93,19 @@ Non-exhaustive list — authoritative detail in [`replay-equivalence-reasoning-s
 
 ---
 
+## RUNTIME tracks (post-doctrine)
+
+| Track | Scope | Doc |
+|-------|--------|-----|
+| **RUNTIME-01** | Live bounded reconstruction: reducers, persistence, Celery, admin jobs/health, basic UI | (implementation in `vector.domains.cortex.reasoning.runtime`) |
+| **RUNTIME-02** | Operator projections: chronology/edge/timeline/degradation explanations, replay structural diff, extended health | [`PHASE06_RUNTIME02_OPERATOR_VISIBILITY.md`](./PHASE06_RUNTIME02_OPERATOR_VISIBILITY.md) |
+| **Substrate completeness** | Cross-pipeline omission ledger (ingestion → TCRE) | `vector.domains.cortex.completeness` + `GET .../cortex/substrate-completeness` + Cortex Overview pipeline UI |
+
+**RUNTIME-02 APIs:** `GET .../runtime/jobs/{job_id}/operator-view`, `GET .../runtime/jobs/{job_id}/replay-diff`, extended `GET .../runtime/health`, `replay_diff` on replay-twin POST.
+
 ## Remaining non-blocking items (post-freeze)
 
 Tracked explicitly (not blockers for starting reducers / harness / runtime / admin coding):
 
 - **P1:** full **STAGE‑A…Z** row map for every **`G‑P06‑*`** vs Phase **05** CI architecture — [`reasoning-spec-gap-matrix.md`](./reasoning-spec-gap-matrix.md) **Active P1**.  
-- **P1 / P2:** operator replay debugger **structural JSON diff** canonicalization — admin spec + gap matrix.
+- **P1 / P2:** operator replay debugger **structural JSON diff** — **partially addressed** by RUNTIME-02 `replay_diff_projection.py` (bounded to in-memory twin runs; persisted artifact diff still P2).

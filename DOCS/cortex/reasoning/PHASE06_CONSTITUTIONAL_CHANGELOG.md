@@ -4,6 +4,15 @@
 
 ---
 
+## 2026‑05‑13 — Default policy pack **v2** (`tcre_policy_pack_version` bump) — **CHRON‑FORB‑1** matrix alignment
+
+- **Updated:** [`fixtures/ReasoningPolicyPackV1_Default.json`](./fixtures/ReasoningPolicyPackV1_Default.json) — canonical body reserialized; **`tcre_policy_pack_version`** **`1` → `2`**; **`strict` + `skew_detected: false` + (`late_arrival` or `export_sequence_conflict`)** rows now emit **`chronology_partial`** (not **`chronology_degraded`**) so **§3** (`strict`, **`chronology_degraded`**) applies only when **`skew_detected`** is true or **§2.2** applies.
+- **Updated:** [`reasoning-policy-pack-v1-default.md`](./reasoning-policy-pack-v1-default.md) — digest + version table.  
+- **Updated:** [`chronology-replay-legality-state-machine.md`](./chronology-replay-legality-state-machine.md) — illustrative **§4** line aligned with **§3**.  
+- **Runtime:** `vector.domains.cortex.reasoning.chronology_legality.TCRE_REASONING_POLICY_PACK_V1_DEFAULT_DIGEST` updated to match fixture bytes.
+
+---
+
 ## 2026‑05‑13 — Final freeze + implementation handoff `P06-FINAL-FREEZE-2026-05-13`
 
 ### Chronology — **CHRON‑FORB‑1** closure (no model redesign)

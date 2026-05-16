@@ -23,7 +23,7 @@ from collections.abc import Generator
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from vector.api.http.deps import get_db
@@ -79,15 +79,29 @@ def engine() -> Any:
 
 @pytest.fixture
 def db_session(engine: Any) -> Generator[Session, None, None]:
+    """Per-test session on a connection rolled back after the test.
+
+    Uses a SAVEPOINT so tests may call ``session.commit()`` without ending the
+    outer transaction (avoids SAWarning on teardown rollback).
+    """
     conn = engine.connect()
     trans = conn.begin()
     factory = sessionmaker(autoflush=False, autocommit=False, bind=conn)
     session = factory()
+    session.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def _restart_savepoint(sess: Session, transaction: Any) -> None:
+        if transaction.nested and not transaction._parent.nested:
+            sess.begin_nested()
+
     try:
         yield session
     finally:
+        event.remove(session, "after_transaction_end", _restart_savepoint)
         session.close()
-        trans.rollback()
+        if trans.is_active:
+            trans.rollback()
         conn.close()
 
 

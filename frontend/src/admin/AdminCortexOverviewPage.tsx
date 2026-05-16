@@ -12,6 +12,10 @@ import {
   CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE,
 } from "./adminConstants";
 import { CortexOverview, CortexRawStats, CortexRecentRuns, titleConnector } from "./cortexAdminTypes";
+import {
+  SubstrateCompletenessLedger,
+  SubstrateCompletenessPipeline,
+} from "./SubstrateCompletenessPipeline";
 import { StatusBadge } from "./ui/StatusBadge";
 
 type ActionResult = { connector: string; ok: boolean; detail?: string };
@@ -71,6 +75,14 @@ export default function AdminCortexOverviewPage() {
   const recentRunsQ = useQuery({
     queryKey: ["admin-cortex-recent-runs", tenantId],
     queryFn: () => adminJson<CortexRecentRuns>(`/admin/tenants/${tenantId}/cortex/ingestion/recent-runs?limit=25`),
+    enabled: Boolean(tenantId),
+  });
+  const completenessQ = useQuery({
+    queryKey: ["admin-substrate-completeness", tenantId],
+    queryFn: () =>
+      adminJson<SubstrateCompletenessLedger>(
+        `/admin/tenants/${tenantId}/cortex/substrate-completeness`,
+      ),
     enabled: Boolean(tenantId),
   });
 
@@ -300,6 +312,10 @@ export default function AdminCortexOverviewPage() {
 
   return (
     <div className="space-y-6">
+      {completenessQ.data && <SubstrateCompletenessPipeline ledger={completenessQ.data} />}
+      {completenessQ.isError && (
+        <p className="text-sm text-red-600">{(completenessQ.error as Error).message}</p>
+      )}
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

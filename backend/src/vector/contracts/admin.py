@@ -824,6 +824,263 @@ class AdminCortexRawMemoryControlPlaneResponse(BaseModel):
     warnings: dict[str, Any]
 
 
+class AdminCortexReasoningControlPlaneSurfaceItem(BaseModel):
+    """One mandatory operator surface from ``reasoning-admin-control-plane-spec.md`` §1."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_id: str
+    title: str
+    operator_purpose: str
+
+
+class AdminCortexReasoningControlPlaneResponse(BaseModel):
+    """Phase 06 Step 32 — **reasoning_control_plane_catalog_v1** (substrate surface catalog)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    reasoning_control_plane_runtime_schema_version: int
+    reasoning_control_plane_surface_version: int
+    reasoning_control_plane_contract: str
+    surfaces: list[AdminCortexReasoningControlPlaneSurfaceItem]
+    doctrine_anchors: list[str]
+    dangerous_action_doctrine_ref: str
+    rbac_substrate_alignment_literal: str
+
+
+class AdminCortexReasoningRuntimeLegalityPredicateItem(BaseModel):
+    """One **R‑LEG‑** production gate row (``reasoning-runtime-legality-matrix.md``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    predicate_id: str
+    required_evidence: str
+
+
+class AdminCortexReasoningRuntimeLegalityForbiddenItem(BaseModel):
+    """Normative forbidden deployment bullet (reasoning matrix §Forbidden deployments)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    forbidden_id: str
+    description: str
+
+
+class AdminCortexReasoningRuntimeLegalityMatrixResponse(BaseModel):
+    """Phase 06 Step 33 — **reasoning_runtime_legality_matrix_catalog_v1** (read-only v1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    reasoning_runtime_legality_matrix_runtime_schema_version: int
+    reasoning_runtime_legality_matrix_surface_version: int
+    reasoning_runtime_legality_matrix_contract: str
+    predicates: list[AdminCortexReasoningRuntimeLegalityPredicateItem]
+    forbidden_deployments: list[AdminCortexReasoningRuntimeLegalityForbiddenItem]
+    doctrine_anchors: list[str]
+    waiver_yaml_future_path: str
+
+
+class AdminCortexReasoningTenantVerificationSliceResponse(BaseModel):
+    """Phase 06 Step 34 — **org_graph_reasoning** tenant verification aggregate (integer-only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    golden_corpus_case_count: int
+    last_reasoning_gate_bundle_sha256: str
+    org_graph_reasoning_slice_schema_version: int
+    phase06_program_freeze_version: int
+    reasoning_gp06_gate_bundle_queue_depth_proxy: int
+    tenant_id: str
+    verification_run_id: str | None = None
+
+
+class AdminCortexReasoningEconomicsStatsV1(BaseModel):
+    """Integer stats embedded in **reasoning_readiness_economics** receipt hash."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    golden_corpus_case_count: int
+    reasoning_economics_threshold_max_cases: int
+    reasoning_economics_threshold_table_version: int
+    reasoning_eco_violation_count: int
+
+
+class AdminCortexReasoningReadinessEconomicsResponse(BaseModel):
+    """Phase 06 Step 34 — readiness / economics receipt (golden-thread manifest; read-only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    economics_receipt_hash: str
+    economics_stats: AdminCortexReasoningEconomicsStatsV1
+    economics_violations: list[str]
+    probe_profile: str
+    reasoning_readiness_economics_contract: str
+    reasoning_readiness_economics_schema_version: int
+    tenant_id: str
+
+
+class AdminCortexReasoningCertificationPackSnapshotResponse(BaseModel):
+    """Phase 06 Step 35 — TCRE certification pack snapshot (gzip + digests; read-only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    reasoning_certification_pack_runtime_schema_version: int
+    tcre_cert_pack_format: str
+    closure_passed: bool
+    closure_detail: dict[str, Any]
+    whole_file_sha256: str | None = None
+    pack_gzip_base64: str | None = None
+    pack_byte_length: int | None = None
+
+
+class AdminCortexReasoningRuntimeHealthResponse(BaseModel):
+    """Phase 06 RUNTIME-01/02 — live reconstruction health strip."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    tcre_runtime_schema_version: int
+    operator_projection_version: int = 1
+    engine_build_ref: str
+    active_tcre_policy_bundle_digest: str
+    active_reasoning_rule_pack_id: str
+    canonical_materialization_count: int
+    job_status_counts: dict[str, int]
+    queue_depth_proxy: int
+    failed_job_count: int = 0
+    last_successful_job: dict[str, Any] | None = None
+    last_replay_twin_job: dict[str, Any] | None = None
+    last_replay_result: bool | None = None
+    last_replay_divergence_at: str | None = None
+    last_successful_replay_twin_passed: bool | None = None
+    degraded_chronology_percent: float = 0.0
+    degraded_edge_percent: float = 0.0
+    avg_reconstruction_duration_seconds: float | None = None
+    replay_equivalence_status: str
+    runtime_legality: dict[str, Any]
+
+
+class AdminCortexReasoningReconstructionJobItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    tenant_id: str
+    job_kind: str
+    status: str
+    dry_run: bool
+    scope_json: dict[str, Any]
+    summary_json: dict[str, Any]
+    tcre_policy_bundle_digest: str
+    reasoning_rule_pack_id: str
+    parent_job_id: str | None = None
+    engine_build_ref: str
+    error_detail: str | None = None
+    celery_task_id: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+
+
+class AdminCortexReasoningReconstructionArtifactItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: int
+    artifact_kind: str
+    artifact_key: str
+    artifact_digest: str
+    body_json: dict[str, Any]
+    created_at: str | None = None
+
+
+class AdminCortexReasoningReconstructionJobDetailResponse(AdminCortexReasoningReconstructionJobItem):
+    artifacts: list[AdminCortexReasoningReconstructionArtifactItem] = Field(default_factory=list)
+
+
+class AdminCortexReasoningReconstructionEnqueueRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    materialization_limit: int | None = None
+    bundle_id: str | None = None
+    octs_walk_id: str | None = None
+    octs_strict_binding: bool = False
+    dry_run: bool = False
+    run_sync: bool = False
+
+
+class AdminCortexReasoningReconstructionEnqueueResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    status: str
+    celery_task_id: str | None = None
+    sync: bool | None = None
+
+
+class AdminCortexReasoningReplayTwinResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    twin_job_id: str
+    source_job_id: str
+    replay_equivalence_passed: bool
+    double_run_digest_a: str
+    double_run_digest_b: str
+    changed_fields: list[str]
+    materialization_count: int
+    equivalence_receipt: dict[str, Any]
+    replay_diff: dict[str, Any] | None = None
+
+
+class AdminCortexReasoningJobOperatorViewResponse(BaseModel):
+    """Phase 06 RUNTIME-02 — human-debuggable reconstruction operator view."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operator_view_schema_version: int
+    tcre_runtime_schema_version: int
+    job_id: str
+    tenant_id: str
+    job_kind: str
+    status: str
+    octs_binding: dict[str, Any] | None = None
+    reconstruction_summary: dict[str, Any]
+    chronology_explanations: list[dict[str, Any]]
+    edge_explanations: list[dict[str, Any]]
+    chain_timeline: dict[str, Any]
+    degradation_explanations: list[dict[str, Any]]
+    replay_diff: dict[str, Any] | None = None
+    retrieval_refs: dict[str, Any]
+
+
+class AdminCortexReasoningReplayDiffResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    replay_equivalence_passed: bool
+    double_run_digest_a: str
+    double_run_digest_b: str
+    changed_fields: list[str]
+    materialization_count: int
+    replay_diff: dict[str, Any]
+
+
+class AdminSubstrateCompletenessLedgerResponse(BaseModel):
+    """Substrate completeness pipeline — bounded visible incompleteness per tenant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    substrate_completeness_ledger_schema_version: int
+    tenant_id: str
+    substrate_state: str
+    substrate_replay_posture: str
+    pipeline_stages: list[dict[str, Any]]
+    degradation_propagation: dict[str, Any]
+    aggregate: dict[str, Any]
+    ledger_digest: str
+
+
 class AdminCortexCanonicalControlPlaneResponse(BaseModel):
     """Phase 03 Step 16 — tenant canonical operator control-plane aggregate."""
 
