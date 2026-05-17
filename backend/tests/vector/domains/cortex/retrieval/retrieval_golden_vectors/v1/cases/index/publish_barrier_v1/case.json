@@ -1,0 +1,9 @@
+{
+  "case_id": "index/publish_barrier_v1",
+  "description": "RET-IDX-01 — query reads only PUBLISHED index_epoch",
+  "tenant_id": "00000000-0000-0000-0000-000000000099",
+  "index_epoch": "epoch-publish-barrier-1",
+  "causal_chain_id": "chain-publish-barrier-1",
+  "replay_identity": "replay-publish-barrier-1",
+  "expect_published": true
+}

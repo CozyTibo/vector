@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vector.local/schemas/retrieval-query-envelope-v1.schema.json",
+  "title": "RetrievalQueryEnvelopeV1",
+  "description": "Phase 07 lawful query envelope. G-P07-SCHEMA-01 rejects forbidden cognition keys: embedding, similarity, llm, summary, recommendation (and runtime-extended denylist in anti_goals.py).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "tenant_id": { "type": "string", "format": "uuid" },
+    "workload_class": {
+      "type": "string",
+      "enum": [
+        "execution_continuity",
+        "chronology_window",
+        "ownership_continuity",
+        "causal_chain",
+        "causal_edge",
+        "degradation_survey",
+        "dependency_propagation",
+        "replay_divergence",
+        "escalation",
+        "traversal_lineage",
+        "replay_equivalence",
+        "lineage_explorer",
+        "continuity_topology",
+        "materialization_as_of"
+      ]
+    },
+    "intent": {
+      "type": "string",
+      "enum": ["inspect", "enumerate", "prove", "audit", "diff"]
+    },
+    "execution_partition": {
+      "type": "string",
+      "enum": ["authoritative", "exploration"]
+    },
+    "temporal_scope": { "type": "object" },
+    "addressing": { "type": "object" },
+    "selection_policy": { "type": "object" },
+    "replay_pins": { "type": "object" },
+    "idempotency_key": { "type": "string" },
+    "retrieval_lookup_id": { "type": "string" },
+    "expected_replay_identity": { "type": "string" }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["embedding"] },
+      { "required": ["embeddings"] },
+      { "required": ["similarity"] },
+      { "required": ["llm"] },
+      { "required": ["summary"] },
+      { "required": ["recommendation"] },
+      { "required": ["recommendations"] },
+      { "required": ["semantic_search"] },
+      { "required": ["vector_search"] },
+      { "required": ["natural_language_query"] },
+      { "required": ["query_text"] },
+      { "required": ["rag"] },
+      { "required": ["rerank"] }
+    ]
+  }
+}

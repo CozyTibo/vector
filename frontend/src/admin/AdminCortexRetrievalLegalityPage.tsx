@@ -2,19 +2,22 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
+import { normalizeRetrievalLegalityClassNames } from "./retrievalAdminSurfaces";
 
 export default function AdminCortexRetrievalLegalityPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const { data, isLoading } = useQuery({
     queryKey: ["retrieval-legality-detail", tenantId],
     queryFn: () =>
-      adminJson<{ retrieval_policy_digest: string; legality_classes: string[] }>(
+      adminJson<{ retrieval_policy_digest: string; legality_classes: unknown }>(
         `/admin/tenants/${tenantId}/cortex/retrieval/legality`,
       ),
   });
 
   if (isLoading) return <p className="text-sm text-stone-500">Loading…</p>;
   if (!data) return null;
+
+  const classNames = normalizeRetrievalLegalityClassNames(data.legality_classes);
 
   return (
     <section className="rounded-lg border border-stone-200 bg-white p-4 text-sm shadow-sm">
@@ -24,7 +27,7 @@ export default function AdminCortexRetrievalLegalityPage() {
         chronology illegality, and unresolved continuity.
       </p>
       <ul className="mt-3 list-disc space-y-1 pl-5 text-stone-800">
-        {data.legality_classes.map((c) => (
+        {classNames.map((c) => (
           <li key={c}>
             <code className="text-xs">{c}</code>
           </li>

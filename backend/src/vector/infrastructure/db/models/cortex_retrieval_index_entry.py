@@ -28,6 +28,7 @@ class CortexRetrievalIndexEntry(Base):
     index_key: Mapped[str] = mapped_column(String(256), nullable=False)
     replay_identity: Mapped[str] = mapped_column(String(128), nullable=False)
     traversal_epoch: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    index_epoch: Mapped[str | None] = mapped_column(String(128), nullable=True)
     chronology_legality_class: Mapped[str] = mapped_column(String(64), nullable=False)
     causal_legality_class: Mapped[str] = mapped_column(String(64), nullable=False)
     retrieval_legality_class: Mapped[str] = mapped_column(String(64), nullable=False)

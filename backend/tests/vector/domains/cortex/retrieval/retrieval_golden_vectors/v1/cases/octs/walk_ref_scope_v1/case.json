@@ -1,0 +1,18 @@
+{
+  "case_id": "octs_walk_ref_scope_v1",
+  "schema_version": 1,
+  "description": "retrieval_walk_ref from walk_result_hash + traversal_epoch; walk scope query kinds",
+  "walk_scope_query_kinds": [
+    "walk_by_id",
+    "walk_by_hash_and_epoch",
+    "tenant_completed_walk_inventory",
+    "graph_eligible_idle_probe"
+  ],
+  "retrieval_walk_ref": {
+    "walk_id": "00000000-0000-4000-8000-000000000001",
+    "walk_result_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "traversal_epoch": "epoch-golden-walk-1"
+  },
+  "expected_idle_omission": "RD-TRAVERSAL-IDLE",
+  "expected_blocked_omission": "RD-TRAVERSAL-BLOCKED"
+}

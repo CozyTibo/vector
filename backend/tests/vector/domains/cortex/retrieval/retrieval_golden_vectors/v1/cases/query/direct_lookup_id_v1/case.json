@@ -1,0 +1,19 @@
+{
+  "case_id": "query/direct_lookup_id_v1",
+  "gate_id": "G-P07-ADDR-01",
+  "inputs": {
+    "tenant_id": "00000000-0000-0000-0000-000000000001",
+    "workload_class": "causal_chain",
+    "intent": "inspect",
+    "execution_partition": "authoritative",
+    "addressing": {
+      "retrieval_lookup_id": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    "replay_pins": {},
+    "temporal_scope": {}
+  },
+  "expected": {
+    "resolution_path": "direct_retrieval_lookup_id",
+    "retrieval_lookup_id": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  }
+}

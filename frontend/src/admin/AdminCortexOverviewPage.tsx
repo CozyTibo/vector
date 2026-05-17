@@ -339,7 +339,7 @@ export default function AdminCortexOverviewPage() {
           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-950">
             <p className="font-medium">Blocking: nothing is consuming the cortex_live queue</p>
             <p className="mt-1 text-red-900/95">
-              Manual <strong>Ingest all connectors</strong>, <strong>Flush + rerun through Phase 05</strong>, and scheduled
+              Manual <strong>Ingest all connectors</strong>, <strong>Flush + rerun through Phase 07</strong>, and scheduled
               syncs all publish tasks to <span className="font-mono">cortex_live</span>. Beat runs{" "}
               <span className="font-mono">scheduler_tick</span> on the default <span className="font-mono">vector</span>{" "}
               queue, then enqueues work to <span className="font-mono">cortex_live</span>. If this banner shows, tasks
@@ -439,7 +439,7 @@ export default function AdminCortexOverviewPage() {
               flushRerunMut.mutate(typed.trim());
             }}
           >
-            {flushRerunMut.isPending ? "Submitting…" : "Flush + rerun through Phase 05"}
+            {flushRerunMut.isPending ? "Submitting…" : "Flush + rerun through Phase 07"}
           </button>
           <button
             type="button"
@@ -518,7 +518,7 @@ export default function AdminCortexOverviewPage() {
                 : "none"}
             </p>
             <p className="mt-1 text-[11px] text-red-800/90">
-              Phase 05 runs <span className="font-medium">inside</span> the Celery task (org graph projection export + receipts). The Graph admin tab is still a{" "}
+              Phases 05–07 run <span className="font-medium">inside</span> the Celery task (graph export, TCRE reconstruction, retrieval index bootstrap). The Graph admin tab is still a{" "}
               <span className="font-medium">client-only demo</span> until OCTS APIs wire it — open{" "}
               <Link className="font-medium underline" to={`/admin/tenants/${tenantId}/cortex/graph`}>
                 Cortex → Graph

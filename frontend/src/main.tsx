@@ -27,11 +27,19 @@ import AdminCortexReasoningJobsPage from "./admin/AdminCortexReasoningJobsPage.t
 import AdminCortexReasoningLayout from "./admin/AdminCortexReasoningLayout.tsx";
 import AdminCortexReasoningLegalityPage from "./admin/AdminCortexReasoningLegalityPage.tsx";
 import AdminCortexReasoningOverviewPage from "./admin/AdminCortexReasoningOverviewPage.tsx";
+import AdminCortexRetrievalAuditPage from "./admin/AdminCortexRetrievalAuditPage.tsx";
+import AdminCortexRetrievalCatalogPage from "./admin/AdminCortexRetrievalCatalogPage.tsx";
 import AdminCortexRetrievalContinuityPage from "./admin/AdminCortexRetrievalContinuityPage.tsx";
+import AdminCortexRetrievalIndexPage from "./admin/AdminCortexRetrievalIndexPage.tsx";
 import AdminCortexRetrievalLayout from "./admin/AdminCortexRetrievalLayout.tsx";
 import AdminCortexRetrievalLegalityPage from "./admin/AdminCortexRetrievalLegalityPage.tsx";
 import AdminCortexRetrievalLineagePage from "./admin/AdminCortexRetrievalLineagePage.tsx";
+import AdminCortexRetrievalControlPlanePage from "./admin/AdminCortexRetrievalControlPlanePage.tsx";
 import AdminCortexRetrievalOverviewPage from "./admin/AdminCortexRetrievalOverviewPage.tsx";
+import AdminCortexRetrievalQueryPage from "./admin/AdminCortexRetrievalQueryPage.tsx";
+import AdminCortexRetrievalWorkflowsPage from "./admin/AdminCortexRetrievalWorkflowsPage.tsx";
+import AdminCortexRetrievalCertificationPackPage from "./admin/AdminCortexRetrievalCertificationPackPage.tsx";
+import AdminCortexRetrievalProgramClosurePage from "./admin/AdminCortexRetrievalProgramClosurePage.tsx";
 import AdminCortexTraversalControlPlanePage from "./admin/AdminCortexTraversalControlPlanePage.tsx";
 import AdminCortexTraversalLayout from "./admin/AdminCortexTraversalLayout.tsx";
 import AdminCortexTraversalOverviewPage from "./admin/AdminCortexTraversalOverviewPage.tsx";
@@ -192,9 +200,32 @@ createRoot(document.getElementById("root")!).render(
                 </Route>
                 <Route path="retrieval" element={<AdminCortexRetrievalLayout />}>
                   <Route index element={<AdminCortexRetrievalOverviewPage />} />
-                  <Route path="legality" element={<AdminCortexRetrievalLegalityPage />} />
+                  <Route path="workflows" element={<AdminCortexRetrievalWorkflowsPage />} />
+                  <Route path="query" element={<AdminCortexRetrievalQueryPage />} />
+                  <Route path="audit" element={<AdminCortexRetrievalAuditPage />} />
+                  <Route path="coverage" element={<AdminCortexRetrievalCatalogPage surfaceKey="coverage" />} />
+                  <Route path="policy" element={<AdminCortexRetrievalCatalogPage surfaceKey="policy" />} />
+                  <Route path="provenance" element={<AdminCortexRetrievalCatalogPage surfaceKey="provenance" />} />
+                  <Route path="replay" element={<AdminCortexRetrievalCatalogPage surfaceKey="replay" />} />
+                  <Route path="omissions" element={<AdminCortexRetrievalCatalogPage surfaceKey="omissions" />} />
+                  <Route path="temporal" element={<AdminCortexRetrievalCatalogPage surfaceKey="temporal" />} />
                   <Route path="lineage" element={<AdminCortexRetrievalLineagePage />} />
+                  <Route path="traversal" element={<AdminCortexRetrievalCatalogPage surfaceKey="traversal" />} />
+                  <Route path="tcre" element={<AdminCortexRetrievalCatalogPage surfaceKey="tcre" />} />
+                  <Route path="degradation" element={<AdminCortexRetrievalCatalogPage surfaceKey="degradation" />} />
+                  <Route path="legality" element={<AdminCortexRetrievalLegalityPage />} />
+                  <Route path="readiness" element={<AdminCortexRetrievalCatalogPage surfaceKey="readiness" />} />
+                  <Route path="index" element={<AdminCortexRetrievalIndexPage />} />
+                  <Route path="control-plane" element={<AdminCortexRetrievalControlPlanePage />} />
                   <Route path="continuity" element={<AdminCortexRetrievalContinuityPage />} />
+                  <Route
+                    path="certification-pack"
+                    element={<AdminCortexRetrievalCertificationPackPage />}
+                  />
+                  <Route
+                    path="program-closure"
+                    element={<AdminCortexRetrievalProgramClosurePage />}
+                  />
                 </Route>
                 <Route path="synthesis" element={<AdminCortexPlaceholderPage title="Synthesis" />} />
                 <Route path="verification" element={<AdminCortexVerificationPage />} />

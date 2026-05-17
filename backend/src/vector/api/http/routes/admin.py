@@ -300,7 +300,14 @@ CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE = "RESUME ALL SCHEDULED CORTEX INGESTION"
 CORTEX_RAW_MEMORY_DELETE_CONFIRM_PHRASE = "APPLY RAW MEMORY RETENTION DELETION"
 CORTEX_MANUAL_SYNC_CONFIRM_PHRASE = "RUN MANUAL CORTEX INGESTION SYNC"
 CORTEX_REPLAY_CONFIRM_PHRASE = "RUN CORTEX INGESTION REPLAY JOB"
-CORTEX_FLUSH_RERUN_CONFIRM_PHRASE = "FLUSH RAW DATA AND RERUN CORTEX THROUGH PHASE 05"
+CORTEX_FLUSH_RERUN_CONFIRM_PHRASE = "FLUSH RAW DATA AND RERUN CORTEX THROUGH PHASE 07"
+CORTEX_FLUSH_RERUN_LEGACY_CONFIRM_PHRASES: frozenset[str] = frozenset(
+    {"FLUSH RAW DATA AND RERUN CORTEX THROUGH PHASE 05"}
+)
+
+
+def _flush_rerun_confirmation_ok(confirmation: str) -> bool:
+    return confirmation == CORTEX_FLUSH_RERUN_CONFIRM_PHRASE or confirmation in CORTEX_FLUSH_RERUN_LEGACY_CONFIRM_PHRASES
 
 
 def _enqueue_cortex_poll_sync(connector_id: str) -> Callable[..., None]:
@@ -5062,9 +5069,9 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexFlushAndRerunResponse:
-        """Flush tenant Cortex state, rerun routed connectors, canonical drain, identity substrate, then Phase 05 projection."""
+        """Flush tenant Cortex state, rerun connectors, then substrate refresh through Phase 07 retrieval."""
         _assert_tenant(db, tenant_id)
-        if body.confirmation != CORTEX_FLUSH_RERUN_CONFIRM_PHRASE:
+        if not _flush_rerun_confirmation_ok(body.confirmation):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Confirmation phrase does not match flush+rerun safeguard phrase.",
@@ -5125,7 +5132,7 @@ def build_admin_router() -> APIRouter:
         log_ingestion_event(
             _logger,
             logging.WARNING,
-            "admin cortex full flush+rerun enqueued (through Phase 05 projection)",
+            "admin cortex full flush+rerun enqueued (through Phase 07 retrieval bootstrap)",
             task_name="admin_cortex_flush_rerun_to_identity",
             phase=PHASE_STEP6,
             outcome="enqueued",
@@ -5197,5 +5204,9 @@ def build_admin_router() -> APIRouter:
     from vector.api.http.routes.admin_cortex_retrieval import register_cortex_retrieval_routes
 
     register_cortex_retrieval_routes(r)
+
+    from vector.api.http.routes.admin_substrate_pipeline import register_substrate_pipeline_routes
+
+    register_substrate_pipeline_routes(r)
 
     return r

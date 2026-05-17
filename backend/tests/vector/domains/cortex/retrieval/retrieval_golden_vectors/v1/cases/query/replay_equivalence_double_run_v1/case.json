@@ -1,0 +1,30 @@
+{
+  "case_id": "query/replay_equivalence_double_run_v1",
+  "gate_id": "G-P07-REPLAY-01",
+  "inputs": {
+    "envelope": {
+      "schema_version": 1,
+      "workload_class": "causal_chain",
+      "intent": "prove",
+      "execution_partition": "authoritative",
+      "addressing": {
+        "retrieval_lookup_id": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      },
+      "replay_pins": {
+        "retrieval_policy_digest": "pinned-policy-digest-placeholder",
+        "index_epoch": "epoch-golden-replay-1"
+      }
+    },
+    "hits": [
+      {
+        "retrieval_lookup_id": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "upstream_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "omissions": []
+  },
+  "expected": {
+    "gp07_replay_01_passed": true,
+    "retrieval_query_replay_identity_match": true
+  }
+}

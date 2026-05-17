@@ -113,3 +113,15 @@ Retrieval MAY read:
 - **Derived:** retrieval index rows **only** when `index_epoch` published per Phase 07 index law.
 
 Retrieval MUST NOT read: LLM caches, embedding tables, synthesis outputs, operator notes.
+
+### Ingress table (runtime: `build_retrieval_ingress_law_catalog_v1`)
+
+| Provenance class | Artifact kinds (representative) | `index_epoch` required | Authoritative partition |
+| ---------------- | ------------------------------- | ---------------------- | ----------------------- |
+| **observed** | `raw_record`, `canonical_materialization`, `authoritative_link`, `octs_walk_record`, `tcre_artifact`, `causal_chain`, `chronology_receipt` | No | Candidate links → `evidence_candidate_only` |
+| **derived** | `retrieval_index`, `retrieval_index_entry` | **Yes** (published epoch only) | Same |
+| **forbidden** | `llm_cache`, `embedding_table`, `synthesis_output`, `operator_notes`, `semantic_index` | N/A (reject ingress) | N/A |
+
+**Degradation:** derived read without published epoch → **`RD-INDEX-STALE`** (never silent success).
+
+**Code:** `vector.domains.cortex.retrieval.retrieval_ingress` — **G‑P07‑INGRESS‑01..04**.

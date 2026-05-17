@@ -131,6 +131,7 @@ def _run_reconstruction_pipeline_in_memory_v1(
         tcre_policy_bundle_digest=tcre_policy_bundle_digest,
         reasoning_rule_pack_id=reasoning_rule_pack_id,
         strict_binding=bool(norm_scope.get("octs_strict_binding")),
+        session=db,
     )
     temporal_edges = reduce_causal_edges_v1(mats, tcre_policy_bundle_digest=tcre_policy_bundle_digest)
     expanded_edges = reduce_all_expanded_edges_v1(

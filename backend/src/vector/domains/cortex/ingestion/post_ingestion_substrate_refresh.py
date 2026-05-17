@@ -1,6 +1,6 @@
-"""After live ingestion: canonical drain, identity substrate refresh, Phase 05 graph projection.
+"""After live ingestion: canonical → identity → Phase 05 graph (phases 06–07 via substrate pipeline).
 
-Shared by ``cortex_full_pipeline_rerun`` (flush path) and scheduled incremental sync follow-up.
+Shared by legacy direct refresh callers; production ingest schedules ``substrate_pipeline`` instead.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ def run_post_ingestion_substrate_refresh(
     """Drain canonical backlog, repair determinism, refresh identity, run graph export.
 
     When ``bundle_id`` is omitted, resolves the default transformable bundle for the tenant.
+    Phases 06–07 run via ``schedule_substrate_pipeline_v1`` (Celery), not in this function.
     """
     bid = (bundle_id or "").strip() or None
     if bid is None:
@@ -97,6 +98,7 @@ def run_post_ingestion_substrate_refresh(
     )
     slice_hash = compute_octs_slice_hash_v1(slice_body)
     proj_summary = dict(projection_job.summary_json or {})
+
     return {
         "tenant_id": str(tenant_id),
         "bundle_id": bid,

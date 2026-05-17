@@ -70,6 +70,7 @@ celery_app = Celery(
         "app.tasks.cortex_full_pipeline_rerun",
         "app.tasks.cortex_org_link_jobs",
         "app.tasks.cortex_post_ingestion_substrate_refresh",
+        "app.tasks.cortex_substrate_pipeline",
         "app.tasks.cortex_tcre_reconstruction_jobs",
     ],
 )

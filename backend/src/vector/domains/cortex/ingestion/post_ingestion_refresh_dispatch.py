@@ -1,4 +1,4 @@
-"""Debounce and enqueue post–ingestion substrate refresh (canonical → identity → graph)."""
+"""Debounce and enqueue post–ingestion substrate pipeline (canonical → … → retrieval)."""
 
 from __future__ import annotations
 
@@ -10,11 +10,12 @@ from vector.settings import Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
-_REFRESH_TASK_ID_PREFIX = "cortex-post-ingest-refresh-"
-
-
 def post_ingestion_refresh_celery_task_id(tenant_id: uuid.UUID | str) -> str:
-    return f"{_REFRESH_TASK_ID_PREFIX}{tenant_id}"
+    from vector.domains.cortex.substrate_pipeline.orchestrator import (
+        substrate_pipeline_celery_task_id,
+    )
+
+    return substrate_pipeline_celery_task_id(tenant_id)
 
 
 def schedule_post_ingestion_substrate_refresh(
@@ -36,25 +37,18 @@ def schedule_post_ingestion_substrate_refresh(
     debounce = max(30, int(cfg.cortex_post_ingestion_substrate_refresh_debounce_seconds))
     task_id = post_ingestion_refresh_celery_task_id(tenant_id)
 
-    from app.celery_app import celery_app
-    from app.tasks.cortex_post_ingestion_substrate_refresh import (
-        run_cortex_post_ingestion_substrate_refresh_task,
-    )
+    from vector.domains.cortex.substrate_pipeline.orchestrator import schedule_substrate_pipeline_v1
 
-    try:
-        celery_app.control.revoke(task_id, terminate=False)
-    except Exception:  # noqa: BLE001 — best-effort cancel of a prior pending refresh
-        pass
-
-    async_result = run_cortex_post_ingestion_substrate_refresh_task.apply_async(
-        kwargs={
-            "tenant_id": str(tenant_id),
-            "batch_limit": cfg.cortex_post_ingestion_canonical_batch_limit,
-        },
-        queue="vector",
-        countdown=debounce,
-        task_id=task_id,
+    result = schedule_substrate_pipeline_v1(
+        tenant_id=tenant_id,
+        settings=cfg,
+        trigger_kind="post_ingestion",
+        batch_limit=cfg.cortex_post_ingestion_canonical_batch_limit,
+        reason=reason,
     )
+    if not result.get("scheduled"):
+        return result
+    async_result_id = result.get("celery_task_id")
     _LOGGER.info(
         "post_ingestion_substrate_refresh_scheduled tenant_id=%s reason=%s countdown_s=%s",
         tenant_id,
@@ -65,6 +59,6 @@ def schedule_post_ingestion_substrate_refresh(
         "scheduled": True,
         "reason": reason,
         "task_id": task_id,
-        "celery_task_id": str(async_result.id),
+        "celery_task_id": async_result_id,
         "countdown_seconds": debounce,
     }

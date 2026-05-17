@@ -23,7 +23,13 @@ from vector.infrastructure.db.models.cortex_artifact_lineage_edge import CortexA
 from vector.infrastructure.db.models.cortex_octs_durable_walk_record import CortexOctsDurableWalkRecord
 from vector.infrastructure.db.models.cortex_octs_traversal_receipt import CortexOctsTraversalReceipt
 from vector.infrastructure.db.models.cortex_octs_traversal_replay_archive import CortexOctsTraversalReplayArchive
+from vector.infrastructure.db.models.cortex_substrate_pipeline_run import (
+    CortexSubstratePhaseRun,
+    CortexSubstratePipelineRun,
+)
 from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
+from vector.infrastructure.db.models.cortex_retrieval_index_epoch import CortexRetrievalIndexEpoch
+from vector.infrastructure.db.models.cortex_retrieval_query_audit import CortexRetrievalQueryAudit
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_artifact import CortexTcreReconstructionArtifact
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import CortexTcreReconstructionJob
 from vector.infrastructure.db.models.cortex_org_link_candidate import CortexOrgLinkCandidate
@@ -104,7 +110,11 @@ __all__ = [
     "CortexOctsDurableWalkRecord",
     "CortexOctsTraversalReceipt",
     "CortexOctsTraversalReplayArchive",
+    "CortexSubstratePhaseRun",
+    "CortexSubstratePipelineRun",
     "CortexRetrievalIndexEntry",
+    "CortexRetrievalIndexEpoch",
+    "CortexRetrievalQueryAudit",
     "CortexTcreReconstructionArtifact",
     "CortexTcreReconstructionJob",
     "CortexOrgLinkCandidate",

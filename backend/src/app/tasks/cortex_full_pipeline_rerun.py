@@ -1,4 +1,4 @@
-"""Tenant-scoped Cortex flush + rerun: P04 identity substrate then P05 graph projection ingress."""
+"""Tenant-scoped Cortex flush + rerun through Phase 07 (ingestion → … → retrieval index)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,13 @@ import uuid
 from typing import Any
 
 from app.celery_app import celery_app
-from vector.domains.cortex.ingestion.post_ingestion_substrate_refresh import (
-    run_post_ingestion_substrate_refresh,
+from vector.domains.cortex.substrate_pipeline.constants import (
+    PHASE_02_CANONICAL,
+    PIPELINE_TRIGGER_FLUSH_RERUN,
+)
+from vector.domains.cortex.substrate_pipeline.orchestrator import (
+    enqueue_next_pipeline_phase_v1,
+    start_substrate_pipeline_run_v1,
 )
 from vector.domains.cortex.ingestion.sync_context import IngestionSyncContext
 from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
@@ -24,7 +29,7 @@ def run_cortex_flush_rerun_to_identity_task(
     connectors: list[dict[str, str]],
     batch_limit: int,
 ) -> dict[str, Any]:
-    """Ingest syncs, canonical drain, identity audit, then Phase 05 org graph projection export."""
+    """Ingest syncs, substrate refresh (canonical → identity → graph → TCRE → retrieval index)."""
     tid = uuid.UUID(tenant_id)
     settings = get_settings()
     sync_results: list[dict[str, Any]] = []
@@ -67,36 +72,26 @@ def run_cortex_flush_rerun_to_identity_task(
                         "error": str(exc),
                     }
                 )
-        substrate = run_post_ingestion_substrate_refresh(
+        run_id, created = start_substrate_pipeline_run_v1(
             session,
-            settings,
             tenant_id=tid,
+            trigger_kind=PIPELINE_TRIGGER_FLUSH_RERUN,
             bundle_id=bundle_id.strip(),
-            batch_limit=batch_limit,
-            identity_substrate_trigger="cortex_flush_rerun",
         )
-        return {
-            "tenant_id": tenant_id,
-            "bundle_id": bundle_id.strip(),
-            "sync_results": sync_results,
-            "canonical_summary": substrate.get("canonical_summary"),
-            "determinism_repair": substrate.get("determinism_repair"),
-            "identity_continuity_substrate": substrate.get("identity_continuity_substrate"),
-            "identity_substrate_audit": substrate.get("identity_substrate_audit"),
-            "identity_substrate_audit_replay_job_id": substrate.get(
-                "identity_substrate_audit_replay_job_id"
-            ),
-            "identity_backfill_summary": substrate.get("identity_continuity_substrate"),
-            "phase05_graph_projection_export_job_id": substrate.get(
-                "phase05_graph_projection_export_job_id"
-            ),
-            "phase05_graph_projection_stable_hash_sha256": substrate.get(
-                "phase05_graph_projection_stable_hash_sha256"
-            ),
-            "phase05_org_graph_traversal_verification_slice": substrate.get(
-                "phase05_org_graph_traversal_verification_slice"
-            ),
-            "phase05_org_graph_traversal_slice_hash": substrate.get(
-                "phase05_org_graph_traversal_slice_hash"
-            ),
-        }
+        session.commit()
+    first_phase = enqueue_next_pipeline_phase_v1(
+        tenant_id=tid,
+        pipeline_run_id=run_id,
+        phase_id=PHASE_02_CANONICAL,
+        bundle_id=bundle_id.strip(),
+        batch_limit=batch_limit,
+        identity_substrate_trigger="cortex_flush_rerun",
+    )
+    return {
+        "tenant_id": tenant_id,
+        "bundle_id": bundle_id.strip(),
+        "sync_results": sync_results,
+        "pipeline_run_id": str(run_id),
+        "pipeline_created": created,
+        "first_phase": first_phase,
+    }

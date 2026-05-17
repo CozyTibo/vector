@@ -14,6 +14,7 @@ RETRIEVAL_LEGALITY_CLASSES_V1: Final[frozenset[str]] = frozenset(
         "retrieval_degraded",
         "retrieval_partial",
         "retrieval_unverifiable",
+        "retrieval_forbidden",
     }
 )
 
@@ -67,10 +68,39 @@ def assert_retrieval_lawful_v1(
     legality_class: str,
     replay_posture: str,
 ) -> None:
+    assert_retrieval_query_lawful_v1(
+        legality_class=legality_class,
+        replay_posture=replay_posture,
+        intent="inspect",
+        execution_partition="authoritative",
+    )
+
+
+def assert_retrieval_query_lawful_v1(
+    *,
+    legality_class: str,
+    replay_posture: str,
+    intent: str,
+    execution_partition: str = "authoritative",
+) -> None:
     if legality_class not in RETRIEVAL_LEGALITY_CLASSES_V1:
         raise RetrievalLegalityError("unknown_retrieval_legality_class")
-    if legality_class == "retrieval_unverifiable":
+    if legality_class == "retrieval_forbidden":
+        raise RetrievalLegalityError(
+            "retrieval_forbidden",
+            detail={"legality_class": legality_class, "replay_posture": replay_posture},
+        )
+    if legality_class == "retrieval_unverifiable" and intent != "audit":
         raise RetrievalLegalityError(
             "retrieval_fail_closed",
             detail={"legality_class": legality_class, "replay_posture": replay_posture},
+        )
+    if (
+        execution_partition == "authoritative"
+        and legality_class == "retrieval_partial"
+        and intent != "audit"
+    ):
+        raise RetrievalLegalityError(
+            "retrieval_partial_requires_audit_intent",
+            detail={"legality_class": legality_class, "intent": intent},
         )

@@ -40,10 +40,16 @@ function toneForState(state: string): "ok" | "warn" | "bad" | "neutral" {
 
 function StageCard({ stage }: { stage: SubstrateCompletenessStage }) {
   const omissions = Object.entries(stage.omission_classes || {}).filter(([, n]) => n > 0);
+  const neverIndexed =
+    stage.stage_id === "retrieval" &&
+    (stage.omission_classes?.retrieval_index_never_built ?? 0) > 0;
   return (
     <Link
       to={stage.detail_route}
-      className="block min-w-[140px] flex-1 rounded-lg border border-stone-200 bg-white p-3 shadow-sm transition hover:border-indigo-300 hover:shadow"
+      className={[
+        "block min-w-[148px] shrink-0 rounded-lg border bg-white p-3 shadow-sm transition hover:border-indigo-300 hover:shadow",
+        neverIndexed ? "border-violet-300 ring-1 ring-violet-200" : "border-stone-200",
+      ].join(" ")}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-stone-600">{stage.label}</p>
@@ -62,7 +68,9 @@ function StageCard({ stage }: { stage: SubstrateCompletenessStage }) {
         </div>
         <div className="flex justify-between">
           <dt>Unresolved</dt>
-          <dd className={stage.unresolved_percent > 0 ? "text-red-700" : ""}>{stage.unresolved_percent}%</dd>
+          <dd className={stage.unresolved_percent > 0 ? "text-red-700" : ""}>
+            {stage.unresolved_percent}%
+          </dd>
         </div>
         {(stage.intentionally_excluded_count ?? 0) > 0 && (
           <div className="flex justify-between">
@@ -90,6 +98,9 @@ function StageCard({ stage }: { stage: SubstrateCompletenessStage }) {
 
 export function SubstrateCompletenessPipeline({ ledger }: { ledger: SubstrateCompletenessLedger }) {
   const chain = ledger.degradation_propagation?.propagation_chain ?? [];
+  const stages = ledger.pipeline_stages ?? [];
+  const missingRetrieval = !stages.some((s) => s.stage_id === "retrieval");
+
   return (
     <section className="rounded-xl border border-stone-200 bg-stone-50/80 p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -97,6 +108,10 @@ export function SubstrateCompletenessPipeline({ ledger }: { ledger: SubstrateCom
           <h2 className="text-lg font-semibold text-stone-900">Substrate completeness pipeline</h2>
           <p className="mt-1 text-sm text-stone-600">
             Bounded visible incompleteness — not execution analytics. Click a stage to debug omissions.
+          </p>
+          <p className="mt-1 text-xs text-stone-500">
+            {stages.length} stages
+            {missingRetrieval ? " · retrieval stage missing from API — refresh after deploy" : ""}
           </p>
         </div>
         <div className="flex gap-2">
@@ -106,17 +121,19 @@ export function SubstrateCompletenessPipeline({ ledger }: { ledger: SubstrateCom
           </StatusBadge>
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap items-stretch gap-2">
-        {ledger.pipeline_stages.map((stage, i) => (
-          <div key={stage.stage_id} className="flex items-center gap-2">
-            <StageCard stage={stage} />
-            {i < ledger.pipeline_stages.length - 1 && (
-              <span className="hidden text-stone-400 sm:inline" aria-hidden>
-                →
-              </span>
-            )}
-          </div>
-        ))}
+      <div className="mt-4 -mx-1 overflow-x-auto pb-2">
+        <div className="flex min-w-min items-stretch gap-2 px-1">
+          {stages.map((stage, i) => (
+            <div key={stage.stage_id} className="flex items-center gap-2">
+              <StageCard stage={stage} />
+              {i < stages.length - 1 && (
+                <span className="shrink-0 text-stone-400" aria-hidden>
+                  →
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
       {chain.length > 0 && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 p-3">

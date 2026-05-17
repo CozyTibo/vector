@@ -62,49 +62,24 @@ def test_build_ledger_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
     session.scalar.return_value = 0
     session.scalars.return_value.all.return_value = []
 
-    monkeypatch.setattr(
-        ledger_mod,
-        "project_ingestion_completeness_v1",
-        lambda *a, **k: build_stage_envelope_v1(
-            stage_id="ingestion", label="Raw", total_objects=0, processed_count=0, detail_route="/i"
-        ),
-    )
-    monkeypatch.setattr(
-        ledger_mod,
-        "project_canonical_completeness_v1",
-        lambda *a, **k: build_stage_envelope_v1(
-            stage_id="canonical", label="C", total_objects=0, processed_count=0, detail_route="/c"
-        ),
-    )
-    monkeypatch.setattr(
-        ledger_mod,
-        "project_identity_completeness_v1",
-        lambda *a, **k: build_stage_envelope_v1(
-            stage_id="identity", label="I", total_objects=0, processed_count=0, detail_route="/id"
-        ),
-    )
-    monkeypatch.setattr(
-        ledger_mod,
-        "project_graph_completeness_v1",
-        lambda *a, **k: build_stage_envelope_v1(
-            stage_id="graph", label="G", total_objects=0, processed_count=0, detail_route="/g"
-        ),
-    )
-    monkeypatch.setattr(
-        ledger_mod,
-        "project_traversal_completeness_v1",
-        lambda *a, **k: build_stage_envelope_v1(
-            stage_id="traversal", label="T", total_objects=0, processed_count=0, detail_route="/t"
-        ),
-    )
-    monkeypatch.setattr(
-        ledger_mod,
-        "project_tcre_completeness_v1",
-        lambda *a, **k: build_stage_envelope_v1(
-            stage_id="tcre", label="R", total_objects=0, processed_count=0, detail_route="/r"
-        ),
-    )
+    for stage_id, label, route in (
+        ("ingestion", "Raw", "/i"),
+        ("canonical", "C", "/c"),
+        ("identity", "I", "/id"),
+        ("graph", "G", "/g"),
+        ("traversal", "T", "/t"),
+        ("tcre", "R", "/r"),
+        ("retrieval", "Retrieval", "/ret"),
+    ):
+        monkeypatch.setitem(
+            ledger_mod._STAGE_PROJECTORS_V1,
+            stage_id,
+            lambda *a, sid=stage_id, lbl=label, r=route, **k: build_stage_envelope_v1(
+                stage_id=sid, label=lbl, total_objects=0, processed_count=0, detail_route=r
+            ),
+        )
     out = ledger_mod.build_substrate_completeness_ledger_v1(session, tenant_id=uuid.uuid4())
     assert out["substrate_state"] in ("healthy", "degraded", "critical")
-    assert len(out["pipeline_stages"]) == 6
+    assert len(out["pipeline_stages"]) == 7
+    assert out["aggregate"].get("retrieval") is not None
     assert out["ledger_digest"]

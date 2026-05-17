@@ -15,7 +15,7 @@ import jsonschema  # type: ignore[import-untyped]
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.traversal.normative import PHASE05_PROGRAM_FREEZE_VERSION
-from vector.domains.cortex.traversal.walk_api_contract import octs_walk_api_memory_store_v1
+from vector.domains.cortex.traversal.runtime.durable_walk_store import resolve_octs_walk_store_v1
 
 
 def _repo_root_with_octs_docs() -> Path:
@@ -126,7 +126,7 @@ def build_org_graph_traversal_verification_slice_v1(
     ``_session`` is reserved for future durable index / job queries (**index_epoch**, queue depth).
     """
     tid = str(tenant_id)
-    depth = octs_walk_api_memory_store_v1().walk_queue_depth_for_tenant(tenant_id)
+    depth = resolve_octs_walk_store_v1(_session).walk_queue_depth_for_tenant(tenant_id)
     body: dict[str, Any] = {
         "index_lag_epochs": 0,
         "last_gate_bundle_sha256": _LAST_GATE_BUNDLE_EMPTY_CANONICAL_SHA256,

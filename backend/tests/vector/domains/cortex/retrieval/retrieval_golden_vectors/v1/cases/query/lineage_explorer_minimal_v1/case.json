@@ -1,0 +1,32 @@
+{
+  "case_id": "query/lineage_explorer_minimal_v1",
+  "gate_id": "G-P07-LINEAGE-01",
+  "inputs": {
+    "tenant_id": "00000000-0000-0000-0000-000000000000",
+    "terminal": {"kind": "retrieval_index", "ref": "sha256:golden-terminal"},
+    "max_lineage_hops": 32,
+    "chain_fixture": {
+      "nodes": [
+        {"artifact_kind": "retrieval_index", "artifact_ref": "sha256:golden-terminal"},
+        {"artifact_kind": "tcre_chain", "artifact_ref": "chain-golden-1"}
+      ],
+      "edges": [
+        {
+          "lineage_edge_id": "edge-golden-1",
+          "from": "tcre_chain:chain-golden-1",
+          "to": "retrieval_index:sha256:golden-terminal",
+          "edge_kind": "tcre_binds_index",
+          "omission_summary": {},
+          "degradation_propagation": {},
+          "replay_identity": "golden-replay-lineage"
+        }
+      ]
+    },
+    "replay_pins": {}
+  },
+  "expected": {
+    "node_count": 2,
+    "lineage_coverage": "complete",
+    "gp07_lineage01_passed": true
+  }
+}

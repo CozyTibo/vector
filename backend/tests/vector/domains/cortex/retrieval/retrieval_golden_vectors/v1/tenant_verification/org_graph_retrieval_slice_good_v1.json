@@ -1,0 +1,9 @@
+{
+  "index_epoch": 0,
+  "org_graph_retrieval_slice_schema_version": 1,
+  "retrieval_program_freeze_version": 1,
+  "tcre_index_depth": 0,
+  "tenant_id": "00000000-0000-0000-0000-000000000000",
+  "verification_run_id": null,
+  "walk_index_depth": 0
+}

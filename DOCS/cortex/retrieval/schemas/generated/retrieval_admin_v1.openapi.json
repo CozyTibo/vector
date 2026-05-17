@@ -1,0 +1,579 @@
+{
+  "components": {
+    "securitySchemes": {
+      "admin_basic": {
+        "scheme": "basic",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Phase 07 retrieval operator control plane surfaces",
+    "title": "Vector Cortex Retrieval Admin API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/admin/tenants/{tenant_id}/cortex/retrieval/addressing": {
+      "get": {
+        "operationId": "retrieval_get_0",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/addressing",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/audit": {
+      "get": {
+        "operationId": "retrieval_get_1",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/audit",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/certification-pack": {
+      "get": {
+        "operationId": "retrieval_get_2",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/certification-pack",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/continuity-topology": {
+      "get": {
+        "operationId": "retrieval_get_3",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/continuity-topology",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/control-plane": {
+      "get": {
+        "operationId": "retrieval_get_4",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/control-plane",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/coverage": {
+      "get": {
+        "operationId": "retrieval_get_5",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/coverage",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/degradation-topology": {
+      "get": {
+        "operationId": "retrieval_get_6",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/degradation-topology",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/graph-binding": {
+      "get": {
+        "operationId": "retrieval_get_7",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/graph-binding",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/health": {
+      "get": {
+        "operationId": "retrieval_get_8",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/health",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/index": {
+      "get": {
+        "operationId": "retrieval_get_9",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/index",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/index/rebuild": {
+      "post": {
+        "operationId": "retrieval_post_10",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin POST /admin/tenants/{tenant_id}/cortex/retrieval/index/rebuild",
+        "x-rbac-permission": "cortex.retrieval.index_rebuild"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/ingress": {
+      "get": {
+        "operationId": "retrieval_get_11",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/ingress",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/legality": {
+      "get": {
+        "operationId": "retrieval_get_12",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/legality",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/lineage-explorer": {
+      "get": {
+        "operationId": "retrieval_get_13",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/lineage-explorer",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/lineage/{artifact_kind}/{artifact_ref}": {
+      "get": {
+        "operationId": "retrieval_get_14",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/lineage/{artifact_kind}/{artifact_ref}",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/observability": {
+      "get": {
+        "operationId": "retrieval_get_15",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/observability",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/omission-explorer": {
+      "get": {
+        "operationId": "retrieval_get_16",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/omission-explorer",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/overview": {
+      "get": {
+        "operationId": "retrieval_get_17",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/overview",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/program-closure": {
+      "get": {
+        "operationId": "retrieval_get_18",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/program-closure",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/provenance-inspector": {
+      "get": {
+        "operationId": "retrieval_get_19",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/provenance-inspector",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/query": {
+      "post": {
+        "operationId": "retrieval_post_20",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin POST /admin/tenants/{tenant_id}/cortex/retrieval/query",
+        "x-rbac-permission": "cortex.retrieval.query"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/query-contract": {
+      "get": {
+        "operationId": "retrieval_get_21",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/query-contract",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/ranking-selection": {
+      "get": {
+        "operationId": "retrieval_get_22",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/ranking-selection",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/readiness-economics": {
+      "get": {
+        "operationId": "retrieval_get_23",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/readiness-economics",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/replay-inspector": {
+      "get": {
+        "operationId": "retrieval_get_24",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/replay-inspector",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/runtime-legality-matrix": {
+      "get": {
+        "operationId": "retrieval_get_25",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/runtime-legality-matrix",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/tcre-binding": {
+      "get": {
+        "operationId": "retrieval_get_26",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/tcre-binding",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/temporal-explorer": {
+      "get": {
+        "operationId": "retrieval_get_27",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/temporal-explorer",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/tenant-verification-slice": {
+      "get": {
+        "operationId": "retrieval_get_28",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/tenant-verification-slice",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/traversal-binding": {
+      "get": {
+        "operationId": "retrieval_get_29",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/traversal-binding",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/walks/replay-equivalence": {
+      "get": {
+        "operationId": "retrieval_get_30",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/walks/replay-equivalence",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/walks/{walk_id}/replay-lineage": {
+      "get": {
+        "operationId": "retrieval_get_31",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/walks/{walk_id}/replay-lineage",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    },
+    "/admin/tenants/{tenant_id}/cortex/retrieval/workflows": {
+      "get": {
+        "operationId": "retrieval_get_32",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "admin_basic": []
+          }
+        ],
+        "summary": "Retrieval admin GET /admin/tenants/{tenant_id}/cortex/retrieval/workflows",
+        "x-rbac-permission": "cortex.retrieval.read"
+      }
+    }
+  }
+}

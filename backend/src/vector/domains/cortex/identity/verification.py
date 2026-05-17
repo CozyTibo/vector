@@ -6,6 +6,10 @@ for tenant-scoped audits and optional ``cortex_org_verification_runs`` persisten
 Phase 05 Step **23** optionally attaches the **``org_graph_traversal``** OCTS structural slice +
 ``octs_slice_hash`` to verification evidence when ``VECTOR_OCTS_TENANT_VERIFICATION_SLICE`` is set
 (see ``vector.domains.cortex.traversal.tenant_verification_slice``).
+
+Phase 07 Step **25** optionally attaches the **``org_graph_retrieval``** structural slice +
+``retrieval_slice_hash`` when ``VECTOR_RETRIEVAL_TENANT_VERIFICATION_SLICE`` is set
+(see ``vector.domains.cortex.retrieval.retrieval_tenant_verification_slice``).
 """
 
 from __future__ import annotations
@@ -89,6 +93,11 @@ def run_org_identity_verification(
     )
     p04_gates = phase04_identity_gate_slice(list(full.get("gates") or []))
     p04_passed = all(g.get("passed") for g in p04_gates if g.get("severity") == "hard_fail")
+    from vector.domains.cortex.retrieval.retrieval_tenant_verification_slice import (
+        build_org_graph_retrieval_verification_slice_v1,
+        compute_retrieval_verification_slice_hash_v1,
+        retrieval_tenant_verification_slice_enabled_v1,
+    )
     from vector.domains.cortex.traversal.tenant_verification_slice import (
         build_org_graph_traversal_verification_slice_v1,
         compute_octs_slice_hash_v1,
@@ -96,6 +105,7 @@ def run_org_identity_verification(
     )
 
     octs_slice_on = octs_tenant_verification_slice_enabled_v1()
+    retrieval_slice_on = retrieval_tenant_verification_slice_enabled_v1()
     evidence: dict[str, Any] = {
         **(full.get("evidence") if isinstance(full.get("evidence"), dict) else {}),
         "canonical_verification_engine_schema_version": full.get("canonical_verification_engine_schema_version"),
@@ -122,13 +132,27 @@ def run_org_identity_verification(
             )
             evidence["org_graph_traversal"] = slice_body
             evidence["octs_slice_hash"] = compute_octs_slice_hash_v1(slice_body)
+        if retrieval_slice_on:
+            rslice = build_org_graph_retrieval_verification_slice_v1(
+                session, tenant_id=tenant_id, verification_run_id=str(row.id)
+            )
+            evidence["org_graph_retrieval"] = rslice
+            evidence["retrieval_slice_hash"] = compute_retrieval_verification_slice_hash_v1(rslice)
+        if octs_slice_on or retrieval_slice_on:
             row.evidence_json = dict(evidence)
-    elif octs_slice_on:
-        slice_body = build_org_graph_traversal_verification_slice_v1(
-            session, tenant_id=tenant_id, verification_run_id=None
-        )
-        evidence["org_graph_traversal"] = slice_body
-        evidence["octs_slice_hash"] = compute_octs_slice_hash_v1(slice_body)
+    else:
+        if octs_slice_on:
+            slice_body = build_org_graph_traversal_verification_slice_v1(
+                session, tenant_id=tenant_id, verification_run_id=None
+            )
+            evidence["org_graph_traversal"] = slice_body
+            evidence["octs_slice_hash"] = compute_octs_slice_hash_v1(slice_body)
+        if retrieval_slice_on:
+            rslice = build_org_graph_retrieval_verification_slice_v1(
+                session, tenant_id=tenant_id, verification_run_id=None
+            )
+            evidence["org_graph_retrieval"] = rslice
+            evidence["retrieval_slice_hash"] = compute_retrieval_verification_slice_hash_v1(rslice)
 
     return {
         "org_identity_verification_engine_schema_version": ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,

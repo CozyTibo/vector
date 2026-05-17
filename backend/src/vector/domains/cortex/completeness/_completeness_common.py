@@ -18,6 +18,7 @@ STAGE_IDS: Final[tuple[str, ...]] = (
     "graph",
     "traversal",
     "tcre",
+    "retrieval",
 )
 
 SUBSTRATE_STATES: Final[frozenset[str]] = frozenset({"healthy", "degraded", "critical"})

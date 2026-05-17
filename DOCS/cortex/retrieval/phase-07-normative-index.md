@@ -1,13 +1,14 @@
 # Phase 07 — Normative index (lawful deterministic retrieval substrate)
 
-**Status:** normative specification program — **PHASE07_PROGRAM_FREEZE_VERSION `0`** (pre-implementation architecture pass; target `1` at **FF‑P07‑5**).  
+**Status:** normative specification program — **PHASE07_PROGRAM_FREEZE_VERSION `1`** (see §Program freeze).  
 **Role:** constitutional entry for **Phase 07 Retrieval & Query Engine (LRE)** — lawful evidence access over replay-safe reconstruction, **not** synthesis, semantic search, or LLM cognition.  
 **Normative tree:** `DOCS/cortex/retrieval/`.  
 **Supersedes (intent only):** shallow `DOCS/cortex/08-retrieval/architecture.md` — that file remains a stub; **this tree** is authoritative for Phase 07.
 
 **Changelog:** [`PHASE07_CONSTITUTIONAL_CHANGELOG.md`](./PHASE07_CONSTITUTIONAL_CHANGELOG.md).  
-**Implementation contract (future):** [`phase-07-implementation-sequencing-plan.md`](./phase-07-implementation-sequencing-plan.md).  
-**Gap discipline:** [`retrieval-spec-gap-matrix.md`](./retrieval-spec-gap-matrix.md).
+**Implementation contract:** [`phase-07-implementation-sequencing-plan.md`](./phase-07-implementation-sequencing-plan.md).  
+**Gap discipline:** [`retrieval-spec-gap-matrix.md`](./retrieval-spec-gap-matrix.md).  
+**Code anchors (P07-01 … P07-30):** `vector.domains.cortex.retrieval.normative.PHASE07_PROGRAM_FREEZE_VERSION`; `vector.domains.cortex.retrieval.normative.build_phase07_normative_program_document_v1` (program freeze public document); `vector.domains.cortex.retrieval.anti_goals` (**G‑P07‑ANTI‑01**, **G‑P07‑ANTI‑02**, **G‑P07‑SCHEMA‑01**, `RETRIEVAL_FORBIDDEN_LEGALITY_CLASS_V1`, `enforce_retrieval_query_envelope_anti_goals_v1`, `validate_retrieval_authoritative_output_algebra_v1`); `vector.domains.cortex.retrieval.phase_boundaries` (**RET‑BND‑06/08/09**, **G‑P07‑BND‑***, `RETRIEVAL_RD_TCRE_GAP_V1`, `build_retrieval_phase_boundary_catalog_v1`, `validate_retrieval_response_phase_boundaries_v1`); `vector.domains.cortex.retrieval.retrieval_ingress` (**G‑P07‑INGRESS‑01..04**, `RETRIEVAL_RD_INDEX_STALE_V1`, `evidence_candidate_only`, `build_retrieval_ingress_law_catalog_v1`, `build_retrieval_provenance_inspector_fields_v1`); `vector.domains.cortex.retrieval.query_contract` (**G‑P07‑QC‑01**, `RETRIEVAL_WORKLOAD_CLASSES_V1`, `RETRIEVAL_INTENT_CLASSES_V1`, `build_retrieval_query_contract_catalog_v1`, `build_retrieval_query_replay_identity_scope_v1`); `vector.domains.cortex.retrieval.query_execution` (**G‑P07‑QC‑02/03**, `RETRIEVAL_QUERY_EXECUTION_PHASES_V1`, `execute_retrieval_query_envelope_v1`, `build_retrieval_query_receipt_v1`); `vector.domains.cortex.retrieval.retrieval_legality_matrix` (**G‑P07‑LEG‑01**, `aggregate_query_legality_class_v1`, `build_retrieval_legality_matrix_catalog_v1`, `run_retrieval_r_leg_precheck_v1`, `build_retrieval_queries_by_legality_histogram_v1`); `vector.domains.cortex.retrieval.retrieval_replay_equivalence` (**G‑P07‑REPLAY‑01**, `compute_retrieval_query_replay_identity_v1`, `compare_gp07_replay_01_double_run_v1`, `build_retrieval_replay_inspector_catalog_v1`, `RETRIEVAL_RD_POLICY_MISMATCH_V1`); `vector.domains.cortex.retrieval.retrieval_addressing` (**G‑P07‑ADDR‑01**, `resolve_retrieval_addressing_v1`, `build_retrieval_addressing_catalog_v1`, `retrieval_golden_vectors_v1_root`); `vector.domains.cortex.retrieval.retrieval_provenance_evidence` (**G‑P07‑PROV‑01**, `build_retrieval_provenance_envelope_v1`, `build_retrieval_evidence_hit_v1`, `normalize_retrieval_omission_rows_v1`, `build_retrieval_provenance_inspector_catalog_v1`, **RET‑PROV‑01/02**); `vector.domains.cortex.retrieval.retrieval_temporal` (**G‑P07‑TEMP‑01**, `normalize_retrieval_temporal_scope_v1`, `apply_retrieval_temporal_law_to_query_v1`, `build_retrieval_temporal_explorer_catalog_v1`, **RET‑TEMP‑01..04**); `vector.domains.cortex.retrieval.retrieval_ranking_selection` (**G‑P07‑RANK‑01**, `sort_hits_deterministically_v1`, `apply_retrieval_ranking_and_selection_v1`, `build_retrieval_ranking_selection_catalog_v1`, **RET‑RANK‑01/02**); `vector.domains.cortex.retrieval.retrieval_bounded_caps` (**G‑P07‑DEG‑01**, `load_retrieval_policy_pack_v1`, `apply_retrieval_policy_pack_defaults_v1`, `normalize_retrieval_omission_law_rows_v1`, `build_retrieval_omission_explorer_catalog_v1`, **RET‑DEG‑01/02**); `vector.domains.cortex.retrieval.retrieval_index_materialization` (**RET‑IDX‑01**, **G‑P07‑REPLAY‑02**, `materialize_retrieval_index_entry_v1`, `publish_retrieval_index_epoch_v1`, `run_retrieval_index_rebuild_v1`, `compute_index_lag_epochs_v1`); `vector.domains.cortex.retrieval.retrieval_tcre_binding` (**RET‑TCRE‑01/02**, **G‑P07‑TCRE‑01**, `build_tcre_handoff_lookup_map_v1`, `apply_retrieval_tcre_binding_to_query_v1`, `materialize_retrieval_index_from_tcre_job_v1`, `build_retrieval_tcre_binding_catalog_v1`); `vector.domains.cortex.retrieval.retrieval_octs_binding` (**RET‑OCTS‑01..03**, **G‑P07‑OCTS‑01**, `build_retrieval_walk_ref_v1`, `query_walk_scope_v1`, `apply_retrieval_octs_binding_to_query_v1`, `materialize_retrieval_index_from_walk_v1`, `build_retrieval_traversal_binding_catalog_v1`); `vector.domains.cortex.retrieval.retrieval_graph_binding` (**RET‑GRAPH‑01..03**, **G‑P07‑GRAPH‑01**, `map_graph_ref_to_retrieval_lookup_id_v1`, `query_graph_scope_v1`, `apply_retrieval_graph_binding_to_query_v1`, `materialize_retrieval_index_from_graph_ref_v1`, `build_retrieval_graph_binding_catalog_v1`).
 
 ---
 
@@ -21,7 +22,7 @@
 
 | Field | Value |
 | ----- | ----- |
-| **PHASE07_PROGRAM_FREEZE_VERSION** | `0` (architecture); `1` at operator closure (**Step 30**). |
+| **PHASE07_PROGRAM_FREEZE_VERSION** | `1` — MUST match runtime constant `vector.domains.cortex.retrieval.normative.PHASE07_PROGRAM_FREEZE_VERSION` (shipped **P07-01**). |
 | **Scope** | Steps **1–30**; **FF‑P07‑0..5** bundles; vocabulary; CI gate catalog (**G‑P07‑***). |
 | **Hard upstream gate** | Phase **06** TCRE doctrine **Frozen (doctrine)** Steps **1–30** + live **RUNTIME‑01/02** bounded slice; Phase **05** OCTS **Steps 19–23** minimum; Phase **04** authoritative graph export. |
 
@@ -83,7 +84,7 @@
 
 | Term | Meaning |
 | ---- | ------- |
-| **LRE** | Lawful Retrieval Engine — Phase 07 runtime name (package TBD: `vector.domains.cortex.retrieval`). |
+| **LRE** | Lawful Retrieval Engine — Phase 07 runtime name (`vector.domains.cortex.retrieval`). |
 | **Query** | A **declared, validated** `RetrievalQueryEnvelopeV1` — not free-text search. |
 | **Hit** | One addressed evidence row returned inside a bounded result set — always carries provenance. |
 | **Omission** | Lawful non-return with **`retrieval_omission_class`** — never silent drop. |

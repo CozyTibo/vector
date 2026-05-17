@@ -18,7 +18,8 @@ def test_retrieval_lookup_id_stable() -> None:
         replay_identity="rid1",
     )
     assert a == b
-    assert len(a) == 32
+    assert a.startswith("sha256:")
+    assert len(a) == 71
 
 
 def test_policy_digest_stable() -> None:

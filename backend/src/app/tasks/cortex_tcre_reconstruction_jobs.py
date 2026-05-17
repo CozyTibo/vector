@@ -27,6 +27,8 @@ def run_tcre_reconstruction_job_task(tenant_id: str, job_id: str) -> dict[str, A
     tid = uuid.UUID(tenant_id)
     jid = uuid.UUID(job_id)
     _LOGGER.info("tcre_reconstruction_start tenant_id=%s job_id=%s", tenant_id, job_id)
+    chained: dict[str, Any] | None = None
+    summary: dict[str, Any] | None = None
     with session_scope() as session:
         job = session.get(CortexTcreReconstructionJob, jid)
         if job is None or job.tenant_id != tid:
@@ -40,6 +42,28 @@ def run_tcre_reconstruction_job_task(tenant_id: str, job_id: str) -> dict[str, A
                 "skipped": True,
             }
         summary = execute_tcre_reconstruction_job_v1(session, job)
+        if job.status == "completed":
+            from vector.domains.cortex.retrieval.retrieval_index_materialization import (
+                materialize_retrieval_index_incremental_after_tcre_v1,
+            )
+            from vector.domains.cortex.substrate_pipeline.orchestrator import (
+                on_tcre_job_completed_for_pipeline_v1,
+            )
+
+            scope = dict(job.scope_json or {})
+            prid_raw = scope.get("substrate_pipeline_run_id")
+            prid = uuid.UUID(str(prid_raw)) if prid_raw else None
+            materialize_retrieval_index_incremental_after_tcre_v1(
+                session,
+                tenant_id=tid,
+                job=job,
+                pipeline_run_id=prid,
+            )
+            chained = on_tcre_job_completed_for_pipeline_v1(
+                session,
+                tenant_id=tid,
+                job_scope=scope,
+            )
         session.commit()
     _LOGGER.info("tcre_reconstruction_done tenant_id=%s job_id=%s", tenant_id, job_id)
-    return {"tenant_id": tenant_id, "job_id": job_id, "summary": summary}
+    return {"tenant_id": tenant_id, "job_id": job_id, "summary": summary, "pipeline_chain": chained}

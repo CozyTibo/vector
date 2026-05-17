@@ -89,6 +89,19 @@ from vector.infrastructure.db.models.raw_memory_retention_event import RawMemory
 from vector.infrastructure.db.models.raw_memory_revision_index import RawMemoryRevisionIndex
 from vector.infrastructure.db.models.raw_memory_trust_state import RawMemoryTrustState
 from vector.infrastructure.db.models.raw_memory_trust_transition import RawMemoryTrustTransition
+from vector.infrastructure.db.models.cortex_artifact_lineage_edge import CortexArtifactLineageEdge
+from vector.infrastructure.db.models.cortex_octs_durable_walk_record import CortexOctsDurableWalkRecord
+from vector.infrastructure.db.models.cortex_octs_traversal_receipt import CortexOctsTraversalReceipt
+from vector.infrastructure.db.models.cortex_octs_traversal_replay_archive import (
+    CortexOctsTraversalReplayArchive,
+)
+from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
+from vector.infrastructure.db.models.cortex_retrieval_index_epoch import CortexRetrievalIndexEpoch
+from vector.infrastructure.db.models.cortex_retrieval_query_audit import CortexRetrievalQueryAudit
+from vector.infrastructure.db.models.cortex_tcre_reconstruction_artifact import (
+    CortexTcreReconstructionArtifact,
+)
+from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import CortexTcreReconstructionJob
 
 
 def _dml_rowcount(session: Session, stmt: UpdateBase) -> int:
@@ -211,12 +224,70 @@ def _flush_phase04_org_identity_tables(session: Session, *, tenant_id: uuid.UUID
     return deleted
 
 
+def _flush_phase05_through_phase07_tables(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, int]:
+    """Delete tenant OCTS / TCRE / retrieval durable rows (FK-safe order)."""
+    deleted: dict[str, int] = {}
+    deleted["cortex_retrieval_query_audits"] = _dml_rowcount(
+        session,
+        delete(CortexRetrievalQueryAudit).where(CortexRetrievalQueryAudit.tenant_id == tenant_id),
+    )
+    deleted["cortex_retrieval_index_entries"] = _dml_rowcount(
+        session,
+        delete(CortexRetrievalIndexEntry).where(CortexRetrievalIndexEntry.tenant_id == tenant_id),
+    )
+    deleted["cortex_retrieval_index_epochs"] = _dml_rowcount(
+        session,
+        delete(CortexRetrievalIndexEpoch).where(CortexRetrievalIndexEpoch.tenant_id == tenant_id),
+    )
+    session.execute(
+        update(CortexTcreReconstructionJob)
+        .where(CortexTcreReconstructionJob.tenant_id == tenant_id)
+        .values(parent_job_id=None),
+    )
+    deleted["cortex_tcre_reconstruction_artifacts"] = _dml_rowcount(
+        session,
+        delete(CortexTcreReconstructionArtifact).where(
+            CortexTcreReconstructionArtifact.tenant_id == tenant_id,
+        ),
+    )
+    deleted["cortex_tcre_reconstruction_jobs"] = _dml_rowcount(
+        session,
+        delete(CortexTcreReconstructionJob).where(CortexTcreReconstructionJob.tenant_id == tenant_id),
+    )
+    deleted["cortex_octs_traversal_receipts"] = _dml_rowcount(
+        session,
+        delete(CortexOctsTraversalReceipt).where(CortexOctsTraversalReceipt.tenant_id == tenant_id),
+    )
+    deleted["cortex_octs_traversal_replay_archives"] = _dml_rowcount(
+        session,
+        delete(CortexOctsTraversalReplayArchive).where(
+            CortexOctsTraversalReplayArchive.tenant_id == tenant_id,
+        ),
+    )
+    deleted["cortex_octs_durable_walk_records"] = _dml_rowcount(
+        session,
+        delete(CortexOctsDurableWalkRecord).where(
+            CortexOctsDurableWalkRecord.tenant_id == tenant_id,
+        ),
+    )
+    deleted["cortex_artifact_lineage_edges"] = _dml_rowcount(
+        session,
+        delete(CortexArtifactLineageEdge).where(CortexArtifactLineageEdge.tenant_id == tenant_id),
+    )
+    session.flush()
+    return deleted
+
+
 def flush_tenant_cortex_pipeline_state(
     session: Session,
     *,
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
-    """Delete tenant-scoped Cortex raw + canonical runtime state + Phase 04 org identity rows."""
+    """Delete tenant-scoped Cortex raw + canonical + identity + OCTS/TCRE/retrieval runtime state."""
     delete_plan: tuple[tuple[str, type[Any]], ...] = (
         ("cortex_canonical_ambiguity_lifecycle_events", CortexCanonicalAmbiguityLifecycleEvent),
         ("cortex_canonical_ambiguity_records", CortexCanonicalAmbiguityRecord),
@@ -250,6 +321,8 @@ def flush_tenant_cortex_pipeline_state(
         )
     org_deleted = _flush_phase04_org_identity_tables(session, tenant_id=tenant_id)
     deleted_by_table.update(org_deleted)
+    downstream_deleted = _flush_phase05_through_phase07_tables(session, tenant_id=tenant_id)
+    deleted_by_table.update(downstream_deleted)
     session.flush()
     return {
         "tenant_id": str(tenant_id),

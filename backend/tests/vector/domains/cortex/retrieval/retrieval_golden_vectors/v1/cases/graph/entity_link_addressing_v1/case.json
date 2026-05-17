@@ -1,0 +1,17 @@
+{
+  "case_id": "graph_entity_link_addressing_v1",
+  "schema_version": 1,
+  "description": "org_entity_id and org_link_id map to retrieval_lookup_id; candidate links stay evidence_candidate_only",
+  "graph_scope_query_kinds": [
+    "entity_by_id",
+    "link_by_id",
+    "tenant_authoritative_link_inventory",
+    "orphan_probe"
+  ],
+  "addressing_refs": {
+    "org_entity_id": "00000000-0000-4000-8000-000000000001",
+    "org_link_id": "00000000-0000-4000-8000-000000000002"
+  },
+  "expected_rd_orphan": "RD-GRAPH-ORPHAN",
+  "expected_candidate_legality": "evidence_candidate_only"
+}

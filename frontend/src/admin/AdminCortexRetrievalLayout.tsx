@@ -1,11 +1,6 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 
-const SECTIONS = [
-  { key: "", label: "Overview", end: true },
-  { key: "legality", label: "Legality", end: true },
-  { key: "lineage", label: "Lineage explorer", end: true },
-  { key: "continuity", label: "Continuity", end: true },
-] as const;
+import { RETRIEVAL_NAV_SECTIONS } from "./retrievalAdminSurfaces";
 
 function tabCls(isActive: boolean): string {
   return [
@@ -27,7 +22,7 @@ export default function AdminCortexRetrievalLayout() {
         Indexes chronology windows, causal chains, and continuity segments with full lineage visibility.
       </p>
       <nav className="flex flex-wrap gap-2 border-b border-stone-200 pb-3">
-        {SECTIONS.map((s) => (
+        {RETRIEVAL_NAV_SECTIONS.map((s) => (
           <NavLink
             key={s.key || "overview"}
             to={s.key ? `${base}/${s.key}` : base}

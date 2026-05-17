@@ -6,6 +6,8 @@ import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
+from sqlalchemy.orm import Session
+
 from vector.domains.cortex.reasoning.reasoning_receipts_proof_artifacts import (
     hash_reasoning_canonical_json_sha256_v1,
 )
@@ -92,16 +94,17 @@ def resolve_octs_walk_payload_v1(
     tenant_id: uuid.UUID,
     *,
     octs_walk_id: str | None,
+    session: Session | None = None,
 ) -> dict[str, Any] | None:
     if not octs_walk_id or not str(octs_walk_id).strip():
         return None
-    from vector.domains.cortex.traversal.walk_api_contract import octs_walk_api_memory_store_v1
+    from vector.domains.cortex.traversal.runtime.durable_walk_store import resolve_octs_walk_store_v1
 
     try:
         wid = uuid.UUID(str(octs_walk_id).strip())
     except ValueError:
         return None
-    rec = octs_walk_api_memory_store_v1().get(tenant_id, wid)
+    rec = resolve_octs_walk_store_v1(session).get(tenant_id, wid)
     if rec is None or rec.walk_payload is None:
         return None
     return dict(rec.walk_payload)
@@ -115,12 +118,17 @@ def build_octs_replay_identity_envelope_v1(
     tcre_policy_bundle_digest: str,
     reasoning_rule_pack_id: str,
     strict_binding: bool,
+    session: Session | None = None,
 ) -> dict[str, Any]:
     """Derive OCTS replay identity envelope; fail closed when strict and evidence missing."""
     octs_walk_id = scope.get("octs_walk_id")
     expected_epoch = scope.get("traversal_epoch")
     expected_walk_hash = scope.get("expected_walk_result_hash")
-    walk_payload = resolve_octs_walk_payload_v1(tenant_id, octs_walk_id=str(octs_walk_id or ""))
+    walk_payload = resolve_octs_walk_payload_v1(
+        tenant_id,
+        octs_walk_id=str(octs_walk_id or ""),
+        session=session,
+    )
 
     permutation = canonical_reasoning_replay_permutation_v1_json(
         ["materialization_id"],

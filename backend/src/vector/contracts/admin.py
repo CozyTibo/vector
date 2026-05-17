@@ -564,7 +564,7 @@ class AdminCortexFlushAndRerunRequest(BaseModel):
 
     confirmation: str = Field(
         ...,
-        description="Must exactly match the server phrase for flush + rerun through Phase 05 (see admin UI).",
+        description="Must exactly match the server phrase for flush + rerun through Phase 07 (see admin UI).",
     )
     canonical_batch_limit: int = Field(
         default=500,
@@ -572,7 +572,7 @@ class AdminCortexFlushAndRerunRequest(BaseModel):
         le=5000,
         description=(
             "Batch size for canonical backlog drain inside the flush+rerun orchestrator "
-            "(before identity refresh and Phase 05 graph projection export)."
+            "(before identity refresh, graph export, TCRE reconstruction, and retrieval index bootstrap)."
         ),
     )
 
@@ -587,7 +587,7 @@ class AdminCortexFlushAndRerunResponse(BaseModel):
         default=None,
         description=(
             "Celery id for the orchestrator task (ingestion syncs + canonical drain + identity substrate + "
-            "Phase 05 org graph projection export)."
+            "graph export, TCRE reconstruction, and retrieval index bootstrap)."
         ),
     )
     canonical_batch_limit: int
@@ -934,6 +934,62 @@ class AdminCortexReasoningCertificationPackSnapshotResponse(BaseModel):
     whole_file_sha256: str | None = None
     pack_gzip_base64: str | None = None
     pack_byte_length: int | None = None
+
+
+class AdminCortexRetrievalCertificationPackSnapshotResponse(BaseModel):
+    """Phase 07 Step 28 — RETRIEVAL-CERT-PACK-1 snapshot (gzip + digests; read-only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    retrieval_certification_pack_runtime_schema_version: int
+    retrieval_cert_pack_format: str
+    closure_passed: bool
+    closure_detail: dict[str, Any]
+    whole_file_sha256: str | None = None
+    pack_gzip_base64: str | None = None
+    pack_byte_length: int | None = None
+
+
+class AdminCortexRetrievalProgramClosureCompletionCriterionRow(BaseModel):
+    """One Phase 07 program completion criterion (C01–C10)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    criterion_id: str
+    label: str
+    passed: bool
+    errors: list[str]
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexRetrievalProgramClosureOperatorChecklistRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    check_id: str
+    label: str
+    detail: str
+    passed: bool
+
+
+class AdminCortexRetrievalProgramClosureResponse(BaseModel):
+    """Phase 07 Step 30 — program closure + FF-P07-5 operator snapshot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    retrieval_program_closure_runtime_schema_version: int
+    retrieval_program_freeze_version: int
+    freeze_bundle_id: str
+    spec_ref: str
+    program_closure_passed: bool
+    completion_criteria: list[AdminCortexRetrievalProgramClosureCompletionCriterionRow]
+    operator_checklist: list[AdminCortexRetrievalProgramClosureOperatorChecklistRow]
+    control_plane_surfaces_wired: int
+    control_plane_surfaces_total: int
+    certification_pack: dict[str, Any]
+    normative_program: dict[str, Any]
+    rd_topology_check: dict[str, Any] | None = None
 
 
 class AdminCortexReasoningRuntimeHealthResponse(BaseModel):

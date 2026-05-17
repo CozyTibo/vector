@@ -55,7 +55,7 @@ def test_schedule_debounced_refresh_with_stable_task_id(monkeypatch: pytest.Monk
 
     monkeypatch.setattr("app.celery_app.celery_app", mock_celery)
     monkeypatch.setattr(
-        "app.tasks.cortex_post_ingestion_substrate_refresh.run_cortex_post_ingestion_substrate_refresh_task",
+        "app.tasks.cortex_substrate_pipeline.run_cortex_substrate_pipeline_coordinator_task",
         mock_task,
     )
 
@@ -75,10 +75,9 @@ def test_schedule_debounced_refresh_with_stable_task_id(monkeypatch: pytest.Monk
         assert call["queue"] == "vector"
         assert call["countdown"] == 120
         assert call["task_id"] == post_ingestion_refresh_celery_task_id(tid)
-        assert call["kwargs"] == {
-            "tenant_id": str(tid),
-            "batch_limit": get_settings().cortex_post_ingestion_canonical_batch_limit,
-        }
+        assert call["kwargs"]["tenant_id"] == str(tid)
+        assert call["kwargs"]["batch_limit"] == get_settings().cortex_post_ingestion_canonical_batch_limit
+        assert call["kwargs"]["trigger_kind"] == "post_ingestion"
         assert revoke_calls == [post_ingestion_refresh_celery_task_id(tid)]
     finally:
         get_settings.cache_clear()
