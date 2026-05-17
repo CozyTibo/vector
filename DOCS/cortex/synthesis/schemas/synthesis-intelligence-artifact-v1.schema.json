@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vector.local/schemas/synthesis-intelligence-artifact-v1.schema.json",
+  "title": "SynthesisIntelligenceArtifactV1",
+  "description": "Phase 08 durable intelligence artifact — claim+citation structured output.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "artifact_kind",
+    "artifact_digest",
+    "synthesis_legality_class",
+    "synthesis_job_replay_identity",
+    "retrieval_query_replay_identity",
+    "synthesis_policy_pack_digest",
+    "evidence_scope_summary",
+    "claims",
+    "synthesis_citation_envelope",
+    "synthesis_omission_rows",
+    "synthesis_degradation_rollup",
+    "synthesis_legality_posture",
+    "lineage_chain_digest",
+    "llm_trace_refs",
+    "retrieval_receipt_embed",
+    "non_authoritative"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "artifact_id": { "type": "string", "format": "uuid" },
+    "artifact_kind": {
+      "type": "string",
+      "enum": [
+        "execution_understanding",
+        "operational_synthesis",
+        "execution_narrative",
+        "management_intelligence",
+        "continuity_assessment",
+        "degradation_brief"
+      ]
+    },
+    "artifact_digest": { "type": "string" },
+    "synthesis_legality_class": {
+      "type": "string",
+      "enum": [
+        "synthesis_replay_safe",
+        "synthesis_degraded",
+        "synthesis_partial",
+        "synthesis_unverifiable",
+        "synthesis_forbidden"
+      ]
+    },
+    "synthesis_job_replay_identity": { "type": "string" },
+    "retrieval_query_replay_identity": { "type": "string" },
+    "synthesis_policy_pack_digest": { "type": "string" },
+    "synthesis_publication_epoch": { "type": ["string", "null"] },
+    "evidence_scope_summary": { "type": "object" },
+    "claims": { "type": "array" },
+    "narrative_blocks": { "type": "array" },
+    "synthesis_citation_envelope": { "type": "object" },
+    "synthesis_omission_rows": { "type": "array" },
+    "synthesis_degradation_rollup": { "type": "object" },
+    "synthesis_legality_posture": { "type": "object" },
+    "lineage_chain_digest": { "type": "string" },
+    "llm_trace_refs": { "type": "array" },
+    "retrieval_receipt_embed": { "type": "object" },
+    "non_authoritative": { "type": "boolean" }
+  }
+}

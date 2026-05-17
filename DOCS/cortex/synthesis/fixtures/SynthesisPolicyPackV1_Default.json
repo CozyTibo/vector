@@ -1,0 +1,87 @@
+{
+  "synthesis_policy_pack_id": "SynthesisPolicyPackV1_Default",
+  "synthesis_policy_pack_version": 1,
+  "synthesis_orchestrator_build_id": "syn-orchestrator-v1-stub",
+  "caps": {
+    "max_claims": 64,
+    "max_retrieval_subqueries": 8,
+    "max_llm_tokens": 8192,
+    "max_wall_ms": 120000,
+    "max_artifact_json_bytes": 524288
+  },
+  "min_citation_coverage": 0.95,
+  "allow_degraded_publish": true,
+  "pipeline_default_workloads": [
+    "execution_understanding",
+    "degradation_brief"
+  ],
+  "synthesis_pipeline_max_scopes_per_run": 32,
+  "model_routes": [
+    {
+      "model_route_id": "struct-v1",
+      "authority_class": "llm_structuring",
+      "provider": "stub",
+      "model": "synthesis-struct-v1",
+      "temperature": 0,
+      "max_tokens": 4096,
+      "response_format": "json_schema",
+      "prompt_template_id": "synthesis_struct_default",
+      "prompt_template_version": 1
+    },
+    {
+      "model_route_id": "narrate-v1",
+      "authority_class": "llm_narration",
+      "provider": "stub",
+      "model": "synthesis-narrate-v1",
+      "temperature": 0,
+      "max_tokens": 2048,
+      "response_format": "json_schema",
+      "prompt_template_id": "synthesis_narrate_default",
+      "prompt_template_version": 1
+    }
+  ],
+  "retrieval_fanout_rules": [
+    {
+      "when_workload": "execution_understanding",
+      "add_workload": "lineage_explorer",
+      "intent": "inspect"
+    },
+    {
+      "when_workload": "continuity_assessment",
+      "add_workload": "ownership_continuity",
+      "intent": "inspect"
+    }
+  ],
+  "sd_codes": [
+    "SD-CAP-CLAIMS",
+    "SD-CAP-RETRIEVAL",
+    "SD-CAP-LLM",
+    "SD-CITE-GAP",
+    "SD-SCOPE-EMPTY",
+    "SD-UPSTREAM-RD",
+    "SD-UPSTREAM-LEG",
+    "SD-LLM-TIMEOUT",
+    "SD-LLM-SCHEMA",
+    "SD-LLM-POLICY",
+    "SD-REPLAY-TWIN",
+    "SD-REPLAY-DRIFT",
+    "SD-POLICY-MISMATCH",
+    "SD-PUBLISH-BLOCKED",
+    "SD-PIPELINE-GAP",
+    "SD-TEMPORAL-PIN"
+  ],
+  "rd_to_sd_propagation": [
+    {
+      "rd_code": "RD-TCRE-GAP",
+      "sd_code": "SD-UPSTREAM-RD"
+    },
+    {
+      "rd_code": "RD-REPLAY-UNSAFE",
+      "sd_code": "SD-UPSTREAM-LEG"
+    },
+    {
+      "rd_code": "RD-INDEX-STALE",
+      "sd_code": "SD-PIPELINE-GAP"
+    }
+  ]
+}

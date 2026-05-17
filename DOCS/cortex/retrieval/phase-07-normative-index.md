@@ -100,3 +100,5 @@ Raw → Canonical → Identity → Graph → Traversal → TCRE → Retrieval �
 ```
 
 Retrieval completeness is **downstream of** TCRE reconstruction coverage and OCTS walk durability but **MUST NOT** collapse TCRE gaps into silent retrieval success.
+
+**Phase 08 downstream:** authoritative synthesis ingress and contracts live in **`DOCS/cortex/synthesis/`** — entry [`../synthesis/phase-08-normative-index.md`](../synthesis/phase-08-normative-index.md) (**SYN-BND-07-01**).

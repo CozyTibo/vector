@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vector.local/schemas/synthesis-job-envelope-v1.schema.json",
+  "title": "SynthesisJobEnvelopeV1",
+  "description": "Phase 08 synthesis job envelope. G-P08-SCHEMA-01 rejects forbidden cognition keys per phase-08-anti-goals-doctrine.md.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "tenant_id",
+    "synthesis_workload_class",
+    "synthesis_intent",
+    "execution_partition"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "tenant_id": { "type": "string", "format": "uuid" },
+    "synthesis_workload_class": {
+      "type": "string",
+      "enum": [
+        "execution_understanding",
+        "operational_synthesis",
+        "execution_narrative",
+        "management_intelligence",
+        "continuity_assessment",
+        "degradation_brief",
+        "replay_equivalence_synthesis",
+        "pipeline_default"
+      ]
+    },
+    "synthesis_intent": {
+      "type": "string",
+      "enum": ["inspect", "prove", "audit", "enumerate", "diff"]
+    },
+    "execution_partition": {
+      "type": "string",
+      "enum": ["authoritative", "exploration"]
+    },
+    "retrieval_scope": { "type": "object" },
+    "retrieval_pins": { "type": "object" },
+    "synthesis_policy_pack_id": { "type": "string" },
+    "selection_policy": { "type": "object" },
+    "idempotency_key": { "type": "string" },
+    "substrate_pipeline_run_id": { "type": "string", "format": "uuid" },
+    "pinned_retrieval_receipt": { "type": "object" }
+  },
+  "not": {
+    "anyOf": [
+      { "required": ["embedding"] },
+      { "required": ["chat"] },
+      { "required": ["messages"] },
+      { "required": ["rag"] },
+      { "required": ["semantic_search"] },
+      { "required": ["natural_language_query"] },
+      { "required": ["query_text"] },
+      { "required": ["recommendation"] },
+      { "required": ["hidden_reasoning"] }
+    ]
+  }
+}

@@ -4,7 +4,7 @@
 - **Architecture maturity:** Core foundation defined across Phases 01-04 and 10; storage/queryability challenge pass added.
 - **Ingestion vs exhaust (non‑negotiable distinction):** **Substrate** (runs, replay lanes, envelope validation, checkpoint storage, admin triggers, verification jobs) is **not** Phase 01 success. **Phase 01 success** = **full raw organizational exhaust** per `DOCS/cortex/01-ingestion/phase-01-organizational-exhaust-spec.md` (pagination, per-stream cursors, backfill + incremental, replay semantics, exit criteria). Do not treat “sync ran,” “scope_ping rows exist,” or “integration connected” as exhaust progress. Deep exhaust is tracked in **§2.5**, `organizational-exhaust-execution-track.md`, `connector-exhaust-matrix.md`, `exhaust_coverage_registry.py`, and admin raw aggregates.
 - **Implementation stage:** Phase 01 Steps **0–16** = ingestion substrate + checkpoint spine + connector depth + admin exhaust proof + verification gate + live-lane logical idempotency lock + runtime correctness hardening — **Yes (Phase 01 complete)**.
-- **Current focus:** Phase **05** OCTS — **Step 26** shipped; **Phase 06** TCRE — **doctrine `Frozen (doctrine)`** for Steps **1–30** + implementation handoff shipped (`P06-FINAL-FREEZE-2026-05-13`: **CHRON‑FORB‑1** closure, **`ReasoningPolicyPackV1_Default`** fixture, registry xref, **`PHASE06_IMPLEMENTATION_HANDOFF.md`** — see **`reasoning/PHASE06_CONSTITUTIONAL_CHANGELOG.md`**). **First Phase 06 runtime package** remains gated on OCTS **Steps 19–23** + tracker dependency; **`G‑P06‑*`** CI wiring **Not Started** (**CI implemented** ≠ **Frozen (doctrine)**). **Steps 1–26** OCTS in **`vector.domains.cortex.traversal`** + admin + pytest; **FF-4** / **FF-5** as before; production OCTS **Blocked** on **`phase-05-runtime-legality-matrix.md`** + **FF-4**; legacy **`05-graph/*`** **SUPERSEDED**. Phase **04** soak / hostile-mock stress remains parallel.
+- **Current focus:** Phase **08** SIL — **doctrine program Steps 1–35** shipped (`DOCS/cortex/synthesis/`, **P08-DOCTRINE-PASS-2026-05-16**); implementation **Not Started** (`vector.domains.cortex.synthesis`). Parallel: Phase **07** retrieval **runtime closure** (**RC**) + production soak; Phase **05** OCTS — **Step 26** shipped; **Phase 06** TCRE — **doctrine `Frozen (doctrine)`** for Steps **1–30** + implementation handoff shipped (`P06-FINAL-FREEZE-2026-05-13`: **CHRON‑FORB‑1** closure, **`ReasoningPolicyPackV1_Default`** fixture, registry xref, **`PHASE06_IMPLEMENTATION_HANDOFF.md`** — see **`reasoning/PHASE06_CONSTITUTIONAL_CHANGELOG.md`**). **First Phase 06 runtime package** remains gated on OCTS **Steps 19–23** + tracker dependency; **`G‑P06‑*`** CI wiring **Not Started** (**CI implemented** ≠ **Frozen (doctrine)**). **Steps 1–26** OCTS in **`vector.domains.cortex.traversal`** + admin + pytest; **FF-4** / **FF-5** as before; production OCTS **Blocked** on **`phase-05-runtime-legality-matrix.md`** + **FF-4**; legacy **`05-graph/*`** **SUPERSEDED**. Phase **04** soak / hostile-mock stress remains parallel.
 - **Total phases:** 10.
 - **Current blockers:** Phase 01 hard blockers cleared; remaining work is post-closure soak/scale confidence and later-phase architecture. (Cortex ingestion routing defaults **on**; use `CORTEX_CONNECTOR_MIGRATION_*=false` only to opt out.)
 - **Next major milestone:** Phase **05** OCTS — ship **`vector.domains.cortex.traversal`** + **`hard_fail`** **`G-P05-*`** CI execution + **FF-4** sign-off before index materialization; **FF-5** path now includes shipped **`OCTS-CERT-PACK-1`** + **`G-P05-CLOSE-01`** (static closure gate). Normative tree: **`DOCS/cortex/05-traversal/`**. Phase **04** **OrgGraphProjectionV1** + graph boundary remain authoritative ingress.
@@ -19,7 +19,7 @@
 | 05 | Organizational Continuity Traversal Substrate (OCTS) | **Replay-safe bounded graph walks** over Phase 04 authoritative org continuity: deterministic traversal contracts, temporal walk semantics, hop receipts + telemetry, derived index replay, verification gates (**G-P05-***), operator control plane — **not** knowledge graph, retrieval, reasoning, synthesis, causal inference, or graph-as-identity-authority | **Program** locked in tracker + **normative doctrine** in **`DOCS/cortex/05-traversal/`**; runtime **`vector.domains.cortex.traversal`** **Partial** (Steps **1–26** implemented + pytest + admin traversal API through **G-P05-*** catalog PR bundle + **tenant org_graph_traversal** verification slice + engine identity + index replay verify stub + **Steps 24–25** control plane + readiness economics receipts + **Step 26** **`OCTS-CERT-PACK-1`** / **G-P05-CLOSE-01**) | **Doctrine: Frozen** · **Replay law: Strong** · **CI law (topology): Strong** · **CI execution: Partial** (Steps **1–26** walk/index/equivalence/**G-P05-*** catalog + tenant slice + control plane + economics **STAGE-E** + **STAGE-Z** closure gate + static gates) · **Production runtime: Blocked** (see §3 Phase 05 table) | **Partial** — normative **closure readiness: Complete** at spec layer; **No** production runtime until **FF-4** + implementation satisfies **`phase-05-runtime-legality-matrix.md`** |
 | 06 | Temporal & causal execution reconstruction | **Deterministic** temporal ordering + **evidence‑bounded causal chains** over Phases **01–04** replay‑safe exhaust and **Phase 05** OCTS receipts — **not** LLM reasoning, embeddings, probabilistic inference, agents, or semantic cognition | **Constitutional program** in **`DOCS/cortex/reasoning/`** (tracker §3 **Steps 1–35**); registries + state machine + **canonical default policy fixture** (`P06-FINAL-FREEZE-2026-05-13`); future runtime package **TBD** (`vector.domains.cortex.reasoning` placeholder) | **Doctrine: `Frozen (doctrine)`** (Steps **1–30**); Steps **31–35** doctrine text **Strong** / **CI + closure execution Partial** (**Step 35** certification pack + **G-P06-CLOSE-01** closure **shipped**); **`G‑P06‑*`** pytest **Partial** (harness + law modules **29–35** + admin operator surfaces) | **No** runtime package yet — **constitutionally authorized** to begin reducers/harness/admin/runtime **coding** per **`reasoning/PHASE06_IMPLEMENTATION_HANDOFF.md`**; **first integration** still requires OCTS **19–23** + **`reasoning-runtime-legality-matrix.md`** for **production‑certified** class |
 | 07 | Retrieval & Query Engine (LRE) | **Lawful deterministic retrieval substrate** — replay-safe, provenance-complete evidence access over TCRE/OCTS/graph/canonical — **not** semantic search, RAG, or synthesis | **Program** in **`DOCS/cortex/retrieval/`** (Steps **1–30** + **runtime closure pass**); runtime **`vector.domains.cortex.retrieval`** **Partial→Strong** (substrate pipeline **02–07**, reconstruction query, truth validation, E2E suite — see [`PHASE07_RUNTIME_CLOSURE.md`](retrieval/PHASE07_RUNTIME_CLOSURE.md)) | **Doctrine: Strong** · **CI: Partial** (E2E + **G-P07-*** + cert pack) · **Production: Partial** (ingest→query path operational; scale soak open) | **Partial** — Steps **1–30:** **Yes**; **runtime closure:** substrate pipeline + reconstruction + E2E; Phase **08** may consume lawful query envelopes |
-| 08 | Synthesis & Intelligence Layer | Generate bounded intelligence from reconstructable memory | Not Started | Incomplete | No |
+| 08 | Synthesis & Intelligence Layer (SIL) | **Evidence-constrained execution intelligence** — bounded synthesis artifacts from Phase **07** retrieval envelopes; deterministic orchestration + pinned LLM narration — **not** chat, RAG, or unconstrained summarization | **Program** in **`DOCS/cortex/synthesis/`** (Steps **1–35**, doctrine pass **P08-DOCTRINE-PASS-2026-05-16**); runtime **`vector.domains.cortex.synthesis`** **Not Started**; pipeline **`phase_08_synthesis`** specified (extends substrate **02–07**) | **Doctrine: Strong** (initial freeze) · **CI: Not Started** · **Production: Not Started** | **No** runtime — **Yes** for doctrine-led implementation (**FF‑P08‑0** complete); blocked on Phase **07** production certification for prod rollout only |
 | 09 | Operational Intelligence Products | Deliver operator-facing cognition workflows | Not Started | Incomplete | No |
 | 10 | Admin / Control Plane | Operate, inspect, and govern all Cortex phases | Architecture Defined | Core Defined | Almost |
 
@@ -78,7 +78,7 @@
 
 No phase is **complete** until its **last numbered step** in this tracker ships **both** production runtime **and** a **strong admin / control plane update** for that same phase.
 
-- **Scope:** Default rule is Phases **03–10 Step 6** where a phase uses the legacy 6-step template. **Phase 03 exception:** Phase 03 runs **Steps 1–18** (granular canonical runtime program); **operator/admin closure + operational certification** must ship through **Steps 16–18** (control plane, stabilization/proof, closure certification)—see Phase 03 tracker rows. **Phase 04 exception:** Phase 04 runs **Steps 1–22** (organizational continuity program **P04-01–P04-22**); **operator/admin closure + certification** must ship through **Steps 17–22** (control plane, API, worker jobs, migrations/backfill, stabilization/economics, closure pack)—see Phase 04 tracker rows. **Phase 05 exception:** Phase 05 runs **Steps 1–26** (traversal substrate program); **operator/admin closure + certification** must ship through **Steps 24–26** (control plane aggregate, readiness/economics pass, closure + certification pack)—see Phase 05 tracker rows. **Phase 06 exception:** Phase 06 runs **Steps 1–35** (temporal–causal **execution reconstruction** substrate — **not** AI reasoning); **operator/admin closure + certification** must ship through **Steps 29–35** (verification harness, **Reasoning Control Plane** surfaces, runtime legality matrix, tenant verification slice + readiness economics, closure + **`G-P06-CLOSE-01`** + certification pack parity)—see Phase 06 tracker rows. **Phase 07 exception:** Phase 07 runs **Steps 1–30** (lawful **retrieval** substrate — **not** semantic search or synthesis); **operator/admin closure + certification** must ship through **Steps 23–30** (retrieval control plane, operator debuggers, runtime legality matrix, tenant verification slice + readiness economics, verification harness, golden vectors, **`RETRIEVAL-CERT-PACK-1`** + **`G-P07-CLOSE-01`**)—see Phase 07 tracker rows. **Phase 02 exception:** Step **9** is the dedicated **Runtime Memory Control Plane**, Step **10** establishes baseline closure gate runtime, and Steps **11–16** complete stabilization/proof before final closure confidence. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
+- **Scope:** Default rule is Phases **03–10 Step 6** where a phase uses the legacy 6-step template. **Phase 08 exception:** Phase 08 runs **Steps 1–35** (synthesis intelligence program); **operator/admin closure + certification** must ship through **Steps 22–30** (control plane, debuggers, verification harness, golden vectors, closure + **`G-P08-CLOSE-01`**) and **Steps 31–35** (substrate pipeline **phase_08_synthesis**, publication epoch, E2E certification)—see Phase 08 tracker rows. **Phase 03 exception:** Phase 03 runs **Steps 1–18** (granular canonical runtime program); **operator/admin closure + operational certification** must ship through **Steps 16–18** (control plane, stabilization/proof, closure certification)—see Phase 03 tracker rows. **Phase 04 exception:** Phase 04 runs **Steps 1–22** (organizational continuity program **P04-01–P04-22**); **operator/admin closure + certification** must ship through **Steps 17–22** (control plane, API, worker jobs, migrations/backfill, stabilization/economics, closure pack)—see Phase 04 tracker rows. **Phase 05 exception:** Phase 05 runs **Steps 1–26** (traversal substrate program); **operator/admin closure + certification** must ship through **Steps 24–26** (control plane aggregate, readiness/economics pass, closure + certification pack)—see Phase 05 tracker rows. **Phase 06 exception:** Phase 06 runs **Steps 1–35** (temporal–causal **execution reconstruction** substrate — **not** AI reasoning); **operator/admin closure + certification** must ship through **Steps 29–35** (verification harness, **Reasoning Control Plane** surfaces, runtime legality matrix, tenant verification slice + readiness economics, closure + **`G-P06-CLOSE-01`** + certification pack parity)—see Phase 06 tracker rows. **Phase 07 exception:** Phase 07 runs **Steps 1–30** (lawful **retrieval** substrate — **not** semantic search or synthesis); **operator/admin closure + certification** must ship through **Steps 23–30** (retrieval control plane, operator debuggers, runtime legality matrix, tenant verification slice + readiness economics, verification harness, golden vectors, **`RETRIEVAL-CERT-PACK-1`** + **`G-P07-CLOSE-01`**)—see Phase 07 tracker rows. **Phase 02 exception:** Step **9** is the dedicated **Runtime Memory Control Plane**, Step **10** establishes baseline closure gate runtime, and Steps **11–16** complete stabilization/proof before final closure confidence. **Phase 01 exception:** substrate **operator closure** is Step **6**; **phase closure** requires Steps **7–16** (Step 16 is the final runtime-correctness hardening gate).
 - **“Strong admin update” means at minimum:**
   1. **Visibility** — Operator UI reflects *this phase’s* new reality: health signals, lag/backlog, failure classes, and (where applicable) replay / reprocess / provenance context—not only raw logs.
   2. **Actions** — At least one **primary**, policy-gated operator control for that phase (manual trigger, scoped replay/reprocess, safe pause/resume, cohort toggle, etc.) with clear **scope, queue lane, and expected impact** before execution.
@@ -512,23 +512,84 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 
 ---
 
-### Phase 08 — Synthesis & Intelligence Layer
-| Step # | Step | Description | Spec Accuracy | Implemented |
-| ------ | ---- | ----------- | ------------- | ----------- |
-| 1 | Synthesis contract model | Define bounded synthesis outputs and constraints | Not Started | No |
-| 2 | AI authority boundaries | Define strict synthesis AI governance and limits | Not Started | No |
-| 3 | Evidence-backed synthesis | Define citation/provenance requirements for outputs | Not Started | No |
-| 4 | Replay-safe synthesis behavior | Define reproducibility and replay semantics | Not Started | No |
-| 5 | Synthesis quality governance | Define evaluation and drift controls | Not Started | No |
-| 6 | Runtime implementation + admin closure | Deliver runtime **and** operator-grade admin for this phase: visibility, scoped safe actions, verification that the phase is healthy (see **Terminal step — admin & operator closure** above). | Not Started | No |
+### Phase 08 — Synthesis & Intelligence Layer (SIL)
+
+**Normative tree:** **`DOCS/cortex/synthesis/`** — entrypoint **[`phase-08-normative-index.md`](synthesis/phase-08-normative-index.md)** (`PHASE08_PROGRAM_FREEZE_VERSION` **1** at doctrine pass).  
+**Constitutional sentence:** Phase **08** transforms **lawful retrieval evidence** into **bounded, cite-backed intelligence artifacts** (execution understanding, operational synthesis, narratives) under **synthesis legality**, **replay identity**, and **AI authority limits** — the organization's **execution reasoning layer**. **NOT:** chat assistant, RAG, freeform summaries, hidden reasoning, or evidence fabrication.  
+**Changelog:** [`synthesis/PHASE08_CONSTITUTIONAL_CHANGELOG.md`](synthesis/PHASE08_CONSTITUTIONAL_CHANGELOG.md).  
+**Gap matrix:** [`synthesis/synthesis-spec-gap-matrix.md`](synthesis/synthesis-spec-gap-matrix.md).  
+**Implementation sequencing:** [`synthesis/phase-08-implementation-sequencing-plan.md`](synthesis/phase-08-implementation-sequencing-plan.md).  
+**Endgoal:** [`synthesis/phase-08-endgoal-doctrine.md`](synthesis/phase-08-endgoal-doctrine.md).  
+**E2E / pipeline:** [`synthesis/phase-08-runtime-flow-e2e.md`](synthesis/phase-08-runtime-flow-e2e.md), [`synthesis/phase-08-pipeline-orchestration.md`](synthesis/phase-08-pipeline-orchestration.md), [`synthesis/phase-08-e2e-operational-flow.md`](synthesis/phase-08-e2e-operational-flow.md).
+
+**Upstream (hard):** Phase **07** authoritative retrieval (`RetrievalEvidenceHitV1`, `retrieval_query_replay_identity`, published `index_epoch`); substrate pipeline **phase_07_retrieval** receipt; **SYN-BND-07-01** ingress law.  
+**Downstream:** Phase **09** products consume `SynthesisIntelligenceArtifactV1` + `synthesis_publication_epoch` only (**SYN-BND-09-01**).
+
+| Step # | Step | Normative doctrine | Description | **Spec strength** | **Implemented** |
+| ------ | ---- | ------------------ | ----------- | ----------------- | --------------- |
+| 1 | Normative index + program freeze | [`phase-08-normative-index.md`](synthesis/phase-08-normative-index.md) | **P08-01** freeze; **FF‑P08‑0..5**; vocabulary; pipeline position after retrieval. | Strong | **No** — doctrine only |
+| 2 | Anti-goals + forbidden cognition | [`phase-08-anti-goals-doctrine.md`](synthesis/phase-08-anti-goals-doctrine.md) | **G‑P08‑ANTI‑01/02**; forbid chat/RAG keys. | Strong | **No** |
+| 3 | Phase boundaries (07 / 09 / 10) | [`phase-08-phase-boundaries-doctrine.md`](synthesis/phase-08-phase-boundaries-doctrine.md) | **SYN‑BND‑07/09/10**; acyclic deps. | Strong | **No** |
+| 4 | Retrieval ingress law | [`phase-08-data-contracts.md`](synthesis/phase-08-data-contracts.md) §Ingress | Validate Phase **07** responses; **SYN-INGRESS-***. | Strong | **No** |
+| 5 | Synthesis workload + intent taxonomy | same §1–2 | 8 workloads; 5 intents. | Strong | **No** |
+| 6 | Job envelope + execution FSM | [`phase-08-synthesis-law-system.md`](synthesis/phase-08-synthesis-law-system.md) §FSM | `SynthesisJobEnvelopeV1`; 9 phases. | Strong | **No** |
+| 7 | Synthesis legality + degradation | same §Legality | 5 classes; **S‑LEG‑01..07**. | Strong | **No** |
+| 8 | Synthesis replay identity | [`phase-08-replay-equivalence-spec.md`](synthesis/phase-08-replay-equivalence-spec.md) | **G‑P08‑REPLAY‑01**; pins. | Strong | **No** |
+| 9 | Cite-or-omit + citations | [`phase-08-data-contracts.md`](synthesis/phase-08-data-contracts.md) §Citations | **SYN-LAW-09**; `SynthesisCitationV1`. | Strong | **No** |
+| 10 | Orchestration PLAN+RETRIEVE | [`phase-08-synthesis-runtime-architecture.md`](synthesis/phase-08-synthesis-runtime-architecture.md) | Retrieval fan-out via Phase **07** only. | Strong | **No** |
+| 11 | LLM authority + adapters | [`phase-08-synthesis-law-system.md`](synthesis/phase-08-synthesis-law-system.md) §AI | Isolated `adapters/llm`; route registry. | Strong | **No** |
+| 12 | Prompt assembly law | same §Prompts | Template ids; `prompt_hash`. | Strong | **No** |
+| 13 | Bounded caps + **SD‑*** registry | [`phase-08-failure-degradation-taxonomy.md`](synthesis/phase-08-failure-degradation-taxonomy.md) | `SynthesisPolicyPackV1_Default` fixture. | Strong | **No** |
+| 14 | Artifact materialization | [`phase-08-data-contracts.md`](synthesis/phase-08-data-contracts.md) §Artifacts | `SynthesisIntelligenceArtifactV1`. | Strong | **No** |
+| 15 | Retrieval/TCRE binding copy | architecture §Bindings | Copy envelopes; no re-derive. | Strong | **No** |
+| 16 | Lineage on artifacts | architecture §Lineage | `lineage_chain_digest`. | Strong | **No** |
+| 17 | Replay equivalence proofs | replay spec §Twin | Structural twin. | Strong | **No** |
+| 18 | Degradation propagation | degradation taxonomy §Propagation | RD→SD map. | Strong | **No** |
+| 19 | Substrate completeness | architecture §Completeness | Overview **synthesis** stage. | Strong | **No** |
+| 20 | Artifact query substrate | architecture | List/get by epoch. | Strong | **No** |
+| 21 | Observability + health | architecture §Observability | Metrics + health states. | Strong | **No** |
+| 22 | Control plane catalog | [`phase-08-admin-control-plane-spec.md`](synthesis/phase-08-admin-control-plane-spec.md) | 16 surfaces + `surface_kind`. | Strong | **No** |
+| 23 | Operator workflows + debuggers | admin §Workflows | W1–W4; SPA routes. | Strong | **No** |
+| 24 | Tenant verification + economics | [`phase-08-evaluation-quality-governance.md`](synthesis/phase-08-evaluation-quality-governance.md) §Tenant | **G‑P08‑TVER‑01**. | Strong | **No** |
+| 25 | Runtime legality matrix | law system §Matrix | **PROD-SYN-01**. | Strong | **No** |
+| 26 | **G‑P08‑*** verification harness | [`phase-08-testing-strategy.md`](synthesis/phase-08-testing-strategy.md) | CI gate catalog. | Strong | **No** |
+| 27 | Golden vectors + policy fixture | [`fixtures/SynthesisPolicyPackV1_Default.json`](synthesis/fixtures/SynthesisPolicyPackV1_Default.json) | Corpus manifest (impl). | Strong | **No** |
+| 28 | Evaluation harness | evaluation doc | **G‑P08‑EVAL‑01/02**. | Strong | **No** |
+| 29 | Implementation sequencing | [`phase-08-implementation-sequencing-plan.md`](synthesis/phase-08-implementation-sequencing-plan.md) | Waves 0–7; 35 steps. | Strong | **No** |
+| 30 | Closure (**G‑P08‑CLOSE‑01**) | [`phase-08-closure-gates-doctrine.md`](synthesis/phase-08-closure-gates-doctrine.md) | **SYNTHESIS-CERT-PACK-1**. | Strong | **No** |
+| 31 | Pipeline **phase_08_synthesis** | [`phase-08-pipeline-orchestration.md`](synthesis/phase-08-pipeline-orchestration.md) | Celery after phase **07** publish. | Strong | **No** |
+| 32 | Publication barrier | pipeline §Publish | `synthesis_publication_epoch`. | Strong | **No** |
+| 33 | Durable store hardening | data contracts §Persistence | Migrations + idempotency. | Strong | **No** |
+| 34 | E2E operational certification | [`phase-08-e2e-operational-flow.md`](synthesis/phase-08-e2e-operational-flow.md) | Scenarios A–D automated. | Strong | **No** |
+| 35 | Constitutional freeze sign-off | changelog | **P08-FINAL-FREEZE** target. | Strong | **No** — doctrine pass only |
 
 ### Missing / Incomplete
-- Entire phase specification pending.
+
+- **Runtime package** `vector.domains.cortex.synthesis` — **Not Started** (doctrine complete).  
+- **Substrate pipeline** `PHASE_08_SYNTHESIS` — specified; not wired in `substrate_pipeline/constants.py`.  
+- **Admin HTTP + SPA** — specified in control plane spec; **Not Started**.  
+- **Live LLM vendor** — stub routes in policy pack; adapter annex **P1** ([`synthesis-spec-gap-matrix.md`](synthesis/synthesis-spec-gap-matrix.md)).  
+- **Phase 08 E2E tests** — specified; **Not Started**.
 
 ### Implementation Blockers
-- Depends on retrieval phase and full provenance/reasoning integrity foundation.
 
-**Confidence:** Experimental
+- **Doctrine-led coding** MAY start at implementation **Step 01** (normative code stubs) per sequencing plan.  
+- **Production rollout** SHOULD wait for Phase **07** **G‑P07‑CLOSE‑01** + soak + **RET‑BND‑08‑01** / **SYN‑BND‑07‑01** enforced in code review.  
+- **Pipeline phase 08** requires Phase **07** `publish_retrieval_index_epoch_v1` receipt on same `substrate_pipeline_run_id`.
+
+### Replay / equivalence milestones (spec)
+
+- **M1:** `synthesis_job_replay_identity` law adopted (**Step 8**).  
+- **M2:** **G‑P08‑REPLAY‑01** structural twin frozen (**Step 17**).  
+- **M3:** **G‑P08‑REPLAY‑02** publication epoch monotonicity (**Step 32**).
+
+### Operator closure milestones (spec)
+
+- **O1:** 16 admin surfaces + `surface_kind` (**Step 22**).  
+- **O2:** Workflows W1–W4 (**Step 23**).  
+- **O3:** Overview synthesis stage + pipeline phase **08** panel (**Steps 19, 31**).
+
+**Confidence:** **Program structure: High**; **Doctrine: Strong** (complete initial pass, no Active P0); **Runtime: Not Started**; **Production: Not Started**
 
 ---
 
@@ -586,8 +647,8 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 | 04 | Complete | Partial | Almost |
 | 05 | **Doctrine: Frozen**; **Replay law: Strong**; **CI law: Strong**; **CI pytest: Partial** (Steps **1–26**); **Runtime: Partial** (contracts + gates + admin traversal stub through **G-P05-*** catalog PR bundle + **tenant org_graph_traversal** slice + engine identity + index replay verify + **Steps 24–26** control plane + readiness economics + **`OCTS-CERT-PACK-1`** closure) / production **Blocked** | **`G-P05-*`** catalog + topology **normative** — **pytest enforcement partial** (Steps **1–26** wired static **G-P05-*** + HTTP slice + **G-P05-TVER-01** / **STAGE-Z** + **G-P05-CP-01** / **STAGE-D** + **G-P05-ECO-01..03** / **STAGE-E** + **G-P05-CLOSE-01**) | **Partial** — **spec** hostile-review **complete**; **No** full production runtime until **FF-4** + implementation + legality matrix |
 | 06 | **Doctrine: `Frozen (doctrine)`** (Steps **1–30**, `P06-FINAL-FREEZE-2026-05-13`); **Runtime package: Not Started** | Harness predicates **frozen** in spec; **`G‑P06‑*`** pytest **Not Started**; golden corpus **`AMB‑*`/`CD‑*`** binding | **Partial** — reducers / harness / admin **constitutionally authorized** per [`reasoning/PHASE06_IMPLEMENTATION_HANDOFF.md`](reasoning/PHASE06_IMPLEMENTATION_HANDOFF.md); **No** production workers until **`reasoning-runtime-legality-matrix.md`** + OCTS **19–23** |
-| 07 | Not Started | Not Started | No |
-| 08 | Not Started | Not Started | No |
+| 07 | **Strong** (Steps 1–30 + RC) | **Partial** (E2E + harness) | **Partial** (dev/E2E yes; prod soak open) |
+| 08 | **Strong** (doctrine Steps 1–35) | **Not Started** | **No** (doctrine-ready) |
 | 09 | Not Started | Not Started | No |
 | 10 | Complete | Partial | Almost |
 
@@ -597,7 +658,7 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 - Temporal lineage and deep provenance traversal costs not yet empirically validated.
 - Identity linkage ambiguity backlog operations are not yet operationally tested.
 - Cross-phase verification depth is uneven (strong in Phase 01, weaker in later phases).
-- Future reasoning/retrieval/synthesis phases remain architecture-light or not started; **Phase 05** program (**Steps 1–26**) is tracker-defined — traversal/queryability economics are exercised under **Step 25** + **Step 26** certification closure in **`vector.domains.cortex.traversal`**; production scale validation remains gated on **FF-4** + the runtime legality matrix.
+- Phase **08** doctrine program **complete** at spec layer (`DOCS/cortex/synthesis/`); runtime **not started**. Phase **07** runtime closure shipped — see [`retrieval/PHASE07_RUNTIME_CLOSURE.md`](retrieval/PHASE07_RUNTIME_CLOSURE.md). **Phase 05** program (**Steps 1–26**) is tracker-defined — traversal/queryability economics are exercised under **Step 25** + **Step 26** certification closure in **`vector.domains.cortex.traversal`**; production scale validation remains gated on **FF-4** + the runtime legality matrix.
 
 ## 7) Open High-Risk Areas
 - Replay scan cost growth under multi-year history.
@@ -610,7 +671,7 @@ See `phase-03-implementation-readiness-audit.md` §Operational risks — include
 - **05 — Organizational Continuity Traversal Substrate (OCTS):** Bounded deterministic walks + temporal semantics + receipts + replay + **G-P05-*** gates + operator control plane (**Steps 1–26**); not knowledge graph / retrieval / reasoning.
 - **06 — Temporal & causal execution reconstruction (TCRE):** Deterministic temporal–causal **execution reconstruction** over replay‑safe exhaust + OCTS receipts — **not** AI reasoning; normative **`DOCS/cortex/reasoning/`**; tracker Steps **1–35**.
 - **07 — Retrieval & Query Engine:** High-signal retrieval with provenance and temporal grounding.
-- **08 — Synthesis & Intelligence Layer:** Bounded intelligence outputs from reconstructable evidence.
+- **08 — Synthesis & Intelligence Layer (SIL):** Evidence-constrained execution intelligence from Phase **07** envelopes; pipeline **phase_08_synthesis**; claim+citation artifacts; **Steps 1–35** in **`DOCS/cortex/synthesis/`**.
 - **09 — Operational Intelligence Products:** Human-facing operational cognition workflows.
 - **10 — Admin / Control Plane:** Cross-phase operation, governance, and debugging interface.
 
