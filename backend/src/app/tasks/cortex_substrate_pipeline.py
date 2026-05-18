@@ -1,4 +1,4 @@
-"""Celery tasks for Cortex substrate pipeline (phases 02–07)."""
+"""Celery tasks for Cortex substrate pipeline (phases 02–08)."""
 
 from __future__ import annotations
 
@@ -14,12 +14,14 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_05_TRAVERSAL,
     PHASE_06_TCRE,
     PHASE_07_RETRIEVAL,
+    PHASE_08_SYNTHESIS,
     PIPELINE_TRIGGER_POST_INGESTION,
 )
 from vector.domains.cortex.substrate_pipeline.orchestrator import (
     chain_after_phase_v1,
     enqueue_next_pipeline_phase_v1,
     finalize_pipeline_if_complete_v1,
+    on_retrieval_publish_completed_for_pipeline_v1,
     start_substrate_pipeline_run_v1,
 )
 from vector.domains.cortex.substrate_pipeline.phase_runners import (
@@ -29,6 +31,7 @@ from vector.domains.cortex.substrate_pipeline.phase_runners import (
     run_phase_05_traversal_v1,
     run_phase_06_tcre_v1,
     run_phase_07_retrieval_v1,
+    run_phase_08_synthesis_v1,
 )
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
@@ -37,6 +40,7 @@ _LOGGER = logging.getLogger("app")
 
 _TASK_COORDINATOR = "vector.cortex.substrate_pipeline.coordinator"
 _TASK_PHASE = "vector.cortex.substrate_pipeline.phase"
+_TASK_PHASE_08 = "vector.cortex.substrate_pipeline.phase_08_synthesis"
 
 
 @celery_app.task(name=_TASK_COORDINATOR, queue="vector")
@@ -143,6 +147,24 @@ def run_cortex_substrate_pipeline_phase_task(
             }
         elif phase_id == PHASE_07_RETRIEVAL:
             out = run_phase_07_retrieval_v1(session, tenant_id=tid, pipeline_run_id=prid)
+            session.commit()
+            chain = on_retrieval_publish_completed_for_pipeline_v1(
+                tenant_id=tid,
+                pipeline_run_id=prid,
+                published_index_epoch=out.get("published_index_epoch") or out.get("index_epoch"),
+                bundle_id=bundle_id,
+                batch_limit=batch_limit,
+            )
+            return {
+                "tenant_id": tenant_id,
+                "pipeline_run_id": pipeline_run_id,
+                "phase_id": phase_id,
+                "output": out,
+                "chained": bool(chain.get("chained", True) if isinstance(chain, dict) else chain),
+                "next_phase": chain,
+            }
+        elif phase_id == PHASE_08_SYNTHESIS:
+            out = run_phase_08_synthesis_v1(session, tenant_id=tid, pipeline_run_id=prid)
             finalize_pipeline_if_complete_v1(session, pipeline_run_id=prid)
             session.commit()
             return {
@@ -175,3 +197,23 @@ def run_cortex_substrate_pipeline_phase_task(
         "chained": next_chain is not None,
         "next_phase": next_chain,
     }
+
+
+@celery_app.task(name=_TASK_PHASE_08, queue="vector", bind=True, max_retries=3)
+def run_cortex_substrate_pipeline_phase_08_task(
+    self,
+    tenant_id: str,
+    pipeline_run_id: str,
+    published_index_epoch: str | None = None,
+    bundle_id: str | None = None,
+    batch_limit: int | None = None,
+) -> dict[str, Any]:
+    """Dedicated Celery entry for phase_08_synthesis (delegates to unified phase task)."""
+    return run_cortex_substrate_pipeline_phase_task(
+        self,
+        tenant_id=tenant_id,
+        pipeline_run_id=pipeline_run_id,
+        phase_id=PHASE_08_SYNTHESIS,
+        bundle_id=bundle_id,
+        batch_limit=batch_limit,
+    )

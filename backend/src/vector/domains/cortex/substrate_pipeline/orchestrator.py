@@ -15,8 +15,10 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_05_TRAVERSAL,
     PHASE_06_TCRE,
     PHASE_07_RETRIEVAL,
+    PHASE_08_SYNTHESIS,
     PIPELINE_TRIGGER_FLUSH_RERUN,
     PIPELINE_TRIGGER_POST_INGESTION,
+    SUBSTRATE_PIPELINE_PHASE_ORDER,
 )
 from vector.domains.cortex.substrate_pipeline.repository import (
     compute_pipeline_idempotency_key_v1,
@@ -24,6 +26,7 @@ from vector.domains.cortex.substrate_pipeline.repository import (
     finalize_pipeline_run_v1,
     get_running_pipeline_run_v1,
 )
+from vector.infrastructure.db.session import session_scope
 from vector.settings import Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,7 +47,7 @@ def schedule_substrate_pipeline_v1(
     batch_limit: int | None = None,
     reason: str = "ingestion",
 ) -> dict[str, Any]:
-    """Debounce and enqueue full substrate pipeline (phases 02–07) for one tenant."""
+    """Debounce and enqueue full substrate pipeline (phases 02–08) for one tenant."""
     cfg = settings or get_settings()
     if not cfg.cortex_post_ingestion_substrate_refresh_enabled:
         return {"scheduled": False, "reason": "disabled"}
@@ -157,14 +160,7 @@ def chain_after_phase_v1(
     identity_substrate_trigger: str = "substrate_pipeline",
 ) -> dict[str, Any] | None:
     """Enqueue the next phase after ``completed_phase_id`` completes."""
-    order = [
-        PHASE_02_CANONICAL,
-        PHASE_03_IDENTITY,
-        PHASE_04_GRAPH,
-        PHASE_05_TRAVERSAL,
-        PHASE_06_TCRE,
-        PHASE_07_RETRIEVAL,
-    ]
+    order = list(SUBSTRATE_PIPELINE_PHASE_ORDER)
     try:
         idx = order.index(completed_phase_id)
     except ValueError:
@@ -185,13 +181,48 @@ def chain_after_phase_v1(
     )
 
 
+def on_retrieval_publish_completed_for_pipeline_v1(
+    *,
+    tenant_id: uuid.UUID,
+    pipeline_run_id: uuid.UUID,
+    published_index_epoch: str | None = None,
+    bundle_id: str | None = None,
+    batch_limit: int | None = None,
+) -> dict[str, Any]:
+    """Chain phase 08 synthesis after phase 07 publish (**PIPE-08-01**)."""
+    cfg = get_settings()
+    if not cfg.cortex_substrate_pipeline_phase_08_enabled:
+        from vector.domains.cortex.substrate_pipeline.repository import skip_phase_v1
+
+        with session_scope() as session:
+            skip_phase_v1(
+                session,
+                pipeline_run_id=pipeline_run_id,
+                phase_id=PHASE_08_SYNTHESIS,
+                reason="phase_08_disabled",
+            )
+            fin = finalize_pipeline_if_complete_v1(session, pipeline_run_id=pipeline_run_id)
+            session.commit()
+        return {"chained": False, "phase_08_skipped": True, "finalize": fin}
+
+    return enqueue_next_pipeline_phase_v1(
+        tenant_id=tenant_id,
+        pipeline_run_id=pipeline_run_id,
+        phase_id=PHASE_08_SYNTHESIS,
+        bundle_id=bundle_id,
+        batch_limit=batch_limit,
+    )
+
+
 def on_tcre_job_completed_for_pipeline_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
     job_scope: dict[str, Any],
+    tcre_job_id: uuid.UUID | None = None,
+    tcre_job_status: str = "completed",
 ) -> dict[str, Any] | None:
-    """When TCRE completes with pipeline scope, enqueue phase 07 retrieval."""
+    """When TCRE completes with pipeline scope, resume phase 07 via continuation layer."""
     run_id_raw = job_scope.get("substrate_pipeline_run_id")
     if not run_id_raw:
         return None
@@ -199,10 +230,22 @@ def on_tcre_job_completed_for_pipeline_v1(
         pipeline_run_id = uuid.UUID(str(run_id_raw))
     except ValueError:
         return None
-    return enqueue_next_pipeline_phase_v1(
+    if tcre_job_id is None:
+        return enqueue_next_pipeline_phase_v1(
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_07_RETRIEVAL,
+        )
+    from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+        resume_pipeline_after_tcre_completion_v1,
+    )
+
+    return resume_pipeline_after_tcre_completion_v1(
+        session,
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,
-        phase_id=PHASE_07_RETRIEVAL,
+        tcre_job_id=tcre_job_id,
+        tcre_job_status=tcre_job_status,
     )
 
 
@@ -214,14 +257,7 @@ def finalize_pipeline_if_complete_v1(
     from vector.domains.cortex.substrate_pipeline.repository import get_phase_run_v1
     from vector.domains.cortex.substrate_pipeline.constants import PHASE_STATUS_COMPLETED, PHASE_STATUS_SKIPPED
 
-    phases = [
-        PHASE_02_CANONICAL,
-        PHASE_03_IDENTITY,
-        PHASE_04_GRAPH,
-        PHASE_05_TRAVERSAL,
-        PHASE_06_TCRE,
-        PHASE_07_RETRIEVAL,
-    ]
+    phases = list(SUBSTRATE_PIPELINE_PHASE_ORDER)
     for pid in phases:
         pr = get_phase_run_v1(session, pipeline_run_id=pipeline_run_id, phase_id=pid)
         if pr is None or pr.status not in (PHASE_STATUS_COMPLETED, PHASE_STATUS_SKIPPED):

@@ -109,6 +109,7 @@ def run_substrate_pipeline_sync_through_retrieval_v1(
                 from_artifact_ref=str(chain_id),
                 to_artifact_kind="retrieval_index",
                 to_artifact_ref=f"pending:{prid}",
+                edge_kind="tcre_binds_index",
                 replay_identity=job.tcre_policy_bundle_digest,
             )
 

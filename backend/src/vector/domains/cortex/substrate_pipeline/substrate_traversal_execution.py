@@ -17,12 +17,14 @@ from vector.domains.cortex.traversal.runtime_execution_model import (
     RuntimeExecutionModelError,
     run_reference_frontier_walk_v1,
 )
-from vector.domains.cortex.traversal.walk_api_contract import (
+from vector.domains.cortex.traversal.walk_policy import (
     compute_policy_hash_v1,
+    validate_walk_policy_for_request_v1,
+)
+from vector.domains.cortex.traversal.walk_result_contract import (
     compute_walk_result_hash_v1,
     validate_walk_result_hash_body_contract_v1,
 )
-from vector.domains.cortex.traversal.walk_policy import validate_walk_policy_for_request_v1
 
 SUBSTRATE_TRAVERSAL_MAX_STARTS_V1: Final[int] = 8
 SUBSTRATE_WALK_POLICY_V1: Final[dict[str, Any]] = {
@@ -182,7 +184,7 @@ def run_substrate_traversal_materialization_v1(
         }
         try:
             validate_walk_policy_for_request_v1(
-                request_body["walk_policy"],
+                cast(Mapping[str, Any], request_body["walk_policy"]),
                 walk_execution_strategy="ONLINE_OBSERVED",
                 exploration_mode=False,
                 enforce_sync_caps=False,

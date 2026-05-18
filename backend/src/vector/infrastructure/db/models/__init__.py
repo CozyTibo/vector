@@ -12,6 +12,9 @@ from vector.infrastructure.db.models.cortex_org_verification_run import CortexOr
 from vector.infrastructure.db.models.cortex_identity_celery_dispatch import CortexIdentityCeleryDispatch
 from vector.infrastructure.db.models.cortex_org_entity import CortexOrgEntity
 from vector.infrastructure.db.models.cortex_org_certification_archive import CortexOrgCertificationArchive
+from vector.infrastructure.db.models.cortex_synthesis_certification_archive import (
+    CortexSynthesisCertificationArchive,
+)
 from vector.infrastructure.db.models.cortex_org_identity_backfill_run import CortexOrgIdentityBackfillRun
 from vector.infrastructure.db.models.cortex_org_identity_console_audit import CortexOrgIdentityConsoleAudit
 from vector.infrastructure.db.models.cortex_org_primitive_instance import CortexOrgPrimitiveInstance
@@ -23,13 +26,29 @@ from vector.infrastructure.db.models.cortex_artifact_lineage_edge import CortexA
 from vector.infrastructure.db.models.cortex_octs_durable_walk_record import CortexOctsDurableWalkRecord
 from vector.infrastructure.db.models.cortex_octs_traversal_receipt import CortexOctsTraversalReceipt
 from vector.infrastructure.db.models.cortex_octs_traversal_replay_archive import CortexOctsTraversalReplayArchive
+from vector.infrastructure.db.models.cortex_pipeline_continuation import CortexPipelineContinuationState
+from vector.infrastructure.db.models.cortex_retrieval_materialization_report import (
+    CortexRetrievalMaterializationReport,
+)
 from vector.infrastructure.db.models.cortex_substrate_pipeline_run import (
     CortexSubstratePhaseRun,
     CortexSubstratePipelineRun,
 )
+from vector.infrastructure.db.models.cortex_synthesis_activation_audit import (
+    CortexSynthesisActivationAudit,
+)
 from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
 from vector.infrastructure.db.models.cortex_retrieval_index_epoch import CortexRetrievalIndexEpoch
 from vector.infrastructure.db.models.cortex_retrieval_query_audit import CortexRetrievalQueryAudit
+from vector.infrastructure.db.models.cortex_synthesis_artifact import CortexSynthesisArtifact
+from vector.infrastructure.db.models.cortex_synthesis_job import CortexSynthesisJob
+from vector.infrastructure.db.models.cortex_synthesis_job_receipt import CortexSynthesisJobReceipt
+from vector.infrastructure.db.models.cortex_synthesis_publication_epoch import (
+    CortexSynthesisPublicationEpoch,
+)
+from vector.infrastructure.db.models.cortex_synthesis_retention_event import (
+    CortexSynthesisRetentionEvent,
+)
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_artifact import CortexTcreReconstructionArtifact
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import CortexTcreReconstructionJob
 from vector.infrastructure.db.models.cortex_org_link_candidate import CortexOrgLinkCandidate
@@ -115,6 +134,9 @@ __all__ = [
     "CortexRetrievalIndexEntry",
     "CortexRetrievalIndexEpoch",
     "CortexRetrievalQueryAudit",
+    "CortexSynthesisJob",
+    "CortexSynthesisArtifact",
+    "CortexSynthesisJobReceipt",
     "CortexTcreReconstructionArtifact",
     "CortexTcreReconstructionJob",
     "CortexOrgLinkCandidate",

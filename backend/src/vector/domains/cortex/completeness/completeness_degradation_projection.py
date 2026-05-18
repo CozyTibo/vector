@@ -21,6 +21,24 @@ _PROPAGATION_RULES_V1: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("identity", "tcre", "replay_conflicted_identity", "tcre_chronology_impact_from_identity_replay"),
     ("traversal", "tcre", "traversal_replay_unverified", "tcre_unbound_from_traversal_unverified"),
     ("traversal", "tcre", "traversal_frontier_cutoff", "tcre_bounded_from_traversal_frontier"),
+    (
+        "retrieval",
+        "synthesis",
+        "retrieval_index_never_built",
+        "synthesis_degraded_from_retrieval_index_gap",
+    ),
+    (
+        "retrieval",
+        "synthesis",
+        "retrieval_index_stale",
+        "synthesis_degraded_from_stale_retrieval_index",
+    ),
+    (
+        "retrieval",
+        "synthesis",
+        "retrieval_upstream_tcre_gap",
+        "synthesis_degraded_from_retrieval_upstream_gap",
+    ),
 )
 
 

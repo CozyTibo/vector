@@ -63,6 +63,7 @@ def compute_pipeline_idempotency_key_v1(
             "tenant_id": str(tenant_id),
             "trigger_kind": trigger_kind,
             "ingestion_epoch": ingestion_epoch or "live",
+            "pipeline_phase_order_version": 2,
         }
     )[:64]
 

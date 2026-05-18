@@ -69,8 +69,10 @@ def plan_reconstruction_scope_v1(
     """Resolve deterministic artifact refs for reconstruction (no inference)."""
     _ = session
     ref = dict(getattr(row, "artifact_ref_json", None) or {})
-    pins = envelope.get("replay_pins") if isinstance(envelope.get("replay_pins"), dict) else {}
-    addressing = envelope.get("addressing") if isinstance(envelope.get("addressing"), dict) else {}
+    _raw_pins = envelope.get("replay_pins")
+    pins: dict[str, Any] = _raw_pins if isinstance(_raw_pins, dict) else {}
+    _raw_addressing = envelope.get("addressing")
+    addressing: dict[str, Any] = _raw_addressing if isinstance(_raw_addressing, dict) else {}
 
     scope: dict[str, Any] = {
         "tenant_id": str(tenant_id),
@@ -85,10 +87,11 @@ def plan_reconstruction_scope_v1(
         "octs_walk_id": ref.get("octs_walk_id") or ref.get("walk_id"),
         "org_link_id": ref.get("org_link_id"),
         "org_entity_id": ref.get("org_entity_id"),
-        "materialization_id": ref.get("materialization_id") or addressing.get("materialization_id"),
-        "chronology_window_ref": addressing.get("chronology_window_ref"),
-        "retrieval_chain_ref": addressing.get("retrieval_chain_ref"),
-        "retrieval_walk_ref": addressing.get("retrieval_walk_ref"),
+        "materialization_id": ref.get("materialization_id")
+        or (addressing.get("materialization_id") if addressing else None),
+        "chronology_window_ref": addressing.get("chronology_window_ref") if addressing else None,
+        "retrieval_chain_ref": addressing.get("retrieval_chain_ref") if addressing else None,
+        "retrieval_walk_ref": addressing.get("retrieval_walk_ref") if addressing else None,
     }
     missing: list[str] = []
     if not scope.get("causal_chain_id") and not scope.get("octs_walk_id") and not scope.get("org_link_id"):

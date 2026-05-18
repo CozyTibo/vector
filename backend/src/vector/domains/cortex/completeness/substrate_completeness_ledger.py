@@ -38,6 +38,9 @@ from vector.domains.cortex.completeness.traversal_completeness_projection import
 from vector.domains.cortex.retrieval.retrieval_completeness_projection import (
     project_retrieval_completeness_v1,
 )
+from vector.domains.cortex.synthesis.synthesis_completeness_projection import (
+    project_synthesis_completeness_v1,
+)
 from vector.domains.cortex.reasoning.reasoning_receipts_proof_artifacts import (
     hash_reasoning_canonical_json_sha256_v1,
 )
@@ -50,6 +53,7 @@ _STAGE_PROJECTORS_V1 = {
     "traversal": project_traversal_completeness_v1,
     "tcre": project_tcre_completeness_v1,
     "retrieval": project_retrieval_completeness_v1,
+    "synthesis": project_synthesis_completeness_v1,
 }
 
 _STAGE_DETAIL_ROUTE_SUFFIX_V1 = {
@@ -60,6 +64,7 @@ _STAGE_DETAIL_ROUTE_SUFFIX_V1 = {
     "traversal": "traversal",
     "tcre": "ingestion",
     "retrieval": "retrieval",
+    "synthesis": "synthesis",
 }
 
 
@@ -139,6 +144,14 @@ def build_substrate_completeness_ledger_v1(
             "replay_safe_query_percent": stages[6]["metrics"].get("replay_safe_query_percent", 0),
             "never_indexed": stages[6]["metrics"].get("retrieval_never_indexed", False),
             "walk_record_count": stages[6]["metrics"].get("walk_record_count", 0),
+        },
+        "synthesis": {
+            "coverage_percent": stages[7]["metrics"].get("synthesis_coverage_percent", 0),
+            "eligible_scopes": stages[7]["metrics"].get("eligible_scopes", 0),
+            "synthesized_scopes": stages[7]["metrics"].get("synthesized_scopes", 0),
+            "substrate_health_state": stages[7]["metrics"].get("substrate_health_state"),
+            "sd_critical_count": stages[7]["metrics"].get("sd_critical_count", 0),
+            "lag_vs_retrieval": stages[7]["metrics"].get("lag_vs_retrieval", 0),
         },
     }
 

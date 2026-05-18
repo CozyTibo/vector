@@ -426,6 +426,7 @@ def materialize_retrieval_index_for_pipeline_v1(
         materialize_retrieval_index_from_tcre_job_v1,
     )
     from vector.domains.cortex.traversal.runtime.durable_walk_store import resolve_octs_walk_store_v1
+    from vector.infrastructure.db.models.cortex_org_link import CortexOrgLink
     from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import (
         CortexTcreReconstructionJob,
     )
@@ -437,12 +438,40 @@ def materialize_retrieval_index_for_pipeline_v1(
     epoch_row = transition_retrieval_index_build_v1(session, epoch_row=epoch_row, to_state="BUILDING")
     epoch_name = epoch_row.index_epoch
 
+    tcre_candidates = int(
+        session.scalar(
+            select(func.count())
+            .select_from(CortexTcreReconstructionJob)
+            .where(
+                CortexTcreReconstructionJob.tenant_id == tenant_id,
+                CortexTcreReconstructionJob.status == "completed",
+                CortexTcreReconstructionJob.job_kind == "reconstruct",
+            )
+        )
+        or 0
+    )
+    store = resolve_octs_walk_store_v1(session)
+    walks_candidates = sum(
+        1
+        for record in store.list_walk_records_for_tenant_v1(tenant_id)
+        if str(record.status) == "completed" and record.walk_payload
+    )
+    org_link_candidates = int(
+        session.scalar(
+            select(func.count()).select_from(CortexOrgLink).where(CortexOrgLink.tenant_id == tenant_id)
+        )
+        or 0
+    )
+
     stats: dict[str, Any] = {
         "tenant_id": str(tenant_id),
         "pipeline_run_id": str(pipeline_run_id),
         "index_epoch": epoch_name,
         "entries_materialized": 0,
         "skip_reasons": [],
+        "tcre_candidates": tcre_candidates,
+        "walks_candidates": walks_candidates,
+        "org_link_candidates": org_link_candidates,
     }
 
     job = session.scalar(
@@ -470,7 +499,6 @@ def materialize_retrieval_index_for_pipeline_v1(
         except (RetrievalTcreBindingError, RetrievalLegalityError) as exc:
             stats["skip_reasons"].append({"source": "tcre_job", "code": exc.code})
 
-    store = resolve_octs_walk_store_v1(session)
     for record in store.list_walk_records_for_tenant_v1(tenant_id):
         if str(record.status) != "completed" or not record.walk_payload:
             continue
@@ -495,6 +523,25 @@ def materialize_retrieval_index_for_pipeline_v1(
                 {"source": "walk", "walk_id": str(record.walk_id), "code": exc.code}
             )
 
+    for link in session.scalars(
+        select(CortexOrgLink).where(CortexOrgLink.tenant_id == tenant_id).limit(500)
+    ).all():
+        try:
+            materialize_retrieval_index_from_graph_ref_v1(
+                session,
+                tenant_id=tenant_id,
+                ref_kind="org_link_id",
+                ref_value=str(link.id),
+                replay_identity=replay,
+                index_epoch=epoch_name,
+                auto_publish=False,
+            )
+            stats["entries_materialized"] += 1
+        except (RetrievalGraphBindingError, RetrievalLegalityError) as exc:
+            stats["skip_reasons"].append(
+                {"source": "org_link", "org_link_id": str(link.id), "code": exc.code}
+            )
+
     published = publish_retrieval_index_epoch_v1(
         session, tenant_id=tenant_id, index_epoch=epoch_name
     )
@@ -502,6 +549,20 @@ def materialize_retrieval_index_for_pipeline_v1(
     stats["entry_count"] = published.entry_count
     stats["output_index_hash"] = published.output_index_hash
     stats["ok"] = published.build_state == "PUBLISHED"
+
+    from vector.domains.cortex.retrieval.retrieval_materialization_diagnostics import (
+        persist_retrieval_materialization_report_v1,
+    )
+
+    persist_retrieval_materialization_report_v1(
+        session,
+        tenant_id=tenant_id,
+        pipeline_run_id=pipeline_run_id,
+        stats=stats,
+        tcre_candidates=tcre_candidates,
+        walks_candidates=walks_candidates,
+        org_link_candidates=org_link_candidates,
+    )
     return stats
 
 

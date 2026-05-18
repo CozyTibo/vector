@@ -5209,4 +5209,8 @@ def build_admin_router() -> APIRouter:
 
     register_substrate_pipeline_routes(r)
 
+    from vector.api.http.routes.admin_cortex_synthesis import register_cortex_synthesis_routes
+
+    register_cortex_synthesis_routes(r)
+
     return r

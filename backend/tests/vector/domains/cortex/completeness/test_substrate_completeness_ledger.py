@@ -70,6 +70,7 @@ def test_build_ledger_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
         ("traversal", "T", "/t"),
         ("tcre", "R", "/r"),
         ("retrieval", "Retrieval", "/ret"),
+        ("synthesis", "Synthesis", "/syn"),
     ):
         monkeypatch.setitem(
             ledger_mod._STAGE_PROJECTORS_V1,
@@ -80,6 +81,7 @@ def test_build_ledger_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     out = ledger_mod.build_substrate_completeness_ledger_v1(session, tenant_id=uuid.uuid4())
     assert out["substrate_state"] in ("healthy", "degraded", "critical")
-    assert len(out["pipeline_stages"]) == 7
+    assert len(out["pipeline_stages"]) == 8
     assert out["aggregate"].get("retrieval") is not None
+    assert out["aggregate"].get("synthesis") is not None
     assert out["ledger_digest"]

@@ -94,10 +94,18 @@
 | POST | `/admin/tenants/{id}/cortex/synthesis/artifacts/{id}/verify-replay` | verification_probe |
 | GET | `/admin/tenants/{id}/cortex/synthesis/omissions` | derived_aggregate |
 | GET | `/admin/tenants/{id}/cortex/synthesis/degradation` | derived_aggregate |
-| GET | `/admin/tenants/{id}/cortex/synthesis/legality-matrix` | doctrine_catalog |
+| GET | `/admin/tenants/{id}/cortex/synthesis/legality-matrix` | doctrine_catalog + tenant histogram |
 | GET | `/admin/tenants/{id}/cortex/synthesis/evaluation` | verification_probe |
 | GET | `/admin/tenants/{id}/cortex/synthesis/certification-pack` | verification_probe |
 | POST | `/admin/tenants/{id}/cortex/synthesis/certification-pack/archive` | verification_probe |
+| GET | `/admin/catalog/cortex/synthesis/program` | doctrine_catalog |
+| GET | `/admin/catalog/cortex/synthesis/anti-goals` | doctrine_catalog |
+| GET | `/admin/catalog/cortex/synthesis/phase-boundaries` | doctrine_catalog |
+| GET | `/admin/catalog/cortex/synthesis/ingress-law` | doctrine_catalog |
+| POST | `/admin/catalog/cortex/synthesis/ingress/validate` | verification_probe |
+| GET | `/admin/catalog/cortex/synthesis/job-contract` | doctrine_catalog |
+| POST | `/admin/tenants/{id}/cortex/synthesis/jobs/run` | runtime_backed |
+| GET | `/admin/tenants/{id}/cortex/synthesis/jobs/{job_id}` | runtime_backed |
 | GET | `/admin/catalog/cortex/synthesis/policy-pack` | doctrine_catalog |
 
 ---

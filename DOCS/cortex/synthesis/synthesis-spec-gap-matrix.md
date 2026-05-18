@@ -1,7 +1,8 @@
 # Phase 08 — Spec gap matrix
 
 **Status:** living document for P0/P1 promotion discipline.  
-**Last doctrine pass:** 2026-05-16.
+**Doctrine freeze:** **`Frozen (implementation)`** — **P08-FINAL-FREEZE-2026-05-17** (Steps **1–35**).  
+**Last doctrine pass:** 2026-05-17 (Step **35** sign-off).
 
 ---
 

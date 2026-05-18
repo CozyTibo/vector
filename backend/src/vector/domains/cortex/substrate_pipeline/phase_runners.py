@@ -226,6 +226,19 @@ def run_phase_06_tcre_v1(
             run_sync=False,
         )
         out = {**enqueue_out, "async": True}
+        job_id_raw = enqueue_out.get("job_id")
+        if job_id_raw:
+            from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+                mark_pipeline_waiting_on_tcre_v1,
+            )
+
+            mark_pipeline_waiting_on_tcre_v1(
+                session,
+                tenant_id=tenant_id,
+                pipeline_run_id=pipeline_run_id,
+                tcre_job_id=uuid.UUID(str(job_id_raw)),
+                celery_task_id=str(enqueue_out.get("celery_task_id") or "") or None,
+            )
         complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_06_TCRE, output=out)
         return out
     except Exception as exc:  # noqa: BLE001
@@ -244,6 +257,10 @@ def run_phase_07_retrieval_v1(
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID,
 ) -> dict[str, Any]:
+    from vector.domains.cortex.retrieval.retrieval_index_materialization import (
+        get_published_index_epoch_v1,
+    )
+
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_07_RETRIEVAL)
     try:
         out = materialize_retrieval_index_for_pipeline_v1(
@@ -251,9 +268,17 @@ def run_phase_07_retrieval_v1(
             tenant_id=tenant_id,
             pipeline_run_id=pipeline_run_id,
         )
+        published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
+        if published:
+            out = {**out, "published_index_epoch": published}
         complete_phase_v1(
             session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_07_RETRIEVAL, output=out
         )
+        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+            mark_continuation_completed_v1,
+        )
+
+        mark_continuation_completed_v1(session, pipeline_run_id=pipeline_run_id)
         return out
     except Exception as exc:  # noqa: BLE001
         fail_phase_v1(
@@ -263,3 +288,18 @@ def run_phase_07_retrieval_v1(
             error=str(exc),
         )
         raise
+
+
+def run_phase_08_synthesis_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    pipeline_run_id: uuid.UUID,
+) -> dict[str, Any]:
+    from vector.domains.cortex.synthesis.synthesis_pipeline import run_substrate_phase_08_synthesis_v1
+
+    return run_substrate_phase_08_synthesis_v1(
+        session,
+        tenant_id=tenant_id,
+        pipeline_run_id=pipeline_run_id,
+    )

@@ -336,6 +336,43 @@ class Settings(BaseSettings):
             "substrate refresh (same scale as admin flush canonical_batch_limit default)."
         ),
     )
+    cortex_substrate_pipeline_phase_08_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SUBSTRATE_PIPELINE_PHASE_08_ENABLED",
+        description=(
+            "When true, substrate pipeline chains phase_08_synthesis after phase_07_retrieval publish. "
+            "False skips synthesis and finalizes after retrieval."
+        ),
+    )
+    cortex_synthesis_pipeline_max_scopes: int = Field(
+        default=32,
+        ge=1,
+        le=256,
+        validation_alias="CORTEX_SYNTHESIS_PIPELINE_MAX_SCOPES",
+        description="Max synthesis scopes executed per substrate pipeline run (PIPE-08-03).",
+    )
+    cortex_synthesis_pipeline_inline: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_INLINE",
+        description=(
+            "When true, phase_08_synthesis runs synthesis jobs inline in the phase Celery task "
+            "(dev/small tenants). False reserves async chord enqueue (future)."
+        ),
+    )
+    cortex_substrate_continuation_stall_seconds: int = Field(
+        default=1800,
+        ge=300,
+        le=86400,
+        validation_alias="CORTEX_SUBSTRATE_CONTINUATION_STALL_SECONDS",
+        description=(
+            "Seconds without continuation heartbeat while waiting on TCRE before marking stalled."
+        ),
+    )
+    cortex_substrate_continuation_auto_recover: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SUBSTRATE_CONTINUATION_AUTO_RECOVER",
+        description="When true, continuity watchdog auto-recovers stalled TCRE-waiting pipelines.",
+    )
     cortex_raw_memory_enforcement_mode: str = Field(
         default="progressive",
         validation_alias="CORTEX_RAW_MEMORY_ENFORCEMENT_MODE",

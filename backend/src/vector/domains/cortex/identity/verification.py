@@ -106,6 +106,12 @@ def run_org_identity_verification(
 
     octs_slice_on = octs_tenant_verification_slice_enabled_v1()
     retrieval_slice_on = retrieval_tenant_verification_slice_enabled_v1()
+    from vector.domains.cortex.synthesis.synthesis_tenant_verification import (
+        synthesis_tenant_verification_slice_enabled_v1,
+        verify_tenant_synthesis_slice_v1,
+    )
+
+    synthesis_slice_on = synthesis_tenant_verification_slice_enabled_v1()
     evidence: dict[str, Any] = {
         **(full.get("evidence") if isinstance(full.get("evidence"), dict) else {}),
         "canonical_verification_engine_schema_version": full.get("canonical_verification_engine_schema_version"),
@@ -138,7 +144,12 @@ def run_org_identity_verification(
             )
             evidence["org_graph_retrieval"] = rslice
             evidence["retrieval_slice_hash"] = compute_retrieval_verification_slice_hash_v1(rslice)
-        if octs_slice_on or retrieval_slice_on:
+        if synthesis_slice_on:
+            syn_verify = verify_tenant_synthesis_slice_v1(session, tenant_id=tenant_id)
+            evidence["synthesis_substrate"] = syn_verify.get("synthesis_substrate")
+            evidence["org_graph_synthesis"] = syn_verify.get("slice")
+            evidence["synthesis_slice_hash"] = syn_verify.get("synthesis_slice_hash")
+        if octs_slice_on or retrieval_slice_on or synthesis_slice_on:
             row.evidence_json = dict(evidence)
     else:
         if octs_slice_on:
@@ -153,6 +164,11 @@ def run_org_identity_verification(
             )
             evidence["org_graph_retrieval"] = rslice
             evidence["retrieval_slice_hash"] = compute_retrieval_verification_slice_hash_v1(rslice)
+        if synthesis_slice_on:
+            syn_verify = verify_tenant_synthesis_slice_v1(session, tenant_id=tenant_id)
+            evidence["synthesis_substrate"] = syn_verify.get("synthesis_substrate")
+            evidence["org_graph_synthesis"] = syn_verify.get("slice")
+            evidence["synthesis_slice_hash"] = syn_verify.get("synthesis_slice_hash")
 
     return {
         "org_identity_verification_engine_schema_version": ORG_IDENTITY_VERIFICATION_ENGINE_SCHEMA_VERSION,

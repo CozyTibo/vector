@@ -6,6 +6,7 @@ import uuid
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy.orm import Session
 
 from vector.domains.cortex.reasoning.runtime.octs_binding_projection import (
     resolve_octs_walk_payload_v1,
@@ -13,20 +14,22 @@ from vector.domains.cortex.reasoning.runtime.octs_binding_projection import (
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_07_RETRIEVAL,
+    PHASE_08_SYNTHESIS,
     SUBSTRATE_PIPELINE_PHASE_ORDER,
 )
 from vector.domains.cortex.traversal.runtime.durable_walk_store import OctsWalkApiDurableStore
 from vector.domains.cortex.traversal.walk_api_contract import build_stub_completed_walk_payload_v1
 
 
-def test_substrate_pipeline_phase_order_includes_retrieval() -> None:
+def test_substrate_pipeline_phase_order_includes_retrieval_and_synthesis() -> None:
     assert SUBSTRATE_PIPELINE_PHASE_ORDER[0] == PHASE_02_CANONICAL
-    assert SUBSTRATE_PIPELINE_PHASE_ORDER[-1] == PHASE_07_RETRIEVAL
-    assert len(SUBSTRATE_PIPELINE_PHASE_ORDER) == 6
+    assert PHASE_07_RETRIEVAL in SUBSTRATE_PIPELINE_PHASE_ORDER
+    assert SUBSTRATE_PIPELINE_PHASE_ORDER[-1] == PHASE_08_SYNTHESIS
+    assert len(SUBSTRATE_PIPELINE_PHASE_ORDER) == 7
 
 
 @pytest.mark.integration
-def test_resolve_octs_walk_payload_uses_durable_store_with_session(db_session) -> None:
+def test_resolve_octs_walk_payload_uses_durable_store_with_session(db_session: Session) -> None:
     from vector.infrastructure.db.models.tenant import Tenant
 
     slug = f"pw-{uuid.uuid4().hex[:8]}"

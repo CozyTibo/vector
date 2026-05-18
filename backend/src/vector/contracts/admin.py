@@ -992,6 +992,688 @@ class AdminCortexRetrievalProgramClosureResponse(BaseModel):
     rd_topology_check: dict[str, Any] | None = None
 
 
+class AdminCortexSynthesisFreezeBannerV1(BaseModel):
+    """Phase 08 Step 35 — program freeze banner (operator UI)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    bundle_id: str
+    headline: str
+    detail: str
+
+
+class AdminCortexSynthesisProgramCatalogResponse(BaseModel):
+    """Phase 08 Step 01 — synthesis program freeze doctrine catalog (global, not tenant-scoped)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    synthesis_program_catalog_runtime_schema_version: int
+    spec_ref: str
+    phase08_program_freeze_version: int
+    step_program_count: int
+    freeze_bundle_ids: list[str]
+    normative_program: dict[str, Any]
+    replay_law: dict[str, Any]
+    degradation_registry: dict[str, Any]
+    constitutional_freeze_bundle: str
+    doctrine_freeze_status: str
+    freeze_banner: AdminCortexSynthesisFreezeBannerV1
+
+
+class AdminCortexSynthesisAntiGoalsCatalogResponse(BaseModel):
+    """Phase 08 Step 02 — synthesis anti-goals / forbidden keys doctrine catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    synthesis_anti_goals_catalog_runtime_schema_version: int
+    spec_ref: str
+    synthesis_forbidden_legality_class: str
+    gate_ids: list[str]
+    job_envelope_forbidden_keys: list[str]
+    artifact_forbidden_top_level_keys: list[str]
+    banned_import_roots: list[str]
+    forbidden_law_import_modules: list[str]
+    authoritative_job_envelope_top_level_keys: list[str]
+    authoritative_artifact_top_level_keys: list[str]
+    synthesis_prompt_overrides_rule: str
+
+
+class AdminCortexSynthesisPhaseBoundariesRuleRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    text: str
+
+
+class AdminCortexSynthesisPhaseBoundariesCatalogResponse(BaseModel):
+    """Phase 08 Step 03 — synthesis phase boundary doctrine catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase08_boundaries_runtime_schema_version: int
+    rule_ids: list[str]
+    acyclic_pipeline: list[str]
+    upstream_replay_identity_field: str
+    synthesis_replay_identity_field: str
+    rd_to_sd_map: dict[str, str]
+    sd_upstream_rd: str
+    forbidden_retrieval_bypass_keys: list[str]
+    phase09_forbidden_field_keys: list[str]
+    rules: list[AdminCortexSynthesisPhaseBoundariesRuleRow]
+    phase08_owns: list[str]
+    phase08_does_not_own: list[str]
+
+
+class AdminCortexSynthesisIngressLawRuleRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    text: str
+
+
+class AdminCortexSynthesisIngressLawCatalogResponse(BaseModel):
+    """Phase 08 Step 04 — synthesis retrieval ingress law catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase08_ingress_runtime_schema_version: int
+    retrieval_evidence_ingress_schema_version: int
+    spec_ref: str
+    gate_ids: list[str]
+    gp08_ingress_gate_id: str
+    authoritative_retrieval_legality_classes: list[str]
+    exploration_retrieval_legality_classes: list[str]
+    retrieval_legality_copy_fields: list[str]
+    ingress_reject_metrics: list[str]
+    sd_upstream_legality_code: str
+    rules: list[AdminCortexSynthesisIngressLawRuleRow]
+
+
+class AdminCortexSynthesisIngressInspectorResponse(BaseModel):
+    """Phase 08 Step 04 — ingress inspector preview for a retrieval response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    ingress_passed: bool
+    gate_id: str
+    gate_results: list[dict[str, Any]]
+    violations: list[str]
+    retrieval_evidence_ingress: dict[str, Any] | None = None
+    inspector_fields: dict[str, Any]
+
+
+class AdminCortexSynthesisWorkloadClassRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    synthesis_workload_class: str
+    purpose: str
+    retrieval_plan_profile: str
+    primary_artifact_kind: str
+    allowed_intents: list[str]
+    default_selection_policy: dict[str, int]
+
+
+class AdminCortexSynthesisIntentClassRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    synthesis_intent: str
+    meaning: str
+    llm_allowed: str
+
+
+class AdminCortexSynthesisJobContractCatalogResponse(BaseModel):
+    """Phase 08 Step 05 — synthesis workload + intent taxonomy catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase08_synthesis_job_contract_runtime_schema_version: int
+    envelope_schema_version: int
+    default_synthesis_policy_pack_id: str
+    gp08_schema_gate_id: str
+    synthesis_workload_classes: list[AdminCortexSynthesisWorkloadClassRow]
+    synthesis_intent_classes: list[AdminCortexSynthesisIntentClassRow]
+    replay_identity_fields: dict[str, str]
+    jobs_by_workload_metric: str
+
+
+class AdminCortexSynthesisJobRunResponse(BaseModel):
+    """Phase 08 Step 06 — synthesis job FSM run result with execution trace."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase08_synthesis_orchestrator_runtime_schema_version: int
+    job_id: str
+    tenant_id: str
+    status: str
+    synthesis_workload_class: str
+    synthesis_intent: str
+    execution_partition: str
+    synthesis_legality_class: str
+    synthesis_legality_posture: dict[str, Any] = {}
+    synthesis_job_replay_identity: str
+    retrieval_ingress_digest: str | None = None
+    synthesis_orchestrator_build_id: str
+    execution_trace: list[dict[str, Any]]
+    synthesis_job_receipt: dict[str, Any]
+    claims: list[dict[str, Any]] = []
+    synthesis_citation_envelope: dict[str, Any] = {}
+    retrieval_subqueries: list[dict[str, Any]] = []
+    llm_invocations: list[dict[str, Any]] = []
+    llm_trace_refs: list[dict[str, Any]] = []
+    prompt_assemblies: list[dict[str, Any]] = []
+    prompt_hashes: list[str] = []
+    idempotent_replay: bool = False
+    execution_phases: list[str]
+    celery_task_id: str | None = None
+    artifact_id: str | None = None
+    artifact_digest: str | None = None
+    synthesis_intelligence_artifact: dict[str, Any] | None = None
+    replay_equivalence_twin: dict[str, Any] = {}
+    gp08_replay_proof_passed: bool | None = None
+    synthesis_job_log: dict[str, Any] | None = None
+    synthesis_observability_metrics: dict[str, Any] | None = None
+
+
+class AdminCortexSynthesisArtifactExplorerResponse(BaseModel):
+    """Phase 08 Step 14 — synthesis artifact explorer catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_artifact_materialization_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    artifact_schema_path: str
+    artifact_kinds: list[str]
+    publish_barrier_legality_classes: list[str]
+    publication_epoch_deferred_step: int
+    recent_artifacts: list[dict[str, Any]] = []
+    rules: list[dict[str, Any]]
+
+
+class AdminCortexSynthesisArtifactDetailResponse(BaseModel):
+    """Phase 08 Step 14 — persisted synthesis intelligence artifact."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase08_synthesis_artifact_materialization_runtime_schema_version: int
+    artifact_id: str
+    tenant_id: str
+    job_id: str
+    artifact_kind: str
+    artifact_digest: str
+    synthesis_legality_class: str
+    published: bool
+    synthesis_publication_epoch: str | None = None
+    created_at: str | None = None
+    synthesis_intelligence_artifact: dict[str, Any]
+    claim_count: int = 0
+    citation_count: int = 0
+    binding_panel: dict[str, Any] = {}
+    lineage_panel: dict[str, Any] = {}
+
+
+class AdminCortexSynthesisArtifactListResponse(BaseModel):
+    """Phase 08 Step 20 — tenant artifact list with lookup / epoch filters."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase08_synthesis_artifact_query_runtime_schema_version: int
+    tenant_id: str
+    filters_applied: dict[str, Any]
+    artifact_count: int
+    artifacts: list[dict[str, Any]]
+
+
+class AdminCortexSynthesisArtifactQueryCatalogResponse(BaseModel):
+    """Phase 08 Step 20 — artifact query law catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_artifact_query_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    artifact_materialization_schema_version: int
+    supported_filters: list[str]
+    index_columns: list[str]
+    rules: list[str]
+
+
+class AdminCortexSynthesisObservabilityCatalogResponse(BaseModel):
+    """Phase 08 Step 21 — synthesis observability law catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    synthesis_observability_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    rules: list[dict[str, Any]]
+    metric_names: list[str]
+    default_thresholds: dict[str, int]
+    engine_build_ref: str
+
+
+class AdminCortexSynthesisRuntimeHealthResponse(BaseModel):
+    """Phase 08 Step 21 — tenant synthesis runtime health."""
+
+    model_config = ConfigDict(extra="allow")
+
+    schema_version: int
+    tenant_id: str
+    substrate_state: str | None = None
+    substrate_health_state: str | None = None
+    replay_posture: str | None = None
+    publication_epoch: str | None = None
+    synthesis_completeness_percent: int = 0
+    sd_critical_count: int = 0
+    publication_lag_epochs: int = 0
+    active_alerts: list[dict[str, Any]] = []
+    metrics: dict[str, Any] = {}
+    s_leg_health: dict[str, Any] = {}
+
+
+class AdminCortexSynthesisBindingsCatalogResponse(BaseModel):
+    """Phase 08 Step 15 — synthesis binding copy law catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_bindings_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    rules: list[dict[str, Any]]
+    artifact_binding_fields: list[str]
+    sd_upstream_binding_gap: str
+
+
+class AdminCortexSynthesisLineageCatalogResponse(BaseModel):
+    """Phase 08 Step 16 — synthesis artifact lineage law catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_lineage_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    terminal_artifact_kind: str
+    edge_kinds: list[str]
+    sd_lineage_gap: str
+    upstream_rd_lineage_gap: str
+    rules: list[dict[str, Any]]
+
+
+class AdminCortexSynthesisLegalityPredicateRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    predicate_id: str
+    description: str
+    failure_class: str
+
+
+class AdminCortexSynthesisLegalityMatrixCatalogResponse(BaseModel):
+    """Phase 08 Step 07 — synthesis legality matrix catalog + tenant histogram."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    tenant_id: str
+    phase08_synthesis_legality_matrix_runtime_schema_version: int
+    synthesis_legality_matrix_contract: str
+    synthesis_policy_pack_digest: str
+    gp08_legality_gate_id: str
+    legality_classes: list[dict[str, Any]]
+    predicates: list[AdminCortexSynthesisLegalityPredicateRow]
+    s_leg_failure_class_map: dict[str, str]
+    retrieval_to_synthesis_upstream_floor: dict[str, str]
+    spec_ref: str
+    synthesis_jobs_by_legality: dict[str, int] = {}
+
+
+class AdminCortexSynthesisJobDetailResponse(BaseModel):
+    """Phase 08 Step 06 — persisted synthesis job detail."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    job_id: str
+    tenant_id: str
+    status: str
+    synthesis_workload_class: str
+    synthesis_intent: str
+    execution_partition: str
+    envelope_json: dict[str, Any]
+    envelope_digest: str
+    retrieval_ingress_digest: str | None = None
+    synthesis_job_replay_identity: str | None = None
+    synthesis_legality_class: str | None = None
+    receipt_digest: str | None = None
+    execution_trace: list[dict[str, Any]]
+    synthesis_job_receipt: dict[str, Any]
+    error_detail: str | None = None
+    celery_task_id: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    retrieval_subqueries: list[dict[str, Any]] = []
+
+
+class AdminCortexSynthesisRetrievalPlanCatalogResponse(BaseModel):
+    """Phase 08 Step 10 — synthesis PLAN+RETRIEVE catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_query_plan_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    synthesis_to_primary_retrieval_workload: dict[str, str]
+    retrieval_fanout_rules: list[dict[str, Any]]
+    max_retrieval_subqueries_default: int
+    sd_cap_retrieval: str
+
+
+class AdminCortexSynthesisRetrievalPlanPreviewResponse(BaseModel):
+    """Phase 08 Step 10 — retrieval plan preview for a job envelope."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    gate_id: str
+    retrieval_plan_count: int
+    retrieval_plan: list[dict[str, Any]]
+    retrieval_query_envelopes: list[dict[str, Any]]
+    cap_violations: list[dict[str, Any]] = []
+
+
+class AdminCortexSynthesisLlmModelRouteCatalogResponse(BaseModel):
+    """Phase 08 Step 11 — LLM model route registry catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_llm_router_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    model_routes: list[dict[str, Any]]
+    max_llm_tokens_default: int
+    sd_llm_codes: list[str]
+    adapter_id: str
+    response_format_required: str
+
+
+class AdminCortexSynthesisLlmRoutePreviewResponse(BaseModel):
+    """Phase 08 Step 11 — LLM route preview for a synthesis job envelope."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    gate_id: str
+    llm_would_skip: bool
+    llm_skip_reason: str
+    selected_model_route_ids: list[str]
+    route_previews: list[dict[str, Any]]
+
+
+class AdminCortexSynthesisPromptTemplateCatalogResponse(BaseModel):
+    """Phase 08 Step 12 — synthesis prompt template registry catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_prompt_assembly_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    syn_prm_rules: list[str]
+    prompt_templates: list[dict[str, Any]]
+    model_route_template_bindings: list[dict[str, Any]]
+
+
+class AdminCortexSynthesisDegradationTopologyResponse(BaseModel):
+    """Phase 08 Step 18 — synthesis degradation topology (RD→SD propagation)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    tenant_id: str
+    phase08_synthesis_degradation_runtime_schema_version: int
+    gate_ids: list[str]
+    synthesis_policy_pack_id: str | None = None
+    synthesis_policy_pack_digest: str
+    sd_codes_registry: list[str]
+    rd_to_sd_propagation_matrix: list[dict[str, str]]
+    rd_to_sd_primary_map: dict[str, str]
+    policy_pack_rd_to_sd: list[dict[str, Any]]
+    substrate_health_states: list[str]
+    degradation_postures: list[str]
+    omission_histogram: dict[str, int]
+    rules: list[dict[str, Any]]
+    doctrine_anchors: list[str]
+
+
+class AdminCortexSynthesisSdOmissionExplorerResponse(BaseModel):
+    """Phase 08 Step 13 — SD-* omission explorer catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_bounded_caps_runtime_schema_version: int
+    gate_id: str
+    spec_ref: str
+    synthesis_policy_pack_id: str | None = None
+    default_caps: dict[str, int]
+    sd_codes_registry: list[str]
+    omission_semantics_by_sd: dict[str, str]
+    substrate_health_states: list[str]
+    degradation_postures: list[str]
+    omission_histogram: dict[str, int]
+    rd_to_sd_propagation: list[dict[str, Any]]
+    rules: list[dict[str, Any]]
+    http_behaviors: dict[str, int]
+
+
+class AdminCortexSynthesisPromptAssemblyPreviewResponse(BaseModel):
+    """Phase 08 Step 12 — prompt assembly preview for a synthesis job envelope."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    gate_id: str
+    prompt_assembly_count: int
+    prompt_assemblies: list[dict[str, Any]]
+    prompt_hashes: list[str]
+
+
+class AdminCortexSynthesisCitationLawCatalogResponse(BaseModel):
+    """Phase 08 Step 09 — synthesis cite-or-omit + citation schema catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    catalog_id: str
+    phase08_synthesis_evidence_binding_runtime_schema_version: int
+    gate_id: str
+    syn_law_rule: str
+    synthesis_citation_schema_version: int
+    claim_kinds: list[str]
+    citation_required_fields: list[str]
+    sd_codes: list[str]
+    cite_or_omit_law: str
+    spec_ref: str
+
+
+class AdminCortexSynthesisCitationBindingInspectorResponse(BaseModel):
+    """Phase 08 Step 09 — citation binding preview for hits + claim plan."""
+
+    model_config = ConfigDict(extra="allow")
+
+    surface_kind: str
+    gate_id: str
+    passed: bool
+    binding: dict[str, Any]
+
+
+class AdminCortexSynthesisReplayExplorerResponse(BaseModel):
+    """Phase 08 Step 08/17 — synthesis replay explorer catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    tenant_id: str
+    phase08_synthesis_replay_equivalence_runtime_schema_version: int
+    gate_ids: list[str]
+    replay_identity_field: str
+    upstream_replay_identity_field: str
+    replay_pin_fields: list[str]
+    syn_rep_rules: list[str]
+    sd_replay_codes: list[str]
+    canonical_identity_vector_fields: list[str]
+    synthesis_replay_divergence_total: int
+    doctrine_anchor: str
+    twin_modes: list[str]
+    recent_jobs: list[dict[str, Any]] = []
+    phase08_synthesis_replay_equivalence_proofs_runtime_schema_version: int = 1
+    sd_replay_twin: str = "SD-REPLAY-TWIN"
+    doctrine_anchors: list[str] = []
+    twin_diff_fields: list[str] = []
+    harness: dict[str, Any] = {}
+    operator_replay_prove_route: str = ""
+    gp08_replay_02_gate_id: str = "G-P08-REPLAY-02"
+
+
+class AdminCortexSynthesisOperatorReplayProveResponse(BaseModel):
+    """Phase 08 Step 17 — operator replay prove (twin vs stored job)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    tenant_id: str
+    job_id: str
+    gate_id: str
+    gp08_replay_proof_passed: bool
+    replay_equivalence_twin: dict[str, Any]
+    stored_synthesis_job_replay_identity: str = ""
+    replay_synthesis_job_replay_identity: str | None = None
+
+
+class AdminCortexSynthesisJobReplayInspectorResponse(BaseModel):
+    """Phase 08 Step 08 — per-job synthesis replay inspector."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    tenant_id: str
+    job_id: str
+    gate_id: str
+    synthesis_job_replay_identity: str
+    expected_synthesis_job_replay_identity: str | None = None
+    receipt_digest: str | None = None
+    retrieval_receipt_embed: dict[str, Any] | None = None
+    retrieval_subqueries: list[dict[str, Any]] = []
+    synthesis_job_replay_identity_vector: dict[str, Any] | None = None
+    upstream_retrieval_query_replay_identity: str | None = None
+    execution_trace: list[dict[str, Any]] = []
+    replay_equivalence_twin: dict[str, Any] = {}
+    gp08_replay_proof_passed: bool | None = None
+
+
+class AdminCortexSynthesisCertificationPackSnapshotResponse(BaseModel):
+    """Phase 08 Step 30 — SYNTHESIS-CERT-PACK-1 snapshot (gzip + digests; read-only)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    synthesis_certification_pack_runtime_schema_version: int
+    synthesis_cert_pack_format: str
+    closure_passed: bool
+    closure_detail: dict[str, Any]
+    whole_file_sha256: str | None = None
+    pack_gzip_base64: str | None = None
+    pack_byte_length: int | None = None
+
+
+class AdminCortexSynthesisProgramClosureCompletionCriterionRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    criterion_id: str
+    label: str
+    passed: bool
+    errors: list[str]
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexSynthesisProgramClosureOperatorChecklistRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    check_id: str
+    label: str
+    detail: str
+    passed: bool
+
+
+class AdminCortexSynthesisProgramClosureResponse(BaseModel):
+    """Phase 08 Step 30 — program closure + FF-P08-5 operator snapshot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: str
+    synthesis_program_closure_runtime_schema_version: int
+    phase08_program_freeze_version: int
+    freeze_bundle_id: str
+    spec_ref: str
+    program_closure_passed: bool
+    completion_criteria: list[AdminCortexSynthesisProgramClosureCompletionCriterionRow]
+    operator_checklist: list[AdminCortexSynthesisProgramClosureOperatorChecklistRow]
+    control_plane_surfaces_wired: int
+    control_plane_surfaces_total: int
+    certification_pack: dict[str, Any]
+    normative_program: dict[str, Any]
+    phase09_handoff_check: dict[str, Any] | None = None
+
+
+class AdminCortexSynthesisCertificationArchiveItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    tenant_id: str
+    synthesis_certification_pack_schema_version: int
+    passed: bool
+    created_at: datetime
+
+
+class AdminCortexSynthesisCertificationArchiveListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    archives: list[AdminCortexSynthesisCertificationArchiveItem]
+
+
+class AdminCortexSynthesisCertificationArchiveDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    archive: AdminCortexSynthesisCertificationArchiveItem
+    pack_json: dict[str, Any]
+
+
 class AdminCortexReasoningRuntimeHealthResponse(BaseModel):
     """Phase 06 RUNTIME-01/02 — live reconstruction health strip."""
 

@@ -11,6 +11,13 @@
   },
   "min_citation_coverage": 0.95,
   "allow_degraded_publish": true,
+  "observability": {
+    "completeness_critical_percent": 50,
+    "job_failure_rate_percent": 10,
+    "max_publication_lag_epochs": 1,
+    "sd_critical_spike_per_hour": 3,
+    "replay_divergence_spike_per_hour": 3
+  },
   "pipeline_default_workloads": [
     "execution_understanding",
     "degradation_brief"
@@ -37,6 +44,17 @@
       "max_tokens": 2048,
       "response_format": "json_schema",
       "prompt_template_id": "synthesis_narrate_default",
+      "prompt_template_version": 1
+    },
+    {
+      "model_route_id": "audit-v1",
+      "authority_class": "llm_narration",
+      "provider": "stub",
+      "model": "synthesis-audit-v1",
+      "temperature": 0,
+      "max_tokens": 2048,
+      "response_format": "json_schema",
+      "prompt_template_id": "synthesis_audit_default",
       "prompt_template_version": 1
     }
   ],
@@ -68,7 +86,8 @@
     "SD-POLICY-MISMATCH",
     "SD-PUBLISH-BLOCKED",
     "SD-PIPELINE-GAP",
-    "SD-TEMPORAL-PIN"
+    "SD-TEMPORAL-PIN",
+    "SD-LINEAGE-GAP"
   ],
   "rd_to_sd_propagation": [
     {
@@ -82,6 +101,14 @@
     {
       "rd_code": "RD-INDEX-STALE",
       "sd_code": "SD-PIPELINE-GAP"
+    },
+    {
+      "rd_code": "RD-REPLAY-TWIN",
+      "sd_code": "SD-REPLAY-TWIN"
+    },
+    {
+      "rd_code": "RD-LINEAGE-GAP",
+      "sd_code": "SD-LINEAGE-GAP"
     }
   ]
 }

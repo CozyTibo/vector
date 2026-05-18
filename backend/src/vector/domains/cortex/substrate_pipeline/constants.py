@@ -13,6 +13,7 @@ PHASE_04_GRAPH: Final[str] = "phase_04_graph"
 PHASE_05_TRAVERSAL: Final[str] = "phase_05_traversal"
 PHASE_06_TCRE: Final[str] = "phase_06_tcre"
 PHASE_07_RETRIEVAL: Final[str] = "phase_07_retrieval"
+PHASE_08_SYNTHESIS: Final[str] = "phase_08_synthesis"
 
 SUBSTRATE_PIPELINE_PHASE_ORDER: Final[tuple[str, ...]] = (
     PHASE_02_CANONICAL,
@@ -21,6 +22,7 @@ SUBSTRATE_PIPELINE_PHASE_ORDER: Final[tuple[str, ...]] = (
     PHASE_05_TRAVERSAL,
     PHASE_06_TCRE,
     PHASE_07_RETRIEVAL,
+    PHASE_08_SYNTHESIS,
 )
 
 PHASE_STATUS_QUEUED: Final[str] = "queued"

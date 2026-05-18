@@ -63,6 +63,8 @@ def run_tcre_reconstruction_job_task(tenant_id: str, job_id: str) -> dict[str, A
                 session,
                 tenant_id=tid,
                 job_scope=scope,
+                tcre_job_id=jid,
+                tcre_job_status=str(job.status),
             )
         session.commit()
     _LOGGER.info("tcre_reconstruction_done tenant_id=%s job_id=%s", tenant_id, job_id)

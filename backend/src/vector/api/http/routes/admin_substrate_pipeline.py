@@ -142,4 +142,149 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
 
         return build_reconstruction_catalog_v1()
 
+    @r.get("/runs/{pipeline_run_id}/synthesis-panel")
+    def get_pipeline_synthesis_panel(
+        tenant_id: uuid.UUID,
+        pipeline_run_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> dict[str, Any]:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        run = db.get(CortexSubstratePipelineRun, pipeline_run_id)
+        if run is None or run.tenant_id != tenant_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline_run_not_found")
+        from vector.domains.cortex.synthesis.synthesis_pipeline import build_pipeline_synthesis_panel_v1
+
+        return build_pipeline_synthesis_panel_v1(
+            db,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+        )
+
+    @r.get("/operational-health")
+    def get_operational_health(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> dict[str, Any]:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        from vector.domains.cortex.substrate_pipeline.substrate_operational_health import (
+            evaluate_substrate_operational_health_v1,
+        )
+
+        return evaluate_substrate_operational_health_v1(db, tenant_id=tenant_id)
+
+    @r.get("/runtime-maturity")
+    def get_runtime_maturity(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> dict[str, Any]:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        from vector.domains.cortex.substrate_pipeline.substrate_runtime_maturity import (
+            evaluate_tenant_runtime_maturity_v1,
+        )
+
+        return evaluate_tenant_runtime_maturity_v1(db, tenant_id=tenant_id)
+
+    @r.get("/continuation")
+    def get_pipeline_continuation(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> dict[str, Any]:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+            get_continuation_for_pipeline_v1,
+        )
+        from vector.domains.cortex.substrate_pipeline.repository import get_running_pipeline_run_v1
+
+        running = get_running_pipeline_run_v1(db, tenant_id=tenant_id)
+        if running is None:
+            return {"continuation": None}
+        cont = get_continuation_for_pipeline_v1(db, pipeline_run_id=running.id)
+        if cont is None:
+            return {"continuation": None, "pipeline_run_id": str(running.id)}
+        return {
+            "pipeline_run_id": str(running.id),
+            "continuation": {
+                "continuation_status": cont.continuation_status,
+                "current_phase": cont.current_phase,
+                "waiting_on": cont.waiting_on,
+                "async_job_id": str(cont.async_job_id) if cont.async_job_id else None,
+                "retry_count": cont.retry_count,
+                "recovery_required": cont.recovery_required,
+                "failure_reason": cont.failure_reason,
+                "last_heartbeat_at": cont.last_heartbeat_at.isoformat()
+                if cont.last_heartbeat_at
+                else None,
+                "resume_receipt_hash": cont.resume_receipt_hash,
+            },
+        }
+
+    @r.get("/retrieval-materialization-reports")
+    def list_retrieval_materialization_reports(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    ) -> dict[str, Any]:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        from vector.infrastructure.db.models.cortex_retrieval_materialization_report import (
+            CortexRetrievalMaterializationReport,
+        )
+
+        rows = list(
+            db.scalars(
+                select(CortexRetrievalMaterializationReport)
+                .where(CortexRetrievalMaterializationReport.tenant_id == tenant_id)
+                .order_by(CortexRetrievalMaterializationReport.created_at.desc())
+                .limit(limit)
+            ).all()
+        )
+        return {
+            "reports": [
+                {
+                    "report_id": str(row.id),
+                    "pipeline_run_id": str(row.pipeline_run_id) if row.pipeline_run_id else None,
+                    "retrieval_epoch": row.retrieval_epoch,
+                    "accepted_rows": row.accepted_rows,
+                    "skipped_rows": row.skipped_rows,
+                    "tcre_candidates": row.tcre_candidates,
+                    "walks_candidates": row.walks_candidates,
+                    "org_link_candidates": row.org_link_candidates,
+                    "skip_reasons": list(row.skip_reasons_json or []),
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                }
+                for row in rows
+            ],
+        }
+
+    @router.get("/catalog/cortex/substrate-pipeline/stalled")
+    def list_stalled_pipelines_catalog(
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> dict[str, Any]:
+        from vector.domains.cortex.substrate_pipeline.stalled_pipeline_recovery import (
+            detect_stalled_substrate_pipelines_v1,
+        )
+
+        return {
+            "stalled_pipelines": detect_stalled_substrate_pipelines_v1(db, limit=limit),
+        }
+
+    @router.post("/catalog/cortex/substrate-pipeline/stalled/{pipeline_run_id}/recover")
+    def recover_stalled_pipeline_catalog(
+        pipeline_run_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        action: Annotated[str, Query()] = "auto",
+    ) -> dict[str, Any]:
+        from vector.domains.cortex.substrate_pipeline.stalled_pipeline_recovery import (
+            recover_stalled_pipeline_v1,
+        )
+
+        out = recover_stalled_pipeline_v1(db, pipeline_run_id=pipeline_run_id, action=action)
+        db.commit()
+        return out
+
     router.include_router(r)

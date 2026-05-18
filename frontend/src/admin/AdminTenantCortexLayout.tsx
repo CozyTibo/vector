@@ -11,7 +11,7 @@ const CORTEX_SECTIONS: Array<{ key: string; label: string; enabled: boolean }> =
   { key: "memory", label: "Memory", enabled: true },
   { key: "reasoning", label: "Reasoning", enabled: true },
   { key: "retrieval", label: "Retrieval", enabled: true },
-  { key: "synthesis", label: "Synthesis", enabled: false },
+  { key: "synthesis", label: "Synthesis", enabled: true },
   { key: "verification", label: "Verification", enabled: true },
   { key: "settings-debug", label: "Settings / Debug", enabled: false },
 ];

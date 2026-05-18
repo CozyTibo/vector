@@ -46,9 +46,19 @@ def _summarize_phase_output(phase_id: str, output: dict[str, Any]) -> dict[str, 
     if phase_id.endswith("retrieval"):
         return {
             "index_epoch": output.get("index_epoch"),
+            "published_index_epoch": output.get("published_index_epoch") or output.get("index_epoch"),
             "build_state": output.get("build_state"),
             "entry_count": output.get("entry_count"),
             "entries_materialized": output.get("entries_materialized"),
+        }
+    if phase_id.endswith("synthesis"):
+        return {
+            "synthesis_publication_epoch": output.get("synthesis_publication_epoch"),
+            "artifact_digests": output.get("artifact_digests"),
+            "synthesis_job_ids": output.get("synthesis_job_ids"),
+            "retrieval_epoch_pinned": output.get("retrieval_epoch_pinned"),
+            "jobs_completed": output.get("jobs_completed"),
+            "sd_rollup": output.get("sd_rollup"),
         }
     if phase_id.endswith("graph"):
         return {

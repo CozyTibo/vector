@@ -40,6 +40,14 @@ import AdminCortexRetrievalQueryPage from "./admin/AdminCortexRetrievalQueryPage
 import AdminCortexRetrievalWorkflowsPage from "./admin/AdminCortexRetrievalWorkflowsPage.tsx";
 import AdminCortexRetrievalCertificationPackPage from "./admin/AdminCortexRetrievalCertificationPackPage.tsx";
 import AdminCortexRetrievalProgramClosurePage from "./admin/AdminCortexRetrievalProgramClosurePage.tsx";
+import AdminCortexSynthesisCatalogPage from "./admin/AdminCortexSynthesisCatalogPage.tsx";
+import AdminCortexSynthesisControlPlanePage from "./admin/AdminCortexSynthesisControlPlanePage.tsx";
+import AdminCortexSynthesisJobDebuggerPage from "./admin/AdminCortexSynthesisJobDebuggerPage.tsx";
+import AdminCortexSynthesisJobsPage from "./admin/AdminCortexSynthesisJobsPage.tsx";
+import AdminCortexSynthesisLayout from "./admin/AdminCortexSynthesisLayout.tsx";
+import AdminCortexSynthesisOverviewPage from "./admin/AdminCortexSynthesisOverviewPage.tsx";
+import AdminCortexSynthesisResynthesizePage from "./admin/AdminCortexSynthesisResynthesizePage.tsx";
+import AdminCortexSynthesisWorkflowsPage from "./admin/AdminCortexSynthesisWorkflowsPage.tsx";
 import AdminCortexTraversalControlPlanePage from "./admin/AdminCortexTraversalControlPlanePage.tsx";
 import AdminCortexTraversalLayout from "./admin/AdminCortexTraversalLayout.tsx";
 import AdminCortexTraversalOverviewPage from "./admin/AdminCortexTraversalOverviewPage.tsx";
@@ -227,7 +235,37 @@ createRoot(document.getElementById("root")!).render(
                     element={<AdminCortexRetrievalProgramClosurePage />}
                   />
                 </Route>
-                <Route path="synthesis" element={<AdminCortexPlaceholderPage title="Synthesis" />} />
+                <Route path="synthesis" element={<AdminCortexSynthesisLayout />}>
+                  <Route index element={<AdminCortexSynthesisOverviewPage />} />
+                  <Route path="workflows" element={<AdminCortexSynthesisWorkflowsPage />} />
+                  <Route path="jobs" element={<AdminCortexSynthesisJobsPage />} />
+                  <Route path="jobs/:jobId" element={<AdminCortexSynthesisJobDebuggerPage />} />
+                  <Route path="artifacts" element={<AdminCortexSynthesisCatalogPage surfaceKey="artifacts" />} />
+                  <Route path="replay" element={<AdminCortexSynthesisCatalogPage surfaceKey="replay" />} />
+                  <Route path="omissions" element={<AdminCortexSynthesisCatalogPage surfaceKey="omissions" />} />
+                  <Route path="degradation" element={<AdminCortexSynthesisCatalogPage surfaceKey="degradation" />} />
+                  <Route path="legality" element={<AdminCortexSynthesisCatalogPage surfaceKey="legality" />} />
+                  <Route
+                    path="runtime-legality"
+                    element={<AdminCortexSynthesisCatalogPage surfaceKey="runtimeLegality" />}
+                  />
+                  <Route
+                    path="evaluation"
+                    element={<AdminCortexSynthesisCatalogPage surfaceKey="evaluation" />}
+                  />
+                  <Route path="coverage" element={<AdminCortexSynthesisCatalogPage surfaceKey="coverage" />} />
+                  <Route path="observability" element={<AdminCortexSynthesisCatalogPage surfaceKey="observability" />} />
+                  <Route path="control-plane" element={<AdminCortexSynthesisControlPlanePage />} />
+                  <Route
+                    path="certification"
+                    element={<AdminCortexSynthesisCatalogPage surfaceKey="certification" />}
+                  />
+                  <Route
+                    path="program-closure"
+                    element={<AdminCortexSynthesisCatalogPage surfaceKey="programClosure" />}
+                  />
+                  <Route path="resynthesize" element={<AdminCortexSynthesisResynthesizePage />} />
+                </Route>
                 <Route path="verification" element={<AdminCortexVerificationPage />} />
                 <Route path="settings-debug" element={<AdminCortexPlaceholderPage title="Settings / Debug" />} />
               </Route>

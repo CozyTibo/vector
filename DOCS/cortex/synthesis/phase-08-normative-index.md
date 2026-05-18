@@ -1,6 +1,6 @@
 # Phase 08 — Normative index (Synthesis & Intelligence Layer)
 
-**Status:** normative specification program — **PHASE08_PROGRAM_FREEZE_VERSION `1`** (doctrine pass; runtime **Not Started**).  
+**Status:** **`Frozen (implementation)`** — **P08-FINAL-FREEZE-2026-05-17** (Steps **1–35** runtime shipped; **PHASE08_PROGRAM_FREEZE_VERSION `1`**).  
 **Role:** constitutional entry for **Phase 08 Synthesis & Intelligence Layer (SIL)** — bounded, evidence-constrained execution intelligence over Phase **07** lawful retrieval envelopes — **not** chat, RAG, or unconstrained LLM cognition.  
 **Normative tree:** `DOCS/cortex/synthesis/`.  
 **Upstream:** Phase **07** retrieval closure ([`../retrieval/PHASE07_RUNTIME_CLOSURE.md`](../retrieval/PHASE07_RUNTIME_CLOSURE.md)); substrate pipeline phases **02–07** ([`phase-08-pipeline-orchestration.md`](./phase-08-pipeline-orchestration.md)).  

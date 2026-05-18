@@ -72,6 +72,7 @@ celery_app = Celery(
         "app.tasks.cortex_post_ingestion_substrate_refresh",
         "app.tasks.cortex_substrate_pipeline",
         "app.tasks.cortex_tcre_reconstruction_jobs",
+        "app.tasks.cortex_synthesis_jobs",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -91,6 +92,7 @@ celery_app.conf.imports = (
     "app.tasks.cortex_org_link_jobs",
     "app.tasks.cortex_post_ingestion_substrate_refresh",
     "app.tasks.cortex_tcre_reconstruction_jobs",
+    "app.tasks.cortex_synthesis_jobs",
 )
 
 # Phase 01 Step 2–3: live lane vs replay lane (orchestration-model.md, replay-strategy.md).
@@ -101,10 +103,16 @@ celery_app.conf.task_routes = {
 
 _tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "1800"))
 _tick_seconds = max(60, _tick_seconds)
+_watchdog_seconds = int(os.environ.get("CORTEX_SUBSTRATE_CONTINUITY_WATCHDOG_INTERVAL_SECONDS", "600"))
+_watchdog_seconds = max(120, _watchdog_seconds)
 celery_app.conf.beat_schedule = {
     "cortex-ingestion-scheduler-tick": {
         "task": "vector.cortex.ingestion.scheduler_tick",
         "schedule": timedelta(seconds=_tick_seconds),
+    },
+    "cortex-substrate-continuity-watchdog": {
+        "task": "vector.cortex.substrate_pipeline.continuity_watchdog",
+        "schedule": timedelta(seconds=_watchdog_seconds),
     },
 }
 
@@ -121,7 +129,9 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_org_link_jobs")
     importlib.import_module("app.tasks.cortex_post_ingestion_substrate_refresh")
     importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
-    importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
+    importlib.import_module("app.tasks.cortex_substrate_pipeline")
+    importlib.import_module("app.tasks.cortex_substrate_continuity_watchdog")
+    importlib.import_module("app.tasks.cortex_synthesis_jobs")
 
 
 _register_tasks()
@@ -140,3 +150,6 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_org_link_jobs")
     importlib.import_module("app.tasks.cortex_post_ingestion_substrate_refresh")
     importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
+    importlib.import_module("app.tasks.cortex_substrate_pipeline")
+    importlib.import_module("app.tasks.cortex_substrate_continuity_watchdog")
+    importlib.import_module("app.tasks.cortex_synthesis_jobs")
