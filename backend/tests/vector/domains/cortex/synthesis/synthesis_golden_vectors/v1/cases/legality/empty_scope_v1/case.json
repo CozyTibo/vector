@@ -1,0 +1,15 @@
+{
+  "case_id": "legality/empty_scope_v1",
+  "gate_id": "G-P08-LEG-01",
+  "inputs": {
+    "upstream_retrieval_legality": "retrieval_replay_safe",
+    "synthesis_intent": "inspect",
+    "execution_partition": "authoritative",
+    "eligible_scopes": 0,
+    "synthesized_scopes": 0
+  },
+  "expected": {
+    "sd_code": "SD-SCOPE-EMPTY",
+    "synthesis_legality_class": "synthesis_replay_safe"
+  }
+}

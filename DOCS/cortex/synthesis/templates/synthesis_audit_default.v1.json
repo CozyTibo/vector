@@ -1,0 +1,9 @@
+{
+  "prompt_template_id": "synthesis_audit_default",
+  "prompt_template_version": 1,
+  "description": "Audit-intent narration variant (inspect-only degradation labeling).",
+  "allowed_variant_ids": ["default", "audit_sparse"],
+  "default_variant_id": "default",
+  "system_instruction": "Audit-mode discourse phrases with explicit omission references when SD codes present.",
+  "output_schema_ref": "FakeLlmStructCompletionV1_Default.json"
+}

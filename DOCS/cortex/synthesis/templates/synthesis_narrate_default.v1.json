@@ -1,0 +1,9 @@
+{
+  "prompt_template_id": "synthesis_narrate_default",
+  "prompt_template_version": 1,
+  "description": "Narration glue for discourse_only fields (non-authoritative wording).",
+  "allowed_variant_ids": ["default", "concise"],
+  "default_variant_id": "default",
+  "system_instruction": "Produce JSON discourse_phrases for discourse_only slots. Wording only; no new evidence.",
+  "output_schema_ref": "FakeLlmStructCompletionV1_Default.json"
+}

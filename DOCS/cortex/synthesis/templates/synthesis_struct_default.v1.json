@@ -1,0 +1,9 @@
+{
+  "prompt_template_id": "synthesis_struct_default",
+  "prompt_template_version": 1,
+  "description": "Structured claim fill from bounded evidence context (Phase 08 default).",
+  "allowed_variant_ids": ["default", "concise", "variant_pin_a"],
+  "default_variant_id": "default",
+  "system_instruction": "Produce JSON discourse_phrases for discourse_only claim slots only. Do not invent substrate facts.",
+  "output_schema_ref": "FakeLlmStructCompletionV1_Default.json"
+}
