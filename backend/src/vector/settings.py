@@ -433,6 +433,29 @@ class Settings(BaseSettings):
             "watchdog beat tasks (sweeper is the only scheduler)."
         ),
     )
+    cortex_canonical_forward_progress_max_batches_per_slice: int = Field(
+        default=120,
+        ge=1,
+        le=5000,
+        validation_alias="CORTEX_CANONICAL_FORWARD_PROGRESS_MAX_BATCHES_PER_SLICE",
+        description="Max materialization batches per convergence worker slice (success-based).",
+    )
+    cortex_canonical_forward_progress_zero_progress_batch_limit: int = Field(
+        default=2,
+        ge=1,
+        le=20,
+        validation_alias="CORTEX_CANONICAL_FORWARD_PROGRESS_ZERO_PROGRESS_BATCH_LIMIT",
+        description="Consecutive zero-success batches before topology_wait spin stop.",
+    )
+    cortex_canonical_topology_wait_cooldown_seconds: int = Field(
+        default=90,
+        ge=5,
+        le=3600,
+        validation_alias="CORTEX_CANONICAL_TOPOLOGY_WAIT_COOLDOWN_SECONDS",
+        description=(
+            "Cooldown before retrying topology-deferred rows; also used for convergence requeue delay."
+        ),
+    )
     cortex_replay_storm_divergence_spike_per_hour: int = Field(
         default=3,
         ge=1,

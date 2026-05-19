@@ -15,6 +15,7 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_STATUS_QUEUED,
     PHASE_STATUS_RUNNING,
     PHASE_STATUS_SKIPPED,
+    PHASE_STATUS_WAITING,
     PIPELINE_STATUS_COMPLETED,
     PIPELINE_STATUS_FAILED,
     PIPELINE_STATUS_PARTIAL,
@@ -214,6 +215,27 @@ def fail_phase_v1(
         run.status = PIPELINE_STATUS_FAILED
         run.error_detail = error[:4000]
         run.completed_at = datetime.now(UTC)
+    session.flush()
+    return phase
+
+
+def wait_phase_v1(
+    session: Session,
+    *,
+    pipeline_run_id: uuid.UUID,
+    phase_id: str,
+    output: dict[str, Any],
+    waiting_reason: str,
+) -> CortexSubstratePhaseRun:
+    """Mark phase waiting (e.g. topology) — not completed; convergence continues later."""
+    phase = get_phase_run_v1(session, pipeline_run_id=pipeline_run_id, phase_id=phase_id)
+    if phase is None:
+        msg = f"unknown_phase:{phase_id}"
+        raise ValueError(msg)
+    phase.status = PHASE_STATUS_WAITING
+    phase.output_json = dict(output)
+    phase.error_detail = waiting_reason[:4000]
+    phase.completed_at = None
     session.flush()
     return phase
 

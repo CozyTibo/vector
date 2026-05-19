@@ -30,10 +30,15 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_06_TCRE,
     PHASE_07_RETRIEVAL,
 )
+from vector.domains.cortex.canonical.forward_progress.constants import (
+    CANONICAL_OUTCOME_FAILED,
+    CANONICAL_OUTCOME_TOPOLOGY_WAIT,
+)
 from vector.domains.cortex.substrate_pipeline.repository import (
     begin_phase_v1,
     complete_phase_v1,
     fail_phase_v1,
+    wait_phase_v1,
 )
 from vector.domains.cortex.substrate_pipeline.substrate_traversal_execution import (
     run_substrate_traversal_materialization_v1,
@@ -65,6 +70,7 @@ def run_phase_02_canonical_v1(
     pipeline_run_id: uuid.UUID,
     bundle_id: str | None,
     batch_limit: int | None,
+    pass_index: int = 0,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_02_CANONICAL)
     bid = _resolve_bundle_id(session, tenant_id=tenant_id, bundle_id=bundle_id)
@@ -81,7 +87,9 @@ def run_phase_02_canonical_v1(
         connector=None,
         resource_type=None,
         batch_limit=lim,
+        pass_index=pass_index,
     )
+    outcome = str(canonical_summary.get("canonical_outcome") or "")
     repair_scan = min(5000, max(200, int(lim) * 4))
     determinism_repair = repair_tenant_materialization_oracle_determinism_drift(
         session,
@@ -93,8 +101,28 @@ def run_phase_02_canonical_v1(
     out = {
         "bundle_id": bid,
         "canonical_summary": canonical_summary,
+        "canonical_outcome": outcome,
         "determinism_repair": determinism_repair,
+        "pass_index_next": canonical_summary.get("pass_index_next"),
     }
+    if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT and int(canonical_summary.get("total_succeeded") or 0) == 0:
+        wait_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_02_CANONICAL,
+            output=out,
+            waiting_reason="topology_wait:parent_materialization_required",
+        )
+        return out
+    if outcome == CANONICAL_OUTCOME_FAILED and int(canonical_summary.get("total_succeeded") or 0) == 0:
+        fail_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_02_CANONICAL,
+            error="canonical_materialization_failed",
+            output=out,
+        )
+        return out
     complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_02_CANONICAL, output=out)
     return out
 

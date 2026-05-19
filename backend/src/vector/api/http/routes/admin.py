@@ -2376,6 +2376,20 @@ def build_admin_router() -> APIRouter:
         payload = {"materialization": materialization_public_dict(mat)}
         return AdminCortexMaterializeTransformResponse.model_validate(payload)
 
+    @r.get("/tenants/{tenant_id}/cortex/canonical/forward-progress")
+    def admin_cortex_canonical_forward_progress(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        bundle_id: str | None = None,
+    ) -> dict[str, object]:
+        """Truth surface: deferrals, topology wait, convergence velocity (no graph theater)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canonical.forward_progress.operator_snapshot import (
+            build_canonical_forward_progress_snapshot,
+        )
+
+        return build_canonical_forward_progress_snapshot(db, tenant_id=tenant_id, bundle_id=bundle_id)
+
     @r.post(
         "/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog",
         response_model=AdminCortexMaterializeBacklogResponse,

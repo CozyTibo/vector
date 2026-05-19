@@ -2031,6 +2031,8 @@ def materialize_stub_backlog(
     resource_type: str | None,
     batch_limit: int,
     dry_run: bool,
+    pass_index: int = 0,
+    topology_cooldown_seconds: int = 60,
 ) -> dict[str, Any]:
     """Materialize stub-routable raw rows that are missing a projection for ``bundle_id``.
 
@@ -2047,12 +2049,17 @@ def materialize_stub_backlog(
     pair_labels = [f"{c}/{rt}" for c, rt in pairs]
 
     lim = max(1, min(batch_limit, 2000))
-    ids, more_remain = list_stub_routable_raw_ids_missing_materialization(
+    from vector.domains.cortex.canonical.forward_progress.candidate_selection import (
+        list_forward_progress_candidate_ids,
+    )
+
+    ids, more_remain, selection_meta = list_forward_progress_candidate_ids(
         db,
         tenant_id=tenant_id,
         bundle_id=bundle_id,
         connector=connector,
         resource_type=resource_type,
+        pass_index=pass_index,
         fetch_limit=lim,
     )
     id_to_rt = {
@@ -2109,7 +2116,9 @@ def materialize_stub_backlog(
             "scope_resource_type": resource_type.strip() if resource_type and resource_type.strip() else None,
             "batch_limit_applied": lim,
             "candidate_more_remain": more_remain,
-            "attempted": len(ids),
+            "selected": len(ids),
+            "attempted": 0,
+            "topology_skipped": len(skip_ids),
             "attempted_by_resource_type": attempted_by_resource_type,
             "succeeded": 0,
             "succeeded_by_resource_type": {},
@@ -2119,6 +2128,7 @@ def materialize_stub_backlog(
             "throughput_rows_per_second": 0.0,
             "topology_materialization": topo_meta,
             "topology_skipped_raw_record_ids": sorted(skip_ids),
+            "forward_progress": selection_meta,
         }
 
     failures: list[dict[str, Any]] = []
@@ -2128,6 +2138,23 @@ def materialize_stub_backlog(
         record_transform_materialize_failure,
     )
 
+    raw_rows_by_id = {int(r.id): r for r in raw_rows}
+    pass_key = str(selection_meta.get("pass_key") or "")
+    from vector.domains.cortex.canonical.forward_progress.deferral_store import (
+        clear_deferral_for_raw_record,
+        record_topology_deferrals_from_plan,
+    )
+
+    topology_deferred_recorded = record_topology_deferrals_from_plan(
+        db,
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        pass_key=pass_key or None,
+        plan=plan,
+        raw_rows_by_id=raw_rows_by_id,
+        cooldown_seconds=topology_cooldown_seconds,
+    )
+
     for stage_idx, stage in enumerate(plan.get("stages") or []):
         for rid in stage:
             if int(rid) in skip_ids:
@@ -2135,6 +2162,9 @@ def materialize_stub_backlog(
             try:
                 materialize_raw_record(db, tenant_id=tenant_id, bundle_id=bundle_id, raw_record_id=int(rid))
                 succeeded += 1
+                clear_deferral_for_raw_record(
+                    db, tenant_id=tenant_id, bundle_id=bundle_id, raw_record_id=int(rid)
+                )
                 rt = id_to_rt.get(int(rid), "unknown")
                 succeeded_by_resource_type[rt] = int(succeeded_by_resource_type.get(rt, 0)) + 1
             except MaterializeError as exc:
@@ -2160,6 +2190,7 @@ def materialize_stub_backlog(
         if elapsed_ms > 0
         else float(succeeded)
     )
+    processable_attempted = succeeded + len(failures)
     return {
         "transform_runtime_schema_version": TRANSFORM_RUNTIME_SCHEMA_VERSION,
         "tenant_id": str(tenant_id),
@@ -2170,7 +2201,10 @@ def materialize_stub_backlog(
         "scope_resource_type": resource_type.strip() if resource_type and resource_type.strip() else None,
         "batch_limit_applied": lim,
         "candidate_more_remain": more_remain,
-        "attempted": len(ids),
+        "selected": len(ids),
+        "attempted": processable_attempted,
+        "topology_skipped": len(skip_ids),
+        "topology_deferred_recorded": topology_deferred_recorded,
         "attempted_by_resource_type": attempted_by_resource_type,
         "succeeded": succeeded,
         "succeeded_by_resource_type": succeeded_by_resource_type,
@@ -2180,6 +2214,7 @@ def materialize_stub_backlog(
         "throughput_rows_per_second": throughput,
         "topology_materialization": topo_meta,
         "topology_skipped_raw_record_ids": sorted(skip_ids),
+        "forward_progress": selection_meta,
     }
 
 
@@ -2228,88 +2263,22 @@ def drain_stub_materialize_backlog(
     connector: str | None = None,
     resource_type: str | None = None,
     batch_limit: int | None = None,
+    pass_index: int = 0,
 ) -> dict[str, Any]:
-    """Repeated batched stub backlog materialization until no candidates remain (bounded loops).
-
-    Intended for Celery / offline drains — commits incrementally inside ``materialize_raw_record``.
-    """
-    lim = batch_limit if batch_limit is not None else _BACKLOG_DRAIN_BATCH_DEFAULT
-    lim = max(1, min(int(lim), 2000))
-
-    bundle = db.get(CortexMappingBundle, bundle_id)
-    if bundle is None:
-        raise MaterializeError("unknown_bundle")
-    if bundle.lifecycle_state not in ALLOWED_BUNDLE_LIFECYCLE_FOR_TRANSFORM:
-        raise MaterializeError(f"bundle_not_transformable:{bundle.lifecycle_state}")
-
-    failure_samples: list[dict[str, Any]] = []
-    total_attempted = 0
-    total_succeeded = 0
-    total_failed_rows = 0
-    batches_run = 0
-    pair_labels: list[str] = []
-    throughput_rows_per_second_samples: list[float] = []
-    drain_started_at = datetime.now(UTC)
-
-    while batches_run < _BACKLOG_DRAIN_MAX_BATCHES:
-        raw_batch = materialize_stub_backlog(
-            db,
-            tenant_id=tenant_id,
-            bundle_id=bundle_id,
-            connector=connector,
-            resource_type=resource_type,
-            batch_limit=lim,
-            dry_run=False,
-        )
-        if not pair_labels and raw_batch.get("stub_resource_pairs_selected"):
-            pair_labels = list(raw_batch["stub_resource_pairs_selected"])
-
-        attempted_n = int(raw_batch["attempted"])
-        succeeded_n = int(raw_batch["succeeded"])
-        total_attempted += attempted_n
-        total_succeeded += succeeded_n
-        failures_batch = raw_batch["failures"] if isinstance(raw_batch["failures"], list) else []
-        total_failed_rows += len(failures_batch)
-        for f in failures_batch:
-            if len(failure_samples) >= _BACKLOG_DRAIN_FAILURE_SAMPLE_CAP:
-                break
-            if isinstance(f, dict):
-                failure_samples.append(f)
-        batches_run += 1
-        tp = raw_batch.get("throughput_rows_per_second")
-        if isinstance(tp, (float, int)):
-            throughput_rows_per_second_samples.append(float(tp))
-
-        if attempted_n == 0:
-            break
-        if not raw_batch.get("candidate_more_remain"):
-            break
-
-    elapsed_ms = int((datetime.now(UTC) - drain_started_at).total_seconds() * 1000)
-    overall_tp = (
-        round(float(total_succeeded) / (float(elapsed_ms) / 1000.0), 3)
-        if elapsed_ms > 0
-        else float(total_succeeded)
+    """Forward-progress-aware canonical backlog drain (topology-safe, bounded slices)."""
+    from vector.domains.cortex.canonical.forward_progress.drain_runtime import (
+        drain_forward_progress_backlog,
     )
-    return {
-        "transform_runtime_schema_version": TRANSFORM_RUNTIME_SCHEMA_VERSION,
-        "tenant_id": str(tenant_id),
-        "bundle_id": bundle_id,
-        "scope_connector": connector.strip() if connector and connector.strip() else None,
-        "scope_resource_type": resource_type.strip() if resource_type and resource_type.strip() else None,
-        "batches_run": batches_run,
-        "batch_limit_applied": lim,
-        "total_attempted": total_attempted,
-        "total_succeeded": total_succeeded,
-        "total_failed_rows": total_failed_rows,
-        "failure_samples": failure_samples,
-        "failure_samples_truncated": total_failed_rows > len(failure_samples),
-        "stub_resource_pairs_selected": pair_labels,
-        "hit_batch_cap": batches_run >= _BACKLOG_DRAIN_MAX_BATCHES,
-        "duration_ms": elapsed_ms,
-        "overall_throughput_rows_per_second": overall_tp,
-        "batch_throughput_rows_per_second_samples": throughput_rows_per_second_samples[:200],
-    }
+
+    return drain_forward_progress_backlog(
+        db,
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        connector=connector,
+        resource_type=resource_type,
+        batch_limit=batch_limit,
+        pass_index=pass_index,
+    )
 
 
 def materialization_public_dict(mat: CortexCanonicalTransformMaterialization) -> dict[str, Any]:

@@ -10,6 +10,10 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.canonical.forward_progress.constants import (
+    CANONICAL_OUTCOME_PARTIAL_PROGRESS,
+    CANONICAL_OUTCOME_TOPOLOGY_WAIT,
+)
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.convergence.constants import LEASE_STATUS_DIRTY
 from vector.domains.cortex.convergence.lease import (
@@ -73,11 +77,34 @@ def _untreated_raw_exists(session: Session, *, tenant_id: uuid.UUID) -> bool:
     return session.execute(stmt).first() is not None
 
 
+def _canonical_pass_index_from_lease(lease: CortexTenantConvergenceLease) -> int:
+    detail = lease.detail_json if isinstance(lease.detail_json, dict) else {}
+    raw = detail.get("canonical_pass_index")
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _store_canonical_pass_index_on_lease(lease: CortexTenantConvergenceLease, pass_index: int) -> None:
+    detail = dict(lease.detail_json or {})
+    detail["canonical_pass_index"] = int(pass_index)
+    lease.detail_json = detail
+
+
 def _canonical_needs_more_work(session: Session, *, canonical_summary: dict[str, Any], tenant_id: uuid.UUID) -> bool:
-    if bool(canonical_summary.get("hit_batch_cap")):
-        return True
     if bool(canonical_summary.get("skipped")):
         return False
+    outcome = str(canonical_summary.get("canonical_outcome") or "")
+    if outcome in (CANONICAL_OUTCOME_TOPOLOGY_WAIT, CANONICAL_OUTCOME_PARTIAL_PROGRESS):
+        return True
+    if bool(canonical_summary.get("progress_made")):
+        if bool(canonical_summary.get("slice_budget_exhausted")) or bool(
+            canonical_summary.get("candidate_more_remain")
+        ):
+            return True
+    if bool(canonical_summary.get("hit_slice_cap")) and bool(canonical_summary.get("progress_made")):
+        return True
     return _untreated_raw_exists(session, tenant_id=tenant_id)
 
 
@@ -145,6 +172,7 @@ def run_tenant_convergence_v1(
             session.flush()
 
             if phase == PHASE_02_CANONICAL:
+                pass_idx = _canonical_pass_index_from_lease(lease)
                 out = run_phase_02_canonical_v1(
                     session,
                     cfg,
@@ -152,22 +180,40 @@ def run_tenant_convergence_v1(
                     pipeline_run_id=pipeline_run_id,
                     bundle_id=bundle_id,
                     batch_limit=cfg.cortex_post_ingestion_canonical_batch_limit,
+                    pass_index=pass_idx,
                 )
                 summary = out.get("canonical_summary") if isinstance(out.get("canonical_summary"), dict) else {}
+                next_pass = summary.get("pass_index_next")
+                if isinstance(next_pass, int):
+                    _store_canonical_pass_index_on_lease(lease, next_pass)
                 if _canonical_needs_more_work(session, canonical_summary=summary, tenant_id=tenant_id):
+                    delay = 0
+                    outcome = str(summary.get("canonical_outcome") or "")
+                    if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT:
+                        delay = max(
+                            30,
+                            int(cfg.cortex_canonical_topology_wait_cooldown_seconds),
+                        )
                     schedule_convergence_retry_v1(
                         session,
                         tenant_id=tenant_id,
                         phase_cursor=PHASE_02_CANONICAL,
+                        delay_seconds=delay,
                     )
+                    detail = dict(lease.detail_json or {})
+                    detail["last_canonical_outcome"] = outcome
+                    lease.detail_json = detail
                     session.commit()
                     enqueue_tenant_convergence_v1(tenant_id, reason="canonical_continue")
+                    worker_outcome = "canonical_topology_wait" if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT else "canonical_partial"
                     return {
                         "tenant_id": str(tenant_id),
                         "acquired": True,
-                        "outcome": "canonical_partial",
+                        "outcome": worker_outcome,
+                        "canonical_outcome": outcome,
                         "pipeline_run_id": str(pipeline_run_id),
                     }
+                _store_canonical_pass_index_on_lease(lease, 0)
                 phase = PHASE_03_IDENTITY
                 continue
 

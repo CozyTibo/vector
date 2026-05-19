@@ -60,6 +60,7 @@ _CESP_ALLOWED_EXTENSION_IMPORTERS_V1: Final[frozenset[str]] = frozenset(
 
 _CESP_ALLOWED_UPSTREAM_IMPORT_PREFIXES_V1: Final[tuple[str, ...]] = (
     "vector.domains.cortex.completeness",
+    "vector.domains.cortex.convergence",
     "vector.domains.cortex.retrieval",
     "vector.domains.cortex.synthesis",
     "vector.domains.cortex.substrate_pipeline",

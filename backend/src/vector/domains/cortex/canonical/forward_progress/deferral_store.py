@@ -1,0 +1,249 @@
+"""Persist and release canonical materialization deferrals."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
+
+from vector.domains.cortex.canonical.forward_progress.constants import (
+    DEFERRAL_REASON_DEPENDENCY_NOT_MATERIALIZED,
+    DEFERRAL_REASON_MISSING_DEPLOYMENT,
+    DEFERRAL_REASON_MISSING_PAGE_PARENT,
+    DEFERRAL_REASON_MISSING_PARENT,
+    DEFERRAL_REASON_MISSING_PARENT_COMMIT,
+    DEFERRAL_REASON_MISSING_PR,
+    DEFERRAL_REASON_TOPOLOGY_ORPHAN,
+    DEFERRAL_QUEUE_EXTERNAL_PARENT,
+    DEFERRAL_QUEUE_TOPOLOGY_ORPHAN,
+)
+from vector.domains.cortex.canonical.materialization_topology_engine import classify_orphan_missing_ref
+from vector.infrastructure.db.models.cortex_canonical_materialization_deferral import (
+    CortexCanonicalMaterializationDeferral,
+)
+from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
+    CortexCanonicalTransformMaterialization,
+)
+from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def map_orphan_class_to_deferral_reason(orphan_class: str, *, resource_type: str) -> str:
+    oc = str(orphan_class or "").strip()
+    rt = str(resource_type or "").strip()
+    if oc == "missing_deployment":
+        return DEFERRAL_REASON_MISSING_DEPLOYMENT
+    if oc == "missing_workflow":
+        return DEFERRAL_REASON_DEPENDENCY_NOT_MATERIALIZED
+    if oc == "missing_root_thread":
+        return DEFERRAL_REASON_DEPENDENCY_NOT_MATERIALIZED
+    if rt == "github.pull_request_timeline_event" and oc == "missing_parent":
+        return DEFERRAL_REASON_MISSING_PR
+    if rt == "github.commit" and oc == "missing_parent":
+        return DEFERRAL_REASON_MISSING_PARENT_COMMIT
+    if rt.startswith("notion.") and oc == "missing_parent":
+        return DEFERRAL_REASON_MISSING_PAGE_PARENT
+    if oc == "missing_parent":
+        return DEFERRAL_REASON_MISSING_PARENT
+    return DEFERRAL_REASON_TOPOLOGY_ORPHAN
+
+
+def record_topology_deferrals_from_plan(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    pass_key: str | None,
+    plan: dict[str, Any],
+    raw_rows_by_id: dict[int, RawIngestionRecord],
+    cooldown_seconds: int,
+) -> int:
+    """Upsert deferrals for rows skipped by topology planning in this batch."""
+    now = _now()
+    retry_at = now + timedelta(seconds=max(5, int(cooldown_seconds)))
+    upserted = 0
+    entries: list[dict[str, Any]] = []
+
+    for item in plan.get("deferred_dependency_queue") or []:
+        if not isinstance(item, dict):
+            continue
+        rid = int(item.get("raw_record_id") or 0)
+        if rid <= 0:
+            continue
+        raw = raw_rows_by_id.get(rid)
+        if raw is None:
+            continue
+        orphan_class = str(item.get("orphan_class") or "missing_parent")
+        entries.append(
+            {
+                "tenant_id": tenant_id,
+                "bundle_id": bundle_id,
+                "raw_record_id": rid,
+                "connector": str(raw.connector),
+                "resource_type": str(raw.resource_type),
+                "deferral_reason": map_orphan_class_to_deferral_reason(
+                    orphan_class, resource_type=str(raw.resource_type)
+                ),
+                "queue": DEFERRAL_QUEUE_EXTERNAL_PARENT,
+                "parent_raw_record_id": int(item["parent_raw_record_id"])
+                if item.get("parent_raw_record_id") is not None
+                else None,
+                "missing_parent_ref": None,
+                "pass_key": pass_key,
+                "retry_ready_at": retry_at,
+                "deferred_at": now,
+                "detail_json": {"orphan_class": orphan_class, "source": "stage_plan"},
+            }
+        )
+
+    for item in plan.get("quarantine") or []:
+        if not isinstance(item, dict):
+            continue
+        rid = int(item.get("raw_record_id") or 0)
+        if rid <= 0:
+            continue
+        raw = raw_rows_by_id.get(rid)
+        if raw is None:
+            continue
+        ref = str(item.get("missing_parent_ref") or "")
+        oc = str(item.get("orphan_class") or classify_orphan_missing_ref(ref, child_resource_type=str(raw.resource_type)))
+        entries.append(
+            {
+                "tenant_id": tenant_id,
+                "bundle_id": bundle_id,
+                "raw_record_id": rid,
+                "connector": str(raw.connector),
+                "resource_type": str(raw.resource_type),
+                "deferral_reason": map_orphan_class_to_deferral_reason(oc, resource_type=str(raw.resource_type)),
+                "queue": DEFERRAL_QUEUE_TOPOLOGY_ORPHAN,
+                "parent_raw_record_id": None,
+                "missing_parent_ref": ref or None,
+                "pass_key": pass_key,
+                "retry_ready_at": retry_at,
+                "deferred_at": now,
+                "detail_json": {"orphan_class": oc, "source": "quarantine"},
+            }
+        )
+
+    if not entries:
+        return 0
+
+    table = CortexCanonicalMaterializationDeferral.__table__
+    for row in entries:
+        stmt = insert(table).values(**row)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["tenant_id", "bundle_id", "raw_record_id"],
+            set_={
+                "deferral_reason": row["deferral_reason"],
+                "queue": row["queue"],
+                "parent_raw_record_id": row["parent_raw_record_id"],
+                "missing_parent_ref": row["missing_parent_ref"],
+                "pass_key": row["pass_key"],
+                "retry_ready_at": row["retry_ready_at"],
+                "deferred_at": row["deferred_at"],
+                "detail_json": row["detail_json"],
+                "updated_at": now,
+            },
+        )
+        db.execute(stmt)
+        upserted += 1
+    db.flush()
+    return upserted
+
+
+def clear_deferral_for_raw_record(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    raw_record_id: int,
+) -> None:
+    db.execute(
+        delete(CortexCanonicalMaterializationDeferral).where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.raw_record_id == int(raw_record_id),
+        )
+    )
+
+
+def release_deferrals_with_materialized_parents(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+) -> int:
+    """Drop deferrals whose parent raw row is now materialized under bundle."""
+    subq = (
+        select(CortexCanonicalMaterializationDeferral.raw_record_id)
+        .where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.parent_raw_record_id.is_not(None),
+        )
+        .join(
+            CortexCanonicalTransformMaterialization,
+            (CortexCanonicalTransformMaterialization.raw_record_id == CortexCanonicalMaterializationDeferral.parent_raw_record_id)
+            & (CortexCanonicalTransformMaterialization.tenant_id == tenant_id)
+            & (CortexCanonicalTransformMaterialization.bundle_id == bundle_id),
+        )
+    )
+    ids = [int(x) for x in db.scalars(subq).all()]
+    if not ids:
+        return 0
+    res = db.execute(
+        delete(CortexCanonicalMaterializationDeferral).where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.raw_record_id.in_(ids),
+        )
+    )
+    db.flush()
+    return int(res.rowcount or 0)
+
+
+def count_deferrals(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+) -> dict[str, int]:
+    now = _now()
+    total = db.scalar(
+        select(func.count())
+        .select_from(CortexCanonicalMaterializationDeferral)
+        .where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+        )
+    )
+    waiting = db.scalar(
+        select(func.count())
+        .select_from(CortexCanonicalMaterializationDeferral)
+        .where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.retry_ready_at > now,
+        )
+    )
+    retry_ready = db.scalar(
+        select(func.count())
+        .select_from(CortexCanonicalMaterializationDeferral)
+        .where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.retry_ready_at <= now,
+        )
+    )
+    return {
+        "deferred_total": int(total or 0),
+        "deferred_waiting_cooldown": int(waiting or 0),
+        "deferred_retry_ready": int(retry_ready or 0),
+    }

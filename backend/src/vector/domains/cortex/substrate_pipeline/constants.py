@@ -30,6 +30,7 @@ PHASE_STATUS_RUNNING: Final[str] = "running"
 PHASE_STATUS_COMPLETED: Final[str] = "completed"
 PHASE_STATUS_FAILED: Final[str] = "failed"
 PHASE_STATUS_SKIPPED: Final[str] = "skipped"
+PHASE_STATUS_WAITING: Final[str] = "waiting"
 
 PIPELINE_STATUS_QUEUED: Final[str] = "queued"
 PIPELINE_STATUS_RUNNING: Final[str] = "running"

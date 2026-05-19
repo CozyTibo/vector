@@ -37,6 +37,9 @@ from vector.infrastructure.db.models.cortex_substrate_pipeline_run import (
     CortexSubstratePhaseRun,
     CortexSubstratePipelineRun,
 )
+from vector.infrastructure.db.models.cortex_canonical_materialization_deferral import (
+    CortexCanonicalMaterializationDeferral,
+)
 from vector.infrastructure.db.models.cortex_tenant_convergence_lease import (
     CortexTenantConvergenceLease,
 )
@@ -142,6 +145,7 @@ __all__ = [
     "CortexOctsTraversalReplayArchive",
     "CortexSubstratePhaseRun",
     "CortexSubstratePipelineRun",
+    "CortexCanonicalMaterializationDeferral",
     "CortexTenantConvergenceLease",
     "CortexRetrievalIndexEntry",
     "CortexRetrievalIndexEpoch",

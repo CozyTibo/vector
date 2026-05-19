@@ -364,12 +364,20 @@ def finalize_pipeline_if_complete_v1(
     pipeline_run_id: uuid.UUID,
 ) -> dict[str, Any]:
     from vector.domains.cortex.substrate_pipeline.repository import get_phase_run_v1
-    from vector.domains.cortex.substrate_pipeline.constants import PHASE_STATUS_COMPLETED, PHASE_STATUS_SKIPPED
+    from vector.domains.cortex.substrate_pipeline.constants import (
+        PHASE_STATUS_COMPLETED,
+        PHASE_STATUS_SKIPPED,
+        PHASE_STATUS_WAITING,
+    )
 
     phases = list(SUBSTRATE_PIPELINE_PHASE_ORDER)
     for pid in phases:
         pr = get_phase_run_v1(session, pipeline_run_id=pipeline_run_id, phase_id=pid)
-        if pr is None or pr.status not in (PHASE_STATUS_COMPLETED, PHASE_STATUS_SKIPPED):
+        if pr is None:
+            return {"finalized": False, "waiting_on": pid}
+        if pr.status == PHASE_STATUS_WAITING:
+            return {"finalized": False, "waiting_on": pid, "waiting_reason": pr.error_detail}
+        if pr.status not in (PHASE_STATUS_COMPLETED, PHASE_STATUS_SKIPPED):
             return {"finalized": False, "waiting_on": pid}
     run = finalize_pipeline_run_v1(session, pipeline_run_id=pipeline_run_id)
     return {"finalized": True, "pipeline_status": run.status}
