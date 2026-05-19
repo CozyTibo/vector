@@ -232,14 +232,26 @@ def verify_gp085_watch01_static() -> dict[str, Any]:
     if int(cat["default_interval_seconds"]) != DEFAULT_WATCHDOG_INTERVAL_SECONDS_V1:
         errors.append("default_interval_not_600")
 
-    from app.celery_app import celery_app
+    from vector.domains.cortex.convergence.scheduling import (
+        convergence_runtime_authoritative_v1,
+        verify_convergence_sweep_in_celery_beat_v1,
+    )
+    if convergence_runtime_authoritative_v1():
+        errors.extend(verify_convergence_sweep_in_celery_beat_v1())
+        from vector.domains.cortex.ingestion import post_ingestion_refresh_dispatch as pid
 
-    beat = dict(celery_app.conf.beat_schedule or {})
-    entry = beat.get(CELERY_BEAT_SCHEDULE_KEY_V1)
-    if entry is None:
-        errors.append("celery_beat_schedule_missing")
-    elif str(entry.get("task")) != CELERY_CONTINUITY_WATCHDOG_TASK_NAME_V1:
-        errors.append("celery_beat_task_name_mismatch")
+        dispatch_src = inspect.getsource(pid.schedule_post_ingestion_substrate_refresh)
+        if "mark_tenant_dirty_v1" not in dispatch_src:
+            errors.append("post_ingestion_missing_convergence_dirty_mark")
+    else:
+        from app.celery_app import celery_app
+
+        beat = dict(celery_app.conf.beat_schedule or {})
+        entry = beat.get(CELERY_BEAT_SCHEDULE_KEY_V1)
+        if entry is None:
+            errors.append("celery_beat_schedule_missing")
+        elif str(entry.get("task")) != CELERY_CONTINUITY_WATCHDOG_TASK_NAME_V1:
+            errors.append("celery_beat_task_name_mismatch")
 
     from vector.domains.cortex.substrate_pipeline import stalled_pipeline_recovery as rec_mod
 

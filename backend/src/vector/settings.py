@@ -376,6 +376,59 @@ class Settings(BaseSettings):
             "is active."
         ),
     )
+    cortex_convergence_runtime_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_CONVERGENCE_RUNTIME_ENABLED",
+        description=(
+            "Use Postgres convergence lease + worker as authoritative substrate progression "
+            "(replaces revoke/debounce coordinator scheduling)."
+        ),
+    )
+    cortex_convergence_sweeper_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_CONVERGENCE_SWEEPER_ENABLED",
+        description="Periodic sweep of dirty/stalled convergence leases.",
+    )
+    cortex_convergence_sweeper_interval_seconds: int = Field(
+        default=120,
+        ge=30,
+        le=3600,
+        validation_alias="CORTEX_CONVERGENCE_SWEEPER_INTERVAL_SECONDS",
+    )
+    cortex_convergence_sweeper_limit: int = Field(
+        default=50,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_CONVERGENCE_SWEEPER_LIMIT",
+    )
+    cortex_convergence_lease_ttl_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=7200,
+        validation_alias="CORTEX_CONVERGENCE_LEASE_TTL_SECONDS",
+        description="Running lease heartbeat TTL; expired leases are recovered as dirty.",
+    )
+    cortex_convergence_time_budget_seconds: int = Field(
+        default=540,
+        ge=30,
+        le=3600,
+        validation_alias="CORTEX_CONVERGENCE_TIME_BUDGET_SECONDS",
+        description="Max wall time per convergence worker invocation before self-requeue.",
+    )
+    cortex_convergence_stalled_retry_seconds: int = Field(
+        default=300,
+        ge=30,
+        le=3600,
+        validation_alias="CORTEX_CONVERGENCE_STALLED_RETRY_SECONDS",
+    )
+    cortex_convergence_disable_legacy_progression_beat: bool = Field(
+        default=True,
+        validation_alias="CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT",
+        description=(
+            "When convergence runtime is enabled, skip legacy progression tick and continuity "
+            "watchdog beat tasks (sweeper is the only scheduler)."
+        ),
+    )
     cortex_replay_storm_divergence_spike_per_hour: int = Field(
         default=3,
         ge=1,

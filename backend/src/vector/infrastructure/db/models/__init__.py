@@ -37,6 +37,9 @@ from vector.infrastructure.db.models.cortex_substrate_pipeline_run import (
     CortexSubstratePhaseRun,
     CortexSubstratePipelineRun,
 )
+from vector.infrastructure.db.models.cortex_tenant_convergence_lease import (
+    CortexTenantConvergenceLease,
+)
 from vector.infrastructure.db.models.cortex_synthesis_activation_audit import (
     CortexSynthesisActivationAudit,
 )
@@ -139,6 +142,7 @@ __all__ = [
     "CortexOctsTraversalReplayArchive",
     "CortexSubstratePhaseRun",
     "CortexSubstratePipelineRun",
+    "CortexTenantConvergenceLease",
     "CortexRetrievalIndexEntry",
     "CortexRetrievalIndexEpoch",
     "CortexPhase09ReadinessSignoff",

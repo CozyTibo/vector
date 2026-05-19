@@ -205,7 +205,10 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         errors.append("chain_after_phase_v1_missing_phase06_none_return")
 
     tcre_src = inspect.getsource(orch_mod.on_tcre_job_completed_for_pipeline_v1)
-    if "resume_pipeline_after_tcre_completion_v1" not in tcre_src:
+    if (
+        "resume_pipeline_after_tcre_completion_v1" not in tcre_src
+        and "on_tcre_completed_for_convergence_v1" not in tcre_src
+    ):
         errors.append("on_tcre_missing_resume_path")
     if "assert_tcre_completion_uses_resume_path_v1" not in tcre_src:
         errors.append("on_tcre_missing_resume_path_guard")

@@ -14,6 +14,7 @@ def test_multi_connector_schedule_coalesces_task_id(monkeypatch: pytest.MonkeyPa
         "postgresql+psycopg://test:test@localhost:5432/vector_test",
     )
     monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED", "true")
+    monkeypatch.setenv("CORTEX_CONVERGENCE_RUNTIME_ENABLED", "false")
 
     tid = uuid.uuid4()
     calls: list[str] = []

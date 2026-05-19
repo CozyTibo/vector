@@ -315,6 +315,7 @@ def resume_pipeline_after_tcre_completion_v1(
     pipeline_run_id: uuid.UUID,
     tcre_job_id: uuid.UUID,
     tcre_job_status: str,
+    enqueue_phase: bool = True,
 ) -> dict[str, Any]:
     """Idempotent resume: enqueue phase 07 once per TCRE completion receipt."""
     from vector.domains.cortex.substrate_pipeline.orchestrator import enqueue_next_pipeline_phase_v1
@@ -441,16 +442,18 @@ def resume_pipeline_after_tcre_completion_v1(
     continuation.last_heartbeat_at = now
     touch_continuation_heartbeat_v1(session, continuation=continuation)
 
-    chain = enqueue_next_pipeline_phase_v1(
-        tenant_id=tenant_id,
-        pipeline_run_id=pipeline_run_id,
-        phase_id=PHASE_07_RETRIEVAL,
-    )
-    from vector.domains.cortex.operational_runtime.substrate_continuity import (
-        increment_continuation_metric_v1,
-    )
+    chain: dict[str, Any] | None = None
+    if enqueue_phase:
+        chain = enqueue_next_pipeline_phase_v1(
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_07_RETRIEVAL,
+        )
+        from vector.domains.cortex.operational_runtime.substrate_continuity import (
+            increment_continuation_metric_v1,
+        )
 
-    increment_continuation_metric_v1("substrate_phase_07_enqueue_total")
+        increment_continuation_metric_v1("substrate_phase_07_enqueue_total")
     from vector.domains.cortex.operational_runtime.recovery_receipts import (
         RECOVERY_RECEIPT_ACTION_REPLAY_CALLBACK,
         RECOVERY_RECEIPT_OUTCOME_RECOVERED,

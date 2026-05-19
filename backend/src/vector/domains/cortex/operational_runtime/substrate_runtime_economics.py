@@ -369,7 +369,8 @@ def verify_gp085_econ01_static() -> dict[str, Any]:
 
     from vector.domains.cortex.ingestion import post_ingestion_refresh_dispatch as pid
 
-    if "schedule_substrate_pipeline_v1" not in inspect.getsource(pid.schedule_post_ingestion_substrate_refresh):
+    dispatch_src = inspect.getsource(pid.schedule_post_ingestion_substrate_refresh)
+    if "schedule_substrate_pipeline_v1" not in dispatch_src and "mark_tenant_dirty_v1" not in dispatch_src:
         errors.append("post_ingestion_dispatch_not_wired")
 
     passed = not errors

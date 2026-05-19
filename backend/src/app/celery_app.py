@@ -73,6 +73,7 @@ celery_app = Celery(
         "app.tasks.cortex_substrate_pipeline",
         "app.tasks.cortex_tcre_reconstruction_jobs",
         "app.tasks.cortex_synthesis_jobs",
+        "app.tasks.cortex_convergence",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -93,6 +94,7 @@ celery_app.conf.imports = (
     "app.tasks.cortex_post_ingestion_substrate_refresh",
     "app.tasks.cortex_tcre_reconstruction_jobs",
     "app.tasks.cortex_synthesis_jobs",
+    "app.tasks.cortex_convergence",
 )
 
 # Phase 01 Step 2–3: live lane vs replay lane (orchestration-model.md, replay-strategy.md).
@@ -109,20 +111,38 @@ _progression_seconds = int(
     os.environ.get("CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_INTERVAL_SECONDS", "300")
 )
 _progression_seconds = max(60, _progression_seconds)
-celery_app.conf.beat_schedule = {
+_convergence_sweep_seconds = int(os.environ.get("CORTEX_CONVERGENCE_SWEEPER_INTERVAL_SECONDS", "120"))
+_convergence_sweep_seconds = max(30, _convergence_sweep_seconds)
+_convergence_runtime = os.environ.get("CORTEX_CONVERGENCE_RUNTIME_ENABLED", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+_disable_legacy_beat = os.environ.get(
+    "CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT", "true"
+).lower() in ("1", "true", "yes")
+
+_beat_schedule: dict[str, dict[str, object]] = {
     "cortex-ingestion-scheduler-tick": {
         "task": "vector.cortex.ingestion.scheduler_tick",
         "schedule": timedelta(seconds=_tick_seconds),
     },
-    "cortex-substrate-continuity-watchdog": {
+}
+if _convergence_runtime:
+    _beat_schedule["cortex-convergence-sweep"] = {
+        "task": "vector.cortex.convergence.sweep",
+        "schedule": timedelta(seconds=_convergence_sweep_seconds),
+    }
+if not (_convergence_runtime and _disable_legacy_beat):
+    _beat_schedule["cortex-substrate-continuity-watchdog"] = {
         "task": "vector.cortex.substrate_pipeline.continuity_watchdog",
         "schedule": timedelta(seconds=_watchdog_seconds),
-    },
-    "cortex-substrate-operational-progression-tick": {
+    }
+    _beat_schedule["cortex-substrate-operational-progression-tick"] = {
         "task": "vector.cortex.operational_runtime.substrate_progression_tick",
         "schedule": timedelta(seconds=_progression_seconds),
-    },
-}
+    }
+celery_app.conf.beat_schedule = _beat_schedule
 
 
 def _register_tasks() -> None:
@@ -148,6 +168,8 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_substrate_synthesis_activation_scheduling")
     importlib.import_module("app.tasks.cortex_substrate_operational_progression")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")
+    importlib.import_module("app.tasks.cortex_convergence")
+    importlib.import_module("app.tasks.cortex_convergence")
 
 
 _register_tasks()
@@ -177,3 +199,4 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_substrate_synthesis_activation_scheduling")
     importlib.import_module("app.tasks.cortex_substrate_operational_progression")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")
+    importlib.import_module("app.tasks.cortex_convergence")

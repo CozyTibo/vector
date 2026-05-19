@@ -320,6 +320,19 @@ def on_tcre_job_completed_for_pipeline_v1(
     )
     if tcre_job_id is None:
         return None
+
+    cfg = get_settings()
+    if cfg.cortex_convergence_runtime_enabled:
+        from vector.domains.cortex.convergence.tcre_resume import on_tcre_completed_for_convergence_v1
+
+        return on_tcre_completed_for_convergence_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            tcre_job_id=tcre_job_id,
+            tcre_job_status=tcre_job_status,
+        )
+
     from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
         resume_pipeline_after_tcre_completion_v1,
     )

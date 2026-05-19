@@ -35,6 +35,7 @@ def test_schedule_debounced_refresh_with_stable_task_id(monkeypatch: pytest.Monk
     )
     monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED", "true")
     monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_DEBOUNCE_SECONDS", "120")
+    monkeypatch.setenv("CORTEX_CONVERGENCE_RUNTIME_ENABLED", "false")
 
     tid = uuid.uuid4()
     apply_calls: list[dict[str, object]] = []
