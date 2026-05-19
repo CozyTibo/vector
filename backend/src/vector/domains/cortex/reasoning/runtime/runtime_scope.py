@@ -23,7 +23,7 @@ def normalize_reconstruction_scope_v1(scope: Mapping[str, Any] | None) -> dict[s
     octs_walk_id = raw.get("octs_walk_id")
     walk_id = str(octs_walk_id).strip() if octs_walk_id is not None and str(octs_walk_id).strip() else None
     strict = bool(raw.get("octs_strict_binding", False))
-    return {
+    out: dict[str, Any] = {
         "slice_label": TCRE_RUNTIME_SLICE_LABEL_V1,
         "materialization_limit": n,
         "bundle_id": bundle_id,
@@ -33,3 +33,7 @@ def normalize_reconstruction_scope_v1(scope: Mapping[str, Any] | None) -> dict[s
         "expected_walk_result_hash": raw.get("expected_walk_result_hash"),
         "continuity_proof_ref": raw.get("continuity_proof_ref"),
     }
+    pipeline_raw = raw.get("substrate_pipeline_run_id")
+    if pipeline_raw is not None and str(pipeline_raw).strip():
+        out["substrate_pipeline_run_id"] = str(pipeline_raw).strip()
+    return out

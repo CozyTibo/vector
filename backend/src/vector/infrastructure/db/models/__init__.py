@@ -27,6 +27,9 @@ from vector.infrastructure.db.models.cortex_octs_durable_walk_record import Cort
 from vector.infrastructure.db.models.cortex_octs_traversal_receipt import CortexOctsTraversalReceipt
 from vector.infrastructure.db.models.cortex_octs_traversal_replay_archive import CortexOctsTraversalReplayArchive
 from vector.infrastructure.db.models.cortex_pipeline_continuation import CortexPipelineContinuationState
+from vector.infrastructure.db.models.cortex_substrate_pipeline_dead_letter import (
+    CortexSubstratePipelineDeadLetter,
+)
 from vector.infrastructure.db.models.cortex_retrieval_materialization_report import (
     CortexRetrievalMaterializationReport,
 )
@@ -39,6 +42,11 @@ from vector.infrastructure.db.models.cortex_synthesis_activation_audit import (
 )
 from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
 from vector.infrastructure.db.models.cortex_retrieval_index_epoch import CortexRetrievalIndexEpoch
+from vector.infrastructure.db.models.cortex_phase09_readiness_signoff import (
+    CortexPhase09ReadinessSignoff,
+)
+from vector.infrastructure.db.models.cortex_replay_divergence_event import CortexReplayDivergenceEvent
+from vector.infrastructure.db.models.cortex_replay_storm_control import CortexReplayStormControl
 from vector.infrastructure.db.models.cortex_retrieval_query_audit import CortexRetrievalQueryAudit
 from vector.infrastructure.db.models.cortex_synthesis_artifact import CortexSynthesisArtifact
 from vector.infrastructure.db.models.cortex_synthesis_job import CortexSynthesisJob
@@ -133,6 +141,9 @@ __all__ = [
     "CortexSubstratePipelineRun",
     "CortexRetrievalIndexEntry",
     "CortexRetrievalIndexEpoch",
+    "CortexPhase09ReadinessSignoff",
+    "CortexReplayDivergenceEvent",
+    "CortexReplayStormControl",
     "CortexRetrievalQueryAudit",
     "CortexSynthesisJob",
     "CortexSynthesisArtifact",

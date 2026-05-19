@@ -99,6 +99,16 @@ def record_synthesis_replay_divergence_v1(
     """Record **G-P08-REPLAY-01** divergence (observability counter)."""
     global _SYNTHESIS_REPLAY_DIVERGENCE_TOTAL_V1
     _SYNTHESIS_REPLAY_DIVERGENCE_TOTAL_V1 += 1
+    from vector.domains.cortex.replay_divergence_observability import (
+        REPLAY_DIVERGENCE_SOURCE_SYNTHESIS_V1,
+        on_replay_divergence_observed_v1,
+    )
+
+    on_replay_divergence_observed_v1(
+        tenant_id=tenant_id,
+        source=REPLAY_DIVERGENCE_SOURCE_SYNTHESIS_V1,
+        detail=dict(detail or {}),
+    )
     return {
         "event": "synthesis_replay_divergence",
         "gate_id": GP08_REPLAY_01_GATE_ID_V1,

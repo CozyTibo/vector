@@ -18,9 +18,57 @@ _PROPAGATION_RULES_V1: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("identity", "graph", "orphan_identity_cluster", "graph_orphan_from_identity_fragmentation"),
     ("graph", "traversal", "orphan_artifacts", "traversal_blocked_from_disconnected_graph"),
     ("graph", "traversal", "pending_link_candidates", "traversal_blocked_from_unpromoted_links"),
+    (
+        "graph",
+        "traversal",
+        "orphan_disconnected_component",
+        "traversal_blocked_ret_skip_graph_disconnected",
+    ),
+    (
+        "graph",
+        "traversal",
+        "orphan_awaiting_promotion",
+        "traversal_blocked_awaiting_link_promotion",
+    ),
+    (
+        "graph",
+        "traversal",
+        "orphan_identity_unresolved",
+        "traversal_blocked_identity_unresolved",
+    ),
+    (
+        "graph",
+        "retrieval",
+        "orphan_disconnected_component",
+        "retrieval_degraded_graph_disconnected",
+    ),
+    (
+        "graph",
+        "retrieval",
+        "orphan_awaiting_promotion",
+        "retrieval_degraded_graph_promotion_backlog",
+    ),
     ("identity", "tcre", "replay_conflicted_identity", "tcre_chronology_impact_from_identity_replay"),
     ("traversal", "tcre", "traversal_replay_unverified", "tcre_unbound_from_traversal_unverified"),
     ("traversal", "tcre", "traversal_frontier_cutoff", "tcre_bounded_from_traversal_frontier"),
+    (
+        "tcre",
+        "retrieval",
+        "reconstruction_not_yet_run",
+        "retrieval_starved_from_tcre_not_run",
+    ),
+    (
+        "tcre",
+        "retrieval",
+        "reconstruction_coverage_gap",
+        "retrieval_degraded_from_tcre_coverage_gap",
+    ),
+    (
+        "tcre",
+        "synthesis",
+        "reconstruction_not_yet_run",
+        "synthesis_starved_from_tcre_not_run",
+    ),
     (
         "retrieval",
         "synthesis",
@@ -38,6 +86,24 @@ _PROPAGATION_RULES_V1: Final[tuple[tuple[str, str, str, str], ...]] = (
         "synthesis",
         "retrieval_upstream_tcre_gap",
         "synthesis_degraded_from_retrieval_upstream_gap",
+    ),
+    (
+        "retrieval",
+        "synthesis",
+        "retrieval_operational_starvation",
+        "synthesis_starved_from_retrieval_operational_starvation",
+    ),
+    (
+        "retrieval",
+        "synthesis",
+        "retrieval_index_empty",
+        "synthesis_starved_from_retrieval_index_empty",
+    ),
+    (
+        "synthesis",
+        "synthesis",
+        "synthesis_operational_starvation",
+        "synthesis_operational_starvation_self_block",
     ),
 )
 

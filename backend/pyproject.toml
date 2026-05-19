@@ -56,6 +56,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
   "integration: uses test DB or external IO",
+  "e2e: slow end-to-end flows (DB-heavy); excluded from make test-fast",
 ]
 
 [tool.mypy]

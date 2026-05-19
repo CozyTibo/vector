@@ -42,6 +42,30 @@ def run_tcre_reconstruction_job_task(tenant_id: str, job_id: str) -> dict[str, A
                 "skipped": True,
             }
         summary = execute_tcre_reconstruction_job_v1(session, job)
+        scope = dict(job.scope_json or {})
+        prid_raw = scope.get("substrate_pipeline_run_id")
+        if job.status == "failed" and prid_raw:
+            from vector.domains.cortex.substrate_pipeline.constants import PHASE_06_TCRE
+            from vector.domains.cortex.substrate_pipeline.pipeline_dead_letter import (
+                FAILURE_CLASS_TCRE_FAILED,
+                record_pipeline_dead_letter_v1,
+            )
+
+            try:
+                pipeline_run_id = uuid.UUID(str(prid_raw))
+            except ValueError:
+                pipeline_run_id = None
+            if pipeline_run_id is not None:
+                record_pipeline_dead_letter_v1(
+                    session,
+                    tenant_id=tid,
+                    pipeline_run_id=pipeline_run_id,
+                    phase_id=PHASE_06_TCRE,
+                    failure_class=FAILURE_CLASS_TCRE_FAILED,
+                    async_job_id=jid,
+                    failure_detail=str(job.error_detail or job.status)[:500],
+                    detail={"tcre_job_status": job.status},
+                )
         if job.status == "completed":
             from vector.domains.cortex.retrieval.retrieval_index_materialization import (
                 materialize_retrieval_index_incremental_after_tcre_v1,
@@ -50,7 +74,6 @@ def run_tcre_reconstruction_job_task(tenant_id: str, job_id: str) -> dict[str, A
                 on_tcre_job_completed_for_pipeline_v1,
             )
 
-            scope = dict(job.scope_json or {})
             prid_raw = scope.get("substrate_pipeline_run_id")
             prid = uuid.UUID(str(prid_raw)) if prid_raw else None
             materialize_retrieval_index_incremental_after_tcre_v1(

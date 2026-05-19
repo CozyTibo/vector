@@ -336,6 +336,52 @@ class Settings(BaseSettings):
             "substrate refresh (same scale as admin flush canonical_batch_limit default)."
         ),
     )
+    cortex_substrate_pipeline_max_concurrent_per_tenant: int = Field(
+        default=1,
+        ge=1,
+        le=8,
+        validation_alias="CORTEX_SUBSTRATE_PIPELINE_MAX_CONCURRENT_PER_TENANT",
+        description=(
+            "G-P085-ECON-01: max overlapping substrate pipeline runs per tenant (doctrine default 1)."
+        ),
+    )
+    cortex_vector_queue_backpressure_threshold: int = Field(
+        default=64,
+        ge=1,
+        le=10_000,
+        validation_alias="CORTEX_VECTOR_QUEUE_BACKPRESSURE_THRESHOLD",
+        description=(
+            "G-P085-ECON-01: when vector queue depth exceeds this threshold (θ_queue), "
+            "defer post-ingestion substrate refresh countdown."
+        ),
+    )
+    cortex_post_ingestion_backpressure_extra_debounce_seconds: int = Field(
+        default=300,
+        ge=0,
+        le=3600,
+        validation_alias="CORTEX_POST_INGESTION_BACKPRESSURE_EXTRA_DEBOUNCE_SECONDS",
+        description=(
+            "G-P085-ECON-01: additional countdown seconds applied when vector queue backpressure "
+            "is active."
+        ),
+    )
+    cortex_replay_storm_divergence_spike_per_hour: int = Field(
+        default=3,
+        ge=1,
+        le=1000,
+        validation_alias="CORTEX_REPLAY_STORM_DIVERGENCE_SPIKE_PER_HOUR",
+        description=(
+            "G-P085-ECON-02: combined retrieval+synthesis replay divergences per hour that "
+            "trigger replay storm controls."
+        ),
+    )
+    cortex_replay_storm_window_hours: int = Field(
+        default=1,
+        ge=1,
+        le=24,
+        validation_alias="CORTEX_REPLAY_STORM_WINDOW_HOURS",
+        description="G-P085-ECON-02: rolling window for replay divergence rate.",
+    )
     cortex_substrate_pipeline_phase_08_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_SUBSTRATE_PIPELINE_PHASE_08_ENABLED",
@@ -372,6 +418,320 @@ class Settings(BaseSettings):
         default=True,
         validation_alias="CORTEX_SUBSTRATE_CONTINUATION_AUTO_RECOVER",
         description="When true, continuity watchdog auto-recovers stalled TCRE-waiting pipelines.",
+    )
+    cortex_substrate_dlq_max_auto_retries_per_receipt: int = Field(
+        default=3,
+        ge=0,
+        le=32,
+        validation_alias="CORTEX_SUBSTRATE_DLQ_MAX_AUTO_RETRIES_PER_RECEIPT",
+        description=(
+            "G-P085-DLQ-01: max auto-recovery attempts per resume_receipt_hash before DLQ blocks retry."
+        ),
+    )
+    cortex_substrate_continuity_watchdog_interval_seconds: int = Field(
+        default=600,
+        ge=120,
+        le=86400,
+        validation_alias="CORTEX_SUBSTRATE_CONTINUITY_WATCHDOG_INTERVAL_SECONDS",
+        description="G-P085-WATCH-01: Celery beat interval for substrate continuity watchdog.",
+    )
+    cortex_substrate_operational_progression_tick_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_TICK_ENABLED",
+        description=(
+            "G-P085-PROG-CLOSE: periodic sweep for downstream substrate progression "
+            "(retrieval/synthesis closure, continuation resume)."
+        ),
+    )
+    cortex_substrate_operational_progression_interval_seconds: int = Field(
+        default=300,
+        ge=60,
+        le=3600,
+        validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_INTERVAL_SECONDS",
+        description="Beat cadence for substrate operational progression tick (seconds).",
+    )
+    cortex_substrate_operational_progression_tick_limit: int = Field(
+        default=50,
+        ge=1,
+        le=200,
+        validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_TICK_LIMIT",
+        description="Max pipeline runs examined per progression tick.",
+    )
+    cortex_graph_density_pending_candidate_threshold: int = Field(
+        default=10,
+        ge=0,
+        le=100_000,
+        validation_alias="CORTEX_GRAPH_DENSITY_PENDING_CANDIDATE_THRESHOLD",
+        description=(
+            "G-P085-GRAPH-01: pending link candidate count above which graph cannot be healthy."
+        ),
+    )
+    cortex_graph_density_promotion_max_per_pass: int = Field(
+        default=200,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_GRAPH_DENSITY_PROMOTION_MAX_PER_PASS",
+        description="G-P085-ECON-01 / G-P085-PROMO-01: max candidate promotions per density pass.",
+    )
+    cortex_graph_density_promotion_backlog_threshold: int = Field(
+        default=10,
+        ge=0,
+        le=100_000,
+        validation_alias="CORTEX_GRAPH_DENSITY_PROMOTION_BACKLOG_THRESHOLD",
+        description="G-P085-PROMO-01: unpromoted candidate count triggering scheduled pass.",
+    )
+    cortex_graph_density_promotion_require_replay_receipt: bool = Field(
+        default=True,
+        validation_alias="CORTEX_GRAPH_DENSITY_PROMOTION_REQUIRE_REPLAY_RECEIPT",
+        description=(
+            "G-P085-PROMO-01: require org_link_replay_job + L0 receipt for promotion passes."
+        ),
+    )
+    cortex_graph_density_promotion_schedule_countdown_seconds: int = Field(
+        default=5,
+        ge=0,
+        le=3600,
+        validation_alias="CORTEX_GRAPH_DENSITY_PROMOTION_SCHEDULE_COUNTDOWN_SECONDS",
+        description="G-P085-PROMO-01: Celery countdown before async promotion pass.",
+    )
+    cortex_orphan_stitching_sample_limit: int = Field(
+        default=100,
+        ge=1,
+        le=5_000,
+        validation_alias="CORTEX_ORPHAN_STITCHING_SAMPLE_LIMIT",
+        description="G-P085-ORPHAN-01: max orphan entity samples returned in classification payload.",
+    )
+    cortex_orphan_stitching_run_anchor_regen: bool = Field(
+        default=True,
+        validation_alias="CORTEX_ORPHAN_STITCHING_RUN_ANCHOR_REGEN",
+        description=(
+            "G-P085-ORPHAN-01: run anchor continuity candidate regeneration during stitch pass."
+        ),
+    )
+    cortex_orphan_stitching_auto_schedule_promotion: bool = Field(
+        default=True,
+        validation_alias="CORTEX_ORPHAN_STITCHING_AUTO_SCHEDULE_PROMOTION",
+        description="G-P085-ORPHAN-01: schedule graph density promotion when orphans await promotion.",
+    )
+    cortex_traversal_max_walks_per_pass: int = Field(
+        default=32,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_TRAVERSAL_MAX_WALKS_PER_PASS",
+        description="G-P085-WALK-01: max OCTS walks scheduled per pass.",
+    )
+    cortex_traversal_schedule_countdown_seconds: int = Field(
+        default=5,
+        ge=0,
+        le=3600,
+        validation_alias="CORTEX_TRAVERSAL_SCHEDULE_COUNTDOWN_SECONDS",
+        description="G-P085-WALK-01: Celery countdown before async walk schedule pass.",
+    )
+    cortex_traversal_queue_saturation_threshold: int = Field(
+        default=64,
+        ge=1,
+        le=10_000,
+        validation_alias="CORTEX_TRAVERSAL_QUEUE_SATURATION_THRESHOLD",
+        description="G-P085-WALK-01: skip scheduling when queued+running walks exceed threshold.",
+    )
+    cortex_traversal_retry_max_attempts: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        validation_alias="CORTEX_TRAVERSAL_RETRY_MAX_ATTEMPTS",
+        description="G-P085-WALK-02: max exponential backoff retries for transient store errors.",
+    )
+    cortex_traversal_retry_backoff_base_seconds: int = Field(
+        default=2,
+        ge=1,
+        le=3600,
+        validation_alias="CORTEX_TRAVERSAL_RETRY_BACKOFF_BASE_SECONDS",
+        description="G-P085-WALK-02: base seconds for transient retry exponential backoff.",
+    )
+    cortex_traversal_frontier_heal_multiplier: int = Field(
+        default=2,
+        ge=2,
+        le=8,
+        validation_alias="CORTEX_TRAVERSAL_FRONTIER_HEAL_MULTIPLIER",
+        description="G-P085-WALK-02: policy multiplier for frontier heal pass.",
+    )
+    cortex_traversal_retry_pass_limit: int = Field(
+        default=32,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_TRAVERSAL_RETRY_PASS_LIMIT",
+        description="G-P085-WALK-02: max walk records processed per retry/heal pass.",
+    )
+    cortex_traversal_stall_seconds: int = Field(
+        default=1800,
+        ge=60,
+        le=86_400,
+        validation_alias="CORTEX_TRAVERSAL_STALL_SECONDS",
+        description="G-P085-WALK-03: seconds since last completed walk before pending queue is stalled.",
+    )
+    cortex_traversal_stall_recovery_pass_limit: int = Field(
+        default=32,
+        ge=1,
+        le=500,
+        validation_alias="CORTEX_TRAVERSAL_STALL_RECOVERY_PASS_LIMIT",
+        description="G-P085-WALK-03: max pending walks processed per stall recovery pass.",
+    )
+    cortex_traversal_poison_max_recovery_passes: int = Field(
+        default=5,
+        ge=1,
+        le=50,
+        validation_alias="CORTEX_TRAVERSAL_POISON_MAX_RECOVERY_PASSES",
+        description="G-P085-WALK-03: cancel walk to DLQ after this many stall recovery re-enqueues.",
+    )
+    cortex_traversal_density_operational_alive_threshold: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        validation_alias="CORTEX_TRAVERSAL_DENSITY_OPERATIONAL_ALIVE_THRESHOLD",
+        description="G-P085-WALK-04: minimum traversal_density for OPERATIONAL_ALIVE at graph G1+.",
+    )
+    cortex_tcre_saturation_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        validation_alias="CORTEX_TCRE_SATURATION_THRESHOLD",
+        description="G-P085-TCRE-01: target reconstructed/mat ratio (θ_tcre).",
+    )
+    cortex_tcre_saturation_jobs_per_hour: int = Field(
+        default=4,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_TCRE_SATURATION_JOBS_PER_HOUR",
+        description="G-P085-TCRE-01: max TCRE reconstruct jobs enqueued per tenant per hour.",
+    )
+    cortex_tcre_saturation_max_queued_jobs: int = Field(
+        default=8,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_TCRE_SATURATION_MAX_QUEUED_JOBS",
+        description="G-P085-TCRE-01: skip scheduling when queued+running jobs exceed threshold.",
+    )
+    cortex_tcre_saturation_pass_max_jobs: int = Field(
+        default=4,
+        ge=1,
+        le=50,
+        validation_alias="CORTEX_TCRE_SATURATION_PASS_MAX_JOBS",
+        description="G-P085-TCRE-01: max jobs enqueued per saturation schedule pass.",
+    )
+    cortex_retrieval_index_stale_seconds: int = Field(
+        default=3600,
+        ge=60,
+        le=604800,
+        validation_alias="CORTEX_RETRIEVAL_INDEX_STALE_SECONDS",
+        description="G-P085-RET-02: degrade retrieval when published index age exceeds threshold (T_index_stale).",
+    )
+    cortex_synthesis_forbidden_backoff_threshold: int = Field(
+        default=3,
+        ge=1,
+        le=50,
+        validation_alias="CORTEX_SYNTHESIS_FORBIDDEN_BACKOFF_THRESHOLD",
+        description=(
+            "G-P085-SYN-01: block automatic phase 08 chaining after this many synthesis_forbidden "
+            "jobs in the backoff window."
+        ),
+    )
+    cortex_synthesis_forbidden_backoff_window_hours: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+        validation_alias="CORTEX_SYNTHESIS_FORBIDDEN_BACKOFF_WINDOW_HOURS",
+        description="G-P085-SYN-01: rolling window for synthesis_forbidden backoff counting.",
+    )
+    cortex_synthesis_throughput_jobs_per_day_floor: int = Field(
+        default=1,
+        ge=0,
+        le=10000,
+        validation_alias="CORTEX_SYNTHESIS_THROUGHPUT_JOBS_PER_DAY_FLOOR",
+        description="G-P085-SYN-03: minimum completed synthesis jobs per 24h for throughput maturity.",
+    )
+    cortex_synthesis_scope_coverage_target_percent: float = Field(
+        default=90.0,
+        ge=0.0,
+        le=100.0,
+        validation_alias="CORTEX_SYNTHESIS_SCOPE_COVERAGE_TARGET_PERCENT",
+        description="G-P085-SYN-03: target synthesis_scope_coverage_percent.",
+    )
+    cortex_synthesis_activation_audit_empty_rate_max_percent: float = Field(
+        default=5.0,
+        ge=0.0,
+        le=100.0,
+        validation_alias="CORTEX_SYNTHESIS_ACTIVATION_AUDIT_EMPTY_RATE_MAX_PERCENT",
+        description="G-P085-SYN-03: max empty activation audit rate when eligible_scopes > 0.",
+    )
+    cortex_synthesis_activation_audit_window_hours: int = Field(
+        default=168,
+        ge=1,
+        le=720,
+        validation_alias="CORTEX_SYNTHESIS_ACTIVATION_AUDIT_WINDOW_HOURS",
+        description="G-P085-SYN-03: rolling window for activation audit empty-rate calculation.",
+    )
+    cortex_operational_maturity_dimension_alive_floor: float = Field(
+        default=60.0,
+        ge=0.0,
+        le=100.0,
+        validation_alias="CORTEX_OPERATIONAL_MATURITY_DIMENSION_ALIVE_FLOOR",
+        description="G-P085-MAT-01: per-dimension floor for OPERATIONAL_ALIVE.",
+    )
+    cortex_operational_maturity_composite_alive_floor: float = Field(
+        default=70.0,
+        ge=0.0,
+        le=100.0,
+        validation_alias="CORTEX_OPERATIONAL_MATURITY_COMPOSITE_ALIVE_FLOOR",
+        description="G-P085-MAT-01: operational_confidence_score floor for OPERATIONAL_ALIVE.",
+    )
+    cortex_operational_maturity_progressing_continuity_floor: float = Field(
+        default=40.0,
+        ge=0.0,
+        le=100.0,
+        validation_alias="CORTEX_OPERATIONAL_MATURITY_PROGRESSING_CONTINUITY_FLOOR",
+        description="G-P085-MAT-01: continuity score floor for PROGRESSING class.",
+    )
+    cortex_operational_maturity_density_emerging_retrieval_floor: float = Field(
+        default=40.0,
+        ge=0.0,
+        le=100.0,
+        validation_alias="CORTEX_OPERATIONAL_MATURITY_DENSITY_EMERGING_RETRIEVAL_FLOOR",
+        description="G-P085-MAT-01: retrieval density floor for DENSITY_EMERGING class.",
+    )
+    cortex_operational_maturity_production_soak_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        validation_alias="CORTEX_OPERATIONAL_MATURITY_PRODUCTION_SOAK_DAYS",
+        description="G-P085-MAT-01: completed pipeline runs required in window for PRODUCTION_READY soak.",
+    )
+    cortex_autonomous_recovery_score_window_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        validation_alias="CORTEX_AUTONOMOUS_RECOVERY_SCORE_WINDOW_DAYS",
+        description="G-P085-HEALTH-02: rolling window for recovery_score calculation.",
+    )
+    cortex_autonomous_recovery_score_target: float = Field(
+        default=0.9,
+        ge=0.0,
+        le=1.0,
+        validation_alias="CORTEX_AUTONOMOUS_RECOVERY_SCORE_TARGET",
+        description="G-P085-HEALTH-02: recovery_score target (Stable / healthy band).",
+    )
+    cortex_autonomous_recovery_score_degraded_floor: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        validation_alias="CORTEX_AUTONOMOUS_RECOVERY_SCORE_DEGRADED_FLOOR",
+        description="G-P085-HEALTH-02: recovery_score floor for degraded band.",
+    )
+    cortex_autonomous_recovery_stability_stall_window_hours: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+        validation_alias="CORTEX_AUTONOMOUS_RECOVERY_STABILITY_STALL_WINDOW_HOURS",
+        description="G-P085-HEALTH-02: no-stall window for operational stability.",
     )
     cortex_raw_memory_enforcement_mode: str = Field(
         default="progressive",

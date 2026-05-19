@@ -275,6 +275,28 @@ class AdminTenantSlackDeliveryRequest(BaseModel):
     slack_vector_paused: bool
 
 
+class AdminConnectionPermissionReport(BaseModel):
+    """Requested vs granted OAuth / app permissions for operator diagnostics."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    permission_model: Literal[
+        "oauth_scopes",
+        "github_app",
+        "notion_integration",
+        "oauth_scope_single",
+        "google_oauth",
+    ]
+    requested: list[str]
+    granted: list[str] | None = None
+    recommended_for_ingestion: list[str] | None = None
+    missing_requested: list[str] = Field(default_factory=list)
+    missing_recommended: list[str] = Field(default_factory=list)
+    extra_granted: list[str] = Field(default_factory=list)
+    ingest_health: Literal["ok", "warn", "unknown", "not_connected"] = "unknown"
+    notes: str | None = None
+
+
 class TenantConnectionAdminItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -282,12 +304,20 @@ class TenantConnectionAdminItem(BaseModel):
     provider: str
     status: str
     created_at: datetime
+    permissions: AdminConnectionPermissionReport | None = None
 
 
 class AdminConnectionsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     items: list[TenantConnectionAdminItem]
+    permissions_by_provider: dict[str, AdminConnectionPermissionReport] = Field(
+        default_factory=dict,
+        description=(
+            "Permission diagnostics for each supported connector id, "
+            "including providers not yet connected (ingest_health=not_connected)."
+        ),
+    )
 
 
 class AdminConnectorConnectLinkResponse(BaseModel):
@@ -1020,6 +1050,104 @@ class AdminCortexSynthesisProgramCatalogResponse(BaseModel):
     constitutional_freeze_bundle: str
     doctrine_freeze_status: str
     freeze_banner: AdminCortexSynthesisFreezeBannerV1
+
+
+class AdminCortexOperationalRuntimeProgramCatalogResponse(BaseModel):
+    """Phase 08.5 Step 01 — CESP program freeze doctrine catalog (global, not tenant-scoped)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    operational_runtime_program_catalog_runtime_schema_version: int
+    spec_ref: str
+    program_id: str
+    phase085_program_freeze_version: int
+    step_program_count: int
+    freeze_bundle_ids: list[str]
+    normative_program: dict[str, Any]
+    continuity_law: dict[str, Any]
+    density_law: dict[str, Any]
+    endgoal_law: dict[str, Any]
+    phase_boundary_law: dict[str, Any]
+    gap_matrix_law: dict[str, Any]
+    vocabulary_law: dict[str, Any]
+    phase09_readiness: dict[str, Any]
+    executive_brief_ref: str
+    gap_matrix_ref: str
+    runtime_architecture_ref: str
+    hard_upstream_gate: str
+    gate_ids: list[str]
+
+
+class AdminCortexOperationalRuntimePhaseBoundariesRuleRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    text: str
+
+
+class AdminCortexOperationalRuntimeVocabularyTermRow(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    term_id: str
+    label: str
+    definition: str
+
+
+class AdminCortexOperationalRuntimeVocabularyCatalogResponse(BaseModel):
+    """Phase 08.5 Step 04 — CESP closed vocabulary catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase085_vocabulary_runtime_schema_version: int
+    spec_ref: str
+    term_ids: list[str]
+    terms: list[AdminCortexOperationalRuntimeVocabularyTermRow]
+    term_count: int
+
+
+class AdminCortexOperationalRuntimeGapMatrixCatalogResponse(BaseModel):
+    """Phase 08.5 Step 04 — CESP spec gap matrix catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase085_gap_matrix_runtime_schema_version: int
+    spec_ref: str
+    gap_matrix_fixture_digest_sha256: str
+    baseline_gap_ids: list[str]
+    parsed_gap_ids: list[str]
+    promotion_rules: list[str]
+    summary: dict[str, Any]
+    active_p0: list[dict[str, Any]]
+    active_p1: list[dict[str, Any]]
+    partially_shipped: list[dict[str, Any]]
+    blocks_step_36_freeze: bool
+    blocks_slice_frozen_runtime: bool
+
+
+class AdminCortexOperationalRuntimePhaseBoundariesCatalogResponse(BaseModel):
+    """Phase 08.5 Step 03 — CESP phase boundary doctrine catalog."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface_kind: str
+    phase085_boundaries_runtime_schema_version: int
+    spec_ref: str
+    runtime_package: str
+    rule_ids: list[str]
+    acyclic_pipeline: list[str]
+    hard_downstream_gate: str
+    synthesis_artifact_schema_rel_path: str
+    synthesis_artifact_schema_digest_sha256: str
+    cesp_allowed_extension_importers: list[str]
+    forbidden_forward_import_prefixes: list[str]
+    cesp_owned_runtime_artifacts: list[str]
+    admin_route_prefixes: list[str]
+    rules: list[AdminCortexOperationalRuntimePhaseBoundariesRuleRow]
+    phase085_owns: list[str]
+    phase085_does_not_own: list[str]
 
 
 class AdminCortexSynthesisAntiGoalsCatalogResponse(BaseModel):

@@ -104,6 +104,16 @@ def build_substrate_completeness_ledger_v1(
         for stage_id in STAGE_IDS
     ]
     propagation = build_completeness_degradation_envelope_v1(stages)
+    from vector.domains.cortex.operational_runtime.fake_green_prohibition import (
+        apply_cesp_anti_idle_law_to_pipeline_stages_v1,
+    )
+
+    stages = apply_cesp_anti_idle_law_to_pipeline_stages_v1(
+        session,
+        tenant_id=tenant_id,
+        stages=stages,
+        propagation_chain=list(propagation.get("propagation_chain") or []),
+    )
     substrate_state = derive_substrate_state_from_stages(stages)
     replay_posture = derive_global_replay_posture(stages)
 

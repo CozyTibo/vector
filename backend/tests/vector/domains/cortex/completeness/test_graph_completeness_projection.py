@@ -43,13 +43,37 @@ def test_graph_projection_uses_linked_entity_count(monkeypatch: pytest.MonkeyPat
         _scalar.n += 1  # type: ignore[attr-defined]
         return v
 
-    session.scalar.side_effect = lambda _stmt: _next()
+    from vector.domains.cortex.operational_runtime.graph_density import (
+        METRIC_GRAPH_CANDIDATE_COUNT_V1,
+        METRIC_GRAPH_CONNECTIVITY_RATIO_V1,
+        METRIC_GRAPH_DENSITY_SCORE_V1,
+        METRIC_GRAPH_ORPHAN_ARTIFACT_COUNT_V1,
+        METRIC_GRAPH_PROMOTED_EDGE_COUNT_V1,
+    )
+
     monkeypatch.setattr(
-        "vector.domains.cortex.completeness.graph_completeness_projection._count_entities_with_authoritative_links",
-        lambda *_a, **_k: 400,
+        "vector.domains.cortex.operational_runtime.graph_density.compute_graph_density_metrics_v1",
+        lambda *_a, **_k: {
+            "graph_maturity_stage": "G1",
+            "metrics": {
+                "entity_count": 977,
+                "linked_entity_count": 400,
+                METRIC_GRAPH_PROMOTED_EDGE_COUNT_V1: 0,
+                METRIC_GRAPH_CANDIDATE_COUNT_V1: 2000,
+                METRIC_GRAPH_ORPHAN_ARTIFACT_COUNT_V1: 577,
+                METRIC_GRAPH_CONNECTIVITY_RATIO_V1: 0.0,
+                METRIC_GRAPH_DENSITY_SCORE_V1: 0,
+                "pending_link_candidates": 2000,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.operational_runtime.graph_orphan_continuity.classify_tenant_graph_orphans_v1",
+        lambda *_a, **_k: {"orphan_entity_count": 577, "counts_by_class": {}},
     )
     out = project_graph_completeness_v1(session, tenant_id=tid)
     assert out["total_objects"] == 977
+    assert out["substrate_state"] == "degraded"
     assert out["degraded_percent"] <= 100.0
     assert out["metrics"]["linked_entity_count"] == 400
     assert out["metrics"]["orphan_node_count"] == 577

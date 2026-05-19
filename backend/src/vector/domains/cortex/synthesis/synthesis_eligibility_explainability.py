@@ -96,6 +96,24 @@ def explain_synthesis_eligibility_v1(
     if synthesis_ready:
         next_required_step = "run_phase_08_synthesis_or_wait_for_pipeline"
 
+    from vector.domains.cortex.synthesis.synthesis_idle_classification import (
+        classify_synthesis_eligibility_v1,
+        evaluate_synthesis_classification_context_v1,
+    )
+
+    ctx = evaluate_synthesis_classification_context_v1(session, tenant_id=tenant_id)
+    classified = classify_synthesis_eligibility_v1(
+        eligible_scopes=eligible,
+        synthesized_scopes=int(ctx["synthesized_scopes"]),
+        retrieval_operational_starvation=bool(ctx["retrieval_operational_starvation"]),
+        upstream_work_present=bool(ctx["upstream_work_present"]),
+        forbidden_count=int(ctx["forbidden_count"]),
+        forbidden_backoff_active=bool(ctx["forbidden_backoff_active"]),
+        pipeline_waiting=bool(ctx["pipeline_waiting"]),
+        pipeline_stalled=bool(ctx["pipeline_stalled"]),
+        replay_unsafe=bool(ctx["replay_unsafe"]),
+    )
+
     return {
         "tenant_id": str(tenant_id),
         "published_epoch_exists": bool(published),
@@ -113,6 +131,9 @@ def explain_synthesis_eligibility_v1(
         "pipeline_run_id": str(running.id) if running else None,
         "continuation_status": continuation.continuation_status if continuation else None,
         "waiting_on": continuation.waiting_on if continuation else None,
+        "classification": classified["classification"],
+        "operational_starvation": classified["operational_starvation"],
+        "ui_color": classified["synthesis_idle_ui_color"],
     }
 
 
@@ -137,6 +158,11 @@ def build_synthesis_empty_panel_v1(
             messages.append(f"Retrieval skip: {cause}")
     if expl["synthesis_ready"]:
         messages.append("Synthesis is ready — eligible scopes exist; check phase 08 execution.")
+    classification = str(expl.get("classification") or "")
+    if classification == "operational_starvation":
+        messages.append("Classification: operational_starvation — upstream work without eligible scopes.")
+    elif classification == "healthy_idle":
+        messages.append("Classification: healthy_idle — no eligible scopes and no upstream starvation.")
     return {
         "panel_title": "Why is synthesis empty?",
         "messages": messages,

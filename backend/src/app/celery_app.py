@@ -105,6 +105,10 @@ _tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS"
 _tick_seconds = max(60, _tick_seconds)
 _watchdog_seconds = int(os.environ.get("CORTEX_SUBSTRATE_CONTINUITY_WATCHDOG_INTERVAL_SECONDS", "600"))
 _watchdog_seconds = max(120, _watchdog_seconds)
+_progression_seconds = int(
+    os.environ.get("CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_INTERVAL_SECONDS", "300")
+)
+_progression_seconds = max(60, _progression_seconds)
 celery_app.conf.beat_schedule = {
     "cortex-ingestion-scheduler-tick": {
         "task": "vector.cortex.ingestion.scheduler_tick",
@@ -113,6 +117,10 @@ celery_app.conf.beat_schedule = {
     "cortex-substrate-continuity-watchdog": {
         "task": "vector.cortex.substrate_pipeline.continuity_watchdog",
         "schedule": timedelta(seconds=_watchdog_seconds),
+    },
+    "cortex-substrate-operational-progression-tick": {
+        "task": "vector.cortex.operational_runtime.substrate_progression_tick",
+        "schedule": timedelta(seconds=_progression_seconds),
     },
 }
 
@@ -131,6 +139,14 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
     importlib.import_module("app.tasks.cortex_substrate_pipeline")
     importlib.import_module("app.tasks.cortex_substrate_continuity_watchdog")
+    importlib.import_module("app.tasks.cortex_graph_density_promotion")
+    importlib.import_module("app.tasks.cortex_orphan_continuity_stitch")
+    importlib.import_module("app.tasks.cortex_substrate_traversal_scheduling")
+    importlib.import_module("app.tasks.cortex_substrate_traversal_retry")
+    importlib.import_module("app.tasks.cortex_substrate_stalled_traversal_recovery")
+    importlib.import_module("app.tasks.cortex_substrate_tcre_saturation_scheduling")
+    importlib.import_module("app.tasks.cortex_substrate_synthesis_activation_scheduling")
+    importlib.import_module("app.tasks.cortex_substrate_operational_progression")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")
 
 
@@ -152,4 +168,12 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
     importlib.import_module("app.tasks.cortex_substrate_pipeline")
     importlib.import_module("app.tasks.cortex_substrate_continuity_watchdog")
+    importlib.import_module("app.tasks.cortex_graph_density_promotion")
+    importlib.import_module("app.tasks.cortex_orphan_continuity_stitch")
+    importlib.import_module("app.tasks.cortex_substrate_traversal_scheduling")
+    importlib.import_module("app.tasks.cortex_substrate_traversal_retry")
+    importlib.import_module("app.tasks.cortex_substrate_stalled_traversal_recovery")
+    importlib.import_module("app.tasks.cortex_substrate_tcre_saturation_scheduling")
+    importlib.import_module("app.tasks.cortex_substrate_synthesis_activation_scheduling")
+    importlib.import_module("app.tasks.cortex_substrate_operational_progression")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")

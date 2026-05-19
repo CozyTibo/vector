@@ -134,6 +134,7 @@ def run_substrate_traversal_materialization_v1(
     tenant_id: uuid.UUID,
     graph_projection_stable_hash: str | None = None,
     max_starts: int = SUBSTRATE_TRAVERSAL_MAX_STARTS_V1,
+    start_node_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Execute bounded reference walks and persist to ``CortexOctsDurableWalkRecord``."""
     export_doc = build_org_graph_projection_export_document(session, tenant_id=tenant_id)
@@ -153,7 +154,10 @@ def run_substrate_traversal_materialization_v1(
         "graph_as_of_unix_ns": {"unix_ns": 0},
     }
 
-    starts = _pick_start_node_ids_v1(inner, limit=max(1, int(max_starts)))
+    if start_node_ids is not None:
+        starts = [str(s).strip() for s in start_node_ids if str(s).strip()][: max(1, int(max_starts))]
+    else:
+        starts = _pick_start_node_ids_v1(inner, limit=max(1, int(max_starts)))
     if not starts:
         return {"ok": True, "reason": "no_start_nodes", "walks_persisted": 0, "walk_ids": []}
 

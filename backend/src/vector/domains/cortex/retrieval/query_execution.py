@@ -494,6 +494,12 @@ def execute_retrieval_query_envelope_v1(
     wl = str(envelope["workload_class"])
     it = str(envelope["intent"])
     partition = str(envelope["execution_partition"])
+    if partition == "exploration":
+        from vector.domains.cortex.operational_runtime.substrate_replay_storm_handling import (
+            assert_exploration_partition_allowed_v1,
+        )
+
+        assert_exploration_partition_allowed_v1(session, tenant_id=tenant_id)
 
     # PROVENANCE (RET-QC-03 — MUST NOT skip)
     t3 = time.perf_counter()

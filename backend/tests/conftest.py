@@ -32,6 +32,11 @@ from vector.settings import get_settings
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    for item in items:
+        nodeid = item.nodeid.replace("\\", "/")
+        if "/e2e/" in nodeid or "_e2e_" in nodeid or nodeid.endswith("_e2e.py"):
+            item.add_marker(pytest.mark.e2e)
+
     if os.environ.get("DATABASE_URL"):
         return
     skip = pytest.mark.skip(reason="DATABASE_URL not set (use `make test`)")

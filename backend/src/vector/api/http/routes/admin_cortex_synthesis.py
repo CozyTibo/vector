@@ -1294,11 +1294,11 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
             },
         )
 
-    @sr.get("/eligibility/explain")
+    @sr.get("/eligibility/explain", response_model=None)
     def get_synthesis_eligibility_explain(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-    ) -> dict[str, Any]:
+    ) -> JSONResponse | dict[str, Any]:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
         from vector.domains.cortex.synthesis.synthesis_eligibility_explainability import (
@@ -1307,11 +1307,11 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
 
         return explain_synthesis_eligibility_v1(db, tenant_id=tenant_id)
 
-    @sr.get("/eligibility/why-empty")
+    @sr.get("/eligibility/why-empty", response_model=None)
     def get_synthesis_why_empty_panel(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-    ) -> dict[str, Any]:
+    ) -> JSONResponse | dict[str, Any]:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
         from vector.domains.cortex.synthesis.synthesis_eligibility_explainability import (
@@ -1320,12 +1320,12 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
 
         return build_synthesis_empty_panel_v1(db, tenant_id=tenant_id)
 
-    @sr.get("/activation-audits")
+    @sr.get("/activation-audits", response_model=None)
     def list_synthesis_activation_audits(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
         limit: Annotated[int, Query(ge=1, le=50)] = 10,
-    ) -> dict[str, Any]:
+    ) -> JSONResponse | dict[str, Any]:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
         from vector.infrastructure.db.models.cortex_synthesis_activation_audit import (

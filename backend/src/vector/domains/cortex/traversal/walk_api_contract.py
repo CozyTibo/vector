@@ -432,6 +432,40 @@ class OctsWalkApiMemoryStore:
         items.sort(key=lambda r: str(r.walk_id))
         return items
 
+    def requeue_pending_walk_v1(
+        self,
+        tenant_id: uuid.UUID,
+        walk_id: uuid.UUID,
+        *,
+        job_id: str | None = None,
+    ) -> WalkApiRecordV1 | None:
+        with self._lock:
+            rec = self._by_walk.get((tenant_id, walk_id))
+            if rec is None:
+                return None
+            if rec.status not in ("queued", "running"):
+                return rec
+            rec.status = "queued"
+            rec.job_id = job_id or str(uuid.uuid4())
+            return rec
+
+    def get_tenant_walk_queue_snapshot_v1(
+        self,
+        tenant_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        with self._lock:
+            records = [
+                rec
+                for (tid, _wid), rec in self._by_walk.items()
+                if tid == tenant_id
+            ]
+        pending = [r for r in records if r.status in ("queued", "running")]
+        return {
+            "pending_count": len(pending),
+            "pending_records": pending,
+            "last_walk_completed_at": None,
+        }
+
 
 _GLOBAL_STORE = OctsWalkApiMemoryStore()
 

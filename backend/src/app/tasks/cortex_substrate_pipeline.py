@@ -21,7 +21,6 @@ from vector.domains.cortex.substrate_pipeline.orchestrator import (
     chain_after_phase_v1,
     enqueue_next_pipeline_phase_v1,
     finalize_pipeline_if_complete_v1,
-    on_retrieval_publish_completed_for_pipeline_v1,
     start_substrate_pipeline_run_v1,
 )
 from vector.domains.cortex.substrate_pipeline.phase_runners import (
@@ -148,13 +147,7 @@ def run_cortex_substrate_pipeline_phase_task(
         elif phase_id == PHASE_07_RETRIEVAL:
             out = run_phase_07_retrieval_v1(session, tenant_id=tid, pipeline_run_id=prid)
             session.commit()
-            chain = on_retrieval_publish_completed_for_pipeline_v1(
-                tenant_id=tid,
-                pipeline_run_id=prid,
-                published_index_epoch=out.get("published_index_epoch") or out.get("index_epoch"),
-                bundle_id=bundle_id,
-                batch_limit=batch_limit,
-            )
+            chain = out.get("next_phase_chain")
             return {
                 "tenant_id": tenant_id,
                 "pipeline_run_id": pipeline_run_id,

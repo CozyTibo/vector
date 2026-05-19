@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 from sqlalchemy.orm import Session
@@ -28,7 +29,7 @@ from vector.domains.cortex.retrieval.retrieval_skip_registry import (
 
 
 @pytest.fixture
-def tenant(db_session: Session):
+def tenant(db_session: Session) -> Any:
     from vector.infrastructure.db.models.tenant import Tenant
 
     slug = f"cont-{uuid.uuid4().hex[:8]}"
@@ -46,7 +47,7 @@ def tenant(db_session: Session):
 
 
 @pytest.mark.integration
-def test_mark_pipeline_waiting_on_tcre(db_session, tenant) -> None:
+def test_mark_pipeline_waiting_on_tcre(db_session: Session, tenant: Any) -> None:
     run = create_pipeline_run_v1(
         db_session,
         tenant_id=tenant.id,
@@ -70,7 +71,11 @@ def test_mark_pipeline_waiting_on_tcre(db_session, tenant) -> None:
 
 
 @pytest.mark.integration
-def test_resume_pipeline_idempotent_receipt(db_session, tenant, monkeypatch) -> None:
+def test_resume_pipeline_idempotent_receipt(
+    db_session: Session,
+    tenant: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     run = create_pipeline_run_v1(
         db_session,
         tenant_id=tenant.id,
@@ -88,7 +93,7 @@ def test_resume_pipeline_idempotent_receipt(db_session, tenant, monkeypatch) -> 
 
     enqueued: list[dict] = []
 
-    def _fake_enqueue(**kwargs):  # type: ignore[no-untyped-def]
+    def _fake_enqueue(**kwargs: Any) -> dict[str, Any]:
         enqueued.append(kwargs)
         return {"phase_id": kwargs.get("phase_id"), "celery_task_id": "task-1"}
 
@@ -123,11 +128,13 @@ def test_resume_pipeline_idempotent_receipt(db_session, tenant, monkeypatch) -> 
 
 
 @pytest.mark.integration
-def test_explain_synthesis_eligibility_idle(db_session, tenant) -> None:
+def test_explain_synthesis_eligibility_idle(db_session: Session, tenant: Any) -> None:
     expl = explain_synthesis_eligibility_v1(db_session, tenant_id=tenant.id)
     assert expl["eligible_scopes"] == 0
     assert expl["synthesis_ready"] is False
     assert "no_published_retrieval_epoch" in expl["blocked_by"]
+    assert "classification" in expl
+    assert "ui_color" in expl
 
 
 def test_retrieval_skip_registry_normalization() -> None:

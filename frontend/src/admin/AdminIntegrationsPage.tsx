@@ -7,7 +7,28 @@ import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 import { StatusBadge } from "./ui/StatusBadge";
 
 type StatusTone = "ok" | "warn" | "neutral" | "bad";
-type Conn = { id: string; provider: string; status: string; created_at: string };
+type ConnPermissionReport = {
+  permission_model: string;
+  requested: string[];
+  granted: string[] | null;
+  recommended_for_ingestion: string[] | null;
+  missing_requested: string[];
+  missing_recommended: string[];
+  extra_granted: string[];
+  ingest_health: "ok" | "warn" | "unknown" | "not_connected";
+  notes: string | null;
+};
+type Conn = {
+  id: string;
+  provider: string;
+  status: string;
+  created_at: string;
+  permissions: ConnPermissionReport | null;
+};
+type ConnectionsResponse = {
+  items: Conn[];
+  permissions_by_provider: Record<string, ConnPermissionReport>;
+};
 type AdminConnectorConnectLinkResponse = {
   provider: "slack" | "github" | "linear" | "notion" | "calls";
   connect_url: string;
@@ -28,12 +49,89 @@ function titleCaseProvider(p: string) {
   return p.charAt(0).toUpperCase() + p.slice(1);
 }
 
+function permissionHealthTone(health: ConnPermissionReport["ingest_health"]): StatusTone {
+  if (health === "ok") return "ok";
+  if (health === "warn") return "warn";
+  if (health === "not_connected") return "neutral";
+  return "bad";
+}
+
+function permissionHealthLabel(health: ConnPermissionReport["ingest_health"]): string {
+  if (health === "ok") return "Scopes OK";
+  if (health === "warn") return "Scope gap";
+  if (health === "not_connected") return "Not connected";
+  return "Unknown";
+}
+
+function ScopeList({ items, emptyLabel }: { items: string[]; emptyLabel: string }) {
+  if (items.length === 0) {
+    return <p className="text-stone-500">{emptyLabel}</p>;
+  }
+  return (
+    <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto font-mono text-xs text-stone-800">
+      {items.map((s) => (
+        <li key={s}>{s}</li>
+      ))}
+    </ul>
+  );
+}
+
+function ConnectionPermissionsPanel({ report }: { report: ConnPermissionReport | undefined }) {
+  if (!report) {
+    return null;
+  }
+  return (
+    <div className="mt-4 space-y-3 border-t border-stone-200 pt-4">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-sm font-medium text-stone-800">OAuth / app permissions</h4>
+        <StatusBadge tone={permissionHealthTone(report.ingest_health)}>
+          {permissionHealthLabel(report.ingest_health)}
+        </StatusBadge>
+      </div>
+      {report.notes ? <p className="text-xs text-amber-900">{report.notes}</p> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Requested (this deploy)</p>
+          <ScopeList items={report.requested} emptyLabel="—" />
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Granted (user approved)</p>
+          <ScopeList
+            items={report.granted ?? []}
+            emptyLabel={report.ingest_health === "not_connected" ? "Connect to see granted scopes" : "—"}
+          />
+        </div>
+      </div>
+      {report.recommended_for_ingestion && report.recommended_for_ingestion.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+            Recommended for message ingest
+          </p>
+          <ScopeList items={report.recommended_for_ingestion} emptyLabel="—" />
+        </div>
+      ) : null}
+      {report.missing_recommended.length > 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2">
+          <p className="text-xs font-medium text-amber-950">Missing for ingest</p>
+          <ScopeList items={report.missing_recommended} emptyLabel="—" />
+        </div>
+      ) : null}
+      {report.missing_requested.length > 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2">
+          <p className="text-xs font-medium text-amber-950">Requested but not granted</p>
+          <ScopeList items={report.missing_requested} emptyLabel="—" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AdminIntegrationsPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["admin-connections", tenantId],
-    queryFn: () => adminJson<{ items: Conn[] }>(`/admin/tenants/${tenantId}/connections`),
+    queryFn: () => adminJson<ConnectionsResponse>(`/admin/tenants/${tenantId}/connections`),
     enabled: Boolean(tenantId),
   });
 
@@ -72,6 +170,7 @@ export default function AdminIntegrationsPage() {
   }
 
   const byProvider = new Map(q.data.items.map((c) => [c.provider, c]));
+  const permissionsByProvider = q.data.permissions_by_provider ?? {};
 
   return (
     <div className="space-y-8">
@@ -119,6 +218,9 @@ export default function AdminIntegrationsPage() {
                     </dd>
                   </div>
                 </dl>
+                <ConnectionPermissionsPanel
+                  report={c?.permissions ?? permissionsByProvider[provider]}
+                />
                 <div className="mt-4 space-y-2 border-t border-stone-200 pt-4">
                   {c ? (
                     <>

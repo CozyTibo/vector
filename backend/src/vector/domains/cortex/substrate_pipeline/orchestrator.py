@@ -52,7 +52,22 @@ def schedule_substrate_pipeline_v1(
     if not cfg.cortex_post_ingestion_substrate_refresh_enabled:
         return {"scheduled": False, "reason": "disabled"}
 
-    debounce = max(30, int(cfg.cortex_post_ingestion_substrate_refresh_debounce_seconds))
+    from vector.domains.cortex.operational_runtime.substrate_runtime_economics import (
+        evaluate_pipeline_concurrency_v1,
+        resolve_post_ingestion_debounce_countdown_v1,
+    )
+
+    with session_scope() as session:
+        concurrency = evaluate_pipeline_concurrency_v1(session, tenant_id=tenant_id)
+        if not concurrency.get("may_start_pipeline"):
+            return {
+                "scheduled": False,
+                "reason": concurrency.get("block_reason") or "pipeline_concurrency_blocked",
+                "pipeline_concurrency": concurrency,
+            }
+
+    debounce_resolved = resolve_post_ingestion_debounce_countdown_v1(cfg)
+    debounce = int(debounce_resolved["effective_countdown_seconds"])
     task_id = substrate_pipeline_celery_task_id(tenant_id)
 
     from app.celery_app import celery_app
@@ -88,6 +103,7 @@ def schedule_substrate_pipeline_v1(
         "task_id": task_id,
         "celery_task_id": str(async_result.id),
         "countdown_seconds": debounce,
+        "post_ingestion_debounce": debounce_resolved,
     }
 
 
@@ -158,6 +174,7 @@ def chain_after_phase_v1(
     batch_limit: int | None = None,
     graph_projection_stable_hash: str | None = None,
     identity_substrate_trigger: str = "substrate_pipeline",
+    session: Session | None = None,
 ) -> dict[str, Any] | None:
     """Enqueue the next phase after ``completed_phase_id`` completes."""
     order = list(SUBSTRATE_PIPELINE_PHASE_ORDER)
@@ -169,6 +186,15 @@ def chain_after_phase_v1(
         return None
     next_phase = order[idx + 1]
     if completed_phase_id == PHASE_06_TCRE:
+        if session is not None:
+            from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
+                assert_pipe085_chain_after_phase06_legal_v1,
+            )
+
+            assert_pipe085_chain_after_phase06_legal_v1(
+                session,
+                pipeline_run_id=pipeline_run_id,
+            )
         return None
     return enqueue_next_pipeline_phase_v1(
         tenant_id=tenant_id,
@@ -189,29 +215,22 @@ def on_retrieval_publish_completed_for_pipeline_v1(
     bundle_id: str | None = None,
     batch_limit: int | None = None,
 ) -> dict[str, Any]:
-    """Chain phase 08 synthesis after phase 07 publish (**PIPE-08-01**)."""
-    cfg = get_settings()
-    if not cfg.cortex_substrate_pipeline_phase_08_enabled:
-        from vector.domains.cortex.substrate_pipeline.repository import skip_phase_v1
-
-        with session_scope() as session:
-            skip_phase_v1(
-                session,
-                pipeline_run_id=pipeline_run_id,
-                phase_id=PHASE_08_SYNTHESIS,
-                reason="phase_08_disabled",
-            )
-            fin = finalize_pipeline_if_complete_v1(session, pipeline_run_id=pipeline_run_id)
-            session.commit()
-        return {"chained": False, "phase_08_skipped": True, "finalize": fin}
-
-    return enqueue_next_pipeline_phase_v1(
-        tenant_id=tenant_id,
-        pipeline_run_id=pipeline_run_id,
-        phase_id=PHASE_08_SYNTHESIS,
-        bundle_id=bundle_id,
-        batch_limit=batch_limit,
+    """Chain phase 08 synthesis after phase 07 publish (**PIPE-08-01**, **G-P085-SYN-01**)."""
+    from vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling import (
+        chain_synthesis_activation_after_phase07_v1,
     )
+
+    with session_scope() as session:
+        out = chain_synthesis_activation_after_phase07_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            published_index_epoch=published_index_epoch,
+            bundle_id=bundle_id,
+            batch_limit=batch_limit,
+        )
+        session.commit()
+    return out
 
 
 def on_tcre_job_completed_for_pipeline_v1(
@@ -230,23 +249,39 @@ def on_tcre_job_completed_for_pipeline_v1(
         pipeline_run_id = uuid.UUID(str(run_id_raw))
     except ValueError:
         return None
+    from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
+        assert_tcre_completion_uses_resume_path_v1,
+    )
+
+    assert_tcre_completion_uses_resume_path_v1(
+        has_tcre_job_id=tcre_job_id is not None,
+        pipeline_scope=True,
+    )
     if tcre_job_id is None:
-        return enqueue_next_pipeline_phase_v1(
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-            phase_id=PHASE_07_RETRIEVAL,
-        )
+        return None
     from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
         resume_pipeline_after_tcre_completion_v1,
     )
 
-    return resume_pipeline_after_tcre_completion_v1(
+    resume_out = resume_pipeline_after_tcre_completion_v1(
         session,
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,
         tcre_job_id=tcre_job_id,
         tcre_job_status=tcre_job_status,
     )
+    from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
+        PROGRESSION_TRIGGER_TCRE_COMPLETED_V1,
+        continue_substrate_operational_progression_v1,
+    )
+
+    progression = continue_substrate_operational_progression_v1(
+        session,
+        tenant_id=tenant_id,
+        pipeline_run_id=pipeline_run_id,
+        trigger=PROGRESSION_TRIGGER_TCRE_COMPLETED_V1,
+    )
+    return {**resume_out, "progression": progression}
 
 
 def finalize_pipeline_if_complete_v1(

@@ -309,12 +309,12 @@ def derive_synthesis_stage_substrate_state_v1(
     return map_synthesis_health_to_stage_substrate_state_v1(substrate_health_state)
 
 
-def project_synthesis_completeness_v1(
+def _project_synthesis_completeness_without_classification_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
-    """8th pipeline stage envelope for substrate completeness ledger."""
+    """8th pipeline stage envelope for substrate completeness ledger (base, pre **G-P085-SYN-02**)."""
     from vector.domains.cortex.completeness._completeness_common import build_stage_envelope_v1, pct
 
     scope_stats = count_synthesis_synthesized_scopes_v1(session, tenant_id=tenant_id)
@@ -416,6 +416,19 @@ def project_synthesis_completeness_v1(
             "index_row_count": scope_stats.get("index_row_count"),
         },
     )
+
+
+def project_synthesis_completeness_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Project synthesis stage (**G-P085-SYN-02** + **G-P085-SYN-03** throughput maturity)."""
+    from vector.domains.cortex.synthesis.synthesis_throughput_maturity import (
+        project_synthesis_completeness_with_throughput_maturity_v1,
+    )
+
+    return project_synthesis_completeness_with_throughput_maturity_v1(session, tenant_id=tenant_id)
 
 
 def build_synthesis_coverage_catalog_v1(

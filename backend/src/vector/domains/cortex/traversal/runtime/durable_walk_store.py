@@ -122,6 +122,19 @@ class OctsWalkStoreProtocol(Protocol):
 
     def list_walk_records_for_tenant_v1(self, tenant_id: uuid.UUID) -> list[WalkApiRecordV1]: ...
 
+    def requeue_pending_walk_v1(
+        self,
+        tenant_id: uuid.UUID,
+        walk_id: uuid.UUID,
+        *,
+        job_id: str | None = None,
+    ) -> WalkApiRecordV1 | None: ...
+
+    def get_tenant_walk_queue_snapshot_v1(
+        self,
+        tenant_id: uuid.UUID,
+    ) -> dict[str, Any]: ...
+
 
 class OctsWalkApiDurableStore:
     """Session-backed walk store — survives worker restart."""
@@ -265,6 +278,54 @@ class OctsWalkApiDurableStore:
             ).all()
         )
         return [self._to_record(r) for r in rows]
+
+    def requeue_pending_walk_v1(
+        self,
+        tenant_id: uuid.UUID,
+        walk_id: uuid.UUID,
+        *,
+        job_id: str | None = None,
+    ) -> WalkApiRecordV1 | None:
+        row = self._session.get(CortexOctsDurableWalkRecord, walk_id)
+        if row is None or row.tenant_id != tenant_id:
+            return None
+        if row.status not in ("queued", "running"):
+            return self._to_record(row)
+        row.status = "queued"
+        row.job_id = job_id or str(uuid.uuid4())
+        row.updated_at = datetime.now(tz=UTC)
+        self._session.flush()
+        return self._to_record(row)
+
+    def get_tenant_walk_queue_snapshot_v1(
+        self,
+        tenant_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        rows = list(
+            self._session.scalars(
+                select(CortexOctsDurableWalkRecord).where(
+                    CortexOctsDurableWalkRecord.tenant_id == tenant_id,
+                )
+            ).all()
+        )
+        pending: list[WalkApiRecordV1] = []
+        last_completed_at: datetime | None = None
+        for row in rows:
+            if row.status in ("queued", "running"):
+                pending.append(self._to_record(row))
+            elif row.status == "completed":
+                ts = row.updated_at or row.created_at
+                if ts is not None and (
+                    last_completed_at is None or ts > last_completed_at
+                ):
+                    last_completed_at = ts
+        return {
+            "pending_count": len(pending),
+            "pending_records": pending,
+            "last_walk_completed_at": (
+                last_completed_at.isoformat() if last_completed_at else None
+            ),
+        }
 
 
 def resolve_octs_walk_store_v1(session: Session | None) -> OctsWalkStoreProtocol:

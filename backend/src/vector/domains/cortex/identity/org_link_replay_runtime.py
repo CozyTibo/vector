@@ -29,6 +29,7 @@ OrgLinkJobKind = Literal[
     "candidate_regen",
     "graph_projection_export",
     "identity_continuity_rebuild",
+    "lawful_edge_promotion",
 ]
 _LINK_DRIFT_CLASSES: Final[frozenset[str]] = frozenset({f"L{i}" for i in range(8)})
 
@@ -165,8 +166,12 @@ def _validate_org_link_replay_job_params(
         "candidate_regen",
         "graph_projection_export",
         "identity_continuity_rebuild",
+        "lawful_edge_promotion",
     ):
-        msg = "job_kind must be authoritative_replay, candidate_regen, graph_projection_export, or identity_continuity_rebuild"
+        msg = (
+            "job_kind must be authoritative_replay, candidate_regen, "
+            "graph_projection_export, identity_continuity_rebuild, or lawful_edge_promotion"
+        )
         raise OrgLinkReplayError(msg)
     if job_kind == "identity_continuity_rebuild":
         return
@@ -283,6 +288,12 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
                 receipt_class="L0",
                 detail_json={"lane": "graph_projection_export", "stable_hash_sha256": doc["stable_hash_sha256"]},
             )
+        elif job_kind == "lawful_edge_promotion":
+            from vector.domains.cortex.identity.org_link_replay_lane_registry import (
+                run_lawful_edge_promotion_lane_v1,
+            )
+
+            run_lawful_edge_promotion_lane_v1(db, job)
         elif job_kind == "candidate_regen":
             if job.dry_run:
                 empty_sha = compute_candidate_set_sha256([])

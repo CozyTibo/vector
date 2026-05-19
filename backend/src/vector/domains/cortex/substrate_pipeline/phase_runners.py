@@ -163,6 +163,16 @@ def run_phase_04_graph_v1(
         "org_graph_traversal_verification_slice": slice_body,
         "org_graph_traversal_slice_hash": slice_hash,
     }
+    from vector.domains.cortex.operational_runtime.graph_density_promotion import (
+        schedule_graph_density_pass_v1,
+    )
+
+    promotion_schedule = schedule_graph_density_pass_v1(
+        tenant_id=tenant_id,
+        trigger="after_phase_04",
+        pipeline_run_id=pipeline_run_id,
+    )
+    out["graph_density_promotion_schedule"] = promotion_schedule
     complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_04_GRAPH, output=out)
     return out
 
@@ -181,6 +191,18 @@ def run_phase_05_traversal_v1(
             tenant_id=tenant_id,
             graph_projection_stable_hash=graph_projection_stable_hash,
         )
+        from vector.domains.cortex.operational_runtime.substrate_traversal_scheduling import (
+            TRAVERSAL_SCHEDULE_TRIGGER_AFTER_PHASE_05_V1,
+            schedule_octs_walks_for_tenant_v1,
+        )
+
+        traversal_schedule = schedule_octs_walks_for_tenant_v1(
+            tenant_id=tenant_id,
+            trigger=TRAVERSAL_SCHEDULE_TRIGGER_AFTER_PHASE_05_V1,
+            pipeline_run_id=pipeline_run_id,
+            graph_projection_stable_hash=graph_projection_stable_hash,
+        )
+        out["octs_walk_schedule"] = traversal_schedule
         complete_phase_v1(
             session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_05_TRAVERSAL, output=out
         )
@@ -240,6 +262,28 @@ def run_phase_06_tcre_v1(
                 celery_task_id=str(enqueue_out.get("celery_task_id") or "") or None,
             )
         complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_06_TCRE, output=out)
+        from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
+            enforce_phase06_progression_law_v1,
+        )
+
+        enforce_phase06_progression_law_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            phase06_output=out,
+        )
+        from vector.domains.cortex.operational_runtime.substrate_tcre_saturation_scheduling import (
+            run_tcre_saturation_after_phase06_v1,
+        )
+
+        saturation_pass = run_tcre_saturation_after_phase06_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            octs_walk_id=str(walk_id) if walk_id else None,
+            phase06_initial_job_enqueued=bool(job_id_raw),
+        )
+        out["tcre_saturation_pass"] = saturation_pass
         return out
     except Exception as exc:  # noqa: BLE001
         fail_phase_v1(
@@ -274,12 +318,33 @@ def run_phase_07_retrieval_v1(
         complete_phase_v1(
             session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_07_RETRIEVAL, output=out
         )
-        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-            mark_continuation_completed_v1,
+        from vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling import (
+            run_synthesis_activation_after_phase07_v1,
         )
 
-        mark_continuation_completed_v1(session, pipeline_run_id=pipeline_run_id)
-        return out
+        activation = run_synthesis_activation_after_phase07_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            published_index_epoch=out.get("published_index_epoch") or out.get("index_epoch"),
+        )
+        from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
+            PROGRESSION_TRIGGER_RETRIEVAL_PUBLISHED_V1,
+            continue_substrate_operational_progression_v1,
+        )
+
+        progression = continue_substrate_operational_progression_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            trigger=PROGRESSION_TRIGGER_RETRIEVAL_PUBLISHED_V1,
+        )
+        return {
+            **out,
+            "synthesis_activation": activation,
+            "next_phase_chain": activation.get("next_phase_chain"),
+            "progression": progression,
+        }
     except Exception as exc:  # noqa: BLE001
         fail_phase_v1(
             session,

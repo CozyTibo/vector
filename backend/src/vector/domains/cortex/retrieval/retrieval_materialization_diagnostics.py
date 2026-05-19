@@ -44,6 +44,7 @@ def build_retrieval_materialization_report_body_v1(
         "tenant_id": stats.get("tenant_id"),
         "pipeline_run_id": stats.get("pipeline_run_id"),
         "retrieval_epoch": stats.get("index_epoch"),
+        "retrieval_card_classification": stats.get("retrieval_card_classification"),
         "tcre_candidates": tcre_candidates,
         "walks_candidates": walks_candidates,
         "org_link_candidates": org_link_candidates,

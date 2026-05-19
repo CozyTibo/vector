@@ -58,6 +58,21 @@ def test_schedule_debounced_refresh_with_stable_task_id(monkeypatch: pytest.Monk
         "app.tasks.cortex_substrate_pipeline.run_cortex_substrate_pipeline_coordinator_task",
         mock_task,
     )
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _fake_scope() -> MagicMock:
+        yield MagicMock()
+
+    monkeypatch.setattr(
+        "vector.domains.cortex.substrate_pipeline.orchestrator.session_scope",
+        _fake_scope,
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.operational_runtime.substrate_runtime_economics."
+        "evaluate_pipeline_concurrency_v1",
+        lambda *_a, **_k: {"may_start_pipeline": True},
+    )
 
     from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
         post_ingestion_refresh_celery_task_id,

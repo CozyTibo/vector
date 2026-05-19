@@ -170,9 +170,13 @@ def derive_retrieval_stage_substrate_state_v1(
     published_epoch: str | None,
     replay_posture: str,
     pending_index_builds: int,
+    upstream_tcre_pending: bool = False,
+    upstream_work_present: bool = False,
 ) -> str:
     """Never ``healthy`` (idle) when ``eligible > 0`` and nothing indexed (**RET-COMP-01**)."""
     if eligible == 0:
+        if upstream_tcre_pending or (upstream_work_present and published_epoch is None):
+            return "degraded"
         return "healthy"
     if indexed == 0 or published_epoch is None:
         return "degraded"
@@ -190,100 +194,12 @@ def project_retrieval_completeness_v1(
     *,
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
-    """7th pipeline stage envelope for substrate completeness ledger."""
-    from vector.domains.cortex.completeness._completeness_common import build_stage_envelope_v1, pct
-
-    eligible_breakdown = count_retrieval_eligible_artifacts_v1(session, tenant_id=tenant_id)
-    eligible = int(eligible_breakdown["eligible_artifact_count"])
-    index_stats = count_retrieval_indexed_in_published_epoch_v1(session, tenant_id=tenant_id)
-    indexed = int(index_stats["indexed_count"])
-    replay_safe = int(index_stats["replay_safe_count"])
-    published = index_stats.get("published_index_epoch")
-    lag = compute_index_lag_epochs_v1(session, tenant_id=tenant_id)
-    stale_epochs = list(lag.get("stale_epochs") or [])
-
-    coverage_percent = _pct(indexed, eligible if eligible else 1)
-    replay_safe_percent = _pct(replay_safe, indexed if indexed else 1)
-
-    pending_builds = int(lag.get("stale_epoch_count") or 0)
-    if published is None and eligible > 0:
-        pending_builds = max(pending_builds, 1)
-
-    never_indexed = eligible > 0 and indexed == 0
-    omission_classes: dict[str, int] = {}
-    if never_indexed:
-        omission_classes[RETRIEVAL_STAGE_OMISSION_INDEX_NEVER_BUILT_V1] = 1
-    if stale_epochs:
-        omission_classes[RETRIEVAL_STAGE_OMISSION_INDEX_STALE_V1] = len(stale_epochs)
-    tcre_gap = max(0, eligible_breakdown["tcre_indexable_count"] - indexed)
-    if tcre_gap > 0 and not never_indexed:
-        omission_classes[RETRIEVAL_STAGE_OMISSION_UPSTREAM_TCRE_GAP_V1] = tcre_gap
-    divergence_total = get_retrieval_replay_divergence_total_v1()
-    if divergence_total > 0:
-        omission_classes[RETRIEVAL_STAGE_OMISSION_REPLAY_DIVERGENCE_V1] = divergence_total
-
-    replay_posture = "stable"
-    if divergence_total > 0:
-        replay_posture = "unsafe"
-    elif coverage_percent < RETRIEVAL_COVERAGE_THRESHOLD_PERCENT_V1 and eligible > 0:
-        replay_posture = "partial"
-    elif never_indexed:
-        replay_posture = "unknown"
-
-    substrate_state = derive_retrieval_stage_substrate_state_v1(
-        eligible=eligible,
-        indexed=indexed,
-        coverage_percent=coverage_percent,
-        published_epoch=str(published) if published else None,
-        replay_posture=replay_posture,
-        pending_index_builds=pending_builds,
+    """Project retrieval stage envelope (**G-P085-RET-PROP-01**)."""
+    from vector.domains.cortex.operational_runtime.retrieval_completeness_propagation import (
+        propagate_retrieval_completeness_stage_v1,
     )
 
-    degraded_count = indexed - replay_safe if indexed > replay_safe else 0
-    unresolved = max(0, eligible - indexed)
-
-    drift_warnings: list[str] = []
-    if never_indexed:
-        drift_warnings.append(
-            "Eligible retrieval artifacts exist but no published index epoch — run index rebuild."
-        )
-    if stale_epochs:
-        drift_warnings.append(f"stale_index_epochs={','.join(stale_epochs[:5])}")
-
-    assert_retrieval_never_idle_healthy_when_eligible_v1(
-        eligible_artifact_count=eligible,
-        indexed_count=indexed,
-        substrate_state=substrate_state,
-    )
-
-    return build_stage_envelope_v1(
-        stage_id="retrieval",
-        label="Retrieval",
-        total_objects=eligible if eligible else indexed,
-        processed_count=indexed,
-        degraded_count=degraded_count,
-        unresolved_count=unresolved,
-        omitted_count=sum(omission_classes.values()),
-        intentionally_excluded_count=pending_builds if pending_builds else 0,
-        replay_posture=replay_posture,
-        substrate_state=substrate_state,
-        last_successful_at=str(published) if published else None,
-        drift_warnings=drift_warnings,
-        omission_classes=omission_classes,
-        detail_route=f"/admin/tenants/{tenant_id}/cortex/retrieval",
-        metrics={
-            "eligible_artifact_count": eligible,
-            "indexed_count": indexed,
-            "retrieval_coverage_percent": coverage_percent,
-            "replay_safe_query_percent": replay_safe_percent,
-            "walk_record_count": eligible_breakdown["walk_record_count"],
-            "retrieval_never_indexed": never_indexed,
-            "published_index_epoch": published,
-            "pending_index_build_count": pending_builds,
-            "retrieval_replay_divergence_total": divergence_total,
-            **eligible_breakdown,
-        },
-    )
+    return propagate_retrieval_completeness_stage_v1(session, tenant_id=tenant_id)
 
 
 def build_retrieval_coverage_catalog_v1(

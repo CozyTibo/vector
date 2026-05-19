@@ -35,28 +35,12 @@ def tick_cortex_ingestion_scheduler() -> dict[str, object]:
         jobs = iter_routed_live_sync_jobs(session, settings)
 
     enqueued = 0
-    substrate_refresh_scheduled = 0
-    tenant_ids: set[uuid.UUID] = set()
     for job in jobs:
         run_cortex_connector_sync_task.apply_async(
             args=[str(job.tenant_id), job.connector_id, "scheduled_lane", "incremental", str(job.connection_id)],
             queue="cortex_live",
         )
         enqueued += 1
-        tenant_ids.add(job.tenant_id)
-
-    if tenant_ids and settings.cortex_post_ingestion_substrate_refresh_enabled:
-        from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
-            schedule_post_ingestion_substrate_refresh,
-        )
-
-        for tid in sorted(tenant_ids, key=lambda x: str(x)):
-            schedule_post_ingestion_substrate_refresh(
-                tenant_id=tid,
-                settings=settings,
-                reason="scheduler_tick",
-            )
-            substrate_refresh_scheduled += 1
 
     log_ingestion_event(
         _LOGGER,
@@ -71,5 +55,9 @@ def tick_cortex_ingestion_scheduler() -> dict[str, object]:
     return {
         "enqueued": enqueued,
         "candidates": len(jobs),
-        "substrate_refresh_scheduled": substrate_refresh_scheduled,
+        "substrate_refresh_note": (
+            "scheduled_on_incremental_sync_complete_only"
+            if settings.cortex_post_ingestion_substrate_refresh_enabled
+            else "substrate_refresh_disabled"
+        ),
     }

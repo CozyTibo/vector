@@ -218,11 +218,15 @@ from vector.contracts.admin import (
     SlackWatchChannelSnapshot,
     SlackWatchChannelsSnapshot,
     TenantAdminDetailResponse,
+    AdminConnectionPermissionReport,
     TenantConnectionAdminItem,
     TenantListItem,
     TenantListResponse,
 )
 from vector.contracts.onboarding import OnboardingCompleteResponse
+from vector.domains.cortex.connectors.admin_connection_permissions import (
+    permissions_by_provider_for_tenant,
+)
 from vector.domains.cortex.connectors.calls.errors import CallsConnectorNotConfiguredError
 from vector.domains.cortex.connectors.calls.oauth_flow import start_calls_oauth_url
 from vector.domains.cortex.connectors.cortex_ingestion_policy import (
@@ -1344,19 +1348,41 @@ def build_admin_router() -> APIRouter:
     def list_connections(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminConnectionsResponse:
         _assert_tenant(db, tenant_id)
         rows = _list_tenant_connections(db, tenant_id=tenant_id)
-        return AdminConnectionsResponse(
-            items=[
+        active_providers = {row.provider for row in rows if row.status == "active"}
+        per_provider = permissions_by_provider_for_tenant(
+            db,
+            settings,
+            tenant_id=tenant_id,
+            active_providers=active_providers,
+        )
+        permissions_by_provider = {
+            k: AdminConnectionPermissionReport.model_validate(v.as_dict())
+            for k, v in per_provider.items()
+        }
+        items: list[TenantConnectionAdminItem] = []
+        for row in rows:
+            snap = per_provider.get(row.provider)
+            perm = (
+                AdminConnectionPermissionReport.model_validate(snap.as_dict())
+                if snap is not None
+                else None
+            )
+            items.append(
                 TenantConnectionAdminItem(
                     id=row.id,
                     provider=row.provider,
                     status=row.status,
                     created_at=row.created_at,
+                    permissions=perm,
                 )
-                for row in rows
-            ],
+            )
+        return AdminConnectionsResponse(
+            items=items,
+            permissions_by_provider=permissions_by_provider,
         )
 
     @r.delete(
@@ -5212,5 +5238,11 @@ def build_admin_router() -> APIRouter:
     from vector.api.http.routes.admin_cortex_synthesis import register_cortex_synthesis_routes
 
     register_cortex_synthesis_routes(r)
+
+    from vector.api.http.routes.admin_cortex_operational_runtime import (
+        register_cortex_operational_runtime_routes,
+    )
+
+    register_cortex_operational_runtime_routes(r)
 
     return r

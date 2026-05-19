@@ -7,30 +7,23 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.operational_runtime.substrate_operational_health_dimensions import (
+    GP085_HEALTH01_GATE_ID_V1,
+    evaluate_operational_health_dimensions_v1,
+)
+from vector.domains.cortex.operational_runtime.substrate_tcre_density import (
+    compute_tcre_density_metrics_v1,
+)
+from vector.domains.cortex.operational_runtime.substrate_tcre_omission_explainability import (
+    build_tcre_omission_explainability_panel_v1,
+)
+from vector.domains.cortex.operational_runtime.substrate_retrieval_starvation import (
+    build_retrieval_starvation_panel_v1,
+    explain_retrieval_eligibility_v1,
+)
 from vector.domains.cortex.retrieval.retrieval_density_metrics import (
     get_retrieval_density_metrics_snapshot_v1,
 )
-from vector.domains.cortex.synthesis.synthesis_eligibility_explainability import (
-    explain_synthesis_eligibility_v1,
-)
-from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-    CONTINUATION_STATUS_STALLED,
-    CONTINUATION_STATUS_WAITING,
-    get_continuation_for_pipeline_v1,
-    list_stale_waiting_continuations_v1,
-)
-from vector.domains.cortex.substrate_pipeline.repository import get_running_pipeline_run_v1
-from vector.domains.cortex.substrate_pipeline.substrate_runtime_maturity import (
-    evaluate_tenant_runtime_maturity_v1,
-)
-
-
-def _health_band(*, ok: bool, degraded: bool = False) -> str:
-    if ok:
-        return "healthy"
-    if degraded:
-        return "degraded"
-    return "critical"
 
 
 def evaluate_substrate_operational_health_v1(
@@ -39,62 +32,44 @@ def evaluate_substrate_operational_health_v1(
     tenant_id: uuid.UUID,
     stall_threshold_seconds: int = 1800,
 ) -> dict[str, Any]:
-    maturity = evaluate_tenant_runtime_maturity_v1(session, tenant_id=tenant_id)
-    eligibility = explain_synthesis_eligibility_v1(session, tenant_id=tenant_id)
-    density = get_retrieval_density_metrics_snapshot_v1()
+    """Tenant operational health aggregate — delegates dimension bands to **G-P085-HEALTH-01**."""
+    core = evaluate_operational_health_dimensions_v1(
+        session,
+        tenant_id=tenant_id,
+        stall_threshold_seconds=stall_threshold_seconds,
+    )
+    maturity = dict(core.get("runtime_maturity") or {})
+    eligibility = dict(core.get("eligibility_explanation") or {})
+    retrieval_density = dict(core.get("retrieval_density_metrics") or {})
+    retrieval_starvation = dict(core.get("retrieval_starvation") or {})
 
-    running = get_running_pipeline_run_v1(session, tenant_id=tenant_id)
-    continuation = (
-        get_continuation_for_pipeline_v1(session, pipeline_run_id=running.id)
-        if running
-        else None
+    tcre_density = compute_tcre_density_metrics_v1(session, tenant_id=tenant_id)
+    tcre_omission_explainability = build_tcre_omission_explainability_panel_v1(
+        session,
+        tenant_id=tenant_id,
     )
-    waiting = (
-        continuation is not None
-        and continuation.continuation_status in (CONTINUATION_STATUS_WAITING, CONTINUATION_STATUS_STALLED)
-    )
-    stalled_local = bool(continuation and continuation.continuation_status == CONTINUATION_STATUS_STALLED)
-
-    substrate_continuity_health = _health_band(
-        ok=not waiting or not stalled_local,
-        degraded=waiting and not stalled_local,
-    )
-    retrieval_density_health = _health_band(
-        ok=int(eligibility.get("retrieval_row_count") or 0) > 0,
-        degraded=bool(eligibility.get("published_epoch_exists")) and int(eligibility.get("retrieval_row_count") or 0) == 0,
-    )
-    async_resume_health = _health_band(
-        ok=not bool(eligibility.get("blocked_by") and "pipeline_waiting_on_tcre" in eligibility["blocked_by"]),
-        degraded=bool(eligibility.get("blocked_by") and "pipeline_waiting_on_tcre" in eligibility["blocked_by"]),
-    )
-    synthesis_activation_health = _health_band(
-        ok=bool(eligibility.get("synthesis_ready")),
-        degraded=int(eligibility.get("eligible_scopes") or 0) > 0 and not eligibility.get("synthesis_ready"),
-    )
-    orchestration_progress_health = _health_band(
-        ok=maturity["maturity_stage"] not in ("STAGE_0_IDLE", "STAGE_3_TCRE_ACTIVE")
-        or maturity.get("operationally_alive"),
-        degraded=maturity["maturity_stage"] == "STAGE_3_TCRE_ACTIVE",
-    )
+    retrieval_starvation_panel = build_retrieval_starvation_panel_v1(session, tenant_id=tenant_id)
+    retrieval_eligibility_explain = explain_retrieval_eligibility_v1(session, tenant_id=tenant_id)
+    density_global = get_retrieval_density_metrics_snapshot_v1()
 
     return {
         "tenant_id": str(tenant_id),
+        "gate_id": GP085_HEALTH01_GATE_ID_V1,
+        "overall_health": core["overall_health"],
         "runtime_maturity": maturity,
         "eligibility_explanation": eligibility,
-        "retrieval_density_metrics": density,
-        "health_dimensions": {
-            "substrate_continuity_health": substrate_continuity_health,
-            "retrieval_density_health": retrieval_density_health,
-            "async_resume_health": async_resume_health,
-            "synthesis_activation_health": synthesis_activation_health,
-            "orchestration_progress_health": orchestration_progress_health,
-        },
-        "stalled_pipeline_count": len(
-            list_stale_waiting_continuations_v1(
-                session,
-                tenant_id=tenant_id,
-                stall_threshold_seconds=stall_threshold_seconds,
-                limit=20,
-            )
-        ),
+        "retrieval_density_metrics": retrieval_density,
+        "retrieval_starvation": retrieval_starvation_panel,
+        "retrieval_starvation_eval": retrieval_starvation,
+        "retrieval_eligibility_explain": retrieval_eligibility_explain,
+        "retrieval_density_global_metrics": density_global,
+        "tcre_density_metrics": tcre_density,
+        "tcre_omission_explainability": tcre_omission_explainability,
+        "synthesis_throughput_metrics": core.get("synthesis_throughput_metrics"),
+        "multidimensional_operational_maturity": core.get("multidimensional_operational_maturity"),
+        "forbidden_metrics": core.get("forbidden_metrics"),
+        "health_dimensions": core["health_dimensions"],
+        "health_dimension_details": core["health_dimension_details"],
+        "stalled_pipeline_count": core["stalled_pipeline_count"],
+        "autonomous_recovery": core.get("autonomous_recovery"),
     }

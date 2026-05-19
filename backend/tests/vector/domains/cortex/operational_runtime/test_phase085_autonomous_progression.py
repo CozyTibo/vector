@@ -1,0 +1,241 @@
+"""P085-06 — Autonomous phase progression (**G-P085-PROG-01**, **PIPE-085-01**)."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
+from sqlalchemy.orm import Session
+
+from vector.domains.cortex.operational_runtime.cesp_progression_gate import (
+    verify_gp085_progression_gate_static,
+)
+from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
+    GP085_PROG01_GATE_ID_V1,
+    PIPE085_CHAIN_RULE_ID_V1,
+    SubstrateProgressionError,
+    assert_pipe085_chain_after_phase06_legal_v1,
+    assert_tcre_completion_uses_resume_path_v1,
+    build_autonomous_progression_catalog_v1,
+    enforce_phase06_progression_law_v1,
+    verify_gp085_prog01_progression_static,
+)
+from vector.domains.cortex.substrate_pipeline.constants import PHASE_06_TCRE, PHASE_07_RETRIEVAL
+from vector.domains.cortex.substrate_pipeline.orchestrator import (
+    chain_after_phase_v1,
+    on_tcre_job_completed_for_pipeline_v1,
+)
+from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+    CONTINUATION_STATUS_WAITING,
+    mark_pipeline_waiting_on_tcre_v1,
+)
+from vector.domains.cortex.substrate_pipeline.repository import create_pipeline_run_v1
+
+
+def test_autonomous_progression_catalog_lists_laws() -> None:
+    cat = build_autonomous_progression_catalog_v1()
+    assert cat["primary_gate_id"] == GP085_PROG01_GATE_ID_V1
+    assert cat["pipe_rule_id"] == PIPE085_CHAIN_RULE_ID_V1
+    assert "PROG-TCRE-RESUME" in cat["progression_law_ids"]
+    assert len(cat["progression_steps"]) == 6
+
+
+def test_verify_gp085_prog01_static_passes() -> None:
+    assert verify_gp085_prog01_progression_static()["passed"] is True
+    assert verify_gp085_progression_gate_static()["passed"] is True
+
+
+def test_tcre_pipeline_scope_requires_job_id_for_resume() -> None:
+    with pytest.raises(SubstrateProgressionError) as exc:
+        assert_tcre_completion_uses_resume_path_v1(
+            has_tcre_job_id=False,
+            pipeline_scope=True,
+        )
+    assert exc.value.code == "tcre_pipeline_resume_requires_job_id"
+
+
+def test_chain_after_phase06_returns_none_without_enqueue() -> None:
+    import vector.domains.cortex.substrate_pipeline.orchestrator as orch
+
+    mock_enqueue = MagicMock(return_value={"phase_id": PHASE_07_RETRIEVAL})
+    original = orch.enqueue_next_pipeline_phase_v1
+    orch.enqueue_next_pipeline_phase_v1 = mock_enqueue
+    try:
+        out = chain_after_phase_v1(
+            tenant_id=uuid.uuid4(),
+            pipeline_run_id=uuid.uuid4(),
+            completed_phase_id=PHASE_06_TCRE,
+        )
+        assert out is None
+        mock_enqueue.assert_not_called()
+    finally:
+        orch.enqueue_next_pipeline_phase_v1 = original
+
+
+@pytest.fixture
+def tenant(db_session: Session) -> Any:
+    from vector.infrastructure.db.models.tenant import Tenant
+
+    slug = f"p085prog-{uuid.uuid4().hex[:8]}"
+    row = Tenant(
+        company_name="P085 Progression Tenant",
+        primary_email=f"{slug}@example.com",
+        email_domain="example.com",
+        slug=slug,
+        status="active",
+        workspace_access_enabled=True,
+    )
+    db_session.add(row)
+    db_session.flush()
+    return row
+
+
+@pytest.mark.integration
+def test_pipe085_chain_after_phase06_requires_waiting_continuation(
+    db_session: Session,
+    tenant: Any,
+) -> None:
+    run = create_pipeline_run_v1(
+        db_session,
+        tenant_id=tenant.id,
+        trigger_kind="manual",
+        bundle_id=None,
+        idempotency_key=f"p085pipe-{uuid.uuid4().hex[:12]}",
+    )
+    with pytest.raises(SubstrateProgressionError) as exc:
+        chain_after_phase_v1(
+            tenant_id=tenant.id,
+            pipeline_run_id=run.id,
+            completed_phase_id=PHASE_06_TCRE,
+            session=db_session,
+        )
+    assert exc.value.code == "pipe085_missing_continuation_after_phase06"
+
+    mark_pipeline_waiting_on_tcre_v1(
+        db_session,
+        tenant_id=tenant.id,
+        pipeline_run_id=run.id,
+        tcre_job_id=uuid.uuid4(),
+    )
+    assert (
+        chain_after_phase_v1(
+            tenant_id=tenant.id,
+            pipeline_run_id=run.id,
+            completed_phase_id=PHASE_06_TCRE,
+            session=db_session,
+        )
+        is None
+    )
+
+
+@pytest.mark.integration
+def test_enforce_phase06_progression_law_after_wait_row(
+    db_session: Session,
+    tenant: Any,
+) -> None:
+    run = create_pipeline_run_v1(
+        db_session,
+        tenant_id=tenant.id,
+        trigger_kind="manual",
+        bundle_id=None,
+        idempotency_key=f"p085p06-{uuid.uuid4().hex[:12]}",
+    )
+    job_id = uuid.uuid4()
+    mark_pipeline_waiting_on_tcre_v1(
+        db_session,
+        tenant_id=tenant.id,
+        pipeline_run_id=run.id,
+        tcre_job_id=job_id,
+    )
+    enforce_phase06_progression_law_v1(
+        db_session,
+        tenant_id=tenant.id,
+        pipeline_run_id=run.id,
+        phase06_output={"async": True, "job_id": str(job_id)},
+    )
+    assert_pipe085_chain_after_phase06_legal_v1(db_session, pipeline_run_id=run.id)
+
+
+@pytest.mark.integration
+def test_on_tcre_pipeline_scope_rejects_missing_job_id(
+    db_session: Session,
+    tenant: Any,
+) -> None:
+    run = create_pipeline_run_v1(
+        db_session,
+        tenant_id=tenant.id,
+        trigger_kind="manual",
+        bundle_id=None,
+        idempotency_key=f"p085tcre-{uuid.uuid4().hex[:12]}",
+    )
+    with pytest.raises(SubstrateProgressionError):
+        on_tcre_job_completed_for_pipeline_v1(
+            db_session,
+            tenant_id=tenant.id,
+            job_scope={"substrate_pipeline_run_id": str(run.id)},
+            tcre_job_id=None,
+        )
+
+
+@pytest.mark.integration
+def test_on_tcre_pipeline_uses_resume_path(
+    db_session: Session,
+    tenant: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = create_pipeline_run_v1(
+        db_session,
+        tenant_id=tenant.id,
+        trigger_kind="manual",
+        bundle_id=None,
+        idempotency_key=f"p085resume-{uuid.uuid4().hex[:12]}",
+    )
+    job_id = uuid.uuid4()
+    cont = mark_pipeline_waiting_on_tcre_v1(
+        db_session,
+        tenant_id=tenant.id,
+        pipeline_run_id=run.id,
+        tcre_job_id=job_id,
+    )
+    assert cont.continuation_status == CONTINUATION_STATUS_WAITING
+
+    monkeypatch.setattr(
+        "vector.domains.cortex.substrate_pipeline.orchestrator.enqueue_next_pipeline_phase_v1",
+        lambda **_k: {"phase_id": PHASE_07_RETRIEVAL},
+    )
+    out = on_tcre_job_completed_for_pipeline_v1(
+        db_session,
+        tenant_id=tenant.id,
+        job_scope={"substrate_pipeline_run_id": str(run.id)},
+        tcre_job_id=job_id,
+        tcre_job_status="completed",
+    )
+    assert out is not None
+    assert out.get("resumed") is True
+
+
+def test_continue_tcre_wait_skips_when_continuation_resumed() -> None:
+    from unittest.mock import MagicMock
+
+    from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
+        _continue_tcre_wait_v1,
+    )
+    from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+        CONTINUATION_STATUS_RESUMED,
+    )
+
+    continuation = MagicMock()
+    continuation.continuation_status = CONTINUATION_STATUS_RESUMED
+    out = _continue_tcre_wait_v1(
+        MagicMock(),
+        tenant_id=uuid.uuid4(),
+        pipeline_run_id=uuid.uuid4(),
+        continuation=continuation,
+        run=MagicMock(),
+    )
+    assert out == {
+        "action": "tcre_continuation_already_advanced",
+        "continuation_status": CONTINUATION_STATUS_RESUMED,
+    }

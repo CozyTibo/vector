@@ -15,7 +15,7 @@ POSTGRES_DB ?= vector
 DEV_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
 TEST_DB_URL ?= postgresql+psycopg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/vector_test
 
-.PHONY: help setup build build-backend up down logs logs-frontend restart install life reinstall migrate migrate-down migrate-repair migrate-repair-test migrate-new migrate-test seed-basic-tenant db-schema routes octs-openapi db-psql db-psql-test db-drop shell test test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-restart celery-inspect redis-monitor celery-logs
+.PHONY: help setup build build-backend up down logs logs-frontend restart install life reinstall migrate migrate-down migrate-repair migrate-repair-test migrate-new migrate-test seed-basic-tenant db-schema routes octs-openapi db-psql db-psql-test db-drop shell test test-fast test-unit mypy lint fmt check frontend-build mock-help celery-tasks celery-restart celery-inspect redis-monitor celery-logs
 
 mock-help:
 	@$(MAKE) -f Makefile.mock help-mock
@@ -43,6 +43,7 @@ help:
 	@echo "  make db-psql-test    psql on test DB"
 	@echo "  make db-drop         DROP + recreate empty dev DB $(POSTGRES_DB), then run make migrate"
 	@echo "  make test            rebuild backend image if needed, migrate-test, pytest"
+	@echo "  make test-fast       pytest excluding integration + e2e (quick local loop)"
 	@echo "  make test-unit       rebuild backend image if needed, pytest (no integration)"
 	@echo "  make mypy / lint / fmt   (mypy checks src/vector + tests per pyproject)"
 	@echo "  make check           mypy + lint + test"
@@ -165,8 +166,11 @@ shell: $(DOTENV)
 test: $(DOTENV) migrate-test
 	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) python -m pytest -q
 
+test-fast: $(DOTENV) build-backend
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration and not e2e"
+
 test-unit: $(DOTENV) build-backend
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration"
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration and not e2e"
 
 mypy: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m mypy

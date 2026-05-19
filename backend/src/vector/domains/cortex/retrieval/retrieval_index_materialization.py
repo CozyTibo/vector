@@ -549,6 +549,17 @@ def materialize_retrieval_index_for_pipeline_v1(
     stats["entry_count"] = published.entry_count
     stats["output_index_hash"] = published.output_index_hash
     stats["ok"] = published.build_state == "PUBLISHED"
+    from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
+        classify_retrieval_materialization_outcome_v1,
+    )
+
+    stats["retrieval_card_classification"] = classify_retrieval_materialization_outcome_v1(
+        entries_materialized=int(stats.get("entries_materialized") or 0),
+        entry_count=int(published.entry_count or 0),
+        tcre_candidates=tcre_candidates,
+        walks_candidates=walks_candidates,
+        org_link_candidates=org_link_candidates,
+    )
 
     from vector.domains.cortex.retrieval.retrieval_materialization_diagnostics import (
         persist_retrieval_materialization_report_v1,
