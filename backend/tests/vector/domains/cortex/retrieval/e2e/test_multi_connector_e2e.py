@@ -34,6 +34,43 @@ def test_multi_connector_schedule_coalesces_task_id(monkeypatch: pytest.MonkeyPa
         mock_task,
     )
 
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _fake_scope() -> MagicMock:
+        yield MagicMock()
+
+    schedule_actions = ["schedule", "coalesce"]
+
+    monkeypatch.setattr(
+        "vector.domains.cortex.substrate_pipeline.orchestrator.session_scope",
+        _fake_scope,
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.operational_runtime.substrate_runtime_economics."
+        "evaluate_pipeline_concurrency_v1",
+        lambda *_a, **_k: {"may_start_pipeline": True},
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.canonical.transform_runtime."
+        "resolve_default_bundle_id_for_stub_transform",
+        lambda *_a, **_k: "bundle-test",
+    )
+
+    def _resolve_action(*_a, **_k: object) -> tuple[str, dict[str, object]]:
+        return schedule_actions.pop(0), {}
+
+    monkeypatch.setattr(
+        "vector.infrastructure.cortex_substrate_pipeline_schedule."
+        "resolve_substrate_pipeline_schedule_action_v1",
+        _resolve_action,
+    )
+    monkeypatch.setattr(
+        "vector.infrastructure.cortex_substrate_pipeline_schedule."
+        "write_substrate_pipeline_schedule_anchor_v1",
+        lambda *_a, **_k: True,
+    )
+
     from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
         schedule_post_ingestion_substrate_refresh,
     )
@@ -43,7 +80,7 @@ def test_multi_connector_schedule_coalesces_task_id(monkeypatch: pytest.MonkeyPa
     try:
         schedule_post_ingestion_substrate_refresh(tenant_id=tid, reason="connector_a")
         schedule_post_ingestion_substrate_refresh(tenant_id=tid, reason="connector_b")
-        assert len(calls) == 2
-        assert calls[0] == calls[1]
+        assert len(calls) == 1
+        assert calls[0].endswith(str(tid))
     finally:
         get_settings.cache_clear()

@@ -73,6 +73,21 @@ def test_schedule_debounced_refresh_with_stable_task_id(monkeypatch: pytest.Monk
         "evaluate_pipeline_concurrency_v1",
         lambda *_a, **_k: {"may_start_pipeline": True},
     )
+    monkeypatch.setattr(
+        "vector.infrastructure.cortex_substrate_pipeline_schedule."
+        "resolve_substrate_pipeline_schedule_action_v1",
+        lambda *_a, **_k: ("schedule", {}),
+    )
+    monkeypatch.setattr(
+        "vector.infrastructure.cortex_substrate_pipeline_schedule."
+        "write_substrate_pipeline_schedule_anchor_v1",
+        lambda *_a, **_k: True,
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.canonical.transform_runtime."
+        "resolve_default_bundle_id_for_stub_transform",
+        lambda *_a, **_k: "bundle-test",
+    )
 
     from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
         post_ingestion_refresh_celery_task_id,

@@ -57,6 +57,15 @@ def schedule_substrate_pipeline_v1(
         resolve_post_ingestion_debounce_countdown_v1,
     )
 
+    from vector.domains.cortex.canonical.transform_runtime import (
+        resolve_default_bundle_id_for_stub_transform,
+    )
+    from vector.infrastructure.cortex_substrate_pipeline_schedule import (
+        clear_substrate_pipeline_schedule_anchor_v1,
+        resolve_substrate_pipeline_schedule_action_v1,
+        write_substrate_pipeline_schedule_anchor_v1,
+    )
+
     with session_scope() as session:
         concurrency = evaluate_pipeline_concurrency_v1(session, tenant_id=tenant_id)
         if not concurrency.get("may_start_pipeline"):
@@ -65,10 +74,58 @@ def schedule_substrate_pipeline_v1(
                 "reason": concurrency.get("block_reason") or "pipeline_concurrency_blocked",
                 "pipeline_concurrency": concurrency,
             }
+        if bundle_id is None:
+            resolved_bundle = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
+            if resolved_bundle is None:
+                _LOGGER.warning(
+                    "substrate_pipeline_schedule_blocked tenant_id=%s reason=no_transformable_bundle",
+                    tenant_id,
+                )
+                return {
+                    "scheduled": False,
+                    "reason": "no_transformable_bundle",
+                }
 
     debounce_resolved = resolve_post_ingestion_debounce_countdown_v1(cfg)
     debounce = int(debounce_resolved["effective_countdown_seconds"])
+    max_wait = int(cfg.cortex_post_ingestion_substrate_refresh_max_wait_seconds)
+    schedule_action, schedule_meta = resolve_substrate_pipeline_schedule_action_v1(
+        tenant_id,
+        debounce_seconds=debounce,
+        max_wait_seconds=max_wait,
+        settings=cfg,
+    )
     task_id = substrate_pipeline_celery_task_id(tenant_id)
+
+    if schedule_action == "coalesce":
+        _LOGGER.info(
+            "substrate_pipeline_schedule_coalesced tenant_id=%s trigger=%s elapsed_s=%s",
+            tenant_id,
+            trigger_kind,
+            schedule_meta.get("elapsed_seconds"),
+        )
+        return {
+            "scheduled": True,
+            "coalesced": True,
+            "coalesce_action": "preserve_pending_coordinator",
+            "reason": reason,
+            "trigger_kind": trigger_kind,
+            "task_id": task_id,
+            "countdown_seconds": debounce,
+            "post_ingestion_debounce": debounce_resolved,
+            "schedule_coalesce": schedule_meta,
+        }
+
+    if schedule_action == "force_now":
+        debounce = 0
+        clear_substrate_pipeline_schedule_anchor_v1(tenant_id, settings=cfg)
+
+    anchor_ttl = max_wait + debounce + 300
+    write_substrate_pipeline_schedule_anchor_v1(
+        tenant_id,
+        ttl_seconds=anchor_ttl,
+        settings=cfg,
+    )
 
     from app.celery_app import celery_app
     from app.tasks.cortex_substrate_pipeline import run_cortex_substrate_pipeline_coordinator_task
@@ -91,19 +148,23 @@ def schedule_substrate_pipeline_v1(
         task_id=task_id,
     )
     _LOGGER.info(
-        "substrate_pipeline_scheduled tenant_id=%s trigger=%s countdown_s=%s",
+        "substrate_pipeline_scheduled tenant_id=%s trigger=%s countdown_s=%s action=%s",
         tenant_id,
         trigger_kind,
         debounce,
+        schedule_action,
     )
     return {
         "scheduled": True,
+        "coalesced": False,
+        "schedule_action": schedule_action,
         "reason": reason,
         "trigger_kind": trigger_kind,
         "task_id": task_id,
         "celery_task_id": str(async_result.id),
         "countdown_seconds": debounce,
         "post_ingestion_debounce": debounce_resolved,
+        "schedule_coalesce": schedule_meta,
     }
 
 

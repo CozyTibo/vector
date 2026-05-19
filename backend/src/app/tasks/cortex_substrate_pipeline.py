@@ -52,6 +52,11 @@ def run_cortex_substrate_pipeline_coordinator_task(
 ) -> dict[str, Any]:
     """Create durable pipeline run and enqueue phase 02 (canonical)."""
     tid = uuid.UUID(tenant_id)
+    from vector.infrastructure.cortex_substrate_pipeline_schedule import (
+        clear_substrate_pipeline_schedule_anchor_v1,
+    )
+
+    clear_substrate_pipeline_schedule_anchor_v1(tid)
     _LOGGER.info(
         "substrate_pipeline_coordinator_start tenant_id=%s trigger=%s reason=%s",
         tenant_id,

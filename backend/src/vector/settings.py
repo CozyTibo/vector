@@ -323,7 +323,18 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_DEBOUNCE_SECONDS",
         description=(
             "Seconds after the last sync completion (or scheduler tick) before substrate refresh runs. "
-            "Resets on each incremental sync so multi-connector tenants get one coalesced refresh."
+            "Repeated syncs coalesce into one pending coordinator without resetting this window."
+        ),
+    )
+    cortex_post_ingestion_substrate_refresh_max_wait_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=7200,
+        validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_MAX_WAIT_SECONDS",
+        description=(
+            "Maximum seconds from the first post-ingestion schedule in a burst before the substrate "
+            "coordinator must run (countdown=0). Prevents perpetual debounce starvation during "
+            "continuous incremental ingestion."
         ),
     )
     cortex_post_ingestion_canonical_batch_limit: int = Field(
