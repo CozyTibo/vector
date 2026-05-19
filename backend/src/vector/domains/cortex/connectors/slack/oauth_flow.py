@@ -73,7 +73,10 @@ def start_slack_oauth_url(
         return_to=return_to,
     )
     redirect_uri = slack_redirect_uri(settings)
-    scopes = settings.slack_bot_scopes.strip() or "channels:read,chat:write,users:read"
+    scopes = (
+        settings.slack_bot_scopes.strip()
+        or "channels:read,channels:history,groups:read,groups:history,chat:write,users:read"
+    )
     params = {
         "client_id": settings.slack_client_id.strip(),
         "scope": scopes,
