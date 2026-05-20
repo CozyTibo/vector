@@ -329,6 +329,69 @@ def count_deferrals(
     }
 
 
+def summarize_topology_parent_gaps(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    """Group missing parent refs for operator truth (ingest gap vs runtime)."""
+    rows = db.execute(
+        select(
+            CortexCanonicalMaterializationDeferral.missing_parent_ref,
+            CortexCanonicalMaterializationDeferral.resource_type,
+            func.count().label("n"),
+        )
+        .where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.missing_parent_ref.is_not(None),
+            CortexCanonicalMaterializationDeferral.missing_parent_ref != "",
+        )
+        .group_by(
+            CortexCanonicalMaterializationDeferral.missing_parent_ref,
+            CortexCanonicalMaterializationDeferral.resource_type,
+        )
+        .order_by(func.count().desc())
+        .limit(max(1, min(limit, 50)))
+    ).all()
+    out: list[dict[str, Any]] = []
+    for ref, rt, n in rows:
+        ref_s = str(ref)
+        prefix = ref_s.split(":", 1)[0] if ref_s else ""
+        out.append(
+            {
+                "missing_parent_ref": ref_s,
+                "parent_kind": prefix,
+                "child_resource_type": str(rt),
+                "count": int(n or 0),
+                "likely_cause": _topology_gap_likely_cause(prefix, str(rt)),
+            }
+        )
+    return out
+
+
+def _topology_gap_likely_cause(parent_kind: str, child_resource_type: str) -> str:
+    pk = parent_kind.strip()
+    crt = child_resource_type.strip()
+    if pk == "github.pull_request_review":
+        return "ingest: PR review not in raw store (review page cap or sync error)"
+    if pk == "github.commit":
+        return "ingest: commit SHA not in raw store (commit page window)"
+    if pk == "github.workflow_run":
+        return "ingest: workflow run not ingested"
+    if pk == "github.deployment":
+        return "ingest: deployment object not ingested"
+    if pk == "github.pull_request":
+        return "ingest: pull request parent missing"
+    if pk == "notion.database":
+        return "ingest: Notion database parent missing"
+    if crt == "github.pull_request_timeline_event":
+        return "ingest/runtime: timeline parent not available in tenant raw graph"
+    return "runtime: parent not materialized or not ingested"
+
+
 def summarize_deferral_pressure(
     db: Session,
     *,

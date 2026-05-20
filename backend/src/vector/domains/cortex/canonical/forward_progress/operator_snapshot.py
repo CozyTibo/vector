@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.canonical.forward_progress.deferral_store import (
     count_deferrals,
     summarize_deferral_pressure,
+    summarize_topology_parent_gaps,
 )
 from vector.domains.cortex.canonical.forward_progress.pass_fairness import parse_pass_cooldown_until
 from vector.domains.cortex.canonical.forward_progress.metrics import build_forward_progress_metrics
@@ -110,7 +111,9 @@ def build_canonical_forward_progress_snapshot(
     ]
 
     deferral_pressure = summarize_deferral_pressure(db, tenant_id=tenant_id, bundle_id=bid)
+    topology_parent_gaps = summarize_topology_parent_gaps(db, tenant_id=tenant_id, bundle_id=bid)
     metrics["deferral_pressure_sample"] = deferral_pressure
+    metrics["topology_parent_gaps_sample"] = topology_parent_gaps
     guidance = _build_operator_guidance(
         untreated=untreated,
         deferral_pressure=deferral_pressure,
@@ -127,6 +130,7 @@ def build_canonical_forward_progress_snapshot(
         "phase_02_canonical": phase_02_doc,
         "deferral_sample": deferral_sample,
         "deferral_pressure": deferral_pressure,
+        "topology_parent_gaps": topology_parent_gaps,
         "operator_guidance": guidance,
     }
 
