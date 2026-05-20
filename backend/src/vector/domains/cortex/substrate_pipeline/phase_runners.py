@@ -83,6 +83,17 @@ def run_phase_02_canonical_v1(
         return out
     lim_src = batch_limit if batch_limit is not None else settings.cortex_post_ingestion_canonical_batch_limit
     lim = max(1, min(int(lim_src), 2000))
+    slack_preface = drain_stub_materialize_backlog(
+        session,
+        tenant_id=tenant_id,
+        bundle_id=bid,
+        connector="slack",
+        resource_type=None,
+        batch_limit=lim,
+        pass_index=0,
+        pass_cooldowns=pass_cooldowns,
+        pass_stall_counts=pass_stall_counts,
+    )
     canonical_summary = drain_stub_materialize_backlog(
         session,
         tenant_id=tenant_id,
@@ -94,6 +105,13 @@ def run_phase_02_canonical_v1(
         pass_cooldowns=pass_cooldowns,
         pass_stall_counts=pass_stall_counts,
     )
+    if isinstance(slack_preface, dict) and isinstance(canonical_summary, dict):
+        for key in ("succeeded", "attempted", "selected", "topology_skipped"):
+            if key in slack_preface and key in canonical_summary:
+                canonical_summary[key] = int(canonical_summary.get(key) or 0) + int(
+                    slack_preface.get(key) or 0
+                )
+        canonical_summary["slack_preface"] = slack_preface
     outcome = str(canonical_summary.get("canonical_outcome") or "")
     repair_scan = min(5000, max(200, int(lim) * 4))
     determinism_repair = repair_tenant_materialization_oracle_determinism_drift(

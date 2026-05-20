@@ -92,6 +92,27 @@ def iter_users_list_pages(
         cursor = next_c
 
 
+def conversations_info(
+    token: str,
+    *,
+    channel: str,
+    api_base: str | None = None,
+) -> dict[str, Any]:
+    """Fetch metadata for one channel (used when conversations.list pagination missed it)."""
+    data = slack_web_api_post(
+        token,
+        "conversations.info",
+        json_body={"channel": channel},
+        api_base=api_base,
+    )
+    if not data.get("ok"):
+        raise SlackWebApiError(str(data.get("error", "conversations.info_failed")))
+    ch = data.get("channel")
+    if not isinstance(ch, dict):
+        raise SlackWebApiError("conversations.info_missing_channel")
+    return ch
+
+
 def conversations_join(
     token: str,
     *,

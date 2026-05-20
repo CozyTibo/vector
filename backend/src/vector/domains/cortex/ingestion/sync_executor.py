@@ -3312,7 +3312,9 @@ def _slack_sync(
     except (TypeError, ValueError):
         ring_index = 0
 
-    channel_patch_map: dict[str, Any] = {}
+    channel_patch_map: dict[str, Any] = (
+        dict(channels_existing) if isinstance(channels_existing, dict) else {}
+    )
     try:
         for members in iter_users_list_pages(
             token,
@@ -3410,6 +3412,31 @@ def _slack_sync(
                 and c.get("is_member") is not False
                 and c.get("is_archived") is not True
             ]
+        if ingest_channel_ids:
+            listed_ids = {
+                str(c["id"]) for c in candidates if isinstance(c.get("id"), str) and str(c["id"]).strip()
+            }
+            for missing_id in sorted(ingest_channel_ids):
+                if missing_id in listed_ids:
+                    continue
+                try:
+                    from vector.domains.cortex.connectors.slack.ingestion_api import conversations_info
+
+                    ch_info = conversations_info(token, channel=missing_id, api_base=slack_api_base)
+                    if ch_info.get("is_archived") is not True:
+                        candidates.append(ch_info)
+                        listed_ids.add(missing_id)
+                except SlackWebApiError:
+                    candidates.append(
+                        {
+                            "id": missing_id,
+                            "is_archived": False,
+                            "is_private": False,
+                            "is_member": True,
+                        }
+                    )
+                    listed_ids.add(missing_id)
+
         selected_channels, next_ring_index = _pick_slack_channels_round_robin(
             candidates,
             ring_index=ring_index,
@@ -3417,13 +3444,34 @@ def _slack_sync(
         )
         for c in selected_channels:
             cid = str(c["id"])
-            existing_channel = channels_existing.get(cid) if isinstance(channels_existing, dict) else None
+            existing_channel = channel_patch_map.get(cid)
+            if not isinstance(existing_channel, dict):
+                existing_channel = (
+                    channels_existing.get(cid) if isinstance(channels_existing, dict) else None
+                )
             existing_history = (
                 existing_channel.get("history")
                 if isinstance(existing_channel, dict) and isinstance(existing_channel.get("history"), dict)
                 else {}
             )
             sync_mode = "backfill" if ctx.sync_mode == "backfill" else "incremental"
+            if (
+                sync_mode == "incremental"
+                and ingest_channel_ids
+                and cid in ingest_channel_ids
+            ):
+                has_history_ckpt = bool(
+                    (
+                        isinstance(existing_history.get("last_message_ts"), str)
+                        and existing_history.get("last_message_ts", "").strip()
+                    )
+                    or (
+                        isinstance(existing_history.get("next_cursor"), str)
+                        and existing_history.get("next_cursor", "").strip()
+                    )
+                )
+                if not has_history_ckpt:
+                    sync_mode = "backfill"
             history_cursor = existing_history.get("next_cursor")
             if not isinstance(history_cursor, str) or not history_cursor.strip():
                 history_cursor = None
@@ -3630,12 +3678,35 @@ def _slack_sync(
                     budget_exhausted = True
                     break
 
+            channel_patch_map[cid] = {
+                "cursor_owner": "slack.message",
+                "history": {
+                    "last_message_ts": latest_message_ts,
+                    "next_cursor": next_history_cursor,
+                    "backfill_complete": bool(sync_mode == "backfill" and not next_history_cursor),
+                    "pages_fetched_last_run": history_pages,
+                },
+                "threads": (
+                    existing_channel.get("threads")
+                    if isinstance(existing_channel, dict) and isinstance(existing_channel.get("threads"), dict)
+                    else {}
+                ),
+                "last_sync_mode": sync_mode,
+                "message_rows_last_run": channel_message_rows,
+                "reply_rows_last_run": channel_reply_rows,
+                "reaction_rows_last_run": channel_reaction_rows,
+                "file_rows_last_run": channel_file_rows,
+                "thread_pages_last_run": channel_thread_pages,
+            }
+
             existing_threads = (
-                existing_channel.get("threads")
-                if isinstance(existing_channel, dict) and isinstance(existing_channel.get("threads"), dict)
+                channel_patch_map[cid].get("threads")
+                if isinstance(channel_patch_map.get(cid), dict)
                 else {}
             )
-            thread_patch: dict[str, Any] = {}
+            if not isinstance(existing_threads, dict):
+                existing_threads = {}
+            thread_patch: dict[str, Any] = dict(existing_threads)
             for thread_ts in thread_roots:
                 if threads_processed >= settings.cortex_slack_threads_per_sync:
                     break
@@ -3664,65 +3735,76 @@ def _slack_sync(
                     )
                 )
                 per_thread_pages = 0
-                for rep_page in iter_conversations_replies_pages(
-                    token,
-                    api_base=slack_api_base,
-                    channel=cid,
-                    thread_ts=thread_ts,
-                    limit=settings.cortex_slack_conversations_history_limit,
-                    max_pages=settings.cortex_slack_replies_max_pages_per_thread,
-                    cursor=replies_cursor,
-                    oldest=replies_oldest,
-                ):
-                    per_thread_pages += 1
-                    thread_pages += 1
-                    channel_thread_pages += 1
-                    page_cursor = rep_page.get("next_cursor")
-                    next_replies_cursor = page_cursor if isinstance(page_cursor, str) and page_cursor else None
-                    rep_msgs = rep_page.get("messages")
-                    rows = [m for m in rep_msgs if isinstance(m, dict)] if isinstance(rep_msgs, list) else []
-                    for reply in rows:
-                        rts = reply.get("ts")
-                        if not isinstance(rts, str) or rts == thread_ts:
-                            continue
-                        reply_ext = f"{cid}:{thread_ts}:{rts}"[:512]
-                        if latest_reply_ts is None or _slack_ts_value(rts) > _slack_ts_value(latest_reply_ts):
-                            latest_reply_ts = rts
-                        reply_rows += 1
-                        channel_reply_rows += 1
-                        if _append_raw(
-                            session,
-                            ctx=ctx,
-                            tenant_id=tenant_id,
-                            connection_id=connection_id,
-                            connector=CONNECTION_PROVIDER_SLACK,
-                            run_id=run_id,
-                            source_trigger=source_trigger,
-                            resource_type="slack.message_reply",
-                            external_id=reply_ext,
-                            api_endpoint=f"{slack_api_base}/conversations.replies",
-                            query_params={"channel": cid, "thread_ts": thread_ts, "mode": sync_mode},
-                            payload_body={
-                                **core_envelope_fields(
-                                    connector=CONNECTION_PROVIDER_SLACK,
-                                    connection_id=connection_id,
-                                    source_object_type="slack.message_reply",
-                                    source_object_id=reply_ext,
-                                ),
-                                "channel_id": cid,
-                                "thread_ts": thread_ts,
-                                "reply": reply,
-                                "paging": {"next_cursor": next_replies_cursor, "mode": sync_mode},
-                            },
-                            http_status=200,
-                            idempotency_key=_idem_key(ctx, run_id, f"slack:reply:{reply_ext}"),
-                        ):
-                            n_ins += 1
-                    if not next_replies_cursor:
-                        break
-                    if time.monotonic() - start_t >= settings.cortex_slack_channel_time_budget_seconds:
-                        budget_exhausted = True
-                        break
+                try:
+                    for rep_page in iter_conversations_replies_pages(
+                        token,
+                        api_base=slack_api_base,
+                        channel=cid,
+                        thread_ts=thread_ts,
+                        limit=settings.cortex_slack_conversations_history_limit,
+                        max_pages=settings.cortex_slack_replies_max_pages_per_thread,
+                        cursor=replies_cursor,
+                        oldest=replies_oldest,
+                    ):
+                        per_thread_pages += 1
+                        thread_pages += 1
+                        channel_thread_pages += 1
+                        page_cursor = rep_page.get("next_cursor")
+                        next_replies_cursor = page_cursor if isinstance(page_cursor, str) and page_cursor else None
+                        rep_msgs = rep_page.get("messages")
+                        rows = [m for m in rep_msgs if isinstance(m, dict)] if isinstance(rep_msgs, list) else []
+                        for reply in rows:
+                            rts = reply.get("ts")
+                            if not isinstance(rts, str) or rts == thread_ts:
+                                continue
+                            reply_ext = f"{cid}:{thread_ts}:{rts}"[:512]
+                            if latest_reply_ts is None or _slack_ts_value(rts) > _slack_ts_value(latest_reply_ts):
+                                latest_reply_ts = rts
+                            reply_rows += 1
+                            channel_reply_rows += 1
+                            if _append_raw(
+                                session,
+                                ctx=ctx,
+                                tenant_id=tenant_id,
+                                connection_id=connection_id,
+                                connector=CONNECTION_PROVIDER_SLACK,
+                                run_id=run_id,
+                                source_trigger=source_trigger,
+                                resource_type="slack.message_reply",
+                                external_id=reply_ext,
+                                api_endpoint=f"{slack_api_base}/conversations.replies",
+                                query_params={"channel": cid, "thread_ts": thread_ts, "mode": sync_mode},
+                                payload_body={
+                                    **core_envelope_fields(
+                                        connector=CONNECTION_PROVIDER_SLACK,
+                                        connection_id=connection_id,
+                                        source_object_type="slack.message_reply",
+                                        source_object_id=reply_ext,
+                                    ),
+                                    "channel_id": cid,
+                                    "thread_ts": thread_ts,
+                                    "reply": reply,
+                                    "paging": {"next_cursor": next_replies_cursor, "mode": sync_mode},
+                                },
+                                http_status=200,
+                                idempotency_key=_idem_key(ctx, run_id, f"slack:reply:{reply_ext}"),
+                            ):
+                                n_ins += 1
+                        if not next_replies_cursor:
+                            break
+                        if time.monotonic() - start_t >= settings.cortex_slack_channel_time_budget_seconds:
+                            budget_exhausted = True
+                            break
+                except SlackWebApiError as reply_exc:
+                    _logger.warning(
+                        "slack thread replies skipped",
+                        extra={"channel_id": cid, "thread_ts": thread_ts, "error": str(reply_exc)},
+                    )
+                    thread_patch[thread_ts] = {
+                        "cursor_owner": "slack.message_reply",
+                        "last_sync_error": str(reply_exc),
+                    }
+                    continue
 
                 thread_patch[thread_ts] = {
                     "cursor_owner": "slack.message_reply",
@@ -3734,22 +3816,10 @@ def _slack_sync(
                 if budget_exhausted:
                     break
 
-            channel_patch_map[cid] = {
-                "cursor_owner": "slack.message",
-                "history": {
-                    "last_message_ts": latest_message_ts,
-                    "next_cursor": next_history_cursor,
-                    "backfill_complete": bool(sync_mode == "backfill" and not next_history_cursor),
-                    "pages_fetched_last_run": history_pages,
-                },
-                "threads": thread_patch,
-                "last_sync_mode": sync_mode,
-                "message_rows_last_run": channel_message_rows,
-                "reply_rows_last_run": channel_reply_rows,
-                "reaction_rows_last_run": channel_reaction_rows,
-                "file_rows_last_run": channel_file_rows,
-                "thread_pages_last_run": channel_thread_pages,
-            }
+            if isinstance(channel_patch_map.get(cid), dict):
+                channel_patch_map[cid]["threads"] = thread_patch
+                channel_patch_map[cid]["reply_rows_last_run"] = channel_reply_rows
+                channel_patch_map[cid]["thread_pages_last_run"] = channel_thread_pages
             if budget_exhausted:
                 break
 
