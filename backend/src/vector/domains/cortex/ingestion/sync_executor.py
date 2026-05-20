@@ -3197,6 +3197,20 @@ def _slack_ts_value(ts: str) -> float:
         return 0.0
 
 
+def _slack_history_pages_done(existing_history: dict[str, Any] | None) -> int | None:
+    history = existing_history if isinstance(existing_history, dict) else {}
+    cumulative = history.get("cumulative_history_pages")
+    if isinstance(cumulative, int):
+        return cumulative
+    at_complete = history.get("history_pages_at_complete")
+    if isinstance(at_complete, int):
+        return at_complete
+    last_run = history.get("pages_fetched_last_run")
+    if isinstance(last_run, int):
+        return last_run
+    return None
+
+
 def _slack_channel_history_sync_mode(
     *,
     ctx_sync_mode: str,
@@ -3204,13 +3218,18 @@ def _slack_channel_history_sync_mode(
     ingest_channel_ids: set[str],
     existing_history: dict[str, Any] | None,
 ) -> str:
-    """Keep admin-selected channels in backfill until history.backfill_complete is true."""
+    """Keep admin-selected channels in backfill until history is fully paginated."""
     if ctx_sync_mode == "backfill":
         return "backfill"
     history = existing_history if isinstance(existing_history, dict) else {}
     if ingest_channel_ids and channel_id not in ingest_channel_ids:
         return "incremental"
+    if history.get("backfill_exhausted") is True:
+        return "incremental"
     if history.get("backfill_complete") is True:
+        pages_done = _slack_history_pages_done(history)
+        if pages_done is None or pages_done <= 1:
+            return "backfill"
         return "incremental"
     return "backfill"
 
@@ -3708,12 +3727,34 @@ def _slack_sync(
                     budget_exhausted = True
                     break
 
+            prev_cumulative = 0
+            if isinstance(existing_history.get("cumulative_history_pages"), int):
+                prev_cumulative = int(existing_history["cumulative_history_pages"])
+            cumulative_history_pages = prev_cumulative + history_pages
+            history_no_progress = (
+                sync_mode == "backfill"
+                and history_pages == 0
+                and channel_message_rows == 0
+                and isinstance(existing_history.get("last_message_ts"), str)
+                and existing_history["last_message_ts"].strip()
+            )
+            backfill_exhausted = (
+                existing_history.get("backfill_exhausted") is True or history_no_progress
+            )
+            history_complete = bool(not next_history_cursor and not backfill_exhausted)
             channel_patch_map[cid] = {
                 "cursor_owner": "slack.message",
                 "history": {
                     "last_message_ts": latest_message_ts,
                     "next_cursor": next_history_cursor,
-                    "backfill_complete": bool(not next_history_cursor),
+                    "backfill_complete": history_complete,
+                    "backfill_exhausted": backfill_exhausted,
+                    "cumulative_history_pages": cumulative_history_pages,
+                    "history_pages_at_complete": (
+                        cumulative_history_pages
+                        if history_complete
+                        else existing_history.get("history_pages_at_complete")
+                    ),
                     "pages_fetched_last_run": history_pages,
                 },
                 "threads": (
