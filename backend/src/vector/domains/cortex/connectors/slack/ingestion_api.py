@@ -92,6 +92,25 @@ def iter_users_list_pages(
         cursor = next_c
 
 
+def conversations_join(
+    token: str,
+    *,
+    channel: str,
+    api_base: str | None = None,
+) -> dict[str, Any]:
+    """Join a public channel (requires ``channels:join``)."""
+    data = slack_web_api_post(
+        token,
+        "conversations.join",
+        json_body={"channel": channel},
+        api_base=api_base,
+    )
+    if not data.get("ok"):
+        raise SlackWebApiError(str(data.get("error", "conversations.join_failed")))
+    ch = data.get("channel")
+    return ch if isinstance(ch, dict) else {"id": channel}
+
+
 def iter_conversations_list_pages(
     token: str,
     *,

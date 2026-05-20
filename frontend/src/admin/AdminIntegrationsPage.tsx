@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
+import AdminSlackChannelsModal from "./AdminSlackChannelsModal";
 import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 import { StatusBadge } from "./ui/StatusBadge";
 
@@ -129,6 +131,7 @@ function ConnectionPermissionsPanel({ report }: { report: ConnPermissionReport |
 export default function AdminIntegrationsPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const qc = useQueryClient();
+  const [slackChannelsOpen, setSlackChannelsOpen] = useState(false);
   const q = useQuery({
     queryKey: ["admin-connections", tenantId],
     queryFn: () => adminJson<ConnectionsResponse>(`/admin/tenants/${tenantId}/connections`),
@@ -224,6 +227,15 @@ export default function AdminIntegrationsPage() {
                 <div className="mt-4 space-y-2 border-t border-stone-200 pt-4">
                   {c ? (
                     <>
+                      {provider === "slack" && c.status === "active" ? (
+                        <button
+                          type="button"
+                          className="w-full rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm font-medium text-violet-950 hover:bg-violet-100 disabled:opacity-50"
+                          onClick={() => setSlackChannelsOpen(true)}
+                        >
+                          Choose channels for ingest
+                        </button>
+                      ) : null}
                       {OAUTH_PROVIDERS.includes(provider as OAuthProvider) && (
                         <>
                           <button
@@ -358,6 +370,12 @@ export default function AdminIntegrationsPage() {
           </div>
         </div>
       </details>
+
+      <AdminSlackChannelsModal
+        tenantId={tenantId}
+        open={slackChannelsOpen}
+        onClose={() => setSlackChannelsOpen(false)}
+      />
     </div>
   );
 }

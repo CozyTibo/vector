@@ -331,6 +331,55 @@ class AdminConnectorConnectLinkResponse(BaseModel):
     user_id: uuid.UUID
 
 
+class AdminSlackChannelIngestItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    channel_id: str
+    name: str
+    is_private: bool = False
+    is_member: bool = False
+    selected_for_ingest: bool = False
+    can_bot_join: bool = True
+
+
+class AdminSlackChannelsIngestListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    connected: bool
+    team_id: str | None = None
+    team_name: str | None = None
+    saved_channel_ids: list[str] = Field(default_factory=list)
+    channels: list[AdminSlackChannelIngestItem] = Field(default_factory=list)
+
+
+class AdminSlackChannelsIngestApplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel_ids: list[str] = Field(
+        default_factory=list,
+        description="Slack channel IDs to watch for ingest; bot joins public channels on apply.",
+    )
+
+
+class AdminSlackChannelJoinResult(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    channel_id: str
+    joined: bool
+    error: str | None = None
+    already_member: bool | None = None
+
+
+class AdminSlackChannelsIngestApplyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    saved_channels: list[dict[str, str]] = Field(default_factory=list)
+    join_results: list[AdminSlackChannelJoinResult] = Field(default_factory=list)
+    joined_count: int = 0
+    failed_count: int = 0
+    message: str = ""
+
+
 class AdminHardDeleteTenantRequest(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

@@ -143,3 +143,38 @@ def list_forward_progress_candidate_ids(
     meta.setdefault("pass_key", pass_key)
     meta.setdefault("pass_index_next", next_index)
     return rows[:lim], more_remain, meta
+
+
+def list_untreated_routable_count_estimate(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+) -> int:
+    """Count routable raw rows missing materialization for this tenant+bundle."""
+    pairs = stub_routing_pairs(connector=None, resource_type=None)
+    if not pairs:
+        return 0
+    type_or = or_(
+        *[
+            and_(RawIngestionRecord.connector == p[0], RawIngestionRecord.resource_type == p[1])
+            for p in pairs
+        ]
+    )
+    stmt = (
+        select(RawIngestionRecord.id)
+        .outerjoin(
+            CortexCanonicalTransformMaterialization,
+            and_(
+                CortexCanonicalTransformMaterialization.raw_record_id == RawIngestionRecord.id,
+                CortexCanonicalTransformMaterialization.tenant_id == tenant_id,
+                CortexCanonicalTransformMaterialization.bundle_id == bundle_id,
+            ),
+        )
+        .where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            type_or,
+            CortexCanonicalTransformMaterialization.id.is_(None),
+        )
+    )
+    return len(db.scalars(stmt).all())

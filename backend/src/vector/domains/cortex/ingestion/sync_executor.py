@@ -70,6 +70,7 @@ from vector.infrastructure.db.repositories import calls_connection as calls_repo
 from vector.infrastructure.db.repositories import github_connection as gh_repo
 from vector.infrastructure.db.repositories import linear_connection as lin_repo
 from vector.infrastructure.db.repositories import notion_connection as notion_repo
+from vector.domains.cortex.connectors.slack.channel_ingest import get_saved_ingest_channel_ids
 from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.observability.ingestion_tasks import (
     PHASE_STEP1,
@@ -3392,13 +3393,23 @@ def _slack_sync(
                 ):
                     n_ins += 1
 
-        candidates = [
-            c
-            for c in all_channels
-            if isinstance(c.get("id"), str)
-            and c.get("is_member") is not False
-            and c.get("is_archived") is not True
-        ]
+        ingest_channel_ids = set(get_saved_ingest_channel_ids(link.detail))
+        if ingest_channel_ids:
+            candidates = [
+                c
+                for c in all_channels
+                if isinstance(c.get("id"), str)
+                and str(c["id"]) in ingest_channel_ids
+                and c.get("is_archived") is not True
+            ]
+        else:
+            candidates = [
+                c
+                for c in all_channels
+                if isinstance(c.get("id"), str)
+                and c.get("is_member") is not False
+                and c.get("is_archived") is not True
+            ]
         selected_channels, next_ring_index = _pick_slack_channels_round_robin(
             candidates,
             ring_index=ring_index,

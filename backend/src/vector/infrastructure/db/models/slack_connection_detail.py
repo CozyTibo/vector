@@ -5,8 +5,10 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+from typing import Any
+
 from sqlalchemy import ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vector.infrastructure.db.base import Base
@@ -27,5 +29,10 @@ class SlackConnectionDetail(Base):
     team_id: Mapped[str] = mapped_column(String(32), nullable=False)
     team_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ingest_channels_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB(),
+        nullable=False,
+        server_default='{"channels":[]}',
+    )
 
     connection: Mapped[TenantConnection] = relationship("TenantConnection")

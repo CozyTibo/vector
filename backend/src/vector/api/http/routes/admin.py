@@ -19,6 +19,9 @@ from vector.api.http.deps import get_db, settings_dep
 from vector.contracts.admin import (
     AdminConnectionsResponse,
     AdminConnectorConnectLinkResponse,
+    AdminSlackChannelsIngestApplyRequest,
+    AdminSlackChannelsIngestApplyResponse,
+    AdminSlackChannelsIngestListResponse,
     AdminCortexAmbiguityAggregates,
     AdminCortexAmbiguityConnectorRollupItem,
     AdminCortexAmbiguityLifecycleRequest,
@@ -1484,6 +1487,52 @@ def build_admin_router() -> APIRouter:
             tenant_id=tenant_id,
             user_id=member.id,
         )
+
+    @r.get(
+        "/tenants/{tenant_id}/connections/slack/channels",
+        response_model=AdminSlackChannelsIngestListResponse,
+    )
+    def admin_slack_channels_ingest_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminSlackChannelsIngestListResponse:
+        """List Slack channels visible to the bot and current ingest selection."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.connectors.slack.channel_ingest import list_slack_channels_for_admin
+
+        raw = list_slack_channels_for_admin(db, tenant_id=tenant_id, settings=settings)
+        if not raw.get("connected"):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Slack is not connected for this tenant.")
+        return AdminSlackChannelsIngestListResponse.model_validate(raw)
+
+    @r.put(
+        "/tenants/{tenant_id}/connections/slack/channels",
+        response_model=AdminSlackChannelsIngestApplyResponse,
+    )
+    def admin_slack_channels_ingest_apply(
+        tenant_id: uuid.UUID,
+        body: AdminSlackChannelsIngestApplyRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminSlackChannelsIngestApplyResponse:
+        """Join selected public channels, persist ingest policy for subsequent syncs."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.connectors.slack.channel_ingest import apply_slack_ingest_channel_selection
+        from vector.domains.cortex.convergence.lease import mark_tenant_dirty_v1
+
+        try:
+            raw = apply_slack_ingest_channel_selection(
+                db,
+                tenant_id=tenant_id,
+                channel_ids=body.channel_ids,
+                settings=settings,
+            )
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        mark_tenant_dirty_v1(db, tenant_id=tenant_id, reason="slack_channels_ingest_apply")
+        db.commit()
+        return AdminSlackChannelsIngestApplyResponse.model_validate(raw)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/ingestion",
