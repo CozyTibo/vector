@@ -350,6 +350,8 @@ class AdminSlackChannelsIngestListResponse(BaseModel):
     team_name: str | None = None
     saved_channel_ids: list[str] = Field(default_factory=list)
     channels: list[AdminSlackChannelIngestItem] = Field(default_factory=list)
+    catalog_stale: bool = False
+    catalog_fetched_at: str | None = None
 
 
 class AdminSlackChannelsIngestApplyRequest(BaseModel):

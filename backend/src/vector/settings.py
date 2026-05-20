@@ -873,6 +873,23 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_SLACK_CONVERSATIONS_MAX_PAGES",
         description="Max conversations.list cursor pages per Slack ingestion sync.",
     )
+    cortex_slack_admin_channel_catalog_max_pages: int = Field(
+        default=15,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_SLACK_ADMIN_CHANNEL_CATALOG_MAX_PAGES",
+        description=(
+            "Max conversations.list pages when refreshing the admin channel picker catalog "
+            "(keeps the HTTP request within gateway timeouts)."
+        ),
+    )
+    cortex_slack_admin_channel_catalog_ttl_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=86400,
+        validation_alias="CORTEX_SLACK_ADMIN_CHANNEL_CATALOG_TTL_SECONDS",
+        description="Reuse cached Slack channel catalog in admin UI for this many seconds.",
+    )
     cortex_slack_conversation_types: str = Field(
         default="public_channel,private_channel",
         validation_alias="CORTEX_SLACK_CONVERSATION_TYPES",

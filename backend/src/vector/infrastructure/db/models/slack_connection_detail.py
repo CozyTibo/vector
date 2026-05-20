@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from typing import Any
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,6 +34,15 @@ class SlackConnectionDetail(Base):
         JSONB(),
         nullable=False,
         server_default='{"channels":[]}',
+    )
+    channel_catalog_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB(),
+        nullable=False,
+        server_default='{"channels":[]}',
+    )
+    channel_catalog_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     connection: Mapped[TenantConnection] = relationship("TenantConnection")

@@ -1496,12 +1496,25 @@ def build_admin_router() -> APIRouter:
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
+        refresh: bool = False,
     ) -> AdminSlackChannelsIngestListResponse:
         """List Slack channels visible to the bot and current ingest selection."""
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.connectors.slack.channel_ingest import list_slack_channels_for_admin
+        from vector.domains.cortex.connectors.slack.errors import SlackWebApiError
 
-        raw = list_slack_channels_for_admin(db, tenant_id=tenant_id, settings=settings)
+        try:
+            raw = list_slack_channels_for_admin(
+                db,
+                tenant_id=tenant_id,
+                settings=settings,
+                force_refresh=refresh,
+            )
+        except SlackWebApiError as exc:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=f"slack_channel_catalog_failed:{exc}",
+            ) from exc
         if not raw.get("connected"):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Slack is not connected for this tenant.")
         return AdminSlackChannelsIngestListResponse.model_validate(raw)
@@ -1518,9 +1531,17 @@ def build_admin_router() -> APIRouter:
     ) -> AdminSlackChannelsIngestApplyResponse:
         """Join selected public channels, persist ingest policy for subsequent syncs."""
         _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.connectors.slack.channel_ingest import apply_slack_ingest_channel_selection
         from vector.domains.cortex.convergence.lease import mark_tenant_dirty_v1
+        from vector.domains.cortex.connectors.slack.channel_ingest import (
+            apply_slack_ingest_channel_selection,
+            enqueue_slack_ingest_after_channel_apply,
+        )
+        from vector.domains.cortex.connectors.slack.errors import SlackWebApiError
+        from vector.infrastructure.db.repositories import slack_connection as slack_repo
 
+        link = slack_repo.get_slack_connection_for_tenant(db, tenant_id)
+        if link is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Slack is not connected for this tenant.")
         try:
             raw = apply_slack_ingest_channel_selection(
                 db,
@@ -1530,8 +1551,17 @@ def build_admin_router() -> APIRouter:
             )
         except ValueError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        except SlackWebApiError as exc:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=f"slack_channel_apply_failed:{exc}",
+            ) from exc
         mark_tenant_dirty_v1(db, tenant_id=tenant_id, reason="slack_channels_ingest_apply")
         db.commit()
+        enqueue_slack_ingest_after_channel_apply(
+            tenant_id=tenant_id,
+            connection_id=link.connection.id,
+        )
         return AdminSlackChannelsIngestApplyResponse.model_validate(raw)
 
     @r.get(

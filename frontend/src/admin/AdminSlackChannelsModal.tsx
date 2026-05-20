@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { adminFetch, adminJson } from "../lib/adminFetch";
@@ -19,6 +19,8 @@ type ListResponse = {
   team_name: string | null;
   saved_channel_ids: string[];
   channels: AdminSlackChannelRow[];
+  catalog_stale?: boolean;
+  catalog_fetched_at?: string | null;
 };
 
 type ApplyResponse = {
@@ -46,11 +48,20 @@ export default function AdminSlackChannelsModal({ tenantId, open, onClose }: Pro
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [applyResult, setApplyResult] = useState<ApplyResponse | null>(null);
 
+  const refreshFromSlackRef = useRef(false);
+
   const listQ = useQuery({
     queryKey: ["admin-slack-channels", tenantId],
-    queryFn: () =>
-      adminJson<ListResponse>(`/admin/tenants/${tenantId}/connections/slack/channels`),
+    queryFn: () => {
+      const refresh = refreshFromSlackRef.current;
+      refreshFromSlackRef.current = false;
+      const suffix = refresh ? "?refresh=true" : "";
+      return adminJson<ListResponse>(
+        `/admin/tenants/${tenantId}/connections/slack/channels${suffix}`,
+      );
+    },
     enabled: open && Boolean(tenantId),
+    staleTime: 60_000,
   });
 
   useEffect(() => {
@@ -81,7 +92,20 @@ export default function AdminSlackChannelsModal({ tenantId, open, onClose }: Pro
     },
     onSuccess: (data) => {
       setApplyResult(data);
-      void qc.invalidateQueries({ queryKey: ["admin-slack-channels", tenantId] });
+      const savedIds = new Set(data.saved_channels.map((c) => c.channel_id));
+      qc.setQueryData<ListResponse>(["admin-slack-channels", tenantId], (old) => {
+        if (!old) {
+          return old;
+        }
+        return {
+          ...old,
+          saved_channel_ids: [...savedIds],
+          channels: old.channels.map((ch) => ({
+            ...ch,
+            selected_for_ingest: savedIds.has(ch.channel_id),
+          })),
+        };
+      });
       void qc.invalidateQueries({ queryKey: ["admin-connections", tenantId] });
     },
   });
@@ -115,12 +139,18 @@ export default function AdminSlackChannelsModal({ tenantId, open, onClose }: Pro
           </h2>
           <p className="mt-1 text-sm text-stone-600">
             Select channels Vector should join and read. Public channels are joined automatically on
-            save; private channels require inviting the bot in Slack. History is fetched on the next
-            ingestion run.
+            save; private channels require inviting the bot in Slack. Saving queues a Slack sync
+            immediately (message history is fetched incrementally over subsequent runs).
           </p>
           {listQ.data?.team_name ? (
             <p className="mt-1 text-xs text-stone-500">
               Workspace: {listQ.data.team_name}
+            </p>
+          ) : null}
+          {listQ.data?.catalog_stale ? (
+            <p className="mt-1 text-xs text-amber-800">
+              Showing cached channel list (Slack refresh failed or is still warming up). Save still
+              works; re-open later or use Refresh.
             </p>
           ) : null}
         </div>
@@ -129,8 +159,14 @@ export default function AdminSlackChannelsModal({ tenantId, open, onClose }: Pro
           {listQ.isPending ? (
             <p className="text-sm text-stone-600">Loading channels…</p>
           ) : null}
-          {listQ.isError ? (
+          {listQ.isError && !listQ.data ? (
             <p className="text-sm text-red-700">{(listQ.error as Error).message}</p>
+          ) : null}
+          {listQ.isError && listQ.data ? (
+            <p className="mb-2 text-sm text-amber-800">
+              Could not refresh the channel list. Your last loaded list is still shown; save results
+              below are authoritative.
+            </p>
           ) : null}
           {applyMut.isError ? (
             <p className="mb-2 text-sm text-red-700">{(applyMut.error as Error).message}</p>
@@ -154,6 +190,17 @@ export default function AdminSlackChannelsModal({ tenantId, open, onClose }: Pro
                   placeholder="Filter by name…"
                   className="min-w-[12rem] flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm"
                 />
+                <button
+                  type="button"
+                  className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-800 hover:bg-stone-50"
+                  onClick={() => {
+                    refreshFromSlackRef.current = true;
+                    void listQ.refetch();
+                  }}
+                  disabled={listQ.isFetching}
+                >
+                  {listQ.isFetching ? "Refreshing…" : "Refresh"}
+                </button>
                 <button
                   type="button"
                   className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-stone-800 hover:bg-stone-50"
