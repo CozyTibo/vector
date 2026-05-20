@@ -3197,6 +3197,48 @@ def _slack_ts_value(ts: str) -> float:
         return 0.0
 
 
+def _slack_channel_history_sync_mode(
+    *,
+    ctx_sync_mode: str,
+    channel_id: str,
+    ingest_channel_ids: set[str],
+    existing_history: dict[str, Any] | None,
+) -> str:
+    """Keep admin-selected channels in backfill until history.backfill_complete is true."""
+    if ctx_sync_mode == "backfill":
+        return "backfill"
+    history = existing_history if isinstance(existing_history, dict) else {}
+    if ingest_channel_ids and channel_id not in ingest_channel_ids:
+        return "incremental"
+    if history.get("backfill_complete") is True:
+        return "incremental"
+    return "backfill"
+
+
+def _slack_history_time_bounds(
+    *,
+    sync_mode: str,
+    existing_history: dict[str, Any] | None,
+    history_cursor: str | None,
+    backfill_oldest_ts: str,
+) -> tuple[str | None, str | None]:
+    """Return (oldest, latest) for conversations.history when cursor is absent."""
+    history = existing_history if isinstance(existing_history, dict) else {}
+    if sync_mode == "incremental":
+        last_seen = history.get("last_message_ts")
+        if isinstance(last_seen, str) and last_seen.strip():
+            return last_seen.strip(), None
+        return None, None
+    if backfill_oldest_ts.strip():
+        return backfill_oldest_ts.strip(), None
+    if history_cursor:
+        return None, None
+    last_seen = history.get("last_message_ts")
+    if isinstance(last_seen, str) and last_seen.strip():
+        return None, last_seen.strip()
+    return None, None
+
+
 def _pick_slack_channels_round_robin(
     channels: list[dict[str, Any]],
     *,
@@ -3454,34 +3496,21 @@ def _slack_sync(
                 if isinstance(existing_channel, dict) and isinstance(existing_channel.get("history"), dict)
                 else {}
             )
-            sync_mode = "backfill" if ctx.sync_mode == "backfill" else "incremental"
-            if (
-                sync_mode == "incremental"
-                and ingest_channel_ids
-                and cid in ingest_channel_ids
-            ):
-                has_history_ckpt = bool(
-                    (
-                        isinstance(existing_history.get("last_message_ts"), str)
-                        and existing_history.get("last_message_ts", "").strip()
-                    )
-                    or (
-                        isinstance(existing_history.get("next_cursor"), str)
-                        and existing_history.get("next_cursor", "").strip()
-                    )
-                )
-                if not has_history_ckpt:
-                    sync_mode = "backfill"
+            sync_mode = _slack_channel_history_sync_mode(
+                ctx_sync_mode=ctx.sync_mode,
+                channel_id=cid,
+                ingest_channel_ids=ingest_channel_ids,
+                existing_history=existing_history,
+            )
             history_cursor = existing_history.get("next_cursor")
             if not isinstance(history_cursor, str) or not history_cursor.strip():
                 history_cursor = None
-            oldest: str | None = None
-            if sync_mode == "incremental":
-                last_seen = existing_history.get("last_message_ts")
-                if isinstance(last_seen, str) and last_seen.strip():
-                    oldest = last_seen.strip()
-            elif settings.cortex_slack_backfill_oldest_ts.strip():
-                oldest = settings.cortex_slack_backfill_oldest_ts.strip()
+            oldest, latest = _slack_history_time_bounds(
+                sync_mode=sync_mode,
+                existing_history=existing_history,
+                history_cursor=history_cursor,
+                backfill_oldest_ts=settings.cortex_slack_backfill_oldest_ts,
+            )
 
             channel_message_rows = 0
             channel_reply_rows = 0
@@ -3510,6 +3539,7 @@ def _slack_sync(
                 max_pages=settings.cortex_slack_history_max_pages_per_channel,
                 cursor=history_cursor,
                 oldest=oldest,
+                latest=latest,
             ):
                 history_pages += 1
                 page_cursor = page.get("next_cursor")
@@ -3683,7 +3713,7 @@ def _slack_sync(
                 "history": {
                     "last_message_ts": latest_message_ts,
                     "next_cursor": next_history_cursor,
-                    "backfill_complete": bool(sync_mode == "backfill" and not next_history_cursor),
+                    "backfill_complete": bool(not next_history_cursor),
                     "pages_fetched_last_run": history_pages,
                 },
                 "threads": (
@@ -3810,7 +3840,7 @@ def _slack_sync(
                     "cursor_owner": "slack.message_reply",
                     "last_reply_ts": latest_reply_ts,
                     "next_cursor": next_replies_cursor,
-                    "backfill_complete": bool(sync_mode == "backfill" and not next_replies_cursor),
+                    "backfill_complete": bool(not next_replies_cursor),
                     "pages_fetched_last_run": per_thread_pages,
                 }
                 if budget_exhausted:
