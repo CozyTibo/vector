@@ -20,7 +20,7 @@ export const WORKSPACE_SIGNAL_SLOTS: SignalSlot[] = [
   {
     id: "communication",
     label: "Communication",
-    description: "Slack messages and DMs where work actually gets discussed.",
+    description: "Slack messages where work actually gets discussed.",
     liveConnector: "slack",
     roadmap: false,
     impactWeight: 30,

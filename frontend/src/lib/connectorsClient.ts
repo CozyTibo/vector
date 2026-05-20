@@ -85,7 +85,10 @@ export async function fetchConnectors(base: string): Promise<ConnectorsResponse>
 
 export async function disconnectConnector(base: string, provider: string): Promise<void> {
   const res = await fetch(`${base}/connectors/${provider}`, mergeProductSessionAuth({ method: "DELETE" }));
-  if (!res.ok && res.status !== 204) {
+  if (res.status === 204) {
+    return;
+  }
+  if (!res.ok) {
     throw new Error(await readErrorDetail(res));
   }
 }

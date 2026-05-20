@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   type ConnectorRow,
+  type ConnectorsResponse,
   CONNECTOR_OAUTH_RETURN_PATH,
   disconnectConnector,
   fetchConnectors,
@@ -160,6 +161,45 @@ function CompactSignalColumn({
   );
 }
 
+type ConnectorProvider = "github" | "linear" | "notion" | "slack";
+
+function useDisconnectConnectorMutation(
+  apiBase: string,
+  qc: ReturnType<typeof useQueryClient>,
+  provider: ConnectorProvider,
+  setBanner: (message: string) => void,
+) {
+  return useMutation({
+    mutationFn: () => disconnectConnector(apiBase, provider),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["connectors", apiBase] });
+      const prev = qc.getQueryData<ConnectorsResponse>(["connectors", apiBase]);
+      if (prev) {
+        qc.setQueryData<ConnectorsResponse>(["connectors", apiBase], {
+          ...prev,
+          items: prev.items.map((row) =>
+            row.provider === provider
+              ? ({ ...row, connected: false, details: null } as ConnectorRow)
+              : row,
+          ),
+        });
+      }
+      return { prevConnectors: prev };
+    },
+    onError: (e: Error, _vars, ctx) => {
+      if (ctx?.prevConnectors) {
+        qc.setQueryData(["connectors", apiBase], ctx.prevConnectors);
+      }
+      setBanner(e.message);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
+      void qc.invalidateQueries({ queryKey: ["me"] });
+      void qc.invalidateQueries({ queryKey: ["onboarding", apiBase] });
+    },
+  });
+}
+
 export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnectors }: Props) {
   const apiBase = productApiBase();
   const qc = useQueryClient();
@@ -170,10 +210,6 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
     queryFn: () => fetchOnboarding(apiBase),
     enabled: Boolean(tenantId),
   });
-  const connected = new Set(connectedConnectors.map((c) => c.toLowerCase()));
-  const pctLive = signalStrengthPercentLive(connected);
-  const coverageUi = useMemo(() => currentCoveragePresentation(pctLive), [pctLive]);
-
   const [banner, setBanner] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [savedStackPick, setSavedStackPick] = useState<ToolPickState | null>(() => getWorkspaceStackToolsPick());
@@ -190,15 +226,36 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
     [savedStackPick, onboardingPick],
   );
 
-  const openEditTools = useCallback(() => {
-    setEditModalSeed(mergeConnectedProvidersIntoPick(effectiveStackPick, connected));
-    setEditOpen(true);
-  }, [effectiveStackPick, connected]);
-
   const connectorsQ = useQuery({
     queryKey: ["connectors", apiBase],
     queryFn: () => fetchConnectors(apiBase),
   });
+
+  /** Prefer live `/connectors` rows; fall back to `/me` props while connectors load. */
+  const connected = useMemo(() => {
+    const s = new Set<string>();
+    const items = connectorsQ.data?.items;
+    if (items && connectorsQ.isFetched) {
+      for (const row of items) {
+        if (row.connected) {
+          s.add(row.provider.toLowerCase());
+        }
+      }
+      return s;
+    }
+    for (const c of me.data?.connected_connectors ?? connectedConnectors) {
+      s.add(c.toLowerCase());
+    }
+    return s;
+  }, [connectorsQ.data?.items, connectorsQ.isFetched, me.data?.connected_connectors, connectedConnectors]);
+
+  const pctLive = signalStrengthPercentLive(connected);
+  const coverageUi = useMemo(() => currentCoveragePresentation(pctLive), [pctLive]);
+
+  const openEditTools = useCallback(() => {
+    setEditModalSeed(mergeConnectedProvidersIntoPick(effectiveStackPick, connected));
+    setEditOpen(true);
+  }, [effectiveStackPick, connected]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -274,38 +331,10 @@ export default function WorkspaceSignalsTab({ connectedConnectors, useMockConnec
     return m;
   }, [connectorsQ.data?.items]);
 
-  const ghDisconnect = useMutation({
-    mutationFn: () => disconnectConnector(apiBase, "github"),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
-      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
-    },
-    onError: (e: Error) => setBanner(e.message),
-  });
-  const linDisconnect = useMutation({
-    mutationFn: () => disconnectConnector(apiBase, "linear"),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
-      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
-    },
-    onError: (e: Error) => setBanner(e.message),
-  });
-  const slackDisconnect = useMutation({
-    mutationFn: () => disconnectConnector(apiBase, "slack"),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
-      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
-    },
-    onError: (e: Error) => setBanner(e.message),
-  });
-  const notionDisconnect = useMutation({
-    mutationFn: () => disconnectConnector(apiBase, "notion"),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["connectors", apiBase] });
-      await qc.invalidateQueries({ queryKey: ["me", apiBase] });
-    },
-    onError: (e: Error) => setBanner(e.message),
-  });
+  const ghDisconnect = useDisconnectConnectorMutation(apiBase, qc, "github", setBanner);
+  const linDisconnect = useDisconnectConnectorMutation(apiBase, qc, "linear", setBanner);
+  const slackDisconnect = useDisconnectConnectorMutation(apiBase, qc, "slack", setBanner);
+  const notionDisconnect = useDisconnectConnectorMutation(apiBase, qc, "notion", setBanner);
 
   const onStackSave = useCallback(
     (pick: ToolPickState) => {
@@ -781,11 +810,10 @@ function LiveConnectorActions({
   connectLabel: string;
 }) {
   const row = statusById.get(provider);
-  const apiConnected = row?.connected === true;
+  const isConnected = row != null ? row.connected : connected.has(provider);
   const configured = row?.connector_configured !== false;
-  const inMe = connected.has(provider);
 
-  if (apiConnected || inMe) {
+  if (isConnected) {
     return (
       <button
         type="button"
