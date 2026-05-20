@@ -899,53 +899,59 @@ class Settings(BaseSettings):
         ),
     )
     cortex_slack_history_channels_per_sync: int = Field(
-        default=5,
+        default=12,
         ge=0,
         le=50,
         validation_alias="CORTEX_SLACK_HISTORY_CHANNELS_PER_SYNC",
         description=(
             "After listing channels, fetch conversations.history for up to N channels per sync "
-            "(0 disables message history in this pass)."
+            "(0 disables message history in this pass). Default 12 for faster catch-up on "
+            "admin-selected channel sets."
         ),
     )
     cortex_slack_conversations_history_limit: int = Field(
-        default=200,
+        default=1000,
         ge=1,
         le=1000,
         validation_alias="CORTEX_SLACK_CONVERSATIONS_HISTORY_LIMIT",
-        description="Slack conversations.history `limit` (most recent messages in the window).",
+        description=(
+            "Slack conversations.history `limit` per page (Slack API max 1000). Larger pages "
+            "reduce round-trips while staying within method limits."
+        ),
     )
     cortex_slack_history_max_pages_per_channel: int = Field(
-        default=5,
+        default=30,
         ge=1,
         le=200,
         validation_alias="CORTEX_SLACK_HISTORY_MAX_PAGES_PER_CHANNEL",
         description=(
             "Max conversations.history pages per channel per sync (supports resumable backfill "
-            "with checkpointed next_cursor)."
+            "with checkpointed next_cursor). Default 30 ≈ up to 30k messages/channel per run before "
+            "time budget."
         ),
     )
     cortex_slack_threads_per_sync: int = Field(
-        default=100,
+        default=250,
         ge=0,
         le=1000,
         validation_alias="CORTEX_SLACK_THREADS_PER_SYNC",
         description="Max thread roots to process via conversations.replies per sync.",
     )
     cortex_slack_replies_max_pages_per_thread: int = Field(
-        default=3,
+        default=10,
         ge=1,
         le=100,
         validation_alias="CORTEX_SLACK_REPLIES_MAX_PAGES_PER_THREAD",
         description="Max conversations.replies pages per thread root per sync.",
     )
     cortex_slack_channel_time_budget_seconds: int = Field(
-        default=20,
+        default=180,
         ge=1,
         le=600,
         validation_alias="CORTEX_SLACK_CHANNEL_TIME_BUDGET_SECONDS",
         description=(
-            "Soft per-run time budget for Slack channel/deep history loop before checkpoint-and-resume."
+            "Soft per-run time budget for Slack channel/deep history loop before checkpoint-and-resume. "
+            "Default 180s so history/thread paging can use the higher page limits without aborting early."
         ),
     )
     cortex_slack_backfill_oldest_ts: str = Field(
