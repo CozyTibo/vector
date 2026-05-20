@@ -9,7 +9,7 @@ import time
 import uuid
 from typing import Any, Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.connectors.cortex_ingestion_policy import (
@@ -27,7 +27,10 @@ from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.settings import Settings
 
 _LOGGER = logging.getLogger("app")
-_OVERVIEW_CACHE_TTL_SECONDS = 8.0
+_OVERVIEW_CACHE_TTL_SECONDS = 30.0
+_OVERVIEW_STALE_SERVE_SECONDS = 120.0
+_DUPLICATE_SCAN_MAX_ROWS = 8_000
+_DUPLICATE_SCAN_STATEMENT_TIMEOUT_MS = 5_000
 _OVERVIEW_CACHE_LOCK = threading.Lock()
 _OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
@@ -207,24 +210,59 @@ def _collect_duplicate_prevention_metric(session: Session, tenant_id: uuid.UUID)
             "detail": "No live rows yet.",
         }
 
-    dup_groups = list(
-        session.execute(
-            select(func.count().label("n"))
-            .select_from(RawIngestionRecord)
-            .where(
-                RawIngestionRecord.tenant_id == tenant_id,
-                RawIngestionRecord.replay_job_id.is_(None),
-            )
-            .group_by(
-                RawIngestionRecord.connection_id,
-                RawIngestionRecord.connector,
-                RawIngestionRecord.resource_type,
-                RawIngestionRecord.source_identity_key,
-                RawIngestionRecord.source_revision_key,
-            )
-            .having(func.count() > 1)
-        ).all()
+    if live_rows_examined > _DUPLICATE_SCAN_MAX_ROWS:
+        return {
+            "status": "deferred",
+            "ratio_percent": None,
+            "live_rows_examined": live_rows_examined,
+            "duplicate_groups": 0,
+            "duplicate_rows_excess": 0,
+            "detail": (
+                "Duplicate scan deferred for large tenants to keep the admin overview responsive."
+            ),
+        }
+
+    dup_stmt = (
+        select(func.count().label("n"))
+        .select_from(RawIngestionRecord)
+        .where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            RawIngestionRecord.replay_job_id.is_(None),
+        )
+        .group_by(
+            RawIngestionRecord.connection_id,
+            RawIngestionRecord.connector,
+            RawIngestionRecord.resource_type,
+            RawIngestionRecord.source_identity_key,
+            RawIngestionRecord.source_revision_key,
+        )
+        .having(func.count() > 1)
     )
+    try:
+        session.execute(
+            text(f"SET LOCAL statement_timeout = {_DUPLICATE_SCAN_STATEMENT_TIMEOUT_MS}")
+        )
+        dup_groups = list(session.execute(dup_stmt).all())
+    except Exception as exc:
+        _LOGGER.warning(
+            "duplicate prevention metric skipped tenant_id=%s rows=%s",
+            tenant_id,
+            live_rows_examined,
+            exc_info=True,
+        )
+        return {
+            "status": "unavailable",
+            "ratio_percent": None,
+            "live_rows_examined": live_rows_examined,
+            "duplicate_groups": 0,
+            "duplicate_rows_excess": 0,
+            "detail": f"Duplicate scan timed out or failed: {exc}",
+        }
+    finally:
+        try:
+            session.execute(text("SET LOCAL statement_timeout = 0"))
+        except Exception:
+            _LOGGER.debug("failed resetting statement_timeout", exc_info=True)
     duplicate_groups = len(dup_groups)
     duplicate_rows_excess = sum(max(0, int(n) - 1) for (n,) in dup_groups)
     unique_rows = max(0, live_rows_examined - duplicate_rows_excess)
@@ -251,13 +289,41 @@ def build_cortex_ingestion_admin_overview(
     """Assemble visibility payload for :class:`AdminCortexIngestionOverviewResponse`."""
     cache_key = str(tenant_id)
     now = time.monotonic()
+    stale_payload: dict[str, Any] | None = None
     with _OVERVIEW_CACHE_LOCK:
         cached = _OVERVIEW_CACHE.get(cache_key)
         if cached is not None:
             ts, payload = cached
             if now - ts <= _OVERVIEW_CACHE_TTL_SECONDS:
                 return copy.deepcopy(payload)
+            if now - ts <= _OVERVIEW_STALE_SERVE_SECONDS:
+                stale_payload = copy.deepcopy(payload)
 
+    try:
+        return _build_cortex_ingestion_admin_overview_uncached(
+            session,
+            settings,
+            tenant_id,
+            cache_key=cache_key,
+        )
+    except Exception:
+        if stale_payload is not None:
+            _LOGGER.warning(
+                "serving stale cortex ingestion overview tenant_id=%s",
+                tenant_id,
+                exc_info=True,
+            )
+            return stale_payload
+        raise
+
+
+def _build_cortex_ingestion_admin_overview_uncached(
+    session: Session,
+    settings: Settings,
+    tenant_id: uuid.UUID,
+    *,
+    cache_key: str,
+) -> dict[str, Any]:
     tenant = session.get(Tenant, tenant_id)
     if tenant is None:
         raise ValueError("tenant not found")

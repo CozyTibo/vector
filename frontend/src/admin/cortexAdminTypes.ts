@@ -21,7 +21,7 @@ export type CortexOverview = {
     detail: string | null;
   };
   duplicate_prevention: {
-    status: "ok" | "warn" | "unavailable";
+    status: "ok" | "warn" | "unavailable" | "deferred";
     ratio_percent: number | null;
     live_rows_examined: number;
     duplicate_groups: number;

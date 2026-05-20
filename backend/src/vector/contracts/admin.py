@@ -563,7 +563,7 @@ class AdminCortexWorkerTelemetry(BaseModel):
 class AdminCortexDuplicatePreventionMetric(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
-    status: Literal["ok", "warn", "unavailable"]
+    status: Literal["ok", "warn", "unavailable", "deferred"]
     ratio_percent: float | None = None
     live_rows_examined: int
     duplicate_groups: int
