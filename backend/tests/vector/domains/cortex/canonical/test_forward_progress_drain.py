@@ -18,7 +18,7 @@ def test_classify_topology_wait_on_spin() -> None:
         _classify_drain_outcome(
             total_succeeded=0,
             total_failed_rows=0,
-            topology_wait=True,
+            full_rotation_topology_stall=True,
             candidate_more_remain=True,
             untreated_estimate=1000,
             hit_slice_cap=False,
@@ -32,7 +32,7 @@ def test_classify_partial_progress() -> None:
         _classify_drain_outcome(
             total_succeeded=50,
             total_failed_rows=0,
-            topology_wait=False,
+            full_rotation_topology_stall=False,
             candidate_more_remain=True,
             untreated_estimate=500,
             hit_slice_cap=True,
@@ -46,7 +46,7 @@ def test_classify_progressed() -> None:
         _classify_drain_outcome(
             total_succeeded=10,
             total_failed_rows=0,
-            topology_wait=False,
+            full_rotation_topology_stall=False,
             candidate_more_remain=False,
             untreated_estimate=0,
             hit_slice_cap=False,
@@ -60,7 +60,7 @@ def test_classify_failed() -> None:
         _classify_drain_outcome(
             total_succeeded=0,
             total_failed_rows=3,
-            topology_wait=False,
+            full_rotation_topology_stall=False,
             candidate_more_remain=True,
             untreated_estimate=10,
             hit_slice_cap=False,
@@ -74,7 +74,7 @@ def test_classify_idle() -> None:
         _classify_drain_outcome(
             total_succeeded=0,
             total_failed_rows=0,
-            topology_wait=False,
+            full_rotation_topology_stall=False,
             candidate_more_remain=False,
             untreated_estimate=0,
             hit_slice_cap=False,

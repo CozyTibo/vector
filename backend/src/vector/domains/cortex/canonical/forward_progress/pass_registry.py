@@ -95,6 +95,25 @@ def all_canonical_passes() -> list[tuple[str, str]]:
     return out
 
 
+def all_canonical_passes_fair_rotation() -> list[tuple[str, str]]:
+    """Round-robin across connectors so one connector's topology blocks do not starve others."""
+    by_connector: dict[str, list[tuple[str, str]]] = {}
+    for connector, resource_type in all_canonical_passes():
+        by_connector.setdefault(connector, []).append((connector, resource_type))
+
+    connectors = sorted(by_connector)
+    if not connectors:
+        return []
+    max_len = max(len(by_connector[c]) for c in connectors)
+    out: list[tuple[str, str]] = []
+    for i in range(max_len):
+        for c in connectors:
+            rows = by_connector[c]
+            if i < len(rows):
+                out.append(rows[i])
+    return out
+
+
 def pass_key_label(connector: str, resource_type: str) -> str:
     return f"{connector.strip()}/{resource_type.strip()}"
 

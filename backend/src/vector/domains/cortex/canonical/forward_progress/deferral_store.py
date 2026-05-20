@@ -11,6 +11,13 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canonical.forward_progress.constants import (
+    DEFERRAL_DETAIL_FIRST_SEEN_AT,
+    DEFERRAL_DETAIL_LAST_PARENT_PROBE_AT,
+    DEFERRAL_DETAIL_LAST_SEEN_AT,
+    DEFERRAL_DETAIL_PERMANENT_ORPHAN,
+    DEFERRAL_DETAIL_RETRY_COUNT,
+    DEFERRAL_QUEUE_EXTERNAL_PARENT,
+    DEFERRAL_QUEUE_TOPOLOGY_ORPHAN,
     DEFERRAL_REASON_DEPENDENCY_NOT_MATERIALIZED,
     DEFERRAL_REASON_MISSING_DEPLOYMENT,
     DEFERRAL_REASON_MISSING_PAGE_PARENT,
@@ -18,8 +25,7 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
     DEFERRAL_REASON_MISSING_PARENT_COMMIT,
     DEFERRAL_REASON_MISSING_PR,
     DEFERRAL_REASON_TOPOLOGY_ORPHAN,
-    DEFERRAL_QUEUE_EXTERNAL_PARENT,
-    DEFERRAL_QUEUE_TOPOLOGY_ORPHAN,
+    PERMANENT_ORPHAN_DEFERRAL_RETRY_THRESHOLD,
 )
 from vector.domains.cortex.canonical.materialization_topology_engine import classify_orphan_missing_ref
 from vector.infrastructure.db.models.cortex_canonical_materialization_deferral import (
@@ -55,6 +61,28 @@ def map_orphan_class_to_deferral_reason(orphan_class: str, *, resource_type: str
     return DEFERRAL_REASON_TOPOLOGY_ORPHAN
 
 
+def _merge_deferral_detail(
+    existing: dict[str, Any] | None,
+    incoming: dict[str, Any],
+    *,
+    now: datetime,
+    queue: str,
+    permanent_orphan_threshold: int,
+) -> dict[str, Any]:
+    base = dict(existing or {})
+    merged = {**base, **incoming}
+    first = base.get(DEFERRAL_DETAIL_FIRST_SEEN_AT)
+    if not isinstance(first, str) or not first.strip():
+        merged[DEFERRAL_DETAIL_FIRST_SEEN_AT] = now.isoformat()
+    merged[DEFERRAL_DETAIL_LAST_SEEN_AT] = now.isoformat()
+    merged[DEFERRAL_DETAIL_LAST_PARENT_PROBE_AT] = now.isoformat()
+    retry = int(base.get(DEFERRAL_DETAIL_RETRY_COUNT) or 0) + 1
+    merged[DEFERRAL_DETAIL_RETRY_COUNT] = retry
+    if queue == DEFERRAL_QUEUE_TOPOLOGY_ORPHAN and retry >= permanent_orphan_threshold:
+        merged[DEFERRAL_DETAIL_PERMANENT_ORPHAN] = True
+    return merged
+
+
 def record_topology_deferrals_from_plan(
     db: Session,
     *,
@@ -64,12 +92,37 @@ def record_topology_deferrals_from_plan(
     plan: dict[str, Any],
     raw_rows_by_id: dict[int, RawIngestionRecord],
     cooldown_seconds: int,
+    permanent_orphan_threshold: int | None = None,
 ) -> int:
     """Upsert deferrals for rows skipped by topology planning in this batch."""
     now = _now()
     retry_at = now + timedelta(seconds=max(5, int(cooldown_seconds)))
+    orphan_threshold = max(
+        1,
+        int(permanent_orphan_threshold or PERMANENT_ORPHAN_DEFERRAL_RETRY_THRESHOLD),
+    )
     upserted = 0
     entries: list[dict[str, Any]] = []
+
+    existing_detail_by_rid: dict[int, dict[str, Any]] = {}
+    candidate_rids = [
+        int(item.get("raw_record_id") or 0)
+        for block in (plan.get("deferred_dependency_queue") or [], plan.get("quarantine") or [])
+        for item in block
+        if isinstance(item, dict)
+    ]
+    candidate_rids = [rid for rid in candidate_rids if rid > 0]
+    if candidate_rids:
+        for row in db.scalars(
+            select(CortexCanonicalMaterializationDeferral).where(
+                CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+                CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+                CortexCanonicalMaterializationDeferral.raw_record_id.in_(candidate_rids),
+            )
+        ).all():
+            existing_detail_by_rid[int(row.raw_record_id)] = (
+                row.detail_json if isinstance(row.detail_json, dict) else {}
+            )
 
     for item in plan.get("deferred_dependency_queue") or []:
         if not isinstance(item, dict):
@@ -99,7 +152,13 @@ def record_topology_deferrals_from_plan(
                 "pass_key": pass_key,
                 "retry_ready_at": retry_at,
                 "deferred_at": now,
-                "detail_json": {"orphan_class": orphan_class, "source": "stage_plan"},
+                "detail_json": _merge_deferral_detail(
+                    existing_detail_by_rid.get(rid),
+                    {"orphan_class": orphan_class, "source": "stage_plan"},
+                    now=now,
+                    queue=DEFERRAL_QUEUE_EXTERNAL_PARENT,
+                    permanent_orphan_threshold=orphan_threshold,
+                ),
             }
         )
 
@@ -128,7 +187,13 @@ def record_topology_deferrals_from_plan(
                 "pass_key": pass_key,
                 "retry_ready_at": retry_at,
                 "deferred_at": now,
-                "detail_json": {"orphan_class": oc, "source": "quarantine"},
+                "detail_json": _merge_deferral_detail(
+                    existing_detail_by_rid.get(rid),
+                    {"orphan_class": oc, "source": "quarantine", "missing_parent_ref": ref or None},
+                    now=now,
+                    queue=DEFERRAL_QUEUE_TOPOLOGY_ORPHAN,
+                    permanent_orphan_threshold=orphan_threshold,
+                ),
             }
         )
 
@@ -137,7 +202,12 @@ def record_topology_deferrals_from_plan(
 
     table = CortexCanonicalMaterializationDeferral.__table__
     for row in entries:
-        stmt = insert(table).values(**row)
+        detail = row["detail_json"] if isinstance(row["detail_json"], dict) else {}
+        is_permanent = bool(detail.get(DEFERRAL_DETAIL_PERMANENT_ORPHAN))
+        effective_retry_at = (
+            now + timedelta(days=3650) if is_permanent else row["retry_ready_at"]
+        )
+        stmt = insert(table).values({**row, "retry_ready_at": effective_retry_at})
         stmt = stmt.on_conflict_do_update(
             index_elements=["tenant_id", "bundle_id", "raw_record_id"],
             set_={
@@ -146,9 +216,9 @@ def record_topology_deferrals_from_plan(
                 "parent_raw_record_id": row["parent_raw_record_id"],
                 "missing_parent_ref": row["missing_parent_ref"],
                 "pass_key": row["pass_key"],
-                "retry_ready_at": row["retry_ready_at"],
+                "retry_ready_at": effective_retry_at,
                 "deferred_at": row["deferred_at"],
-                "detail_json": row["detail_json"],
+                "detail_json": detail,
                 "updated_at": now,
             },
         )
@@ -242,8 +312,58 @@ def count_deferrals(
             CortexCanonicalMaterializationDeferral.retry_ready_at <= now,
         )
     )
+    permanent = db.scalar(
+        select(func.count())
+        .select_from(CortexCanonicalMaterializationDeferral)
+        .where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.detail_json["permanent_orphan"].astext == "true",
+        )
+    )
     return {
         "deferred_total": int(total or 0),
         "deferred_waiting_cooldown": int(waiting or 0),
         "deferred_retry_ready": int(retry_ready or 0),
+        "deferred_permanent_orphan": int(permanent or 0),
     }
+
+
+def summarize_deferral_pressure(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    sample_limit: int = 12,
+) -> list[dict[str, Any]]:
+    """Operator-facing deferral breakdown by resource_type + reason."""
+    rows = db.execute(
+        select(
+            CortexCanonicalMaterializationDeferral.resource_type,
+            CortexCanonicalMaterializationDeferral.deferral_reason,
+            CortexCanonicalMaterializationDeferral.queue,
+            func.count().label("n"),
+        )
+        .where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+        )
+        .group_by(
+            CortexCanonicalMaterializationDeferral.resource_type,
+            CortexCanonicalMaterializationDeferral.deferral_reason,
+            CortexCanonicalMaterializationDeferral.queue,
+        )
+        .order_by(func.count().desc())
+        .limit(max(1, min(sample_limit, 50)))
+    ).all()
+    out: list[dict[str, Any]] = []
+    for rt, reason, queue, n in rows:
+        out.append(
+            {
+                "resource_type": str(rt),
+                "deferral_reason": str(reason),
+                "queue": str(queue),
+                "count": int(n or 0),
+            }
+        )
+    return out

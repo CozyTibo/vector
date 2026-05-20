@@ -453,7 +453,24 @@ class Settings(BaseSettings):
         le=3600,
         validation_alias="CORTEX_CANONICAL_TOPOLOGY_WAIT_COOLDOWN_SECONDS",
         description=(
-            "Cooldown before retrying topology-deferred rows; also used for convergence requeue delay."
+            "Base pass-local cooldown after topology-only batches; also used for full-stall convergence "
+            "requeue delay. Widen GitHub review/commit ingest caps in tandem with timeline caps."
+        ),
+    )
+    cortex_canonical_pass_cooldown_max_seconds: int = Field(
+        default=360,
+        ge=30,
+        le=7200,
+        validation_alias="CORTEX_CANONICAL_PASS_COOLDOWN_MAX_SECONDS",
+        description="Max escalating cooldown for repeatedly topology-blocked passes.",
+    )
+    cortex_canonical_permanent_orphan_deferral_threshold: int = Field(
+        default=5,
+        ge=2,
+        le=50,
+        validation_alias="CORTEX_CANONICAL_PERMANENT_ORPHAN_DEFERRAL_THRESHOLD",
+        description=(
+            "Topology-quarantine deferrals promoted to permanent_orphan after this many deferral cycles."
         ),
     )
     cortex_replay_storm_divergence_spike_per_hour: int = Field(
@@ -1109,7 +1126,10 @@ class Settings(BaseSettings):
         ge=1,
         le=100,
         validation_alias="CORTEX_GITHUB_REVIEWS_MAX_PAGES_PER_PR",
-        description="Max pages for `/pulls/{number}/reviews` per PR per sync.",
+        description=(
+            "Max pages for `/pulls/{number}/reviews` per PR per sync. "
+            "Raise with timeline ingest caps to avoid permanent timeline topology orphans."
+        ),
     )
     cortex_github_review_comments_max_pages_per_pr: int = Field(
         default=2,
@@ -1200,7 +1220,10 @@ class Settings(BaseSettings):
         ge=1,
         le=100,
         validation_alias="CORTEX_GITHUB_TIMELINE_MAX_PAGES_PER_ISSUE_OR_PR",
-        description="Max pages for `/issues/{n}/timeline` per issue or pull request number per sync.",
+        description=(
+            "Max pages for `/issues/{n}/timeline` per issue or pull request number per sync. "
+            "Should not exceed parent ingest (reviews/commits/workflow_runs) or timeline orphans accumulate."
+        ),
     )
     cortex_github_repo_time_budget_seconds: int = Field(
         default=25,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Final
 
-FORWARD_PROGRESS_SCHEMA_VERSION: Final[int] = 1
+FORWARD_PROGRESS_SCHEMA_VERSION: Final[int] = 2
 
 # Canonical drain / phase outcomes (truthful operator semantics).
 CANONICAL_OUTCOME_PROGRESSED: Final[str] = "progressed"
@@ -24,3 +24,13 @@ DEFERRAL_REASON_TOPOLOGY_ORPHAN: Final[str] = "topology_orphan"
 
 DEFERRAL_QUEUE_EXTERNAL_PARENT: Final[str] = "external_parent_unmaterialized"
 DEFERRAL_QUEUE_TOPOLOGY_ORPHAN: Final[str] = "topology_orphan"
+
+# Deferral detail_json flags (no migration — bounded lifecycle in JSONB).
+DEFERRAL_DETAIL_PERMANENT_ORPHAN: Final[str] = "permanent_orphan"
+DEFERRAL_DETAIL_RETRY_COUNT: Final[str] = "retry_count"
+DEFERRAL_DETAIL_FIRST_SEEN_AT: Final[str] = "first_seen_at"
+DEFERRAL_DETAIL_LAST_SEEN_AT: Final[str] = "last_seen_at"
+DEFERRAL_DETAIL_LAST_PARENT_PROBE_AT: Final[str] = "last_parent_probe_at"
+
+# Default stall promotions (override via settings).
+PERMANENT_ORPHAN_DEFERRAL_RETRY_THRESHOLD: Final[int] = 5

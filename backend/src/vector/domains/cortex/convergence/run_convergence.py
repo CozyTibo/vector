@@ -14,6 +14,10 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
     CANONICAL_OUTCOME_PARTIAL_PROGRESS,
     CANONICAL_OUTCOME_TOPOLOGY_WAIT,
 )
+from vector.domains.cortex.canonical.forward_progress.pass_fairness import (
+    parse_pass_cooldown_until,
+    parse_pass_topology_stall_counts,
+)
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.convergence.constants import LEASE_STATUS_DIRTY
 from vector.domains.cortex.convergence.lease import (
@@ -89,6 +93,20 @@ def _canonical_pass_index_from_lease(lease: CortexTenantConvergenceLease) -> int
 def _store_canonical_pass_index_on_lease(lease: CortexTenantConvergenceLease, pass_index: int) -> None:
     detail = dict(lease.detail_json or {})
     detail["canonical_pass_index"] = int(pass_index)
+    lease.detail_json = detail
+
+
+def _store_pass_fairness_on_lease(lease: CortexTenantConvergenceLease, summary: dict[str, Any]) -> None:
+    detail = dict(lease.detail_json or {})
+    cooldowns = summary.get("pass_cooldown_until")
+    if isinstance(cooldowns, dict):
+        detail["pass_cooldown_until"] = cooldowns
+    stalls = summary.get("pass_topology_stall_counts")
+    if isinstance(stalls, dict):
+        detail["pass_topology_stall_counts"] = stalls
+    health = summary.get("convergence_health")
+    if isinstance(health, str) and health.strip():
+        detail["convergence_health"] = health.strip()
     lease.detail_json = detail
 
 
@@ -173,6 +191,7 @@ def run_tenant_convergence_v1(
 
             if phase == PHASE_02_CANONICAL:
                 pass_idx = _canonical_pass_index_from_lease(lease)
+                lease_detail = lease.detail_json if isinstance(lease.detail_json, dict) else {}
                 out = run_phase_02_canonical_v1(
                     session,
                     cfg,
@@ -181,19 +200,26 @@ def run_tenant_convergence_v1(
                     bundle_id=bundle_id,
                     batch_limit=cfg.cortex_post_ingestion_canonical_batch_limit,
                     pass_index=pass_idx,
+                    pass_cooldowns=parse_pass_cooldown_until(lease_detail),
+                    pass_stall_counts=parse_pass_topology_stall_counts(lease_detail),
                 )
                 summary = out.get("canonical_summary") if isinstance(out.get("canonical_summary"), dict) else {}
                 next_pass = summary.get("pass_index_next")
                 if isinstance(next_pass, int):
                     _store_canonical_pass_index_on_lease(lease, next_pass)
+                _store_pass_fairness_on_lease(lease, summary)
                 if _canonical_needs_more_work(session, canonical_summary=summary, tenant_id=tenant_id):
-                    delay = 0
                     outcome = str(summary.get("canonical_outcome") or "")
-                    if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT:
+                    progress_made = bool(summary.get("progress_made"))
+                    if progress_made or outcome == CANONICAL_OUTCOME_PARTIAL_PROGRESS:
+                        delay = 0
+                    elif outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT:
                         delay = max(
                             30,
                             int(cfg.cortex_canonical_topology_wait_cooldown_seconds),
                         )
+                    else:
+                        delay = 0
                     schedule_convergence_retry_v1(
                         session,
                         tenant_id=tenant_id,
@@ -205,12 +231,17 @@ def run_tenant_convergence_v1(
                     lease.detail_json = detail
                     session.commit()
                     enqueue_tenant_convergence_v1(tenant_id, reason="canonical_continue")
-                    worker_outcome = "canonical_topology_wait" if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT else "canonical_partial"
+                    worker_outcome = (
+                        "canonical_topology_wait"
+                        if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT and not progress_made
+                        else "canonical_partial"
+                    )
                     return {
                         "tenant_id": str(tenant_id),
                         "acquired": True,
                         "outcome": worker_outcome,
                         "canonical_outcome": outcome,
+                        "convergence_health": summary.get("convergence_health"),
                         "pipeline_run_id": str(pipeline_run_id),
                     }
                 _store_canonical_pass_index_on_lease(lease, 0)

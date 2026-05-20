@@ -2033,6 +2033,9 @@ def materialize_stub_backlog(
     dry_run: bool,
     pass_index: int = 0,
     topology_cooldown_seconds: int = 60,
+    pass_cooldowns: dict | None = None,
+    pass_stall_counts: dict[str, int] | None = None,
+    permanent_orphan_threshold: int | None = None,
 ) -> dict[str, Any]:
     """Materialize stub-routable raw rows that are missing a projection for ``bundle_id``.
 
@@ -2061,6 +2064,8 @@ def materialize_stub_backlog(
         resource_type=resource_type,
         pass_index=pass_index,
         fetch_limit=lim,
+        pass_cooldowns=pass_cooldowns,
+        pass_stall_counts=pass_stall_counts,
     )
     id_to_rt = {
         int(rid): str(rt)
@@ -2153,6 +2158,7 @@ def materialize_stub_backlog(
         plan=plan,
         raw_rows_by_id=raw_rows_by_id,
         cooldown_seconds=topology_cooldown_seconds,
+        permanent_orphan_threshold=permanent_orphan_threshold,
     )
 
     for stage_idx, stage in enumerate(plan.get("stages") or []):
@@ -2264,6 +2270,8 @@ def drain_stub_materialize_backlog(
     resource_type: str | None = None,
     batch_limit: int | None = None,
     pass_index: int = 0,
+    pass_cooldowns: dict | None = None,
+    pass_stall_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Forward-progress-aware canonical backlog drain (topology-safe, bounded slices)."""
     from vector.domains.cortex.canonical.forward_progress.drain_runtime import (
@@ -2278,6 +2286,8 @@ def drain_stub_materialize_backlog(
         resource_type=resource_type,
         batch_limit=batch_limit,
         pass_index=pass_index,
+        pass_cooldowns=pass_cooldowns,
+        pass_stall_counts=pass_stall_counts,
     )
 
 
