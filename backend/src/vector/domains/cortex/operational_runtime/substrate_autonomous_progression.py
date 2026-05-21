@@ -231,6 +231,10 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
 
     from vector.domains.cortex.substrate_pipeline import phase_runners as runners_mod
 
+    from vector.domains.cortex.execution.scheduling import verify_p0_step2_phase06_tcre_worker_boundary_v1
+
+    errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
+
     p07_src = inspect.getsource(runners_mod.run_phase_07_retrieval_v1)
     if "run_synthesis_activation_after_phase07_v1" in p07_src:
         errors.append("phase07_runner_must_not_call_synthesis_activation_p0_step1")

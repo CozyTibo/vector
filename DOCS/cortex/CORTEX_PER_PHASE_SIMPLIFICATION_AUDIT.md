@@ -27,7 +27,7 @@ input → deterministic transform → explicit output → gate
 | Step | Status | Summary |
 |------|--------|---------|
 | **1** | **Done** | Phase 07 = retrieval index only; synthesis activation evaluation moved to phase 08 entry |
-| 2 | Pending | TCRE worker must not materialize retrieval |
+| **2** | **Done** | TCRE Celery worker no longer materializes retrieval; resume still delegates to phase 07 via convergence |
 | 3 | Pending | Single TCRE resume path |
 | 4 | Pending | Drop continuation writes on execution hot path |
 | 5 | Pending | Canonical single drain |
@@ -43,6 +43,15 @@ input → deterministic transform → explicit output → gate
 | `run_tenant_convergence_v1` | No longer reads `synthesis_activation` / `next_phase_chain` from phase 07 output |
 | CI guard | `verify_p0_step1_phase07_retrieval_boundary_v1` + `test_p0_step1_phase07_boundary.py` |
 | Static gates | `verify_gp085_prog01`, `verify_gp085_syn01` updated for new boundaries |
+
+### P0 step 2 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `run_tcre_reconstruction_job_task` | On `completed`, only `on_tcre_job_completed_for_pipeline_v1` (no retrieval materialization) |
+| `materialize_retrieval_index_incremental_after_tcre_v1` | Removed — TCRE index binding runs only in phase 07 via `materialize_retrieval_index_for_pipeline_v1` |
+| CI guard | `verify_p0_step2_phase06_tcre_worker_boundary_v1` + `test_p0_step2_phase06_boundary.py` |
+| Static gates | `verify_gp085_prog01` calls P0 step 2 boundary verifier |
 
 ---
 
@@ -913,7 +922,7 @@ def run_phase_XX_v1(session, *, tenant_id, pipeline_run_id, ...) -> PhaseResult:
 - [ ] No phase runner creates replay **jobs** (only synchronous transforms)  
 - [ ] Canonical slice has **one** drain entry, no pass fairness on lease  
 - [ ] `pipeline_continuation` unused by execution hot path  
-- [ ] TCRE worker does not materialize retrieval  
+- [x] TCRE worker does not materialize retrieval (**P0 step 2**)  
 - [x] Phase 07 does not enqueue synthesis (**P0 step 1**)  
 - [ ] Every phase output includes `receipt_hash` + terminal `outcome` enum  
 - [ ] FSM `BLOCKED` is the only “stuck” state; no fake-green `completed`  

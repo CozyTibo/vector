@@ -67,21 +67,10 @@ def run_tcre_reconstruction_job_task(tenant_id: str, job_id: str) -> dict[str, A
                     detail={"tcre_job_status": job.status},
                 )
         if job.status == "completed":
-            from vector.domains.cortex.retrieval.retrieval_index_materialization import (
-                materialize_retrieval_index_incremental_after_tcre_v1,
-            )
             from vector.domains.cortex.substrate_pipeline.orchestrator import (
                 on_tcre_job_completed_for_pipeline_v1,
             )
 
-            prid_raw = scope.get("substrate_pipeline_run_id")
-            prid = uuid.UUID(str(prid_raw)) if prid_raw else None
-            materialize_retrieval_index_incremental_after_tcre_v1(
-                session,
-                tenant_id=tid,
-                job=job,
-                pipeline_run_id=prid,
-            )
             chained = on_tcre_job_completed_for_pipeline_v1(
                 session,
                 tenant_id=tid,

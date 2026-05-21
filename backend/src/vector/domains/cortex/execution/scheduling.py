@@ -206,6 +206,27 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p0_step2_phase06_tcre_worker_boundary_v1() -> list[str]:
+    """Return error codes if TCRE Celery worker still materializes retrieval (P0 step 2)."""
+    import importlib.util
+
+    errors: list[str] = []
+    spec = importlib.util.find_spec("app.tasks.cortex_tcre_reconstruction_jobs")
+    if spec is None or spec.origin is None:
+        errors.append("missing_cortex_tcre_reconstruction_jobs_module")
+        return errors
+    from pathlib import Path
+
+    src = Path(spec.origin).read_text(encoding="utf-8")
+    if "materialize_retrieval_index_incremental_after_tcre_v1" in src:
+        errors.append("tcre_worker_still_calls_incremental_retrieval_materialization")
+    if "materialize_retrieval_index" in src:
+        errors.append("tcre_worker_still_imports_retrieval_materialization")
+    if "on_tcre_job_completed_for_pipeline_v1" not in src:
+        errors.append("tcre_worker_missing_pipeline_resume_on_completion")
+    return errors
+
+
 def verify_p0_step1_phase07_retrieval_boundary_v1() -> list[str]:
     """Return error codes if phase 07 still runs synthesis activation (P0 step 1)."""
     from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod

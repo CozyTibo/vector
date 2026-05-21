@@ -359,51 +359,6 @@ def derive_substrate_pipeline_replay_identity_v1(
     )
 
 
-def materialize_retrieval_index_incremental_after_tcre_v1(
-    session: Session,
-    *,
-    tenant_id: uuid.UUID,
-    job: Any,
-    pipeline_run_id: uuid.UUID | None = None,
-) -> dict[str, Any]:
-    """Incremental index update after a single completed TCRE job (idempotent)."""
-    from vector.domains.cortex.retrieval.retrieval_tcre_binding import (
-        RetrievalTcreBindingError,
-        materialize_retrieval_index_from_tcre_job_v1,
-    )
-
-    if str(getattr(job, "status", "")) != "completed":
-        return {"skipped": True, "reason": "job_not_completed"}
-    published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
-    epoch = published or f"epoch-{uuid.uuid4().hex[:12]}"
-    if published is None:
-        epoch_row = start_retrieval_index_build_v1(session, tenant_id=tenant_id, index_epoch=epoch)
-        transition_retrieval_index_build_v1(session, epoch_row=epoch_row, to_state="BUILDING")
-    replay = derive_substrate_pipeline_replay_identity_v1(
-        tenant_id=tenant_id,
-        pipeline_run_id=pipeline_run_id or uuid.uuid4(),
-    )
-    try:
-        out = materialize_retrieval_index_from_tcre_job_v1(
-            session,
-            tenant_id=tenant_id,
-            job=job,
-            replay_identity=replay,
-            index_epoch=epoch,
-            auto_publish=False,
-        )
-        published_row = publish_retrieval_index_epoch_v1(session, tenant_id=tenant_id, index_epoch=epoch)
-        return {
-            "incremental": True,
-            "index_epoch": epoch,
-            "materialized_lookup_ids": out.get("materialized_lookup_ids"),
-            "build_state": published_row.build_state,
-            "entry_count": published_row.entry_count,
-        }
-    except RetrievalTcreBindingError as exc:
-        return {"incremental": True, "skipped": True, "code": exc.code}
-
-
 def materialize_retrieval_index_for_pipeline_v1(
     session: Session,
     *,
