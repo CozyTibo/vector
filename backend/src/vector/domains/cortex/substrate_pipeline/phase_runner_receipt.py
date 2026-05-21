@@ -11,7 +11,6 @@ from vector.domains.cortex.substrate_pipeline.repository import (
     complete_phase_v1,
     fail_phase_v1,
     skip_phase_v1,
-    wait_phase_v1,
 )
 from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
     PHASE_OUTCOME_BLOCKED,
@@ -91,12 +90,11 @@ def wait_phase_with_receipt_v1(
         blocked_reason=reason[:500] if reason else None,
     )
     out = merge_receipt_into_output(raw_output, receipt)
-    wait_phase_v1(
+    complete_phase_v1(
         session,
         pipeline_run_id=pipeline_run_id,
         phase_id=phase_id,
         output=out,
-        waiting_reason=waiting_reason,
     )
     return out
 

@@ -106,7 +106,10 @@ def create_pipeline_run_v1(
         bundle_id=bundle_id,
         idempotency_key=idempotency_key,
         current_phase_id=None,
-        summary_json={},
+        summary_json={
+            "execution_mirror_v1": True,
+            "authoritative_surface": "cortex_tenant_convergence_lease",
+        },
         celery_root_task_id=celery_root_task_id,
     )
     session.add(run)
@@ -174,6 +177,17 @@ def begin_phase_v1(
     return phase
 
 
+def _require_substrate_phase_receipt_in_output_v1(output: dict[str, Any]) -> None:
+    rec = output.get("substrate_phase_receipt")
+    if not isinstance(rec, dict):
+        msg = "phase output missing substrate_phase_receipt envelope"
+        raise ValueError(msg)
+    for key in ("receipt_hash", "outcome", "phase_id"):
+        if not rec.get(key):
+            msg = f"substrate_phase_receipt missing {key}"
+            raise ValueError(msg)
+
+
 def complete_phase_v1(
     session: Session,
     *,
@@ -181,6 +195,7 @@ def complete_phase_v1(
     phase_id: str,
     output: dict[str, Any],
 ) -> CortexSubstratePhaseRun:
+    _require_substrate_phase_receipt_in_output_v1(output)
     phase = get_phase_run_v1(session, pipeline_run_id=pipeline_run_id, phase_id=phase_id)
     if phase is None:
         msg = f"unknown_phase:{phase_id}"

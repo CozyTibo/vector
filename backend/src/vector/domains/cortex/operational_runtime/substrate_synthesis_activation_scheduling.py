@@ -154,16 +154,13 @@ def chain_synthesis_activation_after_phase07_v1(
             "synthesis_forbidden_escalation_panel": panel,
         }
 
-    from vector.domains.cortex.substrate_pipeline.orchestrator import (
-        enqueue_next_pipeline_phase_v1,
-    )
+    from vector.domains.cortex.execution.enqueue import enqueue_execution_slice_at_phase_v1
 
-    chain = enqueue_next_pipeline_phase_v1(
+    chain = enqueue_execution_slice_at_phase_v1(
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,
-        phase_id=PHASE_08_SYNTHESIS,
-        bundle_id=bundle_id,
-        batch_limit=batch_limit,
+        phase_cursor=PHASE_08_SYNTHESIS,
+        reason="synthesis_activation_after_phase07",
     )
     return {
         "chained": True,
@@ -240,14 +237,13 @@ def run_synthesis_activation_schedule_pass_v1(
             "phase_08_output": phase_out,
         }
 
-    from vector.domains.cortex.substrate_pipeline.orchestrator import (
-        enqueue_next_pipeline_phase_v1,
-    )
+    from vector.domains.cortex.execution.enqueue import enqueue_execution_slice_at_phase_v1
 
-    chain = enqueue_next_pipeline_phase_v1(
+    chain = enqueue_execution_slice_at_phase_v1(
         tenant_id=tenant_id,
         pipeline_run_id=prid,
-        phase_id=PHASE_08_SYNTHESIS,
+        phase_cursor=PHASE_08_SYNTHESIS,
+        reason="synthesis_activation_schedule_pass",
     )
     return {
         "gate_id": GP085_SYN01_GATE_ID_V1,

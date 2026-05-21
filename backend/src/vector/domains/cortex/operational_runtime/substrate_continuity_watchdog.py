@@ -228,7 +228,7 @@ def verify_gp085_watch01_static() -> dict[str, Any]:
     if int(cat["default_interval_seconds"]) != DEFAULT_WATCHDOG_INTERVAL_SECONDS_V1:
         errors.append("default_interval_not_600")
 
-    from vector.domains.cortex.convergence.scheduling import (
+    from vector.domains.cortex.execution.scheduling import (
         convergence_runtime_authoritative_v1,
         verify_convergence_sweep_in_celery_beat_v1,
     )

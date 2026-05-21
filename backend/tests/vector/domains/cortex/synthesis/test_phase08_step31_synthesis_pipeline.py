@@ -127,11 +127,19 @@ def test_phase08_pipeline_materialize_and_publish(db_session: Session, monkeypat
         bundle_id=None,
         idempotency_key=f"test-{uuid.uuid4().hex}",
     )
-    complete_phase_v1(
+    from vector.domains.cortex.substrate_pipeline.phase_runner_receipt import (
+        complete_phase_with_receipt_v1,
+    )
+    from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import utc_now_iso_v1
+
+    complete_phase_with_receipt_v1(
         db_session,
         pipeline_run_id=run.id,
         phase_id=PHASE_07_RETRIEVAL,
-        output={"published_index_epoch": epoch, "build_state": "PUBLISHED"},
+        tenant_id=tenant_id,
+        raw_output={"published_index_epoch": epoch, "build_state": "PUBLISHED"},
+        started_at=utc_now_iso_v1(),
+        processed_count=1,
     )
     db_session.flush()
 

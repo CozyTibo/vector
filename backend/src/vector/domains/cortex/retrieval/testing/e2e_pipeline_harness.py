@@ -91,11 +91,18 @@ def run_substrate_pipeline_sync_through_retrieval_v1(
         scope["octs_walk_id"] = str(walk_id)
     job = create_reconstruction_job_v1(session, tenant_id=tenant_id, scope=scope)
     execute_tcre_reconstruction_job_v1(session, job)
-    complete_phase_v1(
+    from vector.domains.cortex.substrate_pipeline.phase_runner_receipt import (
+        complete_async_phase_with_receipt_v1,
+    )
+    from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import utc_now_iso_v1
+
+    complete_async_phase_with_receipt_v1(
         session,
         pipeline_run_id=prid,
         phase_id=PHASE_06_TCRE,
-        output={"job_id": str(job.id), "status": job.status, "sync": True},
+        tenant_id=tenant_id,
+        raw_output={"job_id": str(job.id), "status": job.status, "sync": True},
+        started_at=utc_now_iso_v1(),
     )
     out["phases"][PHASE_06_TCRE] = {"job_id": str(job.id), "status": job.status}
 

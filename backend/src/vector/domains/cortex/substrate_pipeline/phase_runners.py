@@ -32,13 +32,13 @@ from vector.domains.cortex.substrate_pipeline.phase_runner_receipt import (
     complete_phase_with_receipt_v1,
     fail_phase_with_receipt_v1,
     skip_phase_with_receipt_v1,
-    wait_phase_with_receipt_v1,
 )
 from vector.domains.cortex.substrate_pipeline.repository import (
     begin_phase_v1,
     get_phase_run_v1,
 )
 from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
+    PHASE_OUTCOME_BLOCKED,
     PHASE_OUTCOME_COMPLETED_EMPTY,
     PHASE_OUTCOME_SKIPPED_BY_POLICY,
     utc_now_iso_v1,
@@ -103,15 +103,16 @@ def run_phase_02_canonical_v1(
         "convergence_health": canonical_summary.get("convergence_health"),
     }
     if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT and int(canonical_summary.get("total_succeeded") or 0) == 0:
-        return wait_phase_with_receipt_v1(
+        return complete_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
             phase_id=PHASE_02_CANONICAL,
             tenant_id=tenant_id,
             raw_output=out,
             started_at=started_at,
-            waiting_reason="topology_wait:parent_materialization_required",
-            blocked_reason="topology_wait",
+            outcome=PHASE_OUTCOME_BLOCKED,
+            blocked_reason="topology_wait:parent_materialization_required",
+            processed_count=0,
         )
     if outcome == CANONICAL_OUTCOME_FAILED and int(canonical_summary.get("total_succeeded") or 0) == 0:
         return fail_phase_with_receipt_v1(

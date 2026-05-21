@@ -362,10 +362,8 @@ def verify_gp085_econ01_static() -> dict[str, Any]:
     from vector.domains.cortex.substrate_pipeline import orchestrator as orch
 
     sched_src = inspect.getsource(orch.schedule_substrate_pipeline_v1)
-    if "enqueue_tenant_convergence_v1" not in sched_src:
-        errors.append("orchestrator_missing_convergence_enqueue")
-    if "mark_tenant_dirty_v1" not in sched_src:
-        errors.append("orchestrator_missing_dirty_mark")
+    if "mark_dirty_and_enqueue_convergence_v1" not in sched_src:
+        errors.append("orchestrator_missing_unified_convergence_dispatch")
     if "run_cortex_substrate_pipeline_coordinator_task" in sched_src:
         errors.append("orchestrator_still_enqueues_legacy_coordinator")
     if "evaluate_pipeline_concurrency_v1" not in sched_src:
@@ -374,7 +372,7 @@ def verify_gp085_econ01_static() -> dict[str, Any]:
     from vector.domains.cortex.ingestion import post_ingestion_refresh_dispatch as pid
 
     dispatch_src = inspect.getsource(pid.schedule_post_ingestion_substrate_refresh)
-    if "mark_tenant_dirty_v1" not in dispatch_src:
+    if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_src:
         errors.append("post_ingestion_dispatch_not_wired")
     if "schedule_substrate_pipeline_v1" in dispatch_src:
         errors.append("post_ingestion_dispatch_legacy_coordinator_present")

@@ -311,6 +311,20 @@ class Settings(BaseSettings):
             "and attach the report to the task response (disable in hot paths if needed)."
         ),
     )
+    cortex_allow_pipeline_continuation_writes: bool = Field(
+        default=False,
+        validation_alias="CORTEX_ALLOW_PIPELINE_CONTINUATION_WRITES",
+        description=(
+            "When false, pipeline_continuation row writes raise at runtime (admin recovery may enable)."
+        ),
+    )
+    cortex_allow_legacy_enqueue_next_pipeline_phase: bool = Field(
+        default=False,
+        validation_alias="CORTEX_ALLOW_LEGACY_ENQUEUE_NEXT_PIPELINE_PHASE",
+        description=(
+            "When false, enqueue_next_pipeline_phase_v1 raises unless callers use execution enqueue."
+        ),
+    )
     cortex_post_ingestion_substrate_refresh_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED",

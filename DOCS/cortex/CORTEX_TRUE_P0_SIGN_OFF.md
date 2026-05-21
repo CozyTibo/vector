@@ -1,6 +1,6 @@
 # Cortex TRUE P0 Sign-Off — Final Deterministic Substrate Consolidation
 
-**Status:** Authoritative implementation plan (post M0–M12 orchestration + per-phase reduction P0–P3)  
+**Status:** **Signed off** (TRUE P0 waves P0A–P0F + completion pass 2026-05-21)  
 **Context:** [`CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md`](./CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md), [`CORTEX_PER_PHASE_SIMPLIFICATION_AUDIT.md`](./CORTEX_PER_PHASE_SIMPLIFICATION_AUDIT.md)  
 **Date:** 2026-05-21  
 **Implementation:** Waves P0A–P0F landed on `main` (2026-05-21)
@@ -17,6 +17,21 @@
 | **P0D** | **Done** | `build_substrate_progression_status_v1(include_legacy_continuation=False)` |
 | **P0E** | **Done** | Deleted `post_ingestion_substrate_refresh.py` |
 | **P0F** | **Done** | `verify_true_p0_substrate_signoff_v1` in CI / `verify_gp085_prog01` |
+| **Completion** | **Done** | FIFO `candidate_selection`; unified `mark_dirty_and_enqueue_convergence_v1`; topology → `BLOCKED` receipt; continuation writes frozen; `canonical_receipt_hash`; pipeline run execution mirror; repository requires phase receipt |
+
+### Former gaps (now closed)
+
+| Gap | Resolution |
+|-----|------------|
+| FIFO raw selection | `connector, resource_type, source_identity_key, id ASC` in `candidate_selection.py` |
+| Unify schedule APIs | `execution/convergence_dispatch.py` — both post-ingest and orchestrator call it |
+| Topology stuck semantics | Phase 02 topology defer → `PHASE_OUTCOME_BLOCKED` + completed phase row (not `WAITING`) |
+| `repository.complete_phase_v1` | Requires `substrate_phase_receipt` envelope |
+| Golden canonical replay hash | `canonical_drain_receipt.py` + `test_canonical_drain_receipt_golden.py` |
+| `pipeline_continuation` | Runtime freeze (`PipelineContinuationWriteFrozenError`); admin recovery uses `allow_legacy_*` |
+| `enqueue_next_pipeline_phase_v1` | Frozen by default; synthesis/recovery use `enqueue_execution_slice_at_phase_v1` |
+| Pipeline run table | `summary_json.execution_mirror_v1` — FSM/lease authoritative; rows are mirror |
+| T4 drop `CortexSubstratePipelineRun` | **Deferred** — mirror-only semantics without destructive migration |
 
 ---
 

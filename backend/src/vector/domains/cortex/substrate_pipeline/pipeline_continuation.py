@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime, timedelta
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
 from typing import Any, Final
 
 from sqlalchemy import select
@@ -23,6 +25,38 @@ from vector.domains.cortex.substrate_pipeline.repository import get_phase_run_v1
 from vector.infrastructure.db.models.cortex_pipeline_continuation import CortexPipelineContinuationState
 
 _LOGGER = logging.getLogger(__name__)
+
+_LEGACY_CONTINUATION_WRITE_ALLOWED: ContextVar[bool] = ContextVar(
+    "legacy_continuation_write_allowed",
+    default=False,
+)
+
+
+class PipelineContinuationWriteFrozenError(RuntimeError):
+    """Raised when hot path or default config attempts continuation persistence."""
+
+
+@contextmanager
+def allow_legacy_pipeline_continuation_writes_v1() -> Generator[None, None, None]:
+    """Admin/recovery-only escape hatch for frozen continuation table writes."""
+    token = _LEGACY_CONTINUATION_WRITE_ALLOWED.set(True)
+    try:
+        yield
+    finally:
+        _LEGACY_CONTINUATION_WRITE_ALLOWED.reset(token)
+
+
+def _assert_continuation_write_allowed_v1() -> None:
+    if _LEGACY_CONTINUATION_WRITE_ALLOWED.get():
+        return
+    from vector.settings import get_settings
+
+    if get_settings().cortex_allow_pipeline_continuation_writes:
+        return
+    raise PipelineContinuationWriteFrozenError(
+        "pipeline_continuation writes are frozen; use execution lease + FSM only"
+    )
+
 
 CONTINUATION_STATUS_WAITING: Final[str] = "WAITING"
 CONTINUATION_STATUS_RESUMED: Final[str] = "RESUMED"
@@ -66,6 +100,7 @@ def mark_continuation_failed_v1(
     pipeline_run_id: uuid.UUID,
     failure_reason: str,
 ) -> CortexPipelineContinuationState | None:
+    _assert_continuation_write_allowed_v1()
     continuation = get_continuation_for_pipeline_v1(session, pipeline_run_id=pipeline_run_id)
     if continuation is None:
         return None
@@ -85,6 +120,7 @@ def append_recovery_receipt_v1(
     *,
     receipt: Mapping[str, Any],
 ) -> None:
+    _assert_continuation_write_allowed_v1()
     detail = dict(continuation.detail_json or {})
     receipts = list(detail.get("recovery_receipts") or [])
     receipts.append(dict(receipt))
@@ -167,6 +203,7 @@ def mark_pipeline_waiting_on_tcre_v1(
     celery_task_id: str | None = None,
 ) -> CortexPipelineContinuationState:
     """Persist WAITING continuation after phase 06 enqueues async TCRE."""
+    _assert_continuation_write_allowed_v1()
     now = datetime.now(UTC)
     waiting_on = WAITING_ON_TCRE_COMPLETION
     nonce = compute_continuation_nonce_v1(
@@ -235,6 +272,7 @@ def mark_pipeline_waiting_on_traversal_v1(
     celery_task_id: str | None = None,
 ) -> CortexPipelineContinuationState:
     """Persist WAITING continuation after traversal walk batch is scheduled (**G-P085-WALK-01**)."""
+    _assert_continuation_write_allowed_v1()
     now = datetime.now(UTC)
     waiting_on = WAITING_ON_TRAVERSAL_COMPLETION
     nonce = compute_continuation_nonce_v1(

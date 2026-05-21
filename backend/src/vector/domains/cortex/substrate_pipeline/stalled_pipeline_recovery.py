@@ -162,6 +162,24 @@ def recover_stalled_pipeline_v1(
     action: str = "auto",
 ) -> dict[str, Any]:
     """Replay-safe recovery for one stalled pipeline."""
+    from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+        allow_legacy_pipeline_continuation_writes_v1,
+    )
+
+    with allow_legacy_pipeline_continuation_writes_v1():
+        return _recover_stalled_pipeline_impl_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            action=action,
+        )
+
+
+def _recover_stalled_pipeline_impl_v1(
+    session: Session,
+    *,
+    pipeline_run_id: uuid.UUID,
+    action: str = "auto",
+) -> dict[str, Any]:
     run_row = session.get(CortexSubstratePipelineRun, pipeline_run_id)
     if run_row is not None:
         emit_execution_path_telemetry_v1(
@@ -342,7 +360,7 @@ def recover_stalled_pipeline_v1(
             recommendation="resume_phase_07",
         )
 
-    from vector.domains.cortex.substrate_pipeline.orchestrator import enqueue_next_pipeline_phase_v1
+    from vector.domains.cortex.execution.enqueue import enqueue_execution_slice_at_phase_v1
 
     if action in ("replay_phase_06", "auto") and continuation.waiting_on == WAITING_ON_TCRE_COMPLETION:
         from vector.domains.cortex.substrate_pipeline.phase_runners import run_phase_06_tcre_v1
@@ -359,10 +377,11 @@ def recover_stalled_pipeline_v1(
             result={"recovered": True, "reason": "phase_06_re_enqueued"},
         )
 
-    chain = enqueue_next_pipeline_phase_v1(
+    chain = enqueue_execution_slice_at_phase_v1(
         tenant_id=continuation.tenant_id,
         pipeline_run_id=pipeline_run_id,
-        phase_id=PHASE_07_RETRIEVAL,
+        phase_cursor=PHASE_07_RETRIEVAL,
+        reason=f"stalled_recovery:{action}",
     )
     return _finish_stalled_recovery_v1(
         session,

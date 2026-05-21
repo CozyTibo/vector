@@ -8,10 +8,6 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.execution.execution_path_telemetry import (
-    EXECUTION_PATH_CONVERGENCE,
-    emit_execution_path_telemetry_v1,
-)
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_03_IDENTITY,
@@ -51,9 +47,10 @@ def schedule_substrate_pipeline_v1(
     batch_limit: int | None = None,
     reason: str = "ingestion",
 ) -> dict[str, Any]:
-    """Mark tenant dirty and enqueue convergence (M4: no legacy coordinator/debounce/revoke)."""
-    from vector.domains.cortex.execution.enqueue import enqueue_tenant_convergence_v1
-    from vector.domains.cortex.execution.lease import mark_tenant_dirty_v1
+    """Mark tenant dirty and enqueue convergence (compat wrapper over unified dispatch)."""
+    from vector.domains.cortex.execution.convergence_dispatch import (
+        mark_dirty_and_enqueue_convergence_v1,
+    )
 
     cfg = settings or get_settings()
     if not cfg.cortex_post_ingestion_substrate_refresh_enabled:
@@ -87,35 +84,20 @@ def schedule_substrate_pipeline_v1(
                 }
 
     schedule_reason = f"{trigger_kind}:{reason}"
-    with session_scope() as session:
-        dirty = mark_tenant_dirty_v1(session, tenant_id=tenant_id, reason=schedule_reason)
-        session.commit()
-    hint = enqueue_tenant_convergence_v1(tenant_id, reason=schedule_reason)
-    telemetry = emit_execution_path_telemetry_v1(
+    out = mark_dirty_and_enqueue_convergence_v1(
         tenant_id=tenant_id,
-        execution_path=EXECUTION_PATH_CONVERGENCE,
-        trigger=f"schedule_substrate_pipeline:{trigger_kind}",
-        celery_task_id=hint.get("celery_task_id"),
-        detail={"reason": reason, "obligation_epoch": dirty.get("obligation_epoch")},
+        settings=cfg,
+        reason=schedule_reason,
+        telemetry_trigger=f"schedule_substrate_pipeline:{trigger_kind}",
     )
-    _LOGGER.info(
-        "substrate_pipeline_scheduled_convergence tenant_id=%s trigger=%s reason=%s",
-        tenant_id,
-        trigger_kind,
-        reason,
-    )
-    return {
-        "scheduled": True,
-        "path": "convergence_lease",
-        "coalesced": False,
-        "reason": reason,
-        "trigger_kind": trigger_kind,
-        "execution_path": EXECUTION_PATH_CONVERGENCE,
-        "task_id": substrate_pipeline_celery_task_id(tenant_id),
-        **dirty,
-        **hint,
-        "execution_path_telemetry": telemetry,
-    }
+    if out.get("scheduled"):
+        out = {
+            **out,
+            "coalesced": False,
+            "trigger_kind": trigger_kind,
+            "task_id": substrate_pipeline_celery_task_id(tenant_id),
+        }
+    return out
 
 
 def start_substrate_pipeline_run_v1(
@@ -155,9 +137,16 @@ def enqueue_next_pipeline_phase_v1(
     batch_limit: int | None = None,
     graph_projection_stable_hash: str | None = None,
     identity_substrate_trigger: str = "substrate_pipeline",
+    allow_legacy_orchestrator_chain: bool = False,
 ) -> dict[str, Any]:
-    """M6: enqueue execution slice at ``phase_id`` (no per-phase Celery task)."""
+    """Admin/recovery-only: enqueue execution slice at ``phase_id`` (frozen by default)."""
     del bundle_id, batch_limit, graph_projection_stable_hash, identity_substrate_trigger
+    if not allow_legacy_orchestrator_chain:
+        cfg = get_settings()
+        if not cfg.cortex_allow_legacy_enqueue_next_pipeline_phase:
+            raise RuntimeError(
+                "enqueue_next_pipeline_phase_v1 is frozen; use enqueue_execution_slice_at_phase_v1"
+            )
     from vector.domains.cortex.execution.enqueue import enqueue_execution_slice_at_phase_v1
 
     return enqueue_execution_slice_at_phase_v1(
