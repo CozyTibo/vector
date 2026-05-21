@@ -3,6 +3,20 @@
 **Status:** Authoritative implementation plan (post M0–M12 orchestration + per-phase reduction P0–P3)  
 **Context:** [`CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md`](./CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md), [`CORTEX_PER_PHASE_SIMPLIFICATION_AUDIT.md`](./CORTEX_PER_PHASE_SIMPLIFICATION_AUDIT.md)  
 **Date:** 2026-05-21  
+**Implementation:** Waves P0A–P0F landed on `main` (2026-05-21)
+
+---
+
+## Implementation progress (TRUE P0)
+
+| Wave | Status | Commit focus |
+|------|--------|----------------|
+| **P0A** | **Done** | `substrate_phase_receipt.py`, `phase_runner_receipt.py`, all phase runners + phase 08 |
+| **P0B** | **Done** | `phase_outcomes.py`, lease `last_phase_receipt_*`, worker outcome labels |
+| **P0C** | **Done** | Deterministic `resolve_fair_pass_cursor`; drain without cooldown export |
+| **P0D** | **Done** | `build_substrate_progression_status_v1(include_legacy_continuation=False)` |
+| **P0E** | **Done** | Deleted `post_ingestion_substrate_refresh.py` |
+| **P0F** | **Done** | `verify_true_p0_substrate_signoff_v1` in CI / `verify_gp085_prog01` |
 
 ---
 

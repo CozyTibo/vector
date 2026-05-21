@@ -184,19 +184,17 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         verify_phase03_identity_projection_boundary_v1,
         verify_phase04_graph_projection_export_boundary_v1,
         verify_phase05_traversal_slice_boundary_v1,
-        verify_execution_hot_path_no_cesp_imports_boundary_v1,
+        verify_true_p0_substrate_signoff_v1,
     )
 
+    errors.extend(verify_true_p0_substrate_signoff_v1())
     errors.extend(verify_tcre_worker_no_retrieval_materialization_boundary_v1())
     errors.extend(verify_single_tcre_execution_resume_boundary_v1())
-    errors.extend(verify_execution_hot_path_no_continuation_boundary_v1())
-    errors.extend(verify_canonical_single_drain_boundary_v1())
     errors.extend(verify_execution_lease_no_pass_fairness_boundary_v1())
     errors.extend(verify_canonical_no_inline_determinism_repair_boundary_v1())
     errors.extend(verify_phase03_identity_projection_boundary_v1())
     errors.extend(verify_phase04_graph_projection_export_boundary_v1())
     errors.extend(verify_phase05_traversal_slice_boundary_v1())
-    errors.extend(verify_execution_hot_path_no_cesp_imports_boundary_v1())
 
     p03_src = inspect.getsource(runners_mod.run_phase_03_identity_v1)
     if "finalize_identity_substrate_operator_audit" in p03_src:

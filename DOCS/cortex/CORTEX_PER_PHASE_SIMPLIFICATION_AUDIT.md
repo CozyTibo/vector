@@ -1054,8 +1054,12 @@ def run_phase_XX_v1(session, *, tenant_id, pipeline_run_id, ...) -> PhaseResult:
 - [x] `pipeline_continuation` unused by execution hot path (**P0 step 4**)  
 - [x] TCRE worker does not materialize retrieval (**P0 step 2**)  
 - [x] Phase 07 does not enqueue synthesis (**P0 step 1**)  
-- [ ] Every phase output includes `receipt_hash` + terminal `outcome` enum  
-- [ ] FSM `BLOCKED` is the only “stuck” state; no fake-green `completed`  
+- [x] Every phase output includes `receipt_hash` + terminal `outcome` enum (**TRUE P0A**)  
+- [x] BLOCKED / async semantics standardized via phase receipts + FSM (**TRUE P0B**, partial: phase-row `waiting` remains for topology)  
+- [x] Canonical hot path deterministic pass rotation (**TRUE P0C**)  
+- [x] Operator status defaults to lease truth (**TRUE P0D**)  
+- [x] Legacy `post_ingestion_substrate_refresh` removed (**TRUE P0E**)  
+- [x] `verify_true_p0_substrate_signoff_v1` aggregate CI gate (**TRUE P0F**)  
 
 ---
 
