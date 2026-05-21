@@ -64,10 +64,7 @@ def build_canonical_forward_progress_snapshot(
             "phase_cursor": lease.phase_cursor,
             "next_attempt_at": lease.next_attempt_at.isoformat() if lease.next_attempt_at else None,
             "last_canonical_outcome": lease_detail.get("last_canonical_outcome"),
-            "canonical_pass_index": lease_detail.get("canonical_pass_index"),
             "convergence_health": lease_detail.get("convergence_health"),
-            "pass_cooldown_until": lease_detail.get("pass_cooldown_until"),
-            "pass_topology_stall_counts": lease_detail.get("pass_topology_stall_counts"),
         }
         if lease.pipeline_run_id is not None:
             pr = db.get(CortexSubstratePipelineRun, lease.pipeline_run_id)
@@ -89,6 +86,9 @@ def build_canonical_forward_progress_snapshot(
                         "topology_wait": summary.get("topology_wait"),
                         "zero_progress_spin_detected": summary.get("zero_progress_spin_detected"),
                         "deferral_counts": summary.get("deferral_counts"),
+                        "pass_index_next": summary.get("pass_index_next"),
+                        "pass_cooldown_until": summary.get("pass_cooldown_until"),
+                        "pass_topology_stall_counts": summary.get("pass_topology_stall_counts"),
                     }
 
     deferrals = db.scalars(
@@ -175,7 +175,10 @@ def _build_operator_guidance(
         else:
             lines.append(f"{n:,} {rt} deferred ({reason}).")
 
-    cooled = parse_pass_cooldown_until(lease_detail)
+    cooldown_detail: dict[str, Any] | None = None
+    if phase_02_doc and isinstance(phase_02_doc.get("pass_cooldown_until"), dict):
+        cooldown_detail = {"pass_cooldown_until": phase_02_doc["pass_cooldown_until"]}
+    cooled = parse_pass_cooldown_until(cooldown_detail)
     if cooled:
         lines.append(
             f"{len(cooled)} canonical pass(es) on local topology cooldown — other passes continue in parallel."

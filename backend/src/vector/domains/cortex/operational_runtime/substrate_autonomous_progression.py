@@ -255,12 +255,14 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         verify_p0_step3_single_tcre_resume_path_v1,
         verify_p0_step4_no_continuation_on_execution_hot_path_v1,
         verify_p0_step5_canonical_single_drain_v1,
+        verify_p0_step6_no_pass_fairness_on_lease_v1,
     )
 
     errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
     errors.extend(verify_p0_step3_single_tcre_resume_path_v1())
     errors.extend(verify_p0_step4_no_continuation_on_execution_hot_path_v1())
     errors.extend(verify_p0_step5_canonical_single_drain_v1())
+    errors.extend(verify_p0_step6_no_pass_fairness_on_lease_v1())
 
     p02_src = inspect.getsource(runners_mod.run_phase_02_canonical_v1)
     if "drain_stub_materialize_backlog" in p02_src:

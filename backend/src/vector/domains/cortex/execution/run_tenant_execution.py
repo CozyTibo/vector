@@ -13,10 +13,6 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
     CANONICAL_OUTCOME_PARTIAL_PROGRESS,
     CANONICAL_OUTCOME_TOPOLOGY_WAIT,
 )
-from vector.domains.cortex.canonical.forward_progress.pass_fairness import (
-    parse_pass_cooldown_until,
-    parse_pass_topology_stall_counts,
-)
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.execution.enqueue import enqueue_tenant_convergence_v1
 from vector.domains.cortex.execution.execution_path_telemetry import (
@@ -66,34 +62,20 @@ from vector.settings import Settings, get_settings
 _LOGGER = logging.getLogger(__name__)
 
 
-def _canonical_pass_index_from_lease(lease: CortexTenantConvergenceLease) -> int:
-    detail = lease.detail_json if isinstance(lease.detail_json, dict) else {}
-    raw = detail.get("canonical_pass_index")
-    if raw is None:
-        return 0
-    try:
-        return max(0, int(raw))
-    except (TypeError, ValueError):
-        return 0
-
-
-def _store_canonical_pass_index_on_lease(lease: CortexTenantConvergenceLease, pass_index: int) -> None:
+def _store_canonical_slice_outcome_on_lease(
+    lease: CortexTenantConvergenceLease,
+    *,
+    outcome: str,
+    convergence_health: str | None = None,
+) -> None:
+    """Persist slice outcome hints only — no pass-fairness cursor state on the lease (P0 step 6)."""
     detail = dict(lease.detail_json or {})
-    detail["canonical_pass_index"] = int(pass_index)
-    lease.detail_json = detail
-
-
-def _store_pass_fairness_on_lease(lease: CortexTenantConvergenceLease, summary: dict[str, Any]) -> None:
-    detail = dict(lease.detail_json or {})
-    cooldowns = summary.get("pass_cooldown_until")
-    if isinstance(cooldowns, dict):
-        detail["pass_cooldown_until"] = cooldowns
-    stalls = summary.get("pass_topology_stall_counts")
-    if isinstance(stalls, dict):
-        detail["pass_topology_stall_counts"] = stalls
-    health = summary.get("convergence_health")
-    if isinstance(health, str) and health.strip():
-        detail["convergence_health"] = health.strip()
+    for stale in ("canonical_pass_index", "pass_cooldown_until", "pass_topology_stall_counts"):
+        detail.pop(stale, None)
+    if outcome:
+        detail["last_canonical_outcome"] = outcome
+    if isinstance(convergence_health, str) and convergence_health.strip():
+        detail["convergence_health"] = convergence_health.strip()
     lease.detail_json = detail
 
 
@@ -198,8 +180,6 @@ def run_tenant_convergence_v1(
             )
 
             if phase == PHASE_02_CANONICAL:
-                pass_idx = _canonical_pass_index_from_lease(lease)
-                lease_detail = lease.detail_json if isinstance(lease.detail_json, dict) else {}
                 out = run_phase_02_canonical_v1(
                     session,
                     cfg,
@@ -207,16 +187,9 @@ def run_tenant_convergence_v1(
                     pipeline_run_id=pipeline_run_id,
                     bundle_id=bundle_id,
                     batch_limit=cfg.cortex_post_ingestion_canonical_batch_limit,
-                    pass_index=pass_idx,
-                    pass_cooldowns=parse_pass_cooldown_until(lease_detail),
-                    pass_stall_counts=parse_pass_topology_stall_counts(lease_detail),
                 )
                 raw_summary = out.get("canonical_summary")
                 summary: dict[str, Any] = raw_summary if isinstance(raw_summary, dict) else {}
-                next_pass = summary.get("pass_index_next")
-                if isinstance(next_pass, int):
-                    _store_canonical_pass_index_on_lease(lease, next_pass)
-                _store_pass_fairness_on_lease(lease, summary)
                 if canonical_needs_more_work_v1(session, canonical_summary=summary, tenant_id=tenant_id):
                     outcome = str(summary.get("canonical_outcome") or "")
                     progress_made = bool(summary.get("progress_made"))
@@ -235,9 +208,11 @@ def run_tenant_convergence_v1(
                         phase_cursor=PHASE_02_CANONICAL,
                         delay_seconds=delay,
                     )
-                    detail = dict(lease.detail_json or {})
-                    detail["last_canonical_outcome"] = outcome
-                    lease.detail_json = detail
+                    _store_canonical_slice_outcome_on_lease(
+                        lease,
+                        outcome=outcome,
+                        convergence_health=str(summary.get("convergence_health") or "") or None,
+                    )
                     session.commit()
                     enqueue_tenant_convergence_v1(tenant_id, reason="canonical_continue")
                     worker_outcome = (
@@ -254,7 +229,11 @@ def run_tenant_convergence_v1(
                         "pipeline_run_id": str(pipeline_run_id),
                         "fsm_state": lease.fsm_state,
                     }
-                _store_canonical_pass_index_on_lease(lease, 0)
+                _store_canonical_slice_outcome_on_lease(
+                    lease,
+                    outcome=str(summary.get("canonical_outcome") or ""),
+                    convergence_health=str(summary.get("convergence_health") or "") or None,
+                )
                 phase = PHASE_03_IDENTITY
                 continue
 

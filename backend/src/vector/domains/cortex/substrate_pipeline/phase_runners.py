@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -71,9 +70,6 @@ def run_phase_02_canonical_v1(
     pipeline_run_id: uuid.UUID,
     bundle_id: str | None,
     batch_limit: int | None,
-    pass_index: int = 0,
-    pass_cooldowns: dict[str, datetime] | None = None,
-    pass_stall_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_02_CANONICAL)
     bid = _resolve_bundle_id(session, tenant_id=tenant_id, bundle_id=bundle_id)
@@ -90,9 +86,6 @@ def run_phase_02_canonical_v1(
         connector=None,
         resource_type=None,
         batch_limit=lim,
-        pass_index=pass_index,
-        pass_cooldowns=pass_cooldowns,
-        pass_stall_counts=pass_stall_counts,
         settings=settings,
     )
     outcome = str(canonical_summary.get("canonical_outcome") or "")
@@ -109,9 +102,6 @@ def run_phase_02_canonical_v1(
         "canonical_summary": canonical_summary,
         "canonical_outcome": outcome,
         "determinism_repair": determinism_repair,
-        "pass_index_next": canonical_summary.get("pass_index_next"),
-        "pass_cooldown_until": canonical_summary.get("pass_cooldown_until"),
-        "pass_topology_stall_counts": canonical_summary.get("pass_topology_stall_counts"),
         "convergence_health": canonical_summary.get("convergence_health"),
     }
     if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT and int(canonical_summary.get("total_succeeded") or 0) == 0:

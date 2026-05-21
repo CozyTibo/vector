@@ -206,6 +206,34 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p0_step6_no_pass_fairness_on_lease_v1() -> list[str]:
+    """Return error codes if execution lease still stores pass-fairness state (P0 step 6)."""
+    errors: list[str] = []
+    from vector.domains.cortex.execution import run_tenant_execution as exec_mod
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    exec_src = inspect.getsource(exec_mod.run_tenant_convergence_v1)
+    for sym in (
+        "_canonical_pass_index_from_lease",
+        "_store_canonical_pass_index_on_lease",
+        "_store_pass_fairness_on_lease",
+        "parse_pass_cooldown_until",
+        "parse_pass_topology_stall_counts",
+    ):
+        if sym in exec_src:
+            errors.append(f"execution_worker_still_uses_pass_fairness:{sym}")
+
+    if "_store_canonical_slice_outcome_on_lease" not in exec_src:
+        errors.append("execution_worker_missing_canonical_slice_outcome_store")
+
+    p02 = inspect.getsource(pr_mod.run_phase_02_canonical_v1)
+    if "pass_index: int" in p02:
+        errors.append("phase02_runner_still_accepts_pass_index_parameter")
+    if "pass_cooldowns:" in p02 or "pass_stall_counts:" in p02:
+        errors.append("phase02_runner_still_accepts_pass_fairness_parameters")
+    return errors
+
+
 def verify_p0_step5_canonical_single_drain_v1() -> list[str]:
     """Return error codes if phase 02 still uses dual drain / drain_stub (P0 step 5)."""
     errors: list[str] = []

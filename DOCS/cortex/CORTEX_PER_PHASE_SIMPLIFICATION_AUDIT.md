@@ -31,7 +31,7 @@ input → deterministic transform → explicit output → gate
 | **3** | **Done** | Single TCRE resume path — execution lease only (`on_tcre_job_terminal_for_execution_v1`); no continuation enqueue |
 | **4** | **Done** | Execution hot path no longer writes `pipeline_continuation` (phase 06/08); PIPE-085-01 asserts execution lease |
 | **5** | **Done** | Phase 02 single `drain_forward_progress_backlog` call; removed slack preface dual drain |
-| 6 | Pending | Remove pass fairness on lease |
+| **6** | **Done** | No `canonical_pass_index` / pass cooldowns on execution lease; slice-local drain only |
 | 7 | Pending | Determinism repair off hot path |
 
 ### P0 step 1 — done (2026-05-21)
@@ -84,6 +84,15 @@ input → deterministic transform → explicit output → gate
 | Imports | Phase runner imports `drain_forward_progress_backlog` directly, not `drain_stub_materialize_backlog` |
 | `drain_stub_materialize_backlog` | Retained as thin delegate for admin/ingestion/identity paths only |
 | CI guard | `verify_p0_step5_canonical_single_drain_v1` + `test_p0_step5_canonical_single_drain.py` |
+
+### P0 step 6 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `run_tenant_convergence_v1` | Dropped lease `canonical_pass_index`, `pass_cooldown_until`, `pass_topology_stall_counts`; stores `last_canonical_outcome` + `convergence_health` only |
+| `run_phase_02_canonical_v1` | No pass-fairness parameters; each slice uses fresh in-drain pass rotation |
+| `operator_snapshot` | Pass cooldown hints read from phase 02 output, not lease |
+| CI guard | `verify_p0_step6_no_pass_fairness_on_lease_v1` + `test_p0_step6_pass_fairness_lease.py` |
 
 ---
 
@@ -952,7 +961,7 @@ def run_phase_XX_v1(session, *, tenant_id, pipeline_run_id, ...) -> PhaseResult:
 
 - [ ] No phase runner imports `schedule_*` or Celery task modules  
 - [ ] No phase runner creates replay **jobs** (only synchronous transforms)  
-- [ ] Canonical slice has **one** drain entry, no pass fairness on lease  
+- [x] Canonical slice has **one** drain entry, no pass fairness on lease (**P0 steps 5–6**)  
 - [x] `pipeline_continuation` unused by execution hot path (**P0 step 4**)  
 - [x] TCRE worker does not materialize retrieval (**P0 step 2**)  
 - [x] Phase 07 does not enqueue synthesis (**P0 step 1**)  
