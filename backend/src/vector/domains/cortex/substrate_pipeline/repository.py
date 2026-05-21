@@ -246,13 +246,18 @@ def skip_phase_v1(
     pipeline_run_id: uuid.UUID,
     phase_id: str,
     reason: str,
+    output: dict[str, Any] | None = None,
 ) -> CortexSubstratePhaseRun:
     phase = get_phase_run_v1(session, pipeline_run_id=pipeline_run_id, phase_id=phase_id)
     if phase is None:
         msg = f"unknown_phase:{phase_id}"
         raise ValueError(msg)
     phase.status = PHASE_STATUS_SKIPPED
-    phase.output_json = {"skipped": True, "reason": reason}
+    phase.output_json = (
+        dict(output)
+        if output is not None
+        else {"skipped": True, "reason": reason}
+    )
     phase.completed_at = datetime.now(UTC)
     session.flush()
     return phase

@@ -554,6 +554,48 @@ def verify_phase07_retrieval_only_boundary_v1() -> list[str]:
     return errors
 
 
+def verify_substrate_phase_receipt_contract_v1() -> list[str]:
+    """Return error codes if phase runners omit universal substrate phase receipts."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+    from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
+
+    for name, src in (
+        ("run_phase_02_canonical_v1", inspect.getsource(pr_mod.run_phase_02_canonical_v1)),
+        ("run_phase_03_identity_v1", inspect.getsource(pr_mod.run_phase_03_identity_v1)),
+        ("run_phase_04_graph_v1", inspect.getsource(pr_mod.run_phase_04_graph_v1)),
+        ("run_phase_05_traversal_v1", inspect.getsource(pr_mod.run_phase_05_traversal_v1)),
+        ("run_phase_06_tcre_v1", inspect.getsource(pr_mod.run_phase_06_tcre_v1)),
+        ("run_phase_07_retrieval_v1", inspect.getsource(pr_mod.run_phase_07_retrieval_v1)),
+        (
+            "run_substrate_phase_08_synthesis_v1",
+            inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1),
+        ),
+    ):
+        has_complete = (
+            "complete_phase_with_receipt_v1" in src
+            or "complete_async_phase_with_receipt_v1" in src
+        )
+        has_finish = has_complete or "skip_phase_with_receipt_v1" in src
+        if not has_finish:
+            errors.append(f"{name}_missing_receipt_helper")
+        if "fail_phase_with_receipt_v1" not in src and "wait_phase_with_receipt_v1" not in src:
+            if "try:" in src and name not in ("run_phase_03_identity_v1",):
+                errors.append(f"{name}_missing_fail_or_wait_receipt_helper")
+
+    try:
+        from vector.domains.cortex.substrate_pipeline import substrate_phase_receipt as spr
+    except ImportError:
+        errors.append("missing_substrate_phase_receipt_module")
+        return errors
+
+    if not hasattr(spr, "build_substrate_phase_receipt_v1"):
+        errors.append("missing_build_substrate_phase_receipt_v1")
+    if not hasattr(spr, "PHASE_OUTCOME_COMPLETED"):
+        errors.append("missing_phase_outcome_constants")
+    return errors
+
+
 def verify_m8_admin_execution_surface_v1() -> list[str]:
     """Return error codes if M8 consolidated admin execution routes are missing."""
     errors: list[str] = []

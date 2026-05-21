@@ -2,6 +2,7 @@
 
 **Status:** Authoritative phase-reduction plan (post orchestration collapse M0–M9)  
 **Context:** [`CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md`](./CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md), [`operational-runtime/RUNTIME_SIMPLIFICATION_AUDIT.md`](./operational-runtime/RUNTIME_SIMPLIFICATION_AUDIT.md)  
+**Next:** Per-phase reduction (steps 1–12) is complete; remaining substrate work is in [`CORTEX_TRUE_P0_SIGN_OFF.md`](./CORTEX_TRUE_P0_SIGN_OFF.md) (receipts, BLOCKED semantics, canonical FIFO, truth unification, legacy burial).  
 **Date:** 2026-05-21  
 
 ---

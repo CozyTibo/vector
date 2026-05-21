@@ -32,13 +32,16 @@ from vector.domains.cortex.synthesis.synthesis_orchestrator import execute_synth
 from vector.domains.cortex.synthesis.synthesis_publication import publish_synthesis_epoch_v1
 from vector.domains.cortex.synthesis.synthesis_query_plan import load_synthesis_policy_pack_v1
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_07_RETRIEVAL, PHASE_08_SYNTHESIS
+from vector.domains.cortex.substrate_pipeline.phase_runner_receipt import (
+    complete_phase_with_receipt_v1,
+    fail_phase_with_receipt_v1,
+    skip_phase_with_receipt_v1,
+)
 from vector.domains.cortex.substrate_pipeline.repository import (
     begin_phase_v1,
-    complete_phase_v1,
-    fail_phase_v1,
     get_phase_run_v1,
-    skip_phase_v1,
 )
+from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import utc_now_iso_v1
 from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
 from vector.infrastructure.db.models.cortex_synthesis_artifact import CortexSynthesisArtifact
 from vector.infrastructure.db.models.cortex_substrate_pipeline_run import CortexSubstratePipelineRun
@@ -322,20 +325,26 @@ def run_substrate_phase_08_synthesis_v1(
         raise ValueError(msg)
 
     if not cfg.cortex_substrate_pipeline_phase_08_enabled:
-        skip_phase_v1(
+        started_at = utc_now_iso_v1()
+        return skip_phase_with_receipt_v1(
             session,
             pipeline_run_id=prid,
             phase_id=PHASE_08_SYNTHESIS,
+            tenant_id=tenant_id,
             reason="phase_08_disabled",
+            started_at=started_at,
+            raw_output={"skipped": True, "reason": "phase_08_disabled"},
         )
-        return {"skipped": True, "reason": "phase_08_disabled"}
 
     phase07 = get_phase_run_v1(session, pipeline_run_id=prid, phase_id=PHASE_07_RETRIEVAL)
     if phase07 is None or phase07.status != "completed":
-        fail_phase_v1(
+        fail_phase_with_receipt_v1(
             session,
             pipeline_run_id=prid,
             phase_id=PHASE_08_SYNTHESIS,
+            tenant_id=tenant_id,
+            raw_output={},
+            started_at=utc_now_iso_v1(),
             error="phase_07_not_completed",
         )
         msg = "phase_07_not_completed"
@@ -366,25 +375,30 @@ def run_substrate_phase_08_synthesis_v1(
     )
     if not activation_eval.get("should_activate"):
         reason = str(activation_eval.get("activation_reason") or "synthesis_not_activated")
-        skip_phase_v1(
-            session,
-            pipeline_run_id=prid,
-            phase_id=PHASE_08_SYNTHESIS,
-            reason=reason,
-        )
         from vector.domains.cortex.substrate_pipeline.orchestrator import (
             finalize_pipeline_if_complete_v1,
         )
 
         fin = finalize_pipeline_if_complete_v1(session, pipeline_run_id=prid)
-        return {
+        raw = {
             "skipped": True,
             "reason": reason,
             "activation_evaluation": activation_eval,
+            "activation_reason": reason,
             "finalize": fin,
         }
+        return skip_phase_with_receipt_v1(
+            session,
+            pipeline_run_id=prid,
+            phase_id=PHASE_08_SYNTHESIS,
+            tenant_id=tenant_id,
+            reason=reason,
+            started_at=utc_now_iso_v1(),
+            raw_output=raw,
+        )
 
     begin_phase_v1(session, pipeline_run_id=prid, phase_id=PHASE_08_SYNTHESIS)
+    started_at = utc_now_iso_v1()
     try:
         out = materialize_synthesis_for_pipeline_v1(
             session,
@@ -394,26 +408,33 @@ def run_substrate_phase_08_synthesis_v1(
             settings=cfg,
         )
         if out.get("jobs_failed") and not out.get("artifact_digests"):
-            fail_phase_v1(
+            fail_phase_with_receipt_v1(
                 session,
                 pipeline_run_id=prid,
                 phase_id=PHASE_08_SYNTHESIS,
+                tenant_id=tenant_id,
+                raw_output=out,
+                started_at=started_at,
                 error="synthesis_pipeline_all_jobs_failed",
-                output=out,
             )
             return out
-        complete_phase_v1(
+        return complete_phase_with_receipt_v1(
             session,
             pipeline_run_id=prid,
             phase_id=PHASE_08_SYNTHESIS,
-            output=out,
+            tenant_id=tenant_id,
+            raw_output=out,
+            started_at=started_at,
+            input_epoch=published,
         )
-        return out
     except Exception as exc:  # noqa: BLE001
-        fail_phase_v1(
+        fail_phase_with_receipt_v1(
             session,
             pipeline_run_id=prid,
             phase_id=PHASE_08_SYNTHESIS,
+            tenant_id=tenant_id,
+            raw_output={},
+            started_at=started_at,
             error=str(exc),
         )
         raise

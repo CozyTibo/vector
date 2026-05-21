@@ -16,4 +16,4 @@ def test_phase07_runner_returns_retrieval_output_only() -> None:
     src = inspect.getsource(pr.run_phase_07_retrieval_v1)
     assert "run_synthesis_activation_after_phase07_v1" not in src
     assert "next_phase_chain" not in src
-    assert "return out" in src
+    assert "complete_phase_with_receipt_v1" in src

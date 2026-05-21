@@ -1,4 +1,4 @@
-"""Per-phase substrate pipeline execution (invoked from Celery)."""
+"""Per-phase substrate pipeline execution (invoked from execution worker)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.canonical.forward_progress.constants import (
+    CANONICAL_OUTCOME_FAILED,
+    CANONICAL_OUTCOME_TOPOLOGY_WAIT,
+)
 from vector.domains.cortex.canonical.forward_progress.drain_runtime import drain_forward_progress_backlog
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.identity.continuity_rebuild import run_identity_substrate_projection_for_pipeline_v1
@@ -23,15 +27,21 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_06_TCRE,
     PHASE_07_RETRIEVAL,
 )
-from vector.domains.cortex.canonical.forward_progress.constants import (
-    CANONICAL_OUTCOME_FAILED,
-    CANONICAL_OUTCOME_TOPOLOGY_WAIT,
+from vector.domains.cortex.substrate_pipeline.phase_runner_receipt import (
+    complete_async_phase_with_receipt_v1,
+    complete_phase_with_receipt_v1,
+    fail_phase_with_receipt_v1,
+    skip_phase_with_receipt_v1,
+    wait_phase_with_receipt_v1,
 )
 from vector.domains.cortex.substrate_pipeline.repository import (
     begin_phase_v1,
-    complete_phase_v1,
-    fail_phase_v1,
-    wait_phase_v1,
+    get_phase_run_v1,
+)
+from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
+    PHASE_OUTCOME_COMPLETED_EMPTY,
+    PHASE_OUTCOME_SKIPPED_BY_POLICY,
+    utc_now_iso_v1,
 )
 from vector.domains.cortex.substrate_pipeline.substrate_traversal_execution import (
     run_traversal_slice_for_pipeline_v1,
@@ -61,11 +71,19 @@ def run_phase_02_canonical_v1(
     batch_limit: int | None,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_02_CANONICAL)
+    started_at = utc_now_iso_v1()
     bid = _resolve_bundle_id(session, tenant_id=tenant_id, bundle_id=bundle_id)
     if bid is None:
         out = {"skipped": True, "reason": "no_transformable_bundle"}
-        complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_02_CANONICAL, output=out)
-        return out
+        return skip_phase_with_receipt_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_02_CANONICAL,
+            tenant_id=tenant_id,
+            reason="no_transformable_bundle",
+            started_at=started_at,
+            raw_output=out,
+        )
     lim_src = batch_limit if batch_limit is not None else settings.cortex_post_ingestion_canonical_batch_limit
     lim = max(1, min(int(lim_src), 2000))
     canonical_summary = drain_forward_progress_backlog(
@@ -85,25 +103,35 @@ def run_phase_02_canonical_v1(
         "convergence_health": canonical_summary.get("convergence_health"),
     }
     if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT and int(canonical_summary.get("total_succeeded") or 0) == 0:
-        wait_phase_v1(
+        return wait_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
             phase_id=PHASE_02_CANONICAL,
-            output=out,
+            tenant_id=tenant_id,
+            raw_output=out,
+            started_at=started_at,
             waiting_reason="topology_wait:parent_materialization_required",
+            blocked_reason="topology_wait",
         )
-        return out
     if outcome == CANONICAL_OUTCOME_FAILED and int(canonical_summary.get("total_succeeded") or 0) == 0:
-        fail_phase_v1(
+        return fail_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
             phase_id=PHASE_02_CANONICAL,
+            tenant_id=tenant_id,
+            raw_output=out,
+            started_at=started_at,
             error="canonical_materialization_failed",
-            output=out,
         )
-        return out
-    complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_02_CANONICAL, output=out)
-    return out
+    return complete_phase_with_receipt_v1(
+        session,
+        pipeline_run_id=pipeline_run_id,
+        phase_id=PHASE_02_CANONICAL,
+        tenant_id=tenant_id,
+        raw_output=out,
+        started_at=started_at,
+        input_epoch=bid,
+    )
 
 
 def run_phase_03_identity_v1(
@@ -115,11 +143,19 @@ def run_phase_03_identity_v1(
     identity_substrate_trigger: str,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_03_IDENTITY)
+    started_at = utc_now_iso_v1()
     bid = _resolve_bundle_id(session, tenant_id=tenant_id, bundle_id=bundle_id)
     if bid is None:
         out = {"skipped": True, "reason": "no_bundle"}
-        complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_03_IDENTITY, output=out)
-        return out
+        return complete_phase_with_receipt_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_03_IDENTITY,
+            tenant_id=tenant_id,
+            raw_output=out,
+            started_at=started_at,
+            outcome=PHASE_OUTCOME_COMPLETED_EMPTY,
+        )
     out = run_identity_substrate_projection_for_pipeline_v1(
         session,
         tenant_id=tenant_id,
@@ -127,8 +163,15 @@ def run_phase_03_identity_v1(
         substrate_trigger=identity_substrate_trigger,
         anchor_limit=5_000,
     )
-    complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_03_IDENTITY, output=out)
-    return out
+    return complete_phase_with_receipt_v1(
+        session,
+        pipeline_run_id=pipeline_run_id,
+        phase_id=PHASE_03_IDENTITY,
+        tenant_id=tenant_id,
+        raw_output=out,
+        started_at=started_at,
+        input_epoch=bid,
+    )
 
 
 def run_phase_04_graph_v1(
@@ -138,19 +181,28 @@ def run_phase_04_graph_v1(
     pipeline_run_id: uuid.UUID,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_04_GRAPH)
+    started_at = utc_now_iso_v1()
     try:
         out = run_graph_projection_export_for_pipeline_v1(session, tenant_id=tenant_id)
     except ValueError as exc:
-        fail_phase_v1(
+        fail_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
             phase_id=PHASE_04_GRAPH,
+            tenant_id=tenant_id,
+            raw_output={},
+            started_at=started_at,
             error=str(exc),
-            output={},
         )
         raise
-    complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_04_GRAPH, output=out)
-    return out
+    return complete_phase_with_receipt_v1(
+        session,
+        pipeline_run_id=pipeline_run_id,
+        phase_id=PHASE_04_GRAPH,
+        tenant_id=tenant_id,
+        raw_output=out,
+        started_at=started_at,
+    )
 
 
 def run_phase_05_traversal_v1(
@@ -161,6 +213,7 @@ def run_phase_05_traversal_v1(
     graph_projection_stable_hash: str | None = None,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_05_TRAVERSAL)
+    started_at = utc_now_iso_v1()
     try:
         out = run_traversal_slice_for_pipeline_v1(
             session,
@@ -168,15 +221,23 @@ def run_phase_05_traversal_v1(
             pipeline_run_id=pipeline_run_id,
             graph_projection_stable_hash=graph_projection_stable_hash,
         )
-        complete_phase_v1(
-            session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_05_TRAVERSAL, output=out
-        )
-        return out
-    except Exception as exc:  # noqa: BLE001
-        fail_phase_v1(
+        return complete_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
             phase_id=PHASE_05_TRAVERSAL,
+            tenant_id=tenant_id,
+            raw_output=out,
+            started_at=started_at,
+            input_epoch=graph_projection_stable_hash,
+        )
+    except Exception as exc:  # noqa: BLE001
+        fail_phase_with_receipt_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_05_TRAVERSAL,
+            tenant_id=tenant_id,
+            raw_output={},
+            started_at=started_at,
             error=str(exc),
         )
         raise
@@ -189,9 +250,8 @@ def run_phase_06_tcre_v1(
     pipeline_run_id: uuid.UUID,
     octs_walk_id: str | None = None,
 ) -> dict[str, Any]:
-    from vector.domains.cortex.substrate_pipeline.repository import get_phase_run_v1
-
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_06_TCRE)
+    started_at = utc_now_iso_v1()
     p5 = get_phase_run_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_05_TRAVERSAL)
     walk_id = octs_walk_id
     if walk_id is None and p5 is not None:
@@ -213,7 +273,14 @@ def run_phase_06_tcre_v1(
             run_sync=False,
         )
         out = {**enqueue_out, "async": True}
-        complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_06_TCRE, output=out)
+        complete_async_phase_with_receipt_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_06_TCRE,
+            tenant_id=tenant_id,
+            raw_output=out,
+            started_at=started_at,
+        )
         from vector.domains.cortex.execution.phase06_contract import (
             enforce_phase06_progression_law_v1,
         )
@@ -226,10 +293,13 @@ def run_phase_06_tcre_v1(
         )
         return out
     except Exception as exc:  # noqa: BLE001
-        fail_phase_v1(
+        fail_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
             phase_id=PHASE_06_TCRE,
+            tenant_id=tenant_id,
+            raw_output={},
+            started_at=started_at,
             error=str(exc),
         )
         raise
@@ -241,11 +311,15 @@ def run_phase_07_retrieval_v1(
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID,
 ) -> dict[str, Any]:
+    from vector.domains.cortex.execution.progression_status import (
+        classify_retrieval_materialization_outcome_v1,
+    )
     from vector.domains.cortex.retrieval.retrieval_index_materialization import (
         get_published_index_epoch_v1,
     )
 
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_07_RETRIEVAL)
+    started_at = utc_now_iso_v1()
     try:
         out = materialize_retrieval_index_for_pipeline_v1(
             session,
@@ -255,15 +329,30 @@ def run_phase_07_retrieval_v1(
         published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
         if published:
             out = {**out, "published_index_epoch": published}
-        complete_phase_v1(
-            session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_07_RETRIEVAL, output=out
+        ret_class = classify_retrieval_materialization_outcome_v1(
+            entries_materialized=int(out.get("entries_materialized") or out.get("entry_count") or 0),
+            entry_count=int(out.get("entry_count") or 0),
+            tcre_candidates=int(out.get("tcre_candidates") or 0),
+            walks_candidates=int(out.get("walks_candidates") or 0),
+            org_link_candidates=int(out.get("org_link_candidates") or 0),
         )
-        return out
-    except Exception as exc:  # noqa: BLE001
-        fail_phase_v1(
+        out["retrieval_outcome"] = ret_class
+        return complete_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
             phase_id=PHASE_07_RETRIEVAL,
+            tenant_id=tenant_id,
+            raw_output=out,
+            started_at=started_at,
+        )
+    except Exception as exc:  # noqa: BLE001
+        fail_phase_with_receipt_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_07_RETRIEVAL,
+            tenant_id=tenant_id,
+            raw_output={},
+            started_at=started_at,
             error=str(exc),
         )
         raise
