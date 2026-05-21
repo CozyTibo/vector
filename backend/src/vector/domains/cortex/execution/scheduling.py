@@ -689,3 +689,32 @@ def verify_m8_admin_execution_surface_v1() -> list[str]:
     if "materialize-backlog" not in router_src or "raise_admin_endpoint_gone" not in router_src:
         errors.append("materialize_backlog_missing_410_guard")
     return errors
+
+
+def verify_legacy_runtime_burial_v1() -> list[str]:
+    """Return error codes if dead post-ingest substrate refresh module still exists."""
+    from pathlib import Path
+
+    errors: list[str] = []
+    legacy = (
+        Path(__file__).resolve().parent.parent
+        / "ingestion"
+        / "post_ingestion_substrate_refresh.py"
+    )
+    if legacy.is_file():
+        errors.append("post_ingestion_substrate_refresh_module_still_present")
+    return errors
+
+
+def verify_true_p0_substrate_signoff_v1() -> list[str]:
+    """Aggregate TRUE P0 sign-off boundary verifiers (receipts, blocked, canonical, truth, burial)."""
+    errors: list[str] = []
+    errors.extend(verify_substrate_phase_receipt_contract_v1())
+    errors.extend(verify_execution_blocked_semantics_v1())
+    errors.extend(verify_canonical_deterministic_selection_v1())
+    errors.extend(verify_execution_truth_unification_v1())
+    errors.extend(verify_legacy_runtime_burial_v1())
+    errors.extend(verify_execution_hot_path_no_cesp_imports_boundary_v1())
+    errors.extend(verify_execution_hot_path_no_continuation_boundary_v1())
+    errors.extend(verify_canonical_single_drain_boundary_v1())
+    return errors
