@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-import vector.domains.cortex.ingestion.sync_executor as sync_executor
+import vector.domains.cortex.ingestion.connectors.calls.sync as calls_sync
 from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
 from vector.infrastructure.db.models.calls_connection_detail import CallsConnectionDetail
 from vector.infrastructure.db.models.membership import TenantMembership
@@ -95,7 +95,7 @@ def test_step15_live_dedupe_and_revision_append(
         }
         return _MockResponse({"items": [event], "nextPageToken": None})
 
-    monkeypatch.setattr(sync_executor.httpx, "get", _mock_get)
+    monkeypatch.setattr(calls_sync.httpx, "get", _mock_get)
 
     first = execute_connector_sync(
         db_session,

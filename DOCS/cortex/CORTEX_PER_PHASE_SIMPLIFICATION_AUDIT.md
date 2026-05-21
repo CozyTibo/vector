@@ -42,6 +42,12 @@ input → deterministic transform → explicit output → gate
 | **9** | **Done** | Phase 04 direct `run_graph_projection_export_for_pipeline_v1`; no replay job or verification slice on execution hot path |
 | **10** | **Done** | Phase 05 single `run_traversal_slice_for_pipeline_v1`; no schedule pass or explainability on execution hot path |
 
+## Implementation progress (P2)
+
+| Step | Status | Summary |
+|------|--------|---------|
+| **11** | **Done** | Split `sync_executor` into per-connector modules + `sync_router`; `IngestionSyncContext` collapsed to **live** \| **replay** |
+
 ### P0 step 1 — done (2026-05-21)
 
 | Change | Detail |
@@ -141,6 +147,19 @@ input → deterministic transform → explicit output → gate
 | `run_phase_05_traversal_v1` | Calls traversal slice only; dropped `octs_walk_schedule` nested pass |
 | `run_octs_walk_schedule_pass_v1` | Retained for admin scheduling (density frontiers + explainability panel) |
 | CI guard | `verify_p1_step10_traversal_slice_boundary_v1` + `test_p1_step10_traversal_slice.py` |
+
+### P2 step 11 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `connectors/{github,linear,slack,notion,calls}/sync.py` | Per-connector sync bodies extracted from monolithic executor |
+| `sync_shared.py` | Shared raw persistence, checkpoint helpers, `generic_scope_ping` |
+| `sync_router.py` | Thin `execute_connector_sync` dispatch router |
+| `sync_executor.py` | Compatibility shim re-exporting router + test hooks |
+| `IngestionSyncContext` | Top-level modes **live** \| **replay**; `backfill_lane` + `checkpoint_sync_mode` for checkpoint lanes |
+| Celery ingest tasks | No substrate phase imports; post-ingest refresh on live incremental completion |
+| CI guard | `verify_p2_step11_ingestion_sync_split_boundary_v1` + `test_p2_step11_sync_executor_split.py` |
+| Tests | Connector exhaust tests patch `connectors.*.sync.httpx` instead of monolithic module |
 
 ---
 
@@ -928,7 +947,7 @@ flowchart LR
 
 | Item | Phase |
 |------|-------|
-| Split sync_executor | 01 |
+| Split sync_executor | 01 — **done P2 step 11** |
 | Collapse traversal materialization + schedule | 05 — **done P1 step 10** |
 | Direct graph export (no replay job wrapper) | 04 — **done P1 step 9** |
 | Retrieval skip code taxonomy | 07 |
@@ -993,7 +1012,7 @@ def run_phase_XX_v1(session, *, tenant_id, pipeline_run_id, ...) -> PhaseResult:
 
 | Phase | Runner | Primary domain |
 |-------|--------|----------------|
-| 01 | *(ingest)* | `ingestion/sync_executor.py`, `post_ingestion_refresh_dispatch.py` |
+| 01 | *(ingest)* | `ingestion/sync_router.py`, `ingestion/connectors/*/sync.py`, `post_ingestion_refresh_dispatch.py` |
 | 02 | `run_phase_02_canonical_v1` | `canonical/forward_progress/drain_runtime.py`, `canonical/transform_runtime.py` |
 | 03 | `run_phase_03_identity_v1` | `identity/continuity_rebuild.py` |
 | 04 | `run_phase_04_graph_v1` | `identity/projection_export.py` (`run_graph_projection_export_for_pipeline_v1`) |

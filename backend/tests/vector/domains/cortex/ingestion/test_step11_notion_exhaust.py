@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-import vector.domains.cortex.ingestion.sync_executor as sync_executor
+import vector.domains.cortex.ingestion.connectors.notion.sync as notion_sync
 from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.membership import TenantMembership
@@ -158,8 +158,8 @@ def test_step11_notion_ingests_search_databases_rows_and_blocks(
             return _MockResponse({"results": [], "has_more": False, "next_cursor": None})
         return _MockResponse({})
 
-    monkeypatch.setattr(sync_executor.httpx, "post", _mock_post)
-    monkeypatch.setattr(sync_executor.httpx, "get", _mock_get)
+    monkeypatch.setattr(notion_sync.httpx, "post", _mock_post)
+    monkeypatch.setattr(notion_sync.httpx, "get", _mock_get)
 
     out = execute_connector_sync(
         db_session,

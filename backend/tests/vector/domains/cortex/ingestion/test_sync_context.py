@@ -36,9 +36,20 @@ def test_replay_version_minimum() -> None:
 
 
 def test_sync_mode_must_be_allowlisted() -> None:
-    ctx = IngestionSyncContext(sync_mode="live", replay_job_id=None, replay_version=1)
+    ctx = IngestionSyncContext(sync_mode="incremental", replay_job_id=None, replay_version=1)
     with pytest.raises(ValueError, match="sync_mode"):
         ctx.validate()
+
+
+def test_live_checkpoint_lane_incremental() -> None:
+    ctx = IngestionSyncContext.live_incremental()
+    assert ctx.checkpoint_sync_mode == "incremental"
+
+
+def test_backfill_maps_to_live_with_backfill_lane() -> None:
+    ctx = IngestionSyncContext.backfill()
+    assert ctx.sync_mode == "live"
+    assert ctx.checkpoint_sync_mode == "backfill"
 
 
 def test_backfill_context_flags_backfill_lane() -> None:

@@ -139,6 +139,18 @@ module = "vector.domains.cortex.ingestion.sync_executor"
 disable_error_code = ["union-attr", "arg-type", "unreachable", "no-redef"]
 
 [[tool.mypy.overrides]]
+module = "vector.domains.cortex.ingestion.sync_shared"
+disable_error_code = ["union-attr", "arg-type", "unreachable", "no-redef"]
+
+[[tool.mypy.overrides]]
+module = "vector.domains.cortex.ingestion.sync_router"
+disable_error_code = ["union-attr", "arg-type", "unreachable", "no-redef"]
+
+[[tool.mypy.overrides]]
+module = "vector.domains.cortex.ingestion.connectors.*"
+disable_error_code = ["union-attr", "arg-type", "unreachable", "no-redef"]
+
+[[tool.mypy.overrides]]
 module = "vector.domains.cortex.continuity.reference_emitter"
 disable_error_code = ["union-attr", "arg-type", "return-value", "operator", "list-item"]
 

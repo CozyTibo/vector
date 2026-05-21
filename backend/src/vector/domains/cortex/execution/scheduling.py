@@ -287,6 +287,64 @@ def verify_p1_step10_traversal_slice_boundary_v1() -> list[str]:
     return errors
 
 
+def verify_p2_step11_ingestion_sync_split_boundary_v1() -> list[str]:
+    """Return error codes if sync_executor is still monolithic or modes not collapsed (P2 step 11)."""
+    errors: list[str] = []
+    import importlib.util
+    from pathlib import Path
+
+    ingest_root = Path(__file__).resolve().parent.parent / "ingestion"
+    shim = ingest_root / "sync_executor.py"
+    if shim.is_file() and shim.stat().st_size > 4000:
+        errors.append("sync_executor_still_monolithic")
+
+    for connector in ("github", "linear", "slack", "notion", "calls"):
+        mod_path = ingest_root / "connectors" / connector / "sync.py"
+        if not mod_path.is_file():
+            errors.append(f"missing_connector_sync_module:{connector}")
+
+    router_path = ingest_root / "sync_router.py"
+    if not router_path.is_file():
+        errors.append("missing_sync_router")
+    else:
+        router_src = router_path.read_text(encoding="utf-8")
+        if "run_github_connector_sync" not in router_src:
+            errors.append("sync_router_missing_github_dispatch")
+        if "run_calls_connector_sync" not in router_src:
+            errors.append("sync_router_missing_calls_dispatch")
+
+    from vector.domains.cortex.ingestion import sync_context as sc_mod
+
+    allowed: frozenset[str] = getattr(sc_mod, "_ALLOWED_SYNC_MODES", frozenset())
+    if allowed != frozenset({"live", "replay"}):
+        errors.append("sync_context_modes_not_collapsed_to_live_replay")
+
+    ctx_src = inspect.getsource(sc_mod.IngestionSyncContext)
+    if "checkpoint_sync_mode" not in ctx_src:
+        errors.append("sync_context_missing_checkpoint_sync_mode")
+    if 'sync_mode="incremental"' in ctx_src or 'sync_mode="backfill"' in ctx_src:
+        errors.append("sync_context_still_uses_legacy_mode_strings")
+
+    celery_path = Path(__file__).resolve().parents[4] / "app" / "tasks" / "cortex_ingestion_sync.py"
+    if not celery_path.is_file():
+        celery_path = Path(__file__).resolve().parents[5] / "app" / "tasks" / "cortex_ingestion_sync.py"
+    if celery_path.is_file():
+        celery_src = celery_path.read_text(encoding="utf-8")
+        for forbidden in (
+            "run_phase_",
+            "substrate_pipeline",
+            "mark_pipeline_waiting",
+            "execute_org_link_replay_job",
+        ):
+            if forbidden in celery_src:
+                errors.append(f"ingestion_celery_imports_substrate:{forbidden}")
+
+    if importlib.util.find_spec("vector.domains.cortex.ingestion.sync_shared") is None:
+        errors.append("missing_sync_shared_module")
+
+    return errors
+
+
 def verify_p0_step7_determinism_repair_off_hot_path_v1() -> list[str]:
     """Return error codes if phase 02 still runs determinism repair inline (P0 step 7)."""
     errors: list[str] = []

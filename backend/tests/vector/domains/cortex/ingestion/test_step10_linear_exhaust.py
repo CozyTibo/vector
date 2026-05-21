@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-import vector.domains.cortex.ingestion.sync_executor as sync_executor
+import vector.domains.cortex.ingestion.connectors.linear.sync as linear_sync
 from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.linear_connection_detail import LinearConnectionDetail
@@ -204,7 +204,7 @@ def test_step10_linear_paginates_and_ingests_deep_streams(
             )
         return _MockResponse({"data": {"viewer": {"id": "v1", "name": "Linear User"}}})
 
-    monkeypatch.setattr(sync_executor.httpx, "post", _mock_post)
+    monkeypatch.setattr(linear_sync.httpx, "post", _mock_post)
 
     out = execute_connector_sync(
         db_session,
@@ -350,7 +350,7 @@ def test_step10_linear_incremental_watermark_filters_old_issues(
             )
         return _MockResponse({"data": {"viewer": {"id": "v1", "name": "Linear User"}}})
 
-    monkeypatch.setattr(sync_executor.httpx, "post", _mock_post)
+    monkeypatch.setattr(linear_sync.httpx, "post", _mock_post)
 
     out = execute_connector_sync(
         db_session,

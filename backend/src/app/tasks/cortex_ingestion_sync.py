@@ -24,7 +24,7 @@ def _maybe_enqueue_post_ingestion_substrate_refresh(
     sync_mode: str,
 ) -> None:
     """Schedule debounced substrate refresh after a successful live incremental sync."""
-    if sync_mode != "incremental":
+    if sync_mode not in ("incremental", "live"):
         return
     if sync_result.get("status") != "completed":
         return

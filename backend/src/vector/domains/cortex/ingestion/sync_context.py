@@ -7,20 +7,24 @@ from dataclasses import dataclass
 
 SCOPE_DEFAULT = "default"
 
-_ALLOWED_SYNC_MODES = frozenset({"incremental", "backfill", "replay", "recovery", "targeted"})
+_ALLOWED_SYNC_MODES = frozenset({"live", "replay"})
 
 
 @dataclass(frozen=True)
 class IngestionSyncContext:
     """Carries sync mode and replay lineage for one executor invocation.
 
-    Live incremental runs use ``scope_key=default`` checkpoints. Replay runs use a separate
+    Live runs use ``scope_key=default`` checkpoints. Replay runs use a separate
     ``replay:<replay_job_id>`` scope so live cursors are never advanced from replay work.
+
+    ``backfill_lane`` selects the checkpoint backfill writer without a separate top-level
+    sync mode (P2 step 11: collapse to live | replay only).
     """
 
     sync_mode: str
     replay_job_id: uuid.UUID | None
     replay_version: int
+    backfill_lane: bool = False
 
     @property
     def replay_mode(self) -> bool:
@@ -28,7 +32,14 @@ class IngestionSyncContext:
 
     @property
     def writes_backfill_lane(self) -> bool:
-        return self.sync_mode == "backfill"
+        return self.backfill_lane and not self.replay_mode
+
+    @property
+    def checkpoint_sync_mode(self) -> str:
+        """Checkpoint lane for merge_monotonic_connector_state (incremental vs backfill)."""
+        if self.replay_mode:
+            return "incremental"
+        return "backfill" if self.backfill_lane else "incremental"
 
     def checkpoint_scope_key(self) -> str:
         if self.replay_mode and self.replay_job_id is not None:
@@ -49,9 +60,10 @@ class IngestionSyncContext:
     @staticmethod
     def live_incremental() -> IngestionSyncContext:
         return IngestionSyncContext(
-            sync_mode="incremental",
+            sync_mode="live",
             replay_job_id=None,
             replay_version=1,
+            backfill_lane=False,
         )
 
     @staticmethod
@@ -60,12 +72,14 @@ class IngestionSyncContext:
             sync_mode="replay",
             replay_job_id=replay_job_id,
             replay_version=replay_version,
+            backfill_lane=False,
         )
 
     @staticmethod
     def backfill() -> IngestionSyncContext:
         return IngestionSyncContext(
-            sync_mode="backfill",
+            sync_mode="live",
             replay_job_id=None,
             replay_version=1,
+            backfill_lane=True,
         )

@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-import vector.domains.cortex.ingestion.sync_executor as sync_executor
+import vector.domains.cortex.ingestion.connectors.calls.sync as calls_sync
 from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
 from vector.infrastructure.db.models.calls_connection_detail import CallsConnectionDetail
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
@@ -114,7 +114,7 @@ def test_step12_calls_ingests_meetings_transcripts_and_participants(
             return _MockResponse({}, status_code=404)
         return _MockResponse({"items": calls_events, "nextPageToken": None})
 
-    monkeypatch.setattr(sync_executor.httpx, "get", _mock_get)
+    monkeypatch.setattr(calls_sync.httpx, "get", _mock_get)
 
     out = execute_connector_sync(
         db_session,
@@ -225,7 +225,7 @@ def test_step12_calls_incremental_watermark_skips_old_events(
             items = [e for e in items if isinstance(e.get("updated"), str) and e["updated"] > updated_min]
         return _MockResponse({"items": items, "nextPageToken": None})
 
-    monkeypatch.setattr(sync_executor.httpx, "get", _mock_get)
+    monkeypatch.setattr(calls_sync.httpx, "get", _mock_get)
 
     out = execute_connector_sync(
         db_session,
