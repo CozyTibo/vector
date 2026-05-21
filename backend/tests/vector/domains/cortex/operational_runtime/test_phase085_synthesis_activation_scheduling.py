@@ -45,22 +45,22 @@ def test_evaluate_schedule_phase_08_disabled(monkeypatch: pytest.MonkeyPatch) ->
     session = MagicMock()
     tid = uuid.uuid4()
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "is_phase_08_pipeline_enabled_v1",
         lambda: False,
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "count_synthesis_eligible_scopes_v1",
         lambda *_a, **_k: {"eligible_scopes": 5, "published_index_epoch": "ep-1"},
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "count_recent_synthesis_forbidden_v1",
         lambda *_a, **_k: {"forbidden_backoff_active": False},
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "explain_synthesis_eligibility_v1",
         lambda *_a, **_k: {"synthesis_ready": True, "blocked_by": []},
     )
@@ -74,27 +74,27 @@ def test_evaluate_schedule_eligible_requires_activation(monkeypatch: pytest.Monk
     session = MagicMock()
     tid = uuid.uuid4()
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "is_phase_08_pipeline_enabled_v1",
         lambda: True,
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "count_synthesis_eligible_scopes_v1",
         lambda *_a, **_k: {"eligible_scopes": 8, "published_index_epoch": "ep-1"},
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "count_recent_synthesis_forbidden_v1",
         lambda *_a, **_k: {"forbidden_backoff_active": False},
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "explain_synthesis_eligibility_v1",
         lambda *_a, **_k: {"synthesis_ready": True, "blocked_by": []},
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.synthesis_pipeline."
         "synthesis_pipeline_max_scopes_v1",
         lambda: 32,
     )
@@ -109,17 +109,17 @@ def test_evaluate_schedule_forbidden_backoff(monkeypatch: pytest.MonkeyPatch) ->
     session = MagicMock()
     tid = uuid.uuid4()
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "is_phase_08_pipeline_enabled_v1",
         lambda: True,
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "count_synthesis_eligible_scopes_v1",
         lambda *_a, **_k: {"eligible_scopes": 3, "published_index_epoch": "ep-1"},
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "count_recent_synthesis_forbidden_v1",
         lambda *_a, **_k: {
             "forbidden_backoff_active": True,
@@ -128,7 +128,7 @@ def test_evaluate_schedule_forbidden_backoff(monkeypatch: pytest.MonkeyPatch) ->
         },
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "vector.domains.cortex.synthesis.phase08_activation_gate."
         "explain_synthesis_eligibility_v1",
         lambda *_a, **_k: {"synthesis_ready": True, "blocked_by": []},
     )

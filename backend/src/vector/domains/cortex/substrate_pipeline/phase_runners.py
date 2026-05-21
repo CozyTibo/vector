@@ -214,7 +214,7 @@ def run_phase_06_tcre_v1(
         )
         out = {**enqueue_out, "async": True}
         complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_06_TCRE, output=out)
-        from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
+        from vector.domains.cortex.execution.phase06_contract import (
             enforce_phase06_progression_law_v1,
         )
 

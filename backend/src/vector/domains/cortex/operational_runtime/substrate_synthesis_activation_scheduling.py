@@ -16,15 +16,18 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.operational_runtime.normative import (
     PHASE085_NORMATIVE_TREE_V1,
 )
-from vector.domains.cortex.synthesis.synthesis_completeness_projection import (
-    count_synthesis_eligible_scopes_v1,
-)
-from vector.domains.cortex.synthesis.synthesis_eligibility_explainability import (
-    explain_synthesis_eligibility_v1,
+from vector.domains.cortex.synthesis.phase08_activation_gate import (
+    SYNTHESIS_ACTIVATION_TRIGGER_AFTER_PHASE_07_V1,
+    SYNTHESIS_ACTIVATION_TRIGGER_MANUAL_V1,
+    compute_min_synthesis_jobs_target_v1,
+    count_recent_synthesis_forbidden_v1,
+    evaluate_synthesis_activation_schedule_v1 as _evaluate_synthesis_activation_schedule_v1,
+    get_synthesis_forbidden_backoff_threshold_v1,
+    get_synthesis_forbidden_backoff_window_hours_v1,
+    is_phase_08_pipeline_enabled_v1,
 )
 from vector.domains.cortex.synthesis.synthesis_pipeline import (
     materialize_synthesis_for_pipeline_v1,
-    synthesis_pipeline_max_scopes_v1,
 )
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_08_SYNTHESIS
 from vector.domains.cortex.substrate_pipeline.repository import get_running_pipeline_run_v1
@@ -42,82 +45,11 @@ CELERY_SYNTHESIS_ACTIVATION_SCHEDULE_TASK_NAME_V1: Final[str] = (
     "vector.cortex.operational_runtime.schedule_synthesis_activation_for_tenant"
 )
 
-SYNTHESIS_ACTIVATION_TRIGGER_AFTER_PHASE_07_V1: Final[str] = "after_phase_07"
-SYNTHESIS_ACTIVATION_TRIGGER_MANUAL_V1: Final[str] = "manual"
-
-
 class SubstrateSynthesisActivationSchedulingError(ValueError):
     def __init__(self, code: str, *, detail: dict[str, Any] | None = None) -> None:
         self.code = code
         self.detail = dict(detail or {})
         super().__init__(code)
-
-
-def get_synthesis_forbidden_backoff_threshold_v1() -> int:
-    try:
-        from vector.settings import get_settings
-
-        return max(1, int(get_settings().cortex_synthesis_forbidden_backoff_threshold))
-    except Exception:  # noqa: BLE001
-        return 3
-
-
-def get_synthesis_forbidden_backoff_window_hours_v1() -> int:
-    try:
-        from vector.settings import get_settings
-
-        return max(1, int(get_settings().cortex_synthesis_forbidden_backoff_window_hours))
-    except Exception:  # noqa: BLE001
-        return 24
-
-
-def is_phase_08_pipeline_enabled_v1() -> bool:
-    try:
-        from vector.settings import get_settings
-
-        return bool(get_settings().cortex_substrate_pipeline_phase_08_enabled)
-    except Exception:  # noqa: BLE001
-        return True
-
-
-def count_recent_synthesis_forbidden_v1(
-    session: Session,
-    *,
-    tenant_id: uuid.UUID,
-) -> dict[str, Any]:
-    """Count recent ``synthesis_forbidden`` jobs for backoff (**G-P085-SYN-01**)."""
-    window_hours = get_synthesis_forbidden_backoff_window_hours_v1()
-    since = datetime.now(tz=UTC) - timedelta(hours=window_hours)
-    forbidden_count = int(
-        session.scalar(
-            select(func.count())
-            .select_from(CortexSynthesisJob)
-            .where(
-                CortexSynthesisJob.tenant_id == tenant_id,
-                CortexSynthesisJob.synthesis_legality_class == "synthesis_forbidden",
-                CortexSynthesisJob.created_at >= since,
-            )
-        )
-        or 0
-    )
-    threshold = get_synthesis_forbidden_backoff_threshold_v1()
-    return {
-        "forbidden_count": forbidden_count,
-        "forbidden_backoff_threshold": threshold,
-        "forbidden_backoff_window_hours": window_hours,
-        "forbidden_backoff_active": forbidden_count >= threshold,
-    }
-
-
-def compute_min_synthesis_jobs_target_v1(
-    *,
-    eligible_scopes: int,
-    max_scopes: int,
-) -> int:
-    """Minimum jobs per activation pass: ``min(eligible, max_scopes)`` unless legality blocks."""
-    if eligible_scopes <= 0:
-        return 0
-    return min(int(eligible_scopes), max(1, int(max_scopes)))
 
 
 def build_synthesis_forbidden_escalation_panel_v1(
@@ -156,54 +88,16 @@ def evaluate_synthesis_activation_schedule_v1(
     trigger: str | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
-    """Whether phase 08 synthesis activation should run for this tenant/pipeline."""
-    scope = count_synthesis_eligible_scopes_v1(session, tenant_id=tenant_id)
-    eligible = int(scope.get("eligible_scopes") or 0)
-    index_epoch = published_index_epoch or scope.get("published_index_epoch")
-    max_scopes = synthesis_pipeline_max_scopes_v1()
-    min_jobs_target = compute_min_synthesis_jobs_target_v1(
-        eligible_scopes=eligible,
-        max_scopes=max_scopes,
+    """Admin/CI wrapper — execution slice uses ``synthesis.phase08_activation_gate`` directly."""
+    out = _evaluate_synthesis_activation_schedule_v1(
+        session,
+        tenant_id=tenant_id,
+        pipeline_run_id=pipeline_run_id,
+        published_index_epoch=published_index_epoch,
+        trigger=trigger,
+        force=force,
     )
-    forbidden_metrics = count_recent_synthesis_forbidden_v1(session, tenant_id=tenant_id)
-    phase_08_enabled = is_phase_08_pipeline_enabled_v1()
-    eligibility = explain_synthesis_eligibility_v1(session, tenant_id=tenant_id)
-
-    should = False
-    reason = "unknown"
-    must_run_phase_08 = eligible > 0 and phase_08_enabled
-
-    if not phase_08_enabled:
-        reason = "phase_08_disabled"
-    elif forbidden_metrics["forbidden_backoff_active"] and not force:
-        reason = "synthesis_forbidden_backoff"
-    elif must_run_phase_08:
-        should = True
-        reason = "eligible_scopes_require_phase_08"
-    elif phase_08_enabled:
-        should = True
-        reason = "phase_08_enabled_optional_empty_eligible"
-
-    return {
-        "gate_id": GP085_SYN01_GATE_ID_V1,
-        "tenant_id": str(tenant_id),
-        "pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None,
-        "trigger": trigger,
-        "should_activate": should,
-        "must_run_phase_08": must_run_phase_08,
-        "activation_reason": reason,
-        "phase_08_enabled": phase_08_enabled,
-        "eligible_scopes": eligible,
-        "published_index_epoch": index_epoch,
-        "max_scopes_per_pass": max_scopes,
-        "min_jobs_target": min_jobs_target,
-        "forbidden_backoff": forbidden_metrics,
-        "eligibility_summary": {
-            "synthesis_ready": eligibility.get("synthesis_ready"),
-            "blocked_by": list(eligibility.get("blocked_by") or []),
-            "next_required_step": eligibility.get("next_required_step"),
-        },
-    }
+    return {**out, "gate_id": GP085_SYN01_GATE_ID_V1}
 
 
 def chain_synthesis_activation_after_phase07_v1(
@@ -494,10 +388,18 @@ def verify_gp085_syn01_static() -> dict[str, Any]:
         errors.append("phase07_must_not_call_synthesis_activation_p0_step1")
 
     p08_src = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
+    if "operational_runtime" in p08_src:
+        errors.append("phase08_must_not_import_operational_runtime_p3_step12")
+    if "phase08_activation_gate" not in p08_src:
+        errors.append("phase08_must_import_phase08_activation_gate_p3_step12")
     if "evaluate_synthesis_activation_schedule_v1" not in p08_src:
         errors.append("phase08_missing_synthesis_activation_evaluation_p0_step1")
 
-    eval_src = inspect.getsource(evaluate_synthesis_activation_schedule_v1)
+    from vector.domains.cortex.synthesis.phase08_activation_gate import (
+        evaluate_synthesis_activation_schedule_v1 as phase08_evaluate_v1,
+    )
+
+    eval_src = inspect.getsource(phase08_evaluate_v1)
     if "synthesis_forbidden_backoff" not in eval_src:
         errors.append("evaluate_missing_forbidden_backoff")
 

@@ -13,23 +13,24 @@ from typing import Any, Final
 
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.execution.phase06_contract import (
+    ExecutionProgressionError as _ExecutionProgressionError,
+    assert_pipe085_chain_after_phase06_legal_v1,
+    enforce_phase06_progression_law_v1,
+)
 from vector.domains.cortex.operational_runtime.normative import (
     PHASE085_NORMATIVE_TREE_V1,
 )
-from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
-from vector.domains.cortex.execution.tenant_constants import FSM_AWAITING_TCRE, LEASE_STATUS_WAITING
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_03_IDENTITY,
     PHASE_04_GRAPH,
     PHASE_05_TRAVERSAL,
     PHASE_06_TCRE,
-    PHASE_07_RETRIEVAL,
     PHASE_08_SYNTHESIS,
     SUBSTRATE_PIPELINE_PHASE_ORDER,
 )
 from vector.domains.cortex.substrate_pipeline.pipeline_continuation import WAITING_ON_TCRE_COMPLETION
-from vector.infrastructure.db.models.cortex_substrate_pipeline_run import CortexSubstratePipelineRun
 
 PHASE085_AUTONOMOUS_PROGRESSION_RUNTIME_SCHEMA_VERSION: Final[int] = 1
 
@@ -50,11 +51,7 @@ PROGRESSION_LAW_IDS_V1: Final[tuple[str, ...]] = (
 )
 
 
-class SubstrateProgressionError(ValueError):
-    def __init__(self, code: str, *, detail: dict[str, Any] | None = None) -> None:
-        self.code = code
-        self.detail = dict(detail or {})
-        super().__init__(code)
+SubstrateProgressionError = _ExecutionProgressionError
 
 
 def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
@@ -114,57 +111,6 @@ def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
     }
 
 
-def assert_pipe085_chain_after_phase06_legal_v1(
-    session: Session,
-    *,
-    pipeline_run_id: uuid.UUID,
-    tenant_id: uuid.UUID | None = None,
-) -> None:
-    """**PIPE-085-01** — async TCRE gap recorded on execution lease (not continuation table)."""
-    tid = tenant_id
-    if tid is None:
-        run = session.get(CortexSubstratePipelineRun, pipeline_run_id)
-        if run is None:
-            raise SubstrateProgressionError(
-                "pipe085_pipeline_run_not_found",
-                detail={"pipeline_run_id": str(pipeline_run_id)},
-            )
-        tid = run.tenant_id
-
-    lease = get_tenant_execution_lease_v1(session, tenant_id=tid)
-    if lease is None:
-        raise SubstrateProgressionError(
-            "pipe085_missing_execution_lease_after_phase06",
-            detail={
-                "pipeline_run_id": str(pipeline_run_id),
-                "tenant_id": str(tid),
-            },
-        )
-    if lease.status != LEASE_STATUS_WAITING:
-        raise SubstrateProgressionError(
-            "pipe085_execution_lease_not_waiting",
-            detail={"status": lease.status, "expected": LEASE_STATUS_WAITING},
-        )
-    if lease.fsm_state != FSM_AWAITING_TCRE:
-        raise SubstrateProgressionError(
-            "pipe085_execution_lease_not_awaiting_tcre",
-            detail={"fsm_state": lease.fsm_state, "expected": FSM_AWAITING_TCRE},
-        )
-    if lease.pipeline_run_id != pipeline_run_id:
-        raise SubstrateProgressionError(
-            "pipe085_execution_lease_pipeline_mismatch",
-            detail={
-                "lease_pipeline_run_id": str(lease.pipeline_run_id),
-                "expected": str(pipeline_run_id),
-            },
-        )
-    if lease.phase_cursor != PHASE_07_RETRIEVAL:
-        raise SubstrateProgressionError(
-            "pipe085_execution_lease_wrong_phase_cursor",
-            detail={"phase_cursor": lease.phase_cursor, "expected": PHASE_07_RETRIEVAL},
-        )
-
-
 def assert_tcre_completion_uses_resume_path_v1(
     *,
     has_tcre_job_id: bool,
@@ -175,28 +121,6 @@ def assert_tcre_completion_uses_resume_path_v1(
         raise SubstrateProgressionError(
             "tcre_pipeline_resume_requires_job_id",
             detail={"required": "on_tcre_job_terminal_for_execution_v1"},
-        )
-
-
-def enforce_phase06_progression_law_v1(
-    session: Session,
-    *,
-    tenant_id: uuid.UUID,
-    pipeline_run_id: uuid.UUID,
-    phase06_output: Mapping[str, Any],
-) -> None:
-    """After phase 06 enqueue, require async job contract (**PROG-06-WAIT**; lease set by worker)."""
-    _ = (tenant_id, pipeline_run_id)
-    if not phase06_output.get("async"):
-        raise SubstrateProgressionError(
-            "phase06_must_be_async",
-            detail={"output": dict(phase06_output)},
-        )
-    job_id = phase06_output.get("job_id")
-    if not job_id:
-        raise SubstrateProgressionError(
-            "phase06_missing_tcre_job_id",
-            detail={"required": "enqueue_reconstruction_job_v1.job_id"},
         )
 
 
@@ -260,6 +184,7 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         verify_p1_step8_identity_projection_boundary_v1,
         verify_p1_step9_graph_projection_export_boundary_v1,
         verify_p1_step10_traversal_slice_boundary_v1,
+        verify_p3_step12_cesp_frozen_off_execution_hot_path_v1,
     )
 
     errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
@@ -271,6 +196,7 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
     errors.extend(verify_p1_step8_identity_projection_boundary_v1())
     errors.extend(verify_p1_step9_graph_projection_export_boundary_v1())
     errors.extend(verify_p1_step10_traversal_slice_boundary_v1())
+    errors.extend(verify_p3_step12_cesp_frozen_off_execution_hot_path_v1())
 
     p03_src = inspect.getsource(runners_mod.run_phase_03_identity_v1)
     if "finalize_identity_substrate_operator_audit" in p03_src:
@@ -331,6 +257,10 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         errors.append("admin_rerun_missing_execution_slice_enqueue")
 
     p06_src = inspect.getsource(runners_mod.run_phase_06_tcre_v1)
+    if "execution.phase06_contract" not in p06_src:
+        errors.append("phase06_runner_must_import_execution_phase06_contract_p3_step12")
+    if "operational_runtime" in p06_src:
+        errors.append("phase06_runner_must_not_import_operational_runtime_p3_step12")
     if "enforce_phase06_progression_law_v1" not in p06_src:
         errors.append("phase06_runner_missing_progression_enforcement")
 

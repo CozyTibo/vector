@@ -48,6 +48,26 @@ input → deterministic transform → explicit output → gate
 |------|--------|---------|
 | **11** | **Done** | Split `sync_executor` into per-connector modules + `sync_router`; `IngestionSyncContext` collapsed to **live** \| **replay** |
 
+## Implementation progress (P3)
+
+| Step | Status | Summary |
+|------|--------|---------|
+| **12** | **Done** | CESP `verify_gp085_*` / certification packs remain CI-only; execution hot path uses `execution`/`synthesis` contracts, not `operational_runtime` |
+
+### P3 step 12 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `execution/phase06_contract.py` | Phase 06 output law + post-enqueue PIPE-085 lease assert (execution slice, not CESP) |
+| `synthesis/phase08_activation_gate.py` | Phase 08 activation evaluation (eligible scopes, forbidden backoff, triggers) |
+| `phase_runners.run_phase_06_tcre_v1` | Imports `execution.phase06_contract` only (no `operational_runtime`) |
+| `run_tenant_execution_v1` | Post–phase 06 assert via `execution.phase06_contract` |
+| `synthesis_pipeline.run_substrate_phase_08_synthesis_v1` | Imports `phase08_activation_gate` only (no `operational_runtime`) |
+| `substrate_autonomous_progression` | Re-exports phase 06 helpers from execution; `verify_gp085_prog01` calls P3 boundary verifier |
+| `substrate_synthesis_activation_scheduling` | Admin/CI wrapper adds `gate_id`; core evaluate delegates to `phase08_activation_gate` |
+| CI guard | `verify_p3_step12_cesp_frozen_off_execution_hot_path_v1` + `test_p3_step12_cesp_frozen_off_hot_path.py` |
+| Static gates | `verify_gp085_prog01` / `verify_gp085_syn01` enforce hot-path import boundaries |
+
 ### P0 step 1 — done (2026-05-21)
 
 | Change | Detail |
@@ -904,7 +924,7 @@ flowchart LR
 | Partial-state semantics | `completed` + zero work | `blocked` / `waiting` only |
 | Autonomous recovery | Removed orchestration; phase repair scans remain | Admin rerun only |
 | Replay overengineering | `replay_equivalence_proofs`, twin/diff | CI-only |
-| Doctrine leakage | Phase runners call CESP law enforce | Engine gates only |
+| Doctrine leakage | Phase runners call CESP law enforce | Engine gates only — **done P3 step 12** (hot path → execution/synthesis contracts) |
 | Side effects in wrong phase | Synthesis activation in 07; retrieval in TCRE | Strict phase boundaries |
 | Hidden schedulers | `run_octs_walk_schedule_pass` inside 05 | Collapse to materialization |
 
@@ -963,8 +983,8 @@ flowchart LR
 
 ### Freeze / defer (P3)
 
-- CESP gates in CI  
-- Certification packs  
+- CESP gates in CI — **done step 12** (`verify_gp085_*` + certification packs; zero hot-path imports)  
+- Certification packs — **frozen** (tests/CI only)  
 - Phase 09 readiness  
 - Graph orphan/density admin tools  
 
@@ -1017,15 +1037,16 @@ def run_phase_XX_v1(session, *, tenant_id, pipeline_run_id, ...) -> PhaseResult:
 | 03 | `run_phase_03_identity_v1` | `identity/continuity_rebuild.py` |
 | 04 | `run_phase_04_graph_v1` | `identity/projection_export.py` (`run_graph_projection_export_for_pipeline_v1`) |
 | 05 | `run_phase_05_traversal_v1` | `substrate_traversal_execution.py` (`run_traversal_slice_for_pipeline_v1`) |
-| 06 | `run_phase_06_tcre_v1` | `reasoning/runtime` enqueue, `pipeline_continuation.py` |
+| 06 | `run_phase_06_tcre_v1` | `reasoning/runtime` enqueue, `execution/phase06_contract.py` |
 | 07 | `run_phase_07_retrieval_v1` | `retrieval/retrieval_index_materialization.py`, `execution/blocked.py` |
-| 08 | `run_phase_08_synthesis_v1` | `synthesis/synthesis_pipeline.py` |
+| 08 | `run_phase_08_synthesis_v1` | `synthesis/synthesis_pipeline.py`, `synthesis/phase08_activation_gate.py` |
 | Engine | `run_tenant_execution_v1` | `execution/run_tenant_execution.py` |
 
 ---
 
 ## Sign-off criteria (phase reduction complete)
 
+- [x] Execution / phase 08 hot path does not import `operational_runtime` or CESP verifiers (**P3 step 12**)  
 - [ ] No phase runner imports `schedule_*` or Celery task modules  
 - [ ] No phase runner creates replay **jobs** (only synchronous transforms)  
 - [x] Canonical slice has **one** drain entry, no pass fairness on lease (**P0 steps 5–6**)  

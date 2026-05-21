@@ -352,7 +352,7 @@ def run_substrate_phase_08_synthesis_v1(
     else:
         published = None
 
-    from vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling import (
+    from vector.domains.cortex.synthesis.phase08_activation_gate import (
         SYNTHESIS_ACTIVATION_TRIGGER_AFTER_PHASE_07_V1,
         evaluate_synthesis_activation_schedule_v1,
     )

@@ -345,6 +345,55 @@ def verify_p2_step11_ingestion_sync_split_boundary_v1() -> list[str]:
     return errors
 
 
+EXECUTION_HOT_PATH_MODULE_NAMES_V1: Final[tuple[str, ...]] = (
+    "vector.domains.cortex.execution.run_tenant_execution",
+    "vector.domains.cortex.substrate_pipeline.phase_runners",
+    "vector.domains.cortex.synthesis.synthesis_pipeline",
+)
+
+EXECUTION_HOT_PATH_FORBIDDEN_IMPORT_MARKERS_V1: Final[tuple[str, ...]] = (
+    "operational_runtime",
+    "verify_gp085",
+    "cesp_certification",
+)
+
+
+def verify_p3_step12_cesp_frozen_off_execution_hot_path_v1() -> list[str]:
+    """Return error codes if execution/phase bodies import CESP doctrine (P3 step 12)."""
+    import importlib
+
+    errors: list[str] = []
+    for mod_name in EXECUTION_HOT_PATH_MODULE_NAMES_V1:
+        mod = importlib.import_module(mod_name)
+        src = inspect.getsource(mod)
+        for marker in EXECUTION_HOT_PATH_FORBIDDEN_IMPORT_MARKERS_V1:
+            if marker in src:
+                errors.append(f"{mod_name}_imports_{marker}")
+
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p06 = inspect.getsource(pr_mod.run_phase_06_tcre_v1)
+    if "execution.phase06_contract" not in p06:
+        errors.append("phase06_missing_execution_phase06_contract_import")
+    if "enforce_phase06_progression_law_v1" not in p06:
+        errors.append("phase06_missing_progression_enforcement")
+
+    from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
+
+    p08 = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
+    if "phase08_activation_gate" not in p08:
+        errors.append("phase08_missing_phase08_activation_gate_import")
+    if "evaluate_synthesis_activation_schedule_v1" not in p08:
+        errors.append("phase08_missing_activation_evaluation")
+
+    exec_mod = importlib.import_module("vector.domains.cortex.execution.run_tenant_execution")
+    exec_src = inspect.getsource(exec_mod)
+    if "execution.phase06_contract" not in exec_src:
+        errors.append("run_tenant_execution_missing_phase06_contract_import")
+
+    return errors
+
+
 def verify_p0_step7_determinism_repair_off_hot_path_v1() -> list[str]:
     """Return error codes if phase 02 still runs determinism repair inline (P0 step 7)."""
     errors: list[str] = []
