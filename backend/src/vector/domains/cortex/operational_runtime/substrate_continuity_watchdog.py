@@ -1,7 +1,7 @@
 """Phase 08.5 P085-09 — substrate continuity watchdog (**G-P085-WATCH-01**).
 
 Normative: ``DOCS/cortex/operational-runtime/phase-085-recovery-continuity-doctrine.md`` §Watchdog.
-Runtime: ``run_stalled_pipeline_watchdog_v1`` + Celery ``continuity_watchdog`` beat task.
+Runtime: ``run_stalled_pipeline_watchdog_v1``; Celery beat uses convergence sweep only (M3).
 """
 
 from __future__ import annotations

@@ -19,12 +19,10 @@ _TASK = CELERY_SUBSTRATE_PROGRESSION_TICK_TASK_NAME_V1
 
 @celery_app.task(name=_TASK, queue="vector")
 def run_substrate_operational_progression_tick_task() -> dict[str, Any]:
-    """Sweep active pipeline runs and continue downstream phases (**G-P085-PROG-CLOSE**)."""
+    """Manual/operator Celery invoke only (M3: removed from beat; convergence sweeper is authoritative)."""
     from vector.settings import get_settings
 
     cfg = get_settings()
-    if cfg.cortex_convergence_disable_legacy_progression_beat:
-        return {"skipped": True, "reason": "convergence_runtime_authoritative"}
     if not cfg.cortex_substrate_operational_progression_tick_enabled:
         return {"skipped": True, "reason": "progression_tick_disabled"}
 

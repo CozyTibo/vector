@@ -3727,19 +3727,23 @@ def _slack_sync(
                     budget_exhausted = True
                     break
 
+            history_state = (
+                existing_history if isinstance(existing_history, dict) else {}
+            )
             prev_cumulative = 0
-            if isinstance(existing_history.get("cumulative_history_pages"), int):
-                prev_cumulative = int(existing_history["cumulative_history_pages"])
+            if isinstance(history_state.get("cumulative_history_pages"), int):
+                prev_cumulative = int(history_state["cumulative_history_pages"])
             cumulative_history_pages = prev_cumulative + history_pages
+            last_message_ts = history_state.get("last_message_ts")
             history_no_progress = (
                 sync_mode == "backfill"
                 and history_pages == 0
                 and channel_message_rows == 0
-                and isinstance(existing_history.get("last_message_ts"), str)
-                and existing_history["last_message_ts"].strip()
+                and isinstance(last_message_ts, str)
+                and last_message_ts.strip()
             )
             backfill_exhausted = (
-                existing_history.get("backfill_exhausted") is True or history_no_progress
+                history_state.get("backfill_exhausted") is True or history_no_progress
             )
             history_complete = bool(not next_history_cursor and not backfill_exhausted)
             channel_patch_map[cid] = {

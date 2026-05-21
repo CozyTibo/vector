@@ -2,7 +2,7 @@
 
 **Status:** Phase A artifact (2026-05-20)  
 **Scope:** One deterministic convergence runtime — no new orchestration layers  
-**Default production posture:** `CORTEX_CONVERGENCE_RUNTIME_ENABLED=true`, `CORTEX_CONVERGENCE_SWEEPER_ENABLED=true`, `CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT=true`
+**Default production posture:** `CORTEX_CONVERGENCE_SWEEPER_ENABLED=true` (M3: Celery beat = ingestion tick + convergence sweep only; legacy watchdog/progression beats removed)
 
 ---
 

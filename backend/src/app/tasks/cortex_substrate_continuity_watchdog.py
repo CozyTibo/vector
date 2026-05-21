@@ -25,13 +25,7 @@ CELERY_TASK_NAME_SUBSTRATE_CONTINUITY_WATCHDOG = _TASK
 
 @celery_app.task(name=_TASK, queue="vector")
 def run_substrate_continuity_watchdog_task() -> dict[str, Any]:
-    """Celery beat entry — default **600s** schedule in ``celery_app.conf.beat_schedule``."""
-    from vector.settings import get_settings
-
-    cfg = get_settings()
-    if cfg.cortex_convergence_disable_legacy_progression_beat:
-        return {"skipped": True, "reason": "convergence_runtime_authoritative"}
-
+    """Manual/operator Celery invoke only (M3: removed from beat; use convergence sweeper + admin)."""
     threshold = get_watchdog_stall_threshold_seconds_v1()
     auto_recover = get_watchdog_auto_recover_enabled_v1()
     _LOGGER.info(

@@ -130,7 +130,7 @@ def test_orchestrator_coalesces_second_schedule_without_revoke(
         lambda *_a, **_k: {"may_start_pipeline": True},
     )
 
-    def _resolve_action(*_a, **_k: object) -> tuple[str, dict[str, object]]:
+    def _resolve_action(*_a: object, **_k: object) -> tuple[str, dict[str, object]]:
         return schedule_actions.pop(0), {"elapsed_seconds": 30}
 
     monkeypatch.setattr(

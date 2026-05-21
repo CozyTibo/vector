@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import uuid
 from types import SimpleNamespace
+from typing import cast
 
+from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.domains.cortex.identity.identity_primitive_projection import (
     aggregate_github_email_extraction_metrics,
     extract_identity_primitives,
@@ -108,7 +110,10 @@ def test_github_commit_author_and_committer_emails_extracted() -> None:
     assert len(email_kinds) == 2
     norms = sorted(p.identity_material["email_norm"] for p in email_kinds)
     assert norms == ["author@nexora.test", "committer@nexora.test"]
-    metrics = aggregate_github_email_extraction_metrics(anchors=[anchor], raw_by_id={1: raw})
+    metrics = aggregate_github_email_extraction_metrics(
+        anchors=[anchor],
+        raw_by_id=cast(dict[int, RawIngestionRecord], {1: raw}),
+    )
     assert metrics["github_anchors_with_email_primitive"] == 1
 
 

@@ -2033,7 +2033,7 @@ def materialize_stub_backlog(
     dry_run: bool,
     pass_index: int = 0,
     topology_cooldown_seconds: int = 60,
-    pass_cooldowns: dict | None = None,
+    pass_cooldowns: dict[str, Any] | None = None,
     pass_stall_counts: dict[str, int] | None = None,
     permanent_orphan_threshold: int | None = None,
 ) -> dict[str, Any]:
@@ -2270,7 +2270,7 @@ def drain_stub_materialize_backlog(
     resource_type: str | None = None,
     batch_limit: int | None = None,
     pass_index: int = 0,
-    pass_cooldowns: dict | None = None,
+    pass_cooldowns: dict[str, Any] | None = None,
     pass_stall_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Forward-progress-aware canonical backlog drain (topology-safe, bounded slices)."""

@@ -417,14 +417,6 @@ class Settings(BaseSettings):
         le=3600,
         validation_alias="CORTEX_CONVERGENCE_STALLED_RETRY_SECONDS",
     )
-    cortex_convergence_disable_legacy_progression_beat: bool = Field(
-        default=True,
-        validation_alias="CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT",
-        description=(
-            "Skip legacy progression tick and continuity watchdog beat tasks; convergence "
-            "sweeper is the substrate scheduler (post-ingestion always uses convergence lease)."
-        ),
-    )
     cortex_substrate_pipeline_canonical_chain_gate_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_SUBSTRATE_PIPELINE_CANONICAL_CHAIN_GATE_ENABLED",
@@ -541,14 +533,15 @@ class Settings(BaseSettings):
         ge=120,
         le=86400,
         validation_alias="CORTEX_SUBSTRATE_CONTINUITY_WATCHDOG_INTERVAL_SECONDS",
-        description="G-P085-WATCH-01: Celery beat interval for substrate continuity watchdog.",
+        description=(
+            "Legacy watchdog beat removed (M3); interval retained for admin one-shot watchdog runs only."
+        ),
     )
     cortex_substrate_operational_progression_tick_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_TICK_ENABLED",
         description=(
-            "G-P085-PROG-CLOSE: periodic sweep for downstream substrate progression "
-            "(retrieval/synthesis closure, continuation resume)."
+            "Legacy progression beat removed (M3); when true, allows manual Celery task invoke only."
         ),
     )
     cortex_substrate_operational_progression_interval_seconds: int = Field(
@@ -556,7 +549,7 @@ class Settings(BaseSettings):
         ge=60,
         le=3600,
         validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_INTERVAL_SECONDS",
-        description="Beat cadence for substrate operational progression tick (seconds).",
+        description="Legacy progression beat cadence (M3: not registered on Celery beat).",
     )
     cortex_substrate_operational_progression_tick_limit: int = Field(
         default=50,

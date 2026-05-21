@@ -200,24 +200,25 @@ def record_topology_deferrals_from_plan(
     if not entries:
         return 0
 
-    table = CortexCanonicalMaterializationDeferral.__table__
-    for row in entries:
-        detail = row["detail_json"] if isinstance(row["detail_json"], dict) else {}
+    for entry in entries:
+        detail = entry["detail_json"] if isinstance(entry["detail_json"], dict) else {}
         is_permanent = bool(detail.get(DEFERRAL_DETAIL_PERMANENT_ORPHAN))
         effective_retry_at = (
-            now + timedelta(days=3650) if is_permanent else row["retry_ready_at"]
+            now + timedelta(days=3650) if is_permanent else entry["retry_ready_at"]
         )
-        stmt = insert(table).values({**row, "retry_ready_at": effective_retry_at})
+        stmt = insert(CortexCanonicalMaterializationDeferral).values(
+            {**entry, "retry_ready_at": effective_retry_at}
+        )
         stmt = stmt.on_conflict_do_update(
             index_elements=["tenant_id", "bundle_id", "raw_record_id"],
             set_={
-                "deferral_reason": row["deferral_reason"],
-                "queue": row["queue"],
-                "parent_raw_record_id": row["parent_raw_record_id"],
-                "missing_parent_ref": row["missing_parent_ref"],
-                "pass_key": row["pass_key"],
+                "deferral_reason": entry["deferral_reason"],
+                "queue": entry["queue"],
+                "parent_raw_record_id": entry["parent_raw_record_id"],
+                "missing_parent_ref": entry["missing_parent_ref"],
+                "pass_key": entry["pass_key"],
                 "retry_ready_at": effective_retry_at,
-                "deferred_at": row["deferred_at"],
+                "deferred_at": entry["deferred_at"],
                 "detail_json": detail,
                 "updated_at": now,
             },
@@ -276,7 +277,7 @@ def release_deferrals_with_materialized_parents(
         )
     )
     db.flush()
-    return int(res.rowcount or 0)
+    return int(getattr(res, "rowcount", 0) or 0)
 
 
 def count_deferrals(

@@ -100,7 +100,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | **M0** | Feature telemetry: log `execution_path=convergence\|legacy\|progression\|admin_bypass` per tenant run | Low | **Done** — `execution/execution_path_telemetry.py`, structured log `cortex_execution_path` |
 | **M1** | **P0 determinism fix:** In `run_cortex_substrate_pipeline_phase_task`, do not call `chain_after_phase_v1` after phase 02 if phase status is `waiting` or `failed` with zero successes | Medium | **Done** — `canonical_phase_gate.py`; flag `CORTEX_SUBSTRATE_PIPELINE_CANONICAL_CHAIN_GATE_ENABLED` (default true) |
 | **M2** | Force `cortex_convergence_runtime_enabled=true` everywhere; remove flag branch in `post_ingestion_refresh_dispatch` | Low | **Done** — convergence-only dispatch; removed `cortex_convergence_runtime_enabled` setting; TCRE resume via convergence only |
-| **M3** | Disable legacy beat: `cortex_convergence_disable_legacy_progression_beat=true` (already default); delete watchdog/progression beat entries | Low | Verify stall handling via lease |
+| **M3** | Disable legacy beat: `cortex_convergence_disable_legacy_progression_beat=true` (already default); delete watchdog/progression beat entries | Low | **Done** — beat = ingestion + convergence sweep only; removed `cortex_convergence_disable_legacy_progression_beat`; `verify_legacy_substrate_beats_absent_from_celery_beat_v1` |
 | **M4** | Stop enqueueing `run_cortex_substrate_pipeline_coordinator_task` from all callers; redirect to `enqueue_tenant_convergence_v1` | Medium | Grep all `schedule_substrate_pipeline_v1` |
 | **M5** | Rename convergence → `execution` package; add FSM table or extend `CortexTenantConvergenceLease` with explicit `fsm_state` | Medium | DB migration |
 | **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | Dual-run in staging only |
@@ -119,7 +119,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | Flag | Action |
 |------|--------|
 | `cortex_convergence_runtime_enabled` | Remove (always on) |
-| `cortex_convergence_disable_legacy_progression_beat` | Remove (legacy beat deleted) |
+| `cortex_convergence_disable_legacy_progression_beat` | **Removed (M3)** |
 | `cortex_substrate_continuity_watchdog_auto_recover_enabled` | Remove (no auto-orchestration recovery) |
 | `cortex_substrate_operational_progression_tick_enabled` | Remove |
 | Debounce/coalesce settings for legacy coordinator | Remove |
@@ -665,7 +665,7 @@ app/tasks/
 | Week | Deliverable |
 |------|-------------|
 | W1 | M1 P0 gate fix + M2 force convergence + telemetry |
-| W2 | M4 stop legacy coordinator enqueue + M3 beat cleanup |
+| W2 | M4 stop legacy coordinator enqueue (**M3 beat cleanup done**) |
 | W3 | FSM schema + transition log + engine package skeleton |
 | W4 | M6 single slice task; delete phase chain |
 | W5 | M7 progression delete; M8 admin deprecation |

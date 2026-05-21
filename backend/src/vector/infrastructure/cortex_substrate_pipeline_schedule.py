@@ -51,6 +51,8 @@ def read_substrate_pipeline_schedule_anchor_v1(
             raw = client.get(_anchor_key(tenant_id))
         if raw is None:
             return None
+        if not isinstance(raw, (str, bytes, bytearray)):
+            return None
         return float(raw)
     except Exception:
         _LOGGER.warning(

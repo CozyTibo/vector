@@ -219,8 +219,10 @@ def _github_emails_deterministic(payload: dict[str, Any], prof: dict[str, Any]) 
     if isinstance(pr, dict):
         walk_user_dict(pr.get("user"))
         walk_user_dict(pr.get("assignee"))
-        for item in pr.get("assignees") if isinstance(pr.get("assignees"), list) else []:
-            walk_user_dict(item)
+        assignees = pr.get("assignees")
+        if isinstance(assignees, list):
+            for item in assignees:
+                walk_user_dict(item)
         walk_user_dict(pr.get("merged_by"))
 
     issue = payload.get("issue")

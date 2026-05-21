@@ -105,19 +105,11 @@ celery_app.conf.task_routes = {
 
 _tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "1800"))
 _tick_seconds = max(60, _tick_seconds)
-_watchdog_seconds = int(os.environ.get("CORTEX_SUBSTRATE_CONTINUITY_WATCHDOG_INTERVAL_SECONDS", "600"))
-_watchdog_seconds = max(120, _watchdog_seconds)
-_progression_seconds = int(
-    os.environ.get("CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_INTERVAL_SECONDS", "300")
-)
-_progression_seconds = max(60, _progression_seconds)
 _convergence_sweep_seconds = int(os.environ.get("CORTEX_CONVERGENCE_SWEEPER_INTERVAL_SECONDS", "120"))
 _convergence_sweep_seconds = max(30, _convergence_sweep_seconds)
-_disable_legacy_beat = os.environ.get(
-    "CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT", "true"
-).lower() in ("1", "true", "yes")
 
-_beat_schedule: dict[str, dict[str, object]] = {
+# M3: substrate progression is convergence lease + sweeper only (no legacy watchdog/progression beat).
+celery_app.conf.beat_schedule = {
     "cortex-ingestion-scheduler-tick": {
         "task": "vector.cortex.ingestion.scheduler_tick",
         "schedule": timedelta(seconds=_tick_seconds),
@@ -127,16 +119,6 @@ _beat_schedule: dict[str, dict[str, object]] = {
         "schedule": timedelta(seconds=_convergence_sweep_seconds),
     },
 }
-if not _disable_legacy_beat:
-    _beat_schedule["cortex-substrate-continuity-watchdog"] = {
-        "task": "vector.cortex.substrate_pipeline.continuity_watchdog",
-        "schedule": timedelta(seconds=_watchdog_seconds),
-    }
-    _beat_schedule["cortex-substrate-operational-progression-tick"] = {
-        "task": "vector.cortex.operational_runtime.substrate_progression_tick",
-        "schedule": timedelta(seconds=_progression_seconds),
-    }
-celery_app.conf.beat_schedule = _beat_schedule
 
 
 def _register_tasks() -> None:

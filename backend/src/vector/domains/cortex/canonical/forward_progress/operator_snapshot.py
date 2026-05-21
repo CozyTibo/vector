@@ -75,7 +75,12 @@ def build_canonical_forward_progress_snapshot(
                 phase = get_phase_run_v1(db, pipeline_run_id=pr.id, phase_id=PHASE_02_CANONICAL)
                 if phase is not None:
                     out = phase.output_json if isinstance(phase.output_json, dict) else {}
-                    summary = out.get("canonical_summary") if isinstance(out.get("canonical_summary"), dict) else {}
+                    canonical_summary = out.get("canonical_summary")
+                    summary = (
+                        canonical_summary
+                        if isinstance(canonical_summary, dict)
+                        else {}
+                    )
                     phase_02_doc = {
                         "status": phase.status,
                         "waiting_reason": phase.error_detail,

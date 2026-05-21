@@ -18,19 +18,29 @@ def _env_flag(name: str, *, default: str = "true") -> bool:
 
 
 def convergence_runtime_authoritative_v1(settings: Settings | None = None) -> bool:
-    """True when convergence sweeper is on and legacy progression/watchdog beats are disabled.
-
-    Post-ingestion substrate refresh always uses the convergence lease (M2). Uses ``os.environ``
-    when *settings* is omitted so static gates match ``celery_app`` beat construction.
-    """
+    """True when convergence sweeper is enabled (sole periodic substrate scheduler after M3)."""
     if settings is None:
-        return _env_flag("CORTEX_CONVERGENCE_SWEEPER_ENABLED") and _env_flag(
-            "CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT"
-        )
-    return bool(
-        settings.cortex_convergence_sweeper_enabled
-        and settings.cortex_convergence_disable_legacy_progression_beat
-    )
+        return _env_flag("CORTEX_CONVERGENCE_SWEEPER_ENABLED")
+    return bool(settings.cortex_convergence_sweeper_enabled)
+
+
+LEGACY_SUBSTRATE_BEAT_TASK_NAMES_V1: Final[tuple[str, ...]] = (
+    "vector.cortex.substrate_pipeline.continuity_watchdog",
+    "vector.cortex.operational_runtime.substrate_progression_tick",
+)
+
+
+def verify_legacy_substrate_beats_absent_from_celery_beat_v1() -> list[str]:
+    """Return error codes if legacy watchdog/progression ticks are still on Celery beat (M3)."""
+    from app.celery_app import celery_app
+
+    errors: list[str] = []
+    beat = dict(celery_app.conf.beat_schedule or {})
+    for task_name in LEGACY_SUBSTRATE_BEAT_TASK_NAMES_V1:
+        for key, entry in beat.items():
+            if str(entry.get("task")) == task_name:
+                errors.append(f"legacy_substrate_beat_still_registered:{key}:{task_name}")
+    return errors
 
 
 def verify_convergence_sweep_in_celery_beat_v1() -> list[str]:
@@ -52,4 +62,5 @@ def verify_convergence_sweep_in_celery_beat_v1() -> list[str]:
     run_src = inspect.getsource(conv_mod.run_tenant_convergence_task)
     if "run_tenant_convergence_v1" not in run_src:
         errors.append("convergence_run_task_missing_runner")
+    errors.extend(verify_legacy_substrate_beats_absent_from_celery_beat_v1())
     return errors

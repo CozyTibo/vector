@@ -149,10 +149,9 @@ def drain_forward_progress_backlog(
                 )
             ),
         )
+        forward_progress = raw_batch.get("forward_progress")
         last_batch_meta = (
-            raw_batch.get("forward_progress")
-            if isinstance(raw_batch.get("forward_progress"), dict)
-            else {}
+            forward_progress if isinstance(forward_progress, dict) else {}
         )
         if isinstance(last_batch_meta.get("pass_index_next"), int):
             cursor_pass_index = int(last_batch_meta["pass_index_next"])
@@ -170,7 +169,10 @@ def drain_forward_progress_backlog(
         total_topology_deferred += deferred_n
         total_topology_skipped += topology_skipped_n
         total_succeeded += succeeded_n
-        failures_batch = raw_batch.get("failures") if isinstance(raw_batch["failures"], list) else []
+        failures_raw = raw_batch.get("failures")
+        failures_batch: list[Any] = (
+            failures_raw if isinstance(failures_raw, list) else []
+        )
         total_failed_rows += len(failures_batch)
         for f in failures_batch:
             if len(failure_samples) >= 300:
