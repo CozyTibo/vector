@@ -273,14 +273,27 @@ def build_pipeline_overview_v1(
     for op in _OPERATOR_PHASES:
         if op == "ingestion":
             st = _substrate_to_status(str(ing_env.get("substrate_state")))
+            blockers = _envelope_blockers(ing_env)
+            processed_n = int(ing_env.get("processed_count") or ing_env.get("total_objects") or 0)
+            backlog_raw = int(ing_env.get("unresolved_count") or 0)
+            backlog_n = backlog_raw if backlog_raw > 0 else None
+            issues = humanize_phase_issues(
+                operator_phase="ingestion",
+                status=st,
+                blockers=blockers,
+                backlog_count=backlog_n,
+            )
             phases.append(
                 {
                     "phase": "ingestion",
                     "status": st,
-                    "processed_count": int(ing_env.get("processed_count") or ing_env.get("total_objects") or 0),
-                    "backlog_count": int(ing_env.get("unresolved_count") or 0) or None,
+                    "status_label": phase_status_label(st),
+                    "processed_count": processed_n,
+                    "object_count_label": object_count_label(processed_n),
+                    "backlog_count": backlog_n,
                     "last_success_at": ing_env.get("last_successful_at"),
-                    "blockers": _envelope_blockers(ing_env),
+                    "blockers": blockers,
+                    "issues": issues,
                 }
             )
             continue

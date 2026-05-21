@@ -42,6 +42,7 @@ export type CortexOverview = {
     queue_lane_live: string;
     queue_lane_replay: string;
     checkpoint_last_incremental_at: string | null;
+    ingested_row_count: number;
     latest_run: null | {
       run_id: string;
       status: string;

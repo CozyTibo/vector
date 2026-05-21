@@ -529,6 +529,7 @@ class AdminCortexConnectorIngestionRow(BaseModel):
     queue_lane_live: str = Field(default="cortex_live")
     queue_lane_replay: str = Field(default="cortex_replay")
     checkpoint_last_incremental_at: str | None = None
+    ingested_row_count: int = 0
     latest_run: AdminCortexIngestionRunSummary | None = None
 
 

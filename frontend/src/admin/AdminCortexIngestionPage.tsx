@@ -8,31 +8,70 @@ import { CORTEX_MANUAL_SYNC_CONFIRM_PHRASE } from "./adminConstants";
 import { PhaseExplorer } from "./cortex/PhaseExplorer";
 import { PhasePageShell, type PhaseSummaryPayload } from "./cortex/PhasePageShell";
 import { CortexOverview, formatRelativeAge, titleConnector } from "./cortexAdminTypes";
+import AdminFeedbackBanner from "./ui/AdminFeedbackBanner";
 import { StatusBadge } from "./ui/StatusBadge";
+
+type TriggerSyncResponse = {
+  enqueued?: boolean;
+  queue?: string;
+  connector: string;
+  sync_mode?: string;
+};
+
+type SyncFeedback = { kind: "success" | "error"; message: string };
 
 function ConnectorsSummary({ connectors }: { connectors: CortexOverview["connectors"] }) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const qc = useQueryClient();
+  const [feedback, setFeedback] = useState<SyncFeedback | null>(null);
+  const [pendingConnector, setPendingConnector] = useState<string | null>(null);
 
   const syncMut = useMutation({
     mutationFn: async (connector: string) => {
+      setPendingConnector(connector);
       const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/ingestion/actions/trigger-sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connector, confirmation: CORTEX_MANUAL_SYNC_CONFIRM_PHRASE }),
       });
       if (!res.ok) throw new Error(await readErrorDetail(res));
-      return res.json();
+      return (await res.json()) as TriggerSyncResponse;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setFeedback({
+        kind: "success",
+        message: `${titleConnector(data.connector)} sync queued on ${data.queue ?? "cortex_live"} (${data.sync_mode ?? "incremental"}). A worker will run it shortly — refresh this page in a minute to see last sync and checkpoint update.`,
+      });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-phase-summary", tenantId, "ingestion"] });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-pipeline-overview", tenantId] });
+      void qc.invalidateQueries({ queryKey: ["admin-cortex-ingestion", tenantId] });
+    },
+    onError: (err: Error) => {
+      setFeedback({
+        kind: "error",
+        message: err.message || "Failed to queue sync.",
+      });
+    },
+    onSettled: () => {
+      setPendingConnector(null);
     },
   });
 
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <h2 className="text-base font-semibold text-stone-900">Connectors</h2>
+      <p className="mt-1 text-xs text-stone-600">
+        Sync now queues one manual job on the live worker queue. Success means enqueued, not finished.
+      </p>
+      {feedback ? (
+        <div className="mt-3">
+          <AdminFeedbackBanner
+            kind={feedback.kind}
+            message={feedback.message}
+            onDismiss={() => setFeedback(null)}
+          />
+        </div>
+      ) : null}
       <div className="mt-3 overflow-x-auto">
         <table className="min-w-full text-xs">
           <thead className="bg-stone-50 text-left text-stone-700">
@@ -41,7 +80,8 @@ function ConnectorsSummary({ connectors }: { connectors: CortexOverview["connect
               <th className="px-2 py-2">routed</th>
               <th className="px-2 py-2">connection</th>
               <th className="px-2 py-2">last sync</th>
-              <th className="px-2 py-2">rows</th>
+              <th className="px-2 py-2 text-right">ingested rows</th>
+              <th className="px-2 py-2 text-right">last run rows</th>
               <th className="px-2 py-2">actions</th>
             </tr>
           </thead>
@@ -61,15 +101,23 @@ function ConnectorsSummary({ connectors }: { connectors: CortexOverview["connect
                   <td className="px-2 py-2">
                     {latest ? `${latest.status} (${formatRelativeAge(latest.started_at)})` : "n/a"}
                   </td>
-                  <td className="px-2 py-2">{latest?.raw_rows_written ?? "n/a"}</td>
+                  <td className="px-2 py-2 text-right font-medium tabular-nums text-stone-900">
+                    {(row.ingested_row_count ?? 0).toLocaleString()}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums text-stone-600">
+                    {latest?.raw_rows_written != null ? latest.raw_rows_written.toLocaleString() : "—"}
+                  </td>
                   <td className="px-2 py-2">
                     <button
                       type="button"
                       className="rounded border border-indigo-300 bg-indigo-50 px-2 py-1 text-[11px] disabled:opacity-40"
                       disabled={!canAct || syncMut.isPending}
-                      onClick={() => syncMut.mutate(row.connector)}
+                      onClick={() => {
+                        setFeedback(null);
+                        syncMut.mutate(row.connector);
+                      }}
                     >
-                      sync now
+                      {pendingConnector === row.connector ? "Queueing…" : "sync now"}
                     </button>
                   </td>
                 </tr>

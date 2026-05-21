@@ -14,10 +14,21 @@ function phasesForStrip(overview: PipelineOverview): PhaseOverview[] {
   return OPERATOR_PHASES.map((meta) => {
     const row = overview.phases.find((p) => p.phase === meta.phase);
     const status = row?.status ?? "waiting";
+    const statusLabel =
+      row?.status_label?.trim() ||
+      (status === "healthy"
+        ? "Healthy"
+        : status === "running"
+          ? "Running"
+          : status === "blocked"
+            ? "Blocked"
+            : status === "degraded"
+              ? "Has gaps"
+              : "Waiting");
     return {
       ...meta,
       status,
-      statusLabel: row?.status_label ?? "Waiting",
+      statusLabel,
       objectCountLabel: row?.object_count_label ?? null,
     };
   });

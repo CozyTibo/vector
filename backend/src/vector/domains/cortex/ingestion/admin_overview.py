@@ -82,6 +82,26 @@ def _latest_runs_by_connection(
     return out
 
 
+def _raw_row_counts_by_connector(
+    session: Session,
+    tenant_id: uuid.UUID,
+) -> dict[str, int]:
+    """Live raw rows per connector (excludes replay copies and scope/health pings)."""
+    stmt = (
+        select(RawIngestionRecord.connector, func.count().label("n"))
+        .where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            RawIngestionRecord.replay_job_id.is_(None),
+            RawIngestionRecord.resource_type.not_like("%.scope_ping"),
+            RawIngestionRecord.resource_type != "scope_ping",
+            RawIngestionRecord.resource_type != "linear.viewer_ping",
+            RawIngestionRecord.resource_type != "viewer_ping",
+        )
+        .group_by(RawIngestionRecord.connector)
+    )
+    return {str(row[0]): int(row[1]) for row in session.execute(stmt).all()}
+
+
 def _checkpoint_row(
     session: Session,
     *,
@@ -336,6 +356,7 @@ def _build_cortex_ingestion_admin_overview_uncached(
     conns = list(session.scalars(stmt).all())
     by_provider = _pick_connection_per_provider(conns)
     latest_runs = _latest_runs_by_connection(session, tenant_id)
+    ingested_by_connector = _raw_row_counts_by_connector(session, tenant_id)
 
     paused_redis = read_scheduler_paused_flag(settings)
     redis_ok = bool(settings.redis_url.strip())
@@ -368,6 +389,7 @@ def _build_cortex_ingestion_admin_overview_uncached(
                 "queue_lane_live": "cortex_live",
                 "queue_lane_replay": "cortex_replay",
                 "checkpoint_last_incremental_at": ck_at,
+                "ingested_row_count": int(ingested_by_connector.get(connector, 0)),
                 "latest_run": _run_summary_dict(latest) if latest else None,
             },
         )

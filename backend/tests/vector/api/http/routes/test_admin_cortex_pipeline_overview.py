@@ -50,6 +50,13 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
         "retrieval",
         "synthesis",
     }
+    ingestion = next(p for p in body["phases"] if p["phase"] == "ingestion")
+    assert ingestion["status_label"]
+    assert ingestion["object_count_label"]
+    assert "issues" in ingestion
+    for phase in body["phases"]:
+        assert phase["status_label"]
+        assert "object_count_label" in phase
     assert "execution" in body
     assert isinstance(body["attention"], list)
     assert isinstance(body["recent_ingestion_runs"], list)
