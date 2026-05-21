@@ -7,21 +7,15 @@ import AdminLayout from "./admin/AdminLayout.tsx";
 import AdminCortexCanonicalHealthPage from "./admin/AdminCortexCanonicalHealthPage.tsx";
 import AdminCortexCanonicalLayout from "./admin/AdminCortexCanonicalLayout.tsx";
 import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
-import AdminCortexIdentityOverviewPage from "./admin/AdminCortexIdentityOverviewPage.tsx";
+import AdminCortexIdentityPage from "./admin/AdminCortexIdentityPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
 import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
-import AdminCortexReasoningJobsPage from "./admin/AdminCortexReasoningJobsPage.tsx";
-import AdminCortexReasoningLayout from "./admin/AdminCortexReasoningLayout.tsx";
-import AdminCortexReasoningOverviewPage from "./admin/AdminCortexReasoningOverviewPage.tsx";
-import AdminCortexRetrievalIndexPage from "./admin/AdminCortexRetrievalIndexPage.tsx";
-import AdminCortexRetrievalLayout from "./admin/AdminCortexRetrievalLayout.tsx";
-import AdminCortexRetrievalOverviewPage from "./admin/AdminCortexRetrievalOverviewPage.tsx";
+import AdminCortexReconstructionPage from "./admin/AdminCortexReconstructionPage.tsx";
+import AdminCortexRetrievalPage from "./admin/AdminCortexRetrievalPage.tsx";
 import AdminCortexSettingsPage from "./admin/AdminCortexSettingsPage.tsx";
-import AdminCortexSynthesisJobDebuggerPage from "./admin/AdminCortexSynthesisJobDebuggerPage.tsx";
-import AdminCortexSynthesisJobsPage from "./admin/AdminCortexSynthesisJobsPage.tsx";
-import AdminCortexSynthesisLayout from "./admin/AdminCortexSynthesisLayout.tsx";
-import AdminCortexSynthesisOverviewPage from "./admin/AdminCortexSynthesisOverviewPage.tsx";
+import AdminCortexSynthesisJobDetailPage from "./admin/AdminCortexSynthesisJobDetailPage.tsx";
+import AdminCortexSynthesisPage from "./admin/AdminCortexSynthesisPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
 import AdminTenantOnboardingPage from "./admin/AdminTenantOnboardingPage.tsx";
@@ -100,22 +94,14 @@ createRoot(document.getElementById("root")!).render(
                   <Route index element={<AdminCortexCanonicalHealthPage />} />
                   <Route path="health" element={<Navigate to=".." replace />} />
                 </Route>
-                <Route path="identity" element={<AdminCortexIdentityOverviewPage />} />
+                <Route path="identity" element={<AdminCortexIdentityPage />} />
                 <Route path="graph" element={<AdminCortexGraphPage />} />
-                <Route path="reconstruction" element={<AdminCortexReasoningLayout />}>
-                  <Route index element={<AdminCortexReasoningOverviewPage />} />
-                  <Route path="jobs" element={<AdminCortexReasoningJobsPage />} />
-                  <Route path="jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
-                </Route>
-                <Route path="retrieval" element={<AdminCortexRetrievalLayout />}>
-                  <Route index element={<AdminCortexRetrievalOverviewPage />} />
-                  <Route path="index" element={<AdminCortexRetrievalIndexPage />} />
-                </Route>
-                <Route path="synthesis" element={<AdminCortexSynthesisLayout />}>
-                  <Route index element={<AdminCortexSynthesisOverviewPage />} />
-                  <Route path="jobs" element={<AdminCortexSynthesisJobsPage />} />
-                  <Route path="jobs/:jobId" element={<AdminCortexSynthesisJobDebuggerPage />} />
-                </Route>
+                <Route path="reconstruction" element={<AdminCortexReconstructionPage />} />
+                <Route path="reconstruction/jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
+                <Route path="retrieval" element={<AdminCortexRetrievalPage />} />
+                <Route path="retrieval/index" element={<Navigate to=".." replace />} />
+                <Route path="synthesis" element={<AdminCortexSynthesisPage />} />
+                <Route path="synthesis/jobs/:jobId" element={<AdminCortexSynthesisJobDetailPage />} />
                 <Route path="settings" element={<AdminCortexSettingsPage />} />
                 <Route path="entity-resolution" element={<Navigate to="../identity" replace />} />
                 <Route path="identity-certification" element={<Navigate to="../identity" replace />} />

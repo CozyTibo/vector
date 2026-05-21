@@ -1,6 +1,6 @@
 # Cortex Admin Revamp Plan
 
-**Status:** Wave 0 signed off · Wave 1 complete · Wave 2 complete (2026-05-21)  
+**Status:** Wave 0 signed off · Wave 1 complete · Wave 2 complete · Wave 3 complete (2026-05-21)  
 **Scope:** `/admin/tenants/:tenantId/cortex/*` only (not workspace, integrations, or global admin)  
 **Authoritative execution model:** `DOCS/cortex/CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md` (M8 done)  
 **Substrate prerequisite:** `DOCS/cortex/CORTEX_TRUE_P0_SIGN_OFF.md` (signed off)  
@@ -600,13 +600,16 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 
 **Exit:** Overview and kept phase pages use one overview contract; Overview POSTs go through `pipeline/run` only (per-connector sync remains on Ingestion rows).
 
-### Wave 3 — P2 Remaining phases + explorers
+### Wave 3 — P2 Remaining phases + explorers — **Done** (2026-05-21)
 
-1. Identity, Graph (merged), Reconstruction, Retrieval, Synthesis
-2. Shared `PhaseExplorer` with pagination contract
-3. Inline certification warnings on Identity
+1. Identity, Graph (merged), Reconstruction, Retrieval, Synthesis on `PhasePageShell`
+2. Shared `PhaseExplorer` — `GET …/pipeline/phases/{phase}/explorer` with pagination
+3. Inline certification warnings on Identity summary (no certification tab)
+4. Ingestion + Canonical migrated to `PhaseExplorer`
+5. Phase CTAs via `POST …/pipeline/run` (`from_phase`) for identity, graph, retrieval only
+6. Removed legacy layouts/pages, graph forensic mock stack, synthesis retry / reasoning bypass POSTs from phase UIs
 
-**Exit:** Every phase has Summary + Explorer; ≤1 phase CTA.
+**Exit:** Every phase has Summary + Explorer; ≤1 phase CTA. **Met.**
 
 ### Wave 4 — P3 Code deletion
 
@@ -658,3 +661,4 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 | 2026-05-21 | Wave 0 signed off; Wave 1 surface kill implemented (frontend + tests) |
 | 2026-05-21 | Wave 1 gap closure: ingestion/canonical/reconstruction bypass CTAs removed; static test gates extended |
 | 2026-05-21 | Wave 2: pipeline overview/run API, PhasePageShell, Ingestion + Canonical migration |
+| 2026-05-21 | Wave 3: all seven phase pages, `pipeline_phase_views` summary/explorer, `PhaseExplorer`/`PhaseRerunCta`, dead UI removed |

@@ -1,12 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { useParams } from "react-router-dom";
-
-import { adminJson } from "../lib/adminFetch";
+import { PhaseExplorer } from "./cortex/PhaseExplorer";
 import { PhasePageShell, type PhaseSummaryPayload } from "./cortex/PhasePageShell";
 import { formatRelativeAge, titleConnector } from "./cortexAdminTypes";
 import type { ConnectorRollup } from "./canonical/coverageMatrixTypes";
-import { StatusBadge } from "./ui/StatusBadge.tsx";
+import { StatusBadge } from "./ui/StatusBadge";
 
 type CanonicalSummary = PhaseSummaryPayload & {
   health?: {
@@ -15,7 +11,7 @@ type CanonicalSummary = PhaseSummaryPayload & {
     last_verification_passed?: boolean | null;
     verification_freshness_label?: string;
   };
-  forward_progress?: { untreated_estimate?: number; metrics?: Record<string, unknown> };
+  forward_progress?: { untreated_estimate?: number };
   connector_rollups?: ConnectorRollup[];
   failure_count?: number;
 };
@@ -95,101 +91,6 @@ function CanonicalSummaryBody({ summary }: { summary: CanonicalSummary }) {
   );
 }
 
-function CanonicalExplorer() {
-  const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const [offset, setOffset] = useState(0);
-
-  const explorerQ = useQuery({
-    queryKey: ["admin-cortex-phase-explorer", tenantId, "canonical", offset],
-    queryFn: () =>
-      adminJson<{
-        items: Array<{
-          canonical_type: string;
-          source: string;
-          entity: string;
-          updated_at: string;
-          status: string;
-          evidence: Record<string, unknown>;
-        }>;
-        truncated: boolean;
-      }>(`/admin/tenants/${tenantId}/cortex/pipeline/phases/canonical/explorer?limit=50&offset=${offset}`),
-    enabled: Boolean(tenantId),
-  });
-
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  return (
-    <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-stone-900">Canonical explorer</h2>
-      <div className="mt-3 overflow-x-auto rounded border border-stone-200">
-        <table className="min-w-full text-xs">
-          <thead className="bg-stone-50 text-left">
-            <tr>
-              <th className="px-2 py-1 w-16" />
-              <th className="px-2 py-1">canonical_type</th>
-              <th className="px-2 py-1">source</th>
-              <th className="px-2 py-1">entity</th>
-              <th className="px-2 py-1">updated_at</th>
-              <th className="px-2 py-1">status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(explorerQ.data?.items ?? []).map((row) => {
-              const id = String(row.entity ?? row.source);
-              const open = expanded === id;
-              return (
-                <tr key={id} className="border-t border-stone-100">
-                  <td className="px-2 py-1">
-                    <button
-                      type="button"
-                      className="rounded border border-stone-300 px-1.5 py-0.5 text-[10px]"
-                      onClick={() => setExpanded(open ? null : id)}
-                    >
-                      {open ? "hide" : "show"}
-                    </button>
-                  </td>
-                  <td className="px-2 py-1 font-mono">{row.canonical_type}</td>
-                  <td className="px-2 py-1 font-mono">{row.source}</td>
-                  <td className="px-2 py-1 font-mono">{row.entity}</td>
-                  <td className="px-2 py-1">{row.updated_at ? new Date(row.updated_at).toLocaleString() : "—"}</td>
-                  <td className="px-2 py-1">{row.status}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {expanded ? (
-        <pre className="mt-3 max-h-96 overflow-auto rounded border border-stone-200 bg-stone-50 p-3 text-[10px]">
-          {JSON.stringify(
-            explorerQ.data?.items.find((x) => String(x.entity ?? x.source) === expanded)?.evidence ?? {},
-            null,
-            2,
-          )}
-        </pre>
-      ) : null}
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          className="rounded border border-stone-300 px-2 py-1 text-xs disabled:opacity-40"
-          disabled={offset === 0}
-          onClick={() => setOffset((o) => Math.max(0, o - 50))}
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          className="rounded border border-stone-300 px-2 py-1 text-xs disabled:opacity-40"
-          disabled={!explorerQ.data?.truncated}
-          onClick={() => setOffset((o) => o + 50)}
-        >
-          Next
-        </button>
-      </div>
-    </section>
-  );
-}
-
 export default function AdminCortexCanonicalHealthPage() {
   return (
     <PhasePageShell
@@ -197,7 +98,7 @@ export default function AdminCortexCanonicalHealthPage() {
       title="Canonical"
       description="Raw → deterministic canonical rows. Materialization runs on the execution engine only."
       summaryContent={(summary) => <CanonicalSummaryBody summary={summary as CanonicalSummary} />}
-      explorerContent={<CanonicalExplorer />}
+      explorerContent={<PhaseExplorer phase="canonical" />}
     />
   );
 }
