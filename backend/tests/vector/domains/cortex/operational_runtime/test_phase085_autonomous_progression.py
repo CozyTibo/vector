@@ -26,10 +26,6 @@ from vector.domains.cortex.substrate_pipeline.constants import PHASE_06_TCRE, PH
 from vector.domains.cortex.substrate_pipeline.orchestrator import (
     on_tcre_job_completed_for_pipeline_v1,
 )
-from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-    CONTINUATION_STATUS_WAITING,
-    mark_pipeline_waiting_on_tcre_v1,
-)
 from vector.domains.cortex.substrate_pipeline.repository import create_pipeline_run_v1
 
 
@@ -80,10 +76,12 @@ def tenant(db_session: Session) -> Any:
 
 
 @pytest.mark.integration
-def test_pipe085_chain_after_phase06_requires_waiting_continuation(
+def test_pipe085_chain_after_phase06_requires_execution_lease_waiting(
     db_session: Session,
     tenant: Any,
 ) -> None:
+    from vector.domains.cortex.execution.lease import mark_tenant_waiting_v1
+
     run = create_pipeline_run_v1(
         db_session,
         tenant_id=tenant.id,
@@ -92,20 +90,29 @@ def test_pipe085_chain_after_phase06_requires_waiting_continuation(
         idempotency_key=f"p085pipe-{uuid.uuid4().hex[:12]}",
     )
     with pytest.raises(SubstrateProgressionError) as exc:
-        assert_pipe085_chain_after_phase06_legal_v1(db_session, pipeline_run_id=run.id)
-    assert exc.value.code == "pipe085_missing_continuation_after_phase06"
+        assert_pipe085_chain_after_phase06_legal_v1(
+            db_session,
+            tenant_id=tenant.id,
+            pipeline_run_id=run.id,
+        )
+    assert exc.value.code == "pipe085_missing_execution_lease_after_phase06"
 
-    mark_pipeline_waiting_on_tcre_v1(
+    mark_tenant_waiting_v1(
         db_session,
         tenant_id=tenant.id,
         pipeline_run_id=run.id,
-        tcre_job_id=uuid.uuid4(),
+        phase_cursor=PHASE_07_RETRIEVAL,
+        waiting_reason="tcre_async",
     )
-    assert_pipe085_chain_after_phase06_legal_v1(db_session, pipeline_run_id=run.id)
+    assert_pipe085_chain_after_phase06_legal_v1(
+        db_session,
+        tenant_id=tenant.id,
+        pipeline_run_id=run.id,
+    )
 
 
 @pytest.mark.integration
-def test_enforce_phase06_progression_law_after_wait_row(
+def test_enforce_phase06_progression_law_requires_async_job_output(
     db_session: Session,
     tenant: Any,
 ) -> None:
@@ -117,19 +124,12 @@ def test_enforce_phase06_progression_law_after_wait_row(
         idempotency_key=f"p085p06-{uuid.uuid4().hex[:12]}",
     )
     job_id = uuid.uuid4()
-    mark_pipeline_waiting_on_tcre_v1(
-        db_session,
-        tenant_id=tenant.id,
-        pipeline_run_id=run.id,
-        tcre_job_id=job_id,
-    )
     enforce_phase06_progression_law_v1(
         db_session,
         tenant_id=tenant.id,
         pipeline_run_id=run.id,
         phase06_output={"async": True, "job_id": str(job_id)},
     )
-    assert_pipe085_chain_after_phase06_legal_v1(db_session, pipeline_run_id=run.id)
 
 
 @pytest.mark.integration

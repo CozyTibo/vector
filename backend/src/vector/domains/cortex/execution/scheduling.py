@@ -206,6 +206,32 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p0_step4_no_continuation_on_execution_hot_path_v1() -> list[str]:
+    """Return error codes if execution hot path still writes pipeline_continuation (P0 step 4)."""
+    errors: list[str] = []
+    from vector.domains.cortex.execution import run_tenant_execution as exec_mod
+    from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p06 = inspect.getsource(pr_mod.run_phase_06_tcre_v1)
+    if "pipeline_continuation" in p06 or "mark_pipeline_waiting_on_tcre_v1" in p06:
+        errors.append("phase06_runner_still_writes_pipeline_continuation")
+
+    p08 = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
+    if "mark_continuation_completed_v1" in p08 or "pipeline_continuation" in p08:
+        errors.append("phase08_runner_still_writes_pipeline_continuation")
+
+    exec_src = inspect.getsource(exec_mod.run_tenant_convergence_v1)
+    if "pipeline_continuation" in exec_src or "mark_pipeline_waiting_on_tcre_v1" in exec_src:
+        errors.append("execution_worker_still_writes_pipeline_continuation")
+    if "mark_tenant_waiting_v1" not in exec_src:
+        errors.append("execution_worker_missing_mark_tenant_waiting_on_tcre")
+
+    if "assert_pipe085_chain_after_phase06_legal_v1" not in exec_src:
+        errors.append("execution_worker_missing_pipe085_lease_assert_after_phase06")
+    return errors
+
+
 def verify_p0_step3_single_tcre_resume_path_v1() -> list[str]:
     """Return error codes if TCRE completion still uses continuation resume (P0 step 3)."""
     errors: list[str] = []

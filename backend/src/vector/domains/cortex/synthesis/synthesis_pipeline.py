@@ -328,11 +328,6 @@ def run_substrate_phase_08_synthesis_v1(
             phase_id=PHASE_08_SYNTHESIS,
             reason="phase_08_disabled",
         )
-        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-            mark_continuation_completed_v1,
-        )
-
-        mark_continuation_completed_v1(session, pipeline_run_id=prid)
         return {"skipped": True, "reason": "phase_08_disabled"}
 
     phase07 = get_phase_run_v1(session, pipeline_run_id=prid, phase_id=PHASE_07_RETRIEVAL)
@@ -377,14 +372,10 @@ def run_substrate_phase_08_synthesis_v1(
             phase_id=PHASE_08_SYNTHESIS,
             reason=reason,
         )
-        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-            mark_continuation_completed_v1,
-        )
         from vector.domains.cortex.substrate_pipeline.orchestrator import (
             finalize_pipeline_if_complete_v1,
         )
 
-        mark_continuation_completed_v1(session, pipeline_run_id=prid)
         fin = finalize_pipeline_if_complete_v1(session, pipeline_run_id=prid)
         return {
             "skipped": True,
@@ -417,11 +408,6 @@ def run_substrate_phase_08_synthesis_v1(
             phase_id=PHASE_08_SYNTHESIS,
             output=out,
         )
-        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-            mark_continuation_completed_v1,
-        )
-
-        mark_continuation_completed_v1(session, pipeline_run_id=prid)
         return out
     except Exception as exc:  # noqa: BLE001
         fail_phase_v1(

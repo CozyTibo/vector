@@ -227,9 +227,6 @@ def chain_synthesis_activation_after_phase07_v1(
     )
 
     if not eval_out["phase_08_enabled"]:
-        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-            mark_continuation_completed_v1,
-        )
         from vector.domains.cortex.substrate_pipeline.repository import skip_phase_v1
 
         skip_phase_v1(

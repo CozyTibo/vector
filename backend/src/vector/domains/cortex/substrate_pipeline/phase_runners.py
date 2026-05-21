@@ -292,19 +292,6 @@ def run_phase_06_tcre_v1(
             run_sync=False,
         )
         out = {**enqueue_out, "async": True}
-        job_id_raw = enqueue_out.get("job_id")
-        if job_id_raw:
-            from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-                mark_pipeline_waiting_on_tcre_v1,
-            )
-
-            mark_pipeline_waiting_on_tcre_v1(
-                session,
-                tenant_id=tenant_id,
-                pipeline_run_id=pipeline_run_id,
-                tcre_job_id=uuid.UUID(str(job_id_raw)),
-                celery_task_id=str(enqueue_out.get("celery_task_id") or "") or None,
-            )
         complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_06_TCRE, output=out)
         from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
             enforce_phase06_progression_law_v1,

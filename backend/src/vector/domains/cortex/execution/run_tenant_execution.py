@@ -294,6 +294,15 @@ def run_tenant_convergence_v1(
                     phase_cursor=PHASE_07_RETRIEVAL,
                     waiting_reason="tcre_async",
                 )
+                from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
+                    assert_pipe085_chain_after_phase06_legal_v1,
+                )
+
+                assert_pipe085_chain_after_phase06_legal_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    pipeline_run_id=pipeline_run_id,
+                )
                 session.commit()
                 waiting_async = True
                 return {

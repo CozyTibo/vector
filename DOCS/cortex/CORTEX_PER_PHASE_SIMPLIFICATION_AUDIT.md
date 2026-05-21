@@ -29,7 +29,7 @@ input → deterministic transform → explicit output → gate
 | **1** | **Done** | Phase 07 = retrieval index only; synthesis activation evaluation moved to phase 08 entry |
 | **2** | **Done** | TCRE Celery worker no longer materializes retrieval; resume still delegates to phase 07 via convergence |
 | **3** | **Done** | Single TCRE resume path — execution lease only (`on_tcre_job_terminal_for_execution_v1`); no continuation enqueue |
-| 4 | Pending | Drop continuation writes on execution hot path |
+| **4** | **Done** | Execution hot path no longer writes `pipeline_continuation` (phase 06/08); PIPE-085-01 asserts execution lease |
 | 5 | Pending | Canonical single drain |
 | 6 | Pending | Remove pass fairness on lease |
 | 7 | Pending | Determinism repair off hot path |
@@ -64,6 +64,17 @@ input → deterministic transform → explicit output → gate
 | `resume_convergence_from_waiting_v1` | Accepts `pipeline_run_id` so lease cursor stays bound to the pipeline run |
 | CI guard | `verify_p0_step3_single_tcre_resume_path_v1` + `test_p0_step3_single_tcre_resume.py` |
 | Static gates | `verify_gp085_prog01` + **PROG-TCRE-RESUME** updated for execution-only resume |
+
+### P0 step 4 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `run_phase_06_tcre_v1` | Removed `mark_pipeline_waiting_on_tcre_v1`; async wait is execution-lease only |
+| `run_substrate_phase_08_synthesis_v1` | Removed `mark_continuation_completed_v1` on skip/complete paths |
+| `run_tenant_convergence_v1` | After phase 06, `mark_tenant_waiting_v1` + `assert_pipe085_chain_after_phase06_legal_v1` (lease-based) |
+| `assert_pipe085_chain_after_phase06_legal_v1` | Checks `AWAITING_TCRE` lease instead of continuation row |
+| `enforce_phase06_progression_law_v1` | Output contract only (async + `job_id`); no continuation assertion |
+| CI guard | `verify_p0_step4_no_continuation_on_execution_hot_path_v1` + `test_p0_step4_continuation_hot_path.py` |
 
 ---
 
@@ -933,7 +944,7 @@ def run_phase_XX_v1(session, *, tenant_id, pipeline_run_id, ...) -> PhaseResult:
 - [ ] No phase runner imports `schedule_*` or Celery task modules  
 - [ ] No phase runner creates replay **jobs** (only synchronous transforms)  
 - [ ] Canonical slice has **one** drain entry, no pass fairness on lease  
-- [ ] `pipeline_continuation` unused by execution hot path  
+- [x] `pipeline_continuation` unused by execution hot path (**P0 step 4**)  
 - [x] TCRE worker does not materialize retrieval (**P0 step 2**)  
 - [x] Phase 07 does not enqueue synthesis (**P0 step 1**)  
 - [ ] Every phase output includes `receipt_hash` + terminal `outcome` enum  

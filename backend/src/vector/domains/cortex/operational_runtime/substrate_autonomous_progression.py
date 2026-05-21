@@ -16,9 +16,8 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.operational_runtime.normative import (
     PHASE085_NORMATIVE_TREE_V1,
 )
-from vector.domains.cortex.operational_runtime.substrate_continuity import (
-    assert_phase06_must_persist_waiting_v1,
-)
+from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
+from vector.domains.cortex.execution.tenant_constants import FSM_AWAITING_TCRE, LEASE_STATUS_WAITING
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_03_IDENTITY,
@@ -29,11 +28,8 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_08_SYNTHESIS,
     SUBSTRATE_PIPELINE_PHASE_ORDER,
 )
-from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-    CONTINUATION_STATUS_WAITING,
-    WAITING_ON_TCRE_COMPLETION,
-    get_continuation_for_pipeline_v1,
-)
+from vector.domains.cortex.substrate_pipeline.pipeline_continuation import WAITING_ON_TCRE_COMPLETION
+from vector.infrastructure.db.models.cortex_substrate_pipeline_run import CortexSubstratePipelineRun
 
 PHASE085_AUTONOMOUS_PROGRESSION_RUNTIME_SCHEMA_VERSION: Final[int] = 1
 
@@ -96,7 +92,7 @@ def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
             },
             {
                 "law_id": "PROG-06-WAIT",
-                "description": "Phase 06 persists WAITING / TCRE_COMPLETION before returning.",
+                "description": "Phase 06 enqueues async TCRE; execution worker marks lease AWAITING_TCRE.",
             },
             {
                 "law_id": "PROG-TCRE-RESUME",
@@ -108,7 +104,7 @@ def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
             },
             {
                 "law_id": "PROG-08-COMPLETE",
-                "description": "Phase 08 completion calls mark_continuation_completed_v1.",
+                "description": "Phase 08 completes via phase_runs + pipeline finalize (no continuation writes).",
             },
             {
                 "law_id": PIPE085_CHAIN_RULE_ID_V1,
@@ -122,25 +118,50 @@ def assert_pipe085_chain_after_phase06_legal_v1(
     session: Session,
     *,
     pipeline_run_id: uuid.UUID,
+    tenant_id: uuid.UUID | None = None,
 ) -> None:
-    """**PIPE-085-01** — None chain after TCRE requires durable WAITING continuation."""
-    continuation = get_continuation_for_pipeline_v1(session, pipeline_run_id=pipeline_run_id)
-    if continuation is None:
+    """**PIPE-085-01** — async TCRE gap recorded on execution lease (not continuation table)."""
+    tid = tenant_id
+    if tid is None:
+        run = session.get(CortexSubstratePipelineRun, pipeline_run_id)
+        if run is None:
+            raise SubstrateProgressionError(
+                "pipe085_pipeline_run_not_found",
+                detail={"pipeline_run_id": str(pipeline_run_id)},
+            )
+        tid = run.tenant_id
+
+    lease = get_tenant_execution_lease_v1(session, tenant_id=tid)
+    if lease is None:
         raise SubstrateProgressionError(
-            "pipe085_missing_continuation_after_phase06",
-            detail={"pipeline_run_id": str(pipeline_run_id)},
-        )
-    assert_phase06_must_persist_waiting_v1(
-        continuation_present=True,
-        waiting_on=continuation.waiting_on,
-    )
-    if continuation.continuation_status != CONTINUATION_STATUS_WAITING:
-        raise SubstrateProgressionError(
-            "pipe085_phase06_continuation_not_waiting",
+            "pipe085_missing_execution_lease_after_phase06",
             detail={
-                "continuation_status": continuation.continuation_status,
-                "expected": CONTINUATION_STATUS_WAITING,
+                "pipeline_run_id": str(pipeline_run_id),
+                "tenant_id": str(tid),
             },
+        )
+    if lease.status != LEASE_STATUS_WAITING:
+        raise SubstrateProgressionError(
+            "pipe085_execution_lease_not_waiting",
+            detail={"status": lease.status, "expected": LEASE_STATUS_WAITING},
+        )
+    if lease.fsm_state != FSM_AWAITING_TCRE:
+        raise SubstrateProgressionError(
+            "pipe085_execution_lease_not_awaiting_tcre",
+            detail={"fsm_state": lease.fsm_state, "expected": FSM_AWAITING_TCRE},
+        )
+    if lease.pipeline_run_id != pipeline_run_id:
+        raise SubstrateProgressionError(
+            "pipe085_execution_lease_pipeline_mismatch",
+            detail={
+                "lease_pipeline_run_id": str(lease.pipeline_run_id),
+                "expected": str(pipeline_run_id),
+            },
+        )
+    if lease.phase_cursor != PHASE_07_RETRIEVAL:
+        raise SubstrateProgressionError(
+            "pipe085_execution_lease_wrong_phase_cursor",
+            detail={"phase_cursor": lease.phase_cursor, "expected": PHASE_07_RETRIEVAL},
         )
 
 
@@ -164,8 +185,8 @@ def enforce_phase06_progression_law_v1(
     pipeline_run_id: uuid.UUID,
     phase06_output: Mapping[str, Any],
 ) -> None:
-    """After phase 06 enqueue, require durable WAITING continuation (**PROG-06-WAIT**)."""
-    _ = tenant_id
+    """After phase 06 enqueue, require async job contract (**PROG-06-WAIT**; lease set by worker)."""
+    _ = (tenant_id, pipeline_run_id)
     if not phase06_output.get("async"):
         raise SubstrateProgressionError(
             "phase06_must_be_async",
@@ -177,7 +198,6 @@ def enforce_phase06_progression_law_v1(
             "phase06_missing_tcre_job_id",
             detail={"required": "enqueue_reconstruction_job_v1.job_id"},
         )
-    assert_pipe085_chain_after_phase06_legal_v1(session, pipeline_run_id=pipeline_run_id)
 
 
 def verify_gp085_prog01_progression_static() -> dict[str, Any]:
@@ -223,8 +243,8 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
     from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
 
     syn_src = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
-    if "mark_continuation_completed_v1" not in syn_src:
-        errors.append("phase08_runner_missing_mark_continuation_completed")
+    if "mark_continuation_completed_v1" in syn_src:
+        errors.append("phase08_runner_must_not_mark_continuation_completed_p0_step4")
     if "evaluate_synthesis_activation_schedule_v1" not in syn_src:
         errors.append("phase08_runner_missing_synthesis_activation_evaluation_p0_step1")
 
@@ -233,10 +253,16 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
     from vector.domains.cortex.execution.scheduling import (
         verify_p0_step2_phase06_tcre_worker_boundary_v1,
         verify_p0_step3_single_tcre_resume_path_v1,
+        verify_p0_step4_no_continuation_on_execution_hot_path_v1,
     )
 
     errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
     errors.extend(verify_p0_step3_single_tcre_resume_path_v1())
+    errors.extend(verify_p0_step4_no_continuation_on_execution_hot_path_v1())
+
+    p06_src = inspect.getsource(runners_mod.run_phase_06_tcre_v1)
+    if "pipeline_continuation" in p06_src or "mark_pipeline_waiting_on_tcre_v1" in p06_src:
+        errors.append("phase06_runner_must_not_write_pipeline_continuation_p0_step4")
 
     p07_src = inspect.getsource(runners_mod.run_phase_07_retrieval_v1)
     if "run_synthesis_activation_after_phase07_v1" in p07_src:
