@@ -1,9 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
-import { adminFetch, adminJson } from "../lib/adminFetch";
-import { readErrorDetail } from "../lib/canonicalApi";
-import { normalizeRetrievalLegalityClassNames } from "./retrievalAdminSurfaces";
+import { adminJson } from "../lib/adminFetch";
+import { normalizeRetrievalLegalityClassNames } from "./retrievalLegalityUtils";
 import { StatusBadge } from "./ui/StatusBadge";
 
 type Coverage = {
@@ -40,27 +39,8 @@ type Overview = {
   health_strip?: HealthStrip;
 };
 
-type BootstrapResult = {
-  index_epoch: string;
-  entry_count: number;
-  entries_materialized: number;
-  tcre_jobs_processed: number;
-  walks_materialized: number;
-  graph_links_materialized: number;
-  build_state: string;
-};
-
-function invalidateRetrievalQueries(qc: ReturnType<typeof useQueryClient>, tenantId: string) {
-  void qc.invalidateQueries({ queryKey: ["retrieval-overview", tenantId] });
-  void qc.invalidateQueries({ queryKey: ["retrieval-coverage", tenantId] });
-  void qc.invalidateQueries({ queryKey: ["retrieval-legality", tenantId] });
-  void qc.invalidateQueries({ queryKey: ["retrieval-index", tenantId] });
-  void qc.invalidateQueries({ queryKey: ["admin-substrate-completeness", tenantId] });
-}
-
 export default function AdminCortexRetrievalOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const qc = useQueryClient();
 
   const overview = useQuery({
     queryKey: ["retrieval-overview", tenantId],
@@ -73,19 +53,6 @@ export default function AdminCortexRetrievalOverviewPage() {
   const legality = useQuery({
     queryKey: ["retrieval-legality", tenantId],
     queryFn: () => adminJson<Legality>(`/admin/tenants/${tenantId}/cortex/retrieval/legality`),
-  });
-
-  const bootstrapMut = useMutation({
-    mutationFn: async () => {
-      const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/retrieval/index/bootstrap`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) throw new Error(await readErrorDetail(res));
-      return res.json() as Promise<BootstrapResult>;
-    },
-    onSuccess: () => invalidateRetrievalQueries(qc, tenantId),
   });
 
   const c = coverage.data;
@@ -135,40 +102,14 @@ export default function AdminCortexRetrievalOverviewPage() {
 
       {showBootstrapCta && (
         <section className="rounded-lg border border-violet-200 bg-violet-50 p-4 shadow-sm">
-          <h3 className="font-semibold text-violet-950">Index not materialized</h3>
+          <h3 className="font-semibold text-violet-950">Index not built</h3>
           <p className="mt-1 text-sm text-violet-900">
-            Retrieval coverage is empty because no index epoch has been built from upstream TCRE jobs,
-            completed walks, and org links. Use bootstrap to materialize entries and publish a new epoch
-            (safe operator action — no confirmation phrase).
+            Retrieval coverage is empty or very low. Run the pipeline from{" "}
+            <Link className="font-medium underline" to={`/admin/tenants/${tenantId}/cortex/overview`}>
+              Overview
+            </Link>{" "}
+            → Start from step → Retrieval (execution engine).
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded-lg bg-violet-800 px-3 py-2 text-sm font-medium text-white hover:bg-violet-900 disabled:opacity-50"
-              disabled={bootstrapMut.isPending}
-              onClick={() => bootstrapMut.mutate()}
-            >
-              {bootstrapMut.isPending ? "Bootstrapping index…" : "Bootstrap retrieval index"}
-            </button>
-            <Link
-              to={`/admin/tenants/${tenantId}/cortex/retrieval/index`}
-              className="rounded-lg border border-violet-300 bg-white px-3 py-2 text-sm font-medium text-violet-900 hover:bg-violet-100"
-            >
-              Advanced index controls
-            </Link>
-          </div>
-          {bootstrapMut.error && (
-            <p className="mt-2 text-sm text-red-700">{(bootstrapMut.error as Error).message}</p>
-          )}
-          {bootstrapMut.data && (
-            <p className="mt-2 text-xs text-violet-900">
-              Published epoch <span className="font-mono">{bootstrapMut.data.index_epoch}</span> with{" "}
-              {bootstrapMut.data.entry_count} entries (
-              {bootstrapMut.data.entries_materialized} materialized from{" "}
-              {bootstrapMut.data.tcre_jobs_processed} TCRE jobs, {bootstrapMut.data.walks_materialized}{" "}
-              walks, {bootstrapMut.data.graph_links_materialized} org links).
-            </p>
-          )}
         </section>
       )}
 

@@ -44,7 +44,7 @@ export default function AdminCortexReasoningJobsPage() {
                 <td className="py-2 pr-4 font-mono text-xs">
                   <Link
                     className="text-indigo-700 underline"
-                    to={`/admin/tenants/${tenantId}/cortex/reasoning/jobs/${j.job_id}`}
+                    to={`/admin/tenants/${tenantId}/cortex/reconstruction/jobs/${j.job_id}`}
                   >
                     {j.job_id.slice(0, 8)}…
                   </Link>

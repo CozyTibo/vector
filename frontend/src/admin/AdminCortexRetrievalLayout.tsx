@@ -1,7 +1,5 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 
-import { RETRIEVAL_NAV_SECTIONS } from "./retrievalAdminSurfaces";
-
 function tabCls(isActive: boolean): string {
   return [
     "rounded-md px-3 py-1.5 text-sm font-medium no-underline",
@@ -17,21 +15,14 @@ export default function AdminCortexRetrievalLayout() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-stone-600">
-        Deterministic retrieval over lawful replay-safe reconstruction artifacts — not semantic search.
-        Indexes chronology windows, causal chains, and continuity segments with full lineage visibility.
-      </p>
+      <p className="text-sm text-stone-600">Retrieval indexes for query and synthesis. Rebuild via Overview → Start from step → Retrieval.</p>
       <nav className="flex flex-wrap gap-2 border-b border-stone-200 pb-3">
-        {RETRIEVAL_NAV_SECTIONS.map((s) => (
-          <NavLink
-            key={s.key || "overview"}
-            to={s.key ? `${base}/${s.key}` : base}
-            end={s.end}
-            className={({ isActive }) => tabCls(isActive)}
-          >
-            {s.label}
-          </NavLink>
-        ))}
+        <NavLink to={base} end className={({ isActive }) => tabCls(isActive)}>
+          Summary
+        </NavLink>
+        <NavLink to={`${base}/index`} className={({ isActive }) => tabCls(isActive)}>
+          Index
+        </NavLink>
       </nav>
       <Outlet />
     </div>

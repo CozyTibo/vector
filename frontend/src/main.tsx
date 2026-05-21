@@ -4,71 +4,24 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AdminLayout from "./admin/AdminLayout.tsx";
-import AdminCortexIdentityCertificationPage from "./admin/AdminCortexIdentityCertificationPage.tsx";
-import AdminCortexIdentityHandleDetailPage from "./admin/AdminCortexIdentityHandleDetailPage.tsx";
-import AdminCortexIdentityHandlesPage from "./admin/AdminCortexIdentityHandlesPage.tsx";
-import {
-  AdminCortexIdentityAmbiguityQueueDrillPage,
-  AdminCortexIdentityBundleEquivalenceDrillPage,
-  AdminCortexIdentityLinkCandidatesDrillPage,
-  AdminCortexIdentityLinksDrillPage,
-  AdminCortexIdentityMergeQueueDrillPage,
-  AdminCortexIdentityPrimitivesDrillPage,
-  AdminCortexIdentityReplayJobsDrillPage,
-} from "./admin/AdminCortexIdentityJsonDrillPage.tsx";
+import AdminCortexCanonicalHealthPage from "./admin/AdminCortexCanonicalHealthPage.tsx";
+import AdminCortexCanonicalLayout from "./admin/AdminCortexCanonicalLayout.tsx";
+import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
 import AdminCortexIdentityOverviewPage from "./admin/AdminCortexIdentityOverviewPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
-import AdminCortexMemoryPage from "./admin/AdminCortexMemoryPage.tsx";
 import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
-import AdminCortexPlaceholderPage from "./admin/AdminCortexPlaceholderPage.tsx";
-import AdminCortexReasoningCertificationPackPage from "./admin/AdminCortexReasoningCertificationPackPage.tsx";
 import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
 import AdminCortexReasoningJobsPage from "./admin/AdminCortexReasoningJobsPage.tsx";
 import AdminCortexReasoningLayout from "./admin/AdminCortexReasoningLayout.tsx";
-import AdminCortexReasoningLegalityPage from "./admin/AdminCortexReasoningLegalityPage.tsx";
 import AdminCortexReasoningOverviewPage from "./admin/AdminCortexReasoningOverviewPage.tsx";
-import AdminCortexRetrievalAuditPage from "./admin/AdminCortexRetrievalAuditPage.tsx";
-import AdminCortexRetrievalCatalogPage from "./admin/AdminCortexRetrievalCatalogPage.tsx";
-import AdminCortexRetrievalContinuityPage from "./admin/AdminCortexRetrievalContinuityPage.tsx";
 import AdminCortexRetrievalIndexPage from "./admin/AdminCortexRetrievalIndexPage.tsx";
 import AdminCortexRetrievalLayout from "./admin/AdminCortexRetrievalLayout.tsx";
-import AdminCortexRetrievalLegalityPage from "./admin/AdminCortexRetrievalLegalityPage.tsx";
-import AdminCortexRetrievalLineagePage from "./admin/AdminCortexRetrievalLineagePage.tsx";
-import AdminCortexRetrievalControlPlanePage from "./admin/AdminCortexRetrievalControlPlanePage.tsx";
 import AdminCortexRetrievalOverviewPage from "./admin/AdminCortexRetrievalOverviewPage.tsx";
-import AdminCortexRetrievalQueryPage from "./admin/AdminCortexRetrievalQueryPage.tsx";
-import AdminCortexRetrievalWorkflowsPage from "./admin/AdminCortexRetrievalWorkflowsPage.tsx";
-import AdminCortexRetrievalCertificationPackPage from "./admin/AdminCortexRetrievalCertificationPackPage.tsx";
-import AdminCortexRetrievalProgramClosurePage from "./admin/AdminCortexRetrievalProgramClosurePage.tsx";
-import AdminCortexSynthesisCatalogPage from "./admin/AdminCortexSynthesisCatalogPage.tsx";
-import AdminCortexSynthesisControlPlanePage from "./admin/AdminCortexSynthesisControlPlanePage.tsx";
+import AdminCortexSettingsPage from "./admin/AdminCortexSettingsPage.tsx";
 import AdminCortexSynthesisJobDebuggerPage from "./admin/AdminCortexSynthesisJobDebuggerPage.tsx";
 import AdminCortexSynthesisJobsPage from "./admin/AdminCortexSynthesisJobsPage.tsx";
 import AdminCortexSynthesisLayout from "./admin/AdminCortexSynthesisLayout.tsx";
 import AdminCortexSynthesisOverviewPage from "./admin/AdminCortexSynthesisOverviewPage.tsx";
-import AdminCortexSynthesisResynthesizePage from "./admin/AdminCortexSynthesisResynthesizePage.tsx";
-import AdminCortexSynthesisWorkflowsPage from "./admin/AdminCortexSynthesisWorkflowsPage.tsx";
-import AdminCortexTraversalControlPlanePage from "./admin/AdminCortexTraversalControlPlanePage.tsx";
-import AdminCortexTraversalLayout from "./admin/AdminCortexTraversalLayout.tsx";
-import AdminCortexTraversalOverviewPage from "./admin/AdminCortexTraversalOverviewPage.tsx";
-import AdminCortexCanonicalAmbiguitiesPage from "./admin/AdminCortexCanonicalAmbiguitiesPage.tsx";
-import AdminCortexCanonicalCertificationPage from "./admin/AdminCortexCanonicalCertificationPage.tsx";
-import AdminCortexCanonicalCoveragePage from "./admin/AdminCortexCanonicalCoveragePage.tsx";
-import AdminCortexCanonicalControlPlanePage from "./admin/AdminCortexCanonicalControlPlanePage.tsx";
-import AdminCortexCanonicalDebugTabPage from "./admin/AdminCortexCanonicalDebugTabPage.tsx";
-import AdminCortexCanonicalDoctrineTabPage from "./admin/AdminCortexCanonicalDoctrineTabPage.tsx";
-import AdminCortexCanonicalLayout from "./admin/AdminCortexCanonicalLayout.tsx";
-import AdminCortexCanonicalLegacyOntologyToolsPage from "./admin/AdminCortexCanonicalLegacyOntologyToolsPage.tsx";
-import AdminCortexCanonicalAdvancedLayout from "./admin/AdminCortexCanonicalAdvancedLayout.tsx";
-import AdminCortexCanonicalFailuresPage from "./admin/AdminCortexCanonicalFailuresPage.tsx";
-import AdminCortexCanonicalHealthPage from "./admin/AdminCortexCanonicalHealthPage.tsx";
-import AdminCortexCanonicalRegistryPage from "./admin/AdminCortexCanonicalRegistryPage.tsx";
-import AdminCortexCanonicalReplayTabPage from "./admin/AdminCortexCanonicalReplayTabPage.tsx";
-import AdminCortexCanonicalRuntimePage from "./admin/AdminCortexCanonicalRuntimePage.tsx";
-import AdminCortexCanonicalStabilizationPage from "./admin/AdminCortexCanonicalStabilizationPage.tsx";
-import AdminCortexCanonicalVerificationTabPage from "./admin/AdminCortexCanonicalVerificationTabPage.tsx";
-import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
-import AdminCortexVerificationPage from "./admin/AdminCortexVerificationPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
 import AdminTenantOnboardingPage from "./admin/AdminTenantOnboardingPage.tsx";
@@ -144,130 +97,39 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="overview" element={<AdminCortexOverviewPage />} />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
                 <Route path="canonical" element={<AdminCortexCanonicalLayout />}>
-                  <Route index element={<Navigate to="health" replace />} />
-                  <Route path="health" element={<AdminCortexCanonicalHealthPage />} />
-                  <Route path="coverage" element={<AdminCortexCanonicalCoveragePage />} />
-                  <Route path="failures" element={<AdminCortexCanonicalFailuresPage />} />
-                  <Route path="advanced" element={<AdminCortexCanonicalAdvancedLayout />}>
-                    <Route index element={<Navigate to="runtime" replace />} />
-                    <Route path="runtime" element={<AdminCortexCanonicalRuntimePage />} />
-                    <Route path="replay" element={<AdminCortexCanonicalReplayTabPage />} />
-                    <Route path="verification" element={<AdminCortexCanonicalVerificationTabPage />} />
-                    <Route path="ambiguities" element={<AdminCortexCanonicalAmbiguitiesPage />} />
-                    <Route path="registry" element={<AdminCortexCanonicalRegistryPage />} />
-                    <Route path="doctrine" element={<AdminCortexCanonicalDoctrineTabPage />} />
-                    <Route path="debug" element={<AdminCortexCanonicalDebugTabPage />} />
-                    <Route path="legacy-tools" element={<AdminCortexCanonicalLegacyOntologyToolsPage />} />
-                    <Route path="inspector" element={<AdminCortexCanonicalControlPlanePage />} />
-                    <Route path="stabilization" element={<AdminCortexCanonicalStabilizationPage />} />
-                    <Route path="certification" element={<AdminCortexCanonicalCertificationPage />} />
-                  </Route>
-                  <Route path="overview" element={<Navigate to="health" replace />} />
-                  <Route path="runtime" element={<Navigate to="advanced/runtime" replace />} />
-                  <Route path="replay" element={<Navigate to="advanced/replay" replace />} />
-                  <Route path="verification" element={<Navigate to="advanced/verification" replace />} />
-                  <Route path="ambiguities" element={<Navigate to="advanced/ambiguities" replace />} />
-                  <Route path="registry" element={<Navigate to="advanced/registry" replace />} />
-                  <Route path="doctrine" element={<Navigate to="advanced/doctrine" replace />} />
-                  <Route path="debug" element={<Navigate to="advanced/debug" replace />} />
-                  <Route path="legacy-tools" element={<Navigate to="advanced/legacy-tools" replace />} />
-                  <Route path="inspector" element={<Navigate to="advanced/inspector" replace />} />
-                  <Route path="stabilization" element={<Navigate to="advanced/stabilization" replace />} />
-                  <Route path="certification" element={<Navigate to="advanced/certification" replace />} />
-                  <Route path="control-plane" element={<Navigate to="health" replace />} />
+                  <Route index element={<AdminCortexCanonicalHealthPage />} />
+                  <Route path="health" element={<Navigate to=".." replace />} />
                 </Route>
-                <Route path="entity-resolution" element={<AdminCortexIdentityOverviewPage />} />
-                <Route path="identity-certification" element={<AdminCortexIdentityCertificationPage />} />
-                <Route path="identity/handles/:handleId" element={<AdminCortexIdentityHandleDetailPage />} />
-                <Route path="identity/handles" element={<AdminCortexIdentityHandlesPage />} />
-                <Route path="identity/links" element={<AdminCortexIdentityLinksDrillPage />} />
-                <Route path="identity/link-candidates" element={<AdminCortexIdentityLinkCandidatesDrillPage />} />
-                <Route path="identity/merge-queue" element={<AdminCortexIdentityMergeQueueDrillPage />} />
-                <Route path="identity/ambiguity-queue" element={<AdminCortexIdentityAmbiguityQueueDrillPage />} />
-                <Route path="identity/replay-jobs" element={<AdminCortexIdentityReplayJobsDrillPage />} />
-                <Route
-                  path="identity/bundle-equivalence"
-                  element={<AdminCortexIdentityBundleEquivalenceDrillPage />}
-                />
-                <Route path="identity/primitives" element={<AdminCortexIdentityPrimitivesDrillPage />} />
+                <Route path="identity" element={<AdminCortexIdentityOverviewPage />} />
                 <Route path="graph" element={<AdminCortexGraphPage />} />
-                <Route path="traversal" element={<AdminCortexTraversalLayout />}>
-                  <Route index element={<AdminCortexTraversalOverviewPage />} />
-                  <Route path="control-plane" element={<AdminCortexTraversalControlPlanePage />} />
-                </Route>
-                <Route path="memory" element={<AdminCortexMemoryPage />} />
-                <Route path="reasoning" element={<AdminCortexReasoningLayout />}>
+                <Route path="reconstruction" element={<AdminCortexReasoningLayout />}>
                   <Route index element={<AdminCortexReasoningOverviewPage />} />
                   <Route path="jobs" element={<AdminCortexReasoningJobsPage />} />
                   <Route path="jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
-                  <Route path="legality" element={<AdminCortexReasoningLegalityPage />} />
-                  <Route
-                    path="certification-pack"
-                    element={<AdminCortexReasoningCertificationPackPage />}
-                  />
                 </Route>
                 <Route path="retrieval" element={<AdminCortexRetrievalLayout />}>
                   <Route index element={<AdminCortexRetrievalOverviewPage />} />
-                  <Route path="workflows" element={<AdminCortexRetrievalWorkflowsPage />} />
-                  <Route path="query" element={<AdminCortexRetrievalQueryPage />} />
-                  <Route path="audit" element={<AdminCortexRetrievalAuditPage />} />
-                  <Route path="coverage" element={<AdminCortexRetrievalCatalogPage surfaceKey="coverage" />} />
-                  <Route path="policy" element={<AdminCortexRetrievalCatalogPage surfaceKey="policy" />} />
-                  <Route path="provenance" element={<AdminCortexRetrievalCatalogPage surfaceKey="provenance" />} />
-                  <Route path="replay" element={<AdminCortexRetrievalCatalogPage surfaceKey="replay" />} />
-                  <Route path="omissions" element={<AdminCortexRetrievalCatalogPage surfaceKey="omissions" />} />
-                  <Route path="temporal" element={<AdminCortexRetrievalCatalogPage surfaceKey="temporal" />} />
-                  <Route path="lineage" element={<AdminCortexRetrievalLineagePage />} />
-                  <Route path="traversal" element={<AdminCortexRetrievalCatalogPage surfaceKey="traversal" />} />
-                  <Route path="tcre" element={<AdminCortexRetrievalCatalogPage surfaceKey="tcre" />} />
-                  <Route path="degradation" element={<AdminCortexRetrievalCatalogPage surfaceKey="degradation" />} />
-                  <Route path="legality" element={<AdminCortexRetrievalLegalityPage />} />
-                  <Route path="readiness" element={<AdminCortexRetrievalCatalogPage surfaceKey="readiness" />} />
                   <Route path="index" element={<AdminCortexRetrievalIndexPage />} />
-                  <Route path="control-plane" element={<AdminCortexRetrievalControlPlanePage />} />
-                  <Route path="continuity" element={<AdminCortexRetrievalContinuityPage />} />
-                  <Route
-                    path="certification-pack"
-                    element={<AdminCortexRetrievalCertificationPackPage />}
-                  />
-                  <Route
-                    path="program-closure"
-                    element={<AdminCortexRetrievalProgramClosurePage />}
-                  />
                 </Route>
                 <Route path="synthesis" element={<AdminCortexSynthesisLayout />}>
                   <Route index element={<AdminCortexSynthesisOverviewPage />} />
-                  <Route path="workflows" element={<AdminCortexSynthesisWorkflowsPage />} />
                   <Route path="jobs" element={<AdminCortexSynthesisJobsPage />} />
                   <Route path="jobs/:jobId" element={<AdminCortexSynthesisJobDebuggerPage />} />
-                  <Route path="artifacts" element={<AdminCortexSynthesisCatalogPage surfaceKey="artifacts" />} />
-                  <Route path="replay" element={<AdminCortexSynthesisCatalogPage surfaceKey="replay" />} />
-                  <Route path="omissions" element={<AdminCortexSynthesisCatalogPage surfaceKey="omissions" />} />
-                  <Route path="degradation" element={<AdminCortexSynthesisCatalogPage surfaceKey="degradation" />} />
-                  <Route path="legality" element={<AdminCortexSynthesisCatalogPage surfaceKey="legality" />} />
-                  <Route
-                    path="runtime-legality"
-                    element={<AdminCortexSynthesisCatalogPage surfaceKey="runtimeLegality" />}
-                  />
-                  <Route
-                    path="evaluation"
-                    element={<AdminCortexSynthesisCatalogPage surfaceKey="evaluation" />}
-                  />
-                  <Route path="coverage" element={<AdminCortexSynthesisCatalogPage surfaceKey="coverage" />} />
-                  <Route path="observability" element={<AdminCortexSynthesisCatalogPage surfaceKey="observability" />} />
-                  <Route path="control-plane" element={<AdminCortexSynthesisControlPlanePage />} />
-                  <Route
-                    path="certification"
-                    element={<AdminCortexSynthesisCatalogPage surfaceKey="certification" />}
-                  />
-                  <Route
-                    path="program-closure"
-                    element={<AdminCortexSynthesisCatalogPage surfaceKey="programClosure" />}
-                  />
-                  <Route path="resynthesize" element={<AdminCortexSynthesisResynthesizePage />} />
                 </Route>
-                <Route path="verification" element={<AdminCortexVerificationPage />} />
-                <Route path="settings-debug" element={<AdminCortexPlaceholderPage title="Settings / Debug" />} />
+                <Route path="settings" element={<AdminCortexSettingsPage />} />
+                <Route path="entity-resolution" element={<Navigate to="../identity" replace />} />
+                <Route path="identity-certification" element={<Navigate to="../identity" replace />} />
+                <Route path="identity/*" element={<Navigate to="../identity" replace />} />
+                <Route path="traversal" element={<Navigate to="../graph" replace />} />
+                <Route path="traversal/*" element={<Navigate to="../../graph" replace />} />
+                <Route path="memory" element={<Navigate to="../overview" replace />} />
+                <Route path="reasoning" element={<Navigate to="../reconstruction" replace />} />
+                <Route path="reasoning/*" element={<Navigate to="../../reconstruction" replace />} />
+                <Route path="verification" element={<Navigate to="../overview" replace />} />
+                <Route path="settings-debug" element={<Navigate to="../settings" replace />} />
+                <Route path="canonical/*" element={<Navigate to=".." replace />} />
+                <Route path="retrieval/*" element={<Navigate to=".." replace />} />
+                <Route path="synthesis/*" element={<Navigate to=".." replace />} />
               </Route>
               <Route path="connections" element={<RedirectTenantToIntegrations />} />
               <Route path="slack-onboarding" element={<RedirectTenantToWorkspace />} />
