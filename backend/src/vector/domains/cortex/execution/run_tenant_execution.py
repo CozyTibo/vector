@@ -15,6 +15,14 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
 )
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.execution.enqueue import enqueue_tenant_convergence_v1
+from vector.domains.cortex.execution.phase_outcomes import (
+    WORKER_OUTCOME_BLOCKED_RETRIEVAL,
+    WORKER_OUTCOME_TIME_BUDGET,
+    WORKER_OUTCOME_WAITING_TCRE,
+    is_waiting_async_phase06_v1,
+    store_last_phase_receipt_on_lease_v1,
+    worker_outcome_label_for_phase02_continue_v1,
+)
 from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_CONVERGENCE,
     emit_execution_path_telemetry_v1,
@@ -190,6 +198,7 @@ def run_tenant_convergence_v1(
                 )
                 raw_summary = out.get("canonical_summary")
                 summary: dict[str, Any] = raw_summary if isinstance(raw_summary, dict) else {}
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=out)
                 if canonical_needs_more_work_v1(session, canonical_summary=summary, tenant_id=tenant_id):
                     outcome = str(summary.get("canonical_outcome") or "")
                     progress_made = bool(summary.get("progress_made"))
@@ -215,15 +224,16 @@ def run_tenant_convergence_v1(
                     )
                     session.commit()
                     enqueue_tenant_convergence_v1(tenant_id, reason="canonical_continue")
-                    worker_outcome = (
-                        "canonical_topology_wait"
-                        if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT and not progress_made
-                        else "canonical_partial"
+                    worker_outcome = worker_outcome_label_for_phase02_continue_v1(
+                        phase_output=out,
+                        canonical_summary=summary,
                     )
                     return {
                         "tenant_id": str(tenant_id),
                         "acquired": True,
                         "outcome": worker_outcome,
+                        "phase_outcome": out.get("outcome"),
+                        "receipt_hash": out.get("receipt_hash"),
                         "canonical_outcome": outcome,
                         "convergence_health": summary.get("convergence_health"),
                         "pipeline_run_id": str(pipeline_run_id),
@@ -238,34 +248,38 @@ def run_tenant_convergence_v1(
                 continue
 
             if phase == PHASE_03_IDENTITY:
-                run_phase_03_identity_v1(
+                p03 = run_phase_03_identity_v1(
                     session,
                     tenant_id=tenant_id,
                     pipeline_run_id=pipeline_run_id,
                     bundle_id=bundle_id,
                     identity_substrate_trigger=identity_trigger,
                 )
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p03)
                 phase = PHASE_04_GRAPH
                 continue
 
             if phase == PHASE_04_GRAPH:
                 out = run_phase_04_graph_v1(session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=out)
                 graph_hash = out.get("graph_projection_stable_hash_sha256")
                 phase = PHASE_05_TRAVERSAL
                 continue
 
             if phase == PHASE_05_TRAVERSAL:
-                run_phase_05_traversal_v1(
+                p05 = run_phase_05_traversal_v1(
                     session,
                     tenant_id=tenant_id,
                     pipeline_run_id=pipeline_run_id,
                     graph_projection_stable_hash=graph_hash,
                 )
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p05)
                 phase = PHASE_06_TCRE
                 continue
 
             if phase == PHASE_06_TCRE:
-                run_phase_06_tcre_v1(session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id)
+                p06 = run_phase_06_tcre_v1(session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p06)
                 mark_tenant_waiting_v1(
                     session,
                     tenant_id=tenant_id,
@@ -283,11 +297,13 @@ def run_tenant_convergence_v1(
                     pipeline_run_id=pipeline_run_id,
                 )
                 session.commit()
-                waiting_async = True
+                waiting_async = is_waiting_async_phase06_v1(p06)
                 return {
                     "tenant_id": str(tenant_id),
                     "acquired": True,
-                    "outcome": "waiting_on_tcre",
+                    "outcome": WORKER_OUTCOME_WAITING_TCRE,
+                    "phase_outcome": p06.get("outcome"),
+                    "receipt_hash": p06.get("receipt_hash"),
                     "pipeline_run_id": str(pipeline_run_id),
                     "fsm_state": lease.fsm_state,
                 }
@@ -298,6 +314,7 @@ def run_tenant_convergence_v1(
                     tenant_id=tenant_id,
                     pipeline_run_id=pipeline_run_id,
                 )
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=out)
                 from vector.domains.cortex.execution.blocked import (
                     apply_post_phase07_retrieval_policy_v1,
                 )
@@ -313,7 +330,9 @@ def run_tenant_convergence_v1(
                     return {
                         "tenant_id": str(tenant_id),
                         "acquired": True,
-                        "outcome": "blocked_retrieval_starvation",
+                        "outcome": WORKER_OUTCOME_BLOCKED_RETRIEVAL,
+                        "phase_outcome": out.get("outcome"),
+                        "receipt_hash": out.get("receipt_hash"),
                         "pipeline_run_id": str(pipeline_run_id),
                         "fsm_state": lease.fsm_state,
                         "block_reason_code": lease.block_reason_code,
@@ -325,11 +344,12 @@ def run_tenant_convergence_v1(
                 continue
 
             if phase == PHASE_08_SYNTHESIS:
-                run_phase_08_synthesis_v1(
+                p08 = run_phase_08_synthesis_v1(
                     session,
                     tenant_id=tenant_id,
                     pipeline_run_id=pipeline_run_id,
                 )
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p08)
                 finalize_pipeline_if_complete_v1(session, pipeline_run_id=pipeline_run_id)
                 phase = ""
                 break
@@ -345,7 +365,7 @@ def run_tenant_convergence_v1(
             return {
                 "tenant_id": str(tenant_id),
                 "acquired": True,
-                "outcome": "time_budget_requeue",
+                "outcome": WORKER_OUTCOME_TIME_BUDGET,
                 "pipeline_run_id": str(pipeline_run_id),
                 "fsm_state": lease.fsm_state,
             }

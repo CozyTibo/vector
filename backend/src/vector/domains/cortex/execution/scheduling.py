@@ -554,6 +554,27 @@ def verify_phase07_retrieval_only_boundary_v1() -> list[str]:
     return errors
 
 
+def verify_execution_blocked_semantics_v1() -> list[str]:
+    """Return error codes if execution worker lacks receipt-driven stop semantics."""
+    errors: list[str] = []
+    from vector.domains.cortex.execution import run_tenant_execution as exec_mod
+
+    src = inspect.getsource(exec_mod.run_tenant_convergence_v1)
+    for sym in (
+        "store_last_phase_receipt_on_lease_v1",
+        "WORKER_OUTCOME_WAITING_TCRE",
+        "WORKER_OUTCOME_BLOCKED_RETRIEVAL",
+        "worker_outcome_label_for_phase02_continue_v1",
+    ):
+        if sym not in src:
+            errors.append(f"execution_worker_missing_{sym}")
+    from vector.domains.cortex.substrate_pipeline import substrate_phase_receipt as spr
+
+    if not hasattr(spr, "PHASE_OUTCOME_BLOCKED"):
+        errors.append("missing_phase_outcome_blocked_constant")
+    return errors
+
+
 def verify_substrate_phase_receipt_contract_v1() -> list[str]:
     """Return error codes if phase runners omit universal substrate phase receipts."""
     errors: list[str] = []
