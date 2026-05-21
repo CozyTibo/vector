@@ -206,6 +206,26 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p0_step1_phase07_retrieval_boundary_v1() -> list[str]:
+    """Return error codes if phase 07 still runs synthesis activation (P0 step 1)."""
+    from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    errors: list[str] = []
+    p07 = inspect.getsource(pr_mod.run_phase_07_retrieval_v1)
+    if "run_synthesis_activation_after_phase07_v1" in p07:
+        errors.append("phase07_still_calls_synthesis_activation")
+    p08 = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
+    if "evaluate_synthesis_activation_schedule_v1" not in p08:
+        errors.append("phase08_missing_synthesis_activation_evaluation")
+    from vector.domains.cortex.execution import run_tenant_execution as exec_mod
+
+    exec_src = inspect.getsource(exec_mod.run_tenant_convergence_v1)
+    if "synthesis_activation" in exec_src:
+        errors.append("execution_worker_still_reads_synthesis_activation_from_phase07")
+    return errors
+
+
 def verify_m8_admin_execution_surface_v1() -> list[str]:
     """Return error codes if M8 consolidated admin execution routes are missing."""
     errors: list[str] = []

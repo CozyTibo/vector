@@ -357,6 +357,42 @@ def run_substrate_phase_08_synthesis_v1(
     else:
         published = None
 
+    from vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling import (
+        SYNTHESIS_ACTIVATION_TRIGGER_AFTER_PHASE_07_V1,
+        evaluate_synthesis_activation_schedule_v1,
+    )
+
+    activation_eval = evaluate_synthesis_activation_schedule_v1(
+        session,
+        tenant_id=tenant_id,
+        pipeline_run_id=prid,
+        published_index_epoch=published,
+        trigger=SYNTHESIS_ACTIVATION_TRIGGER_AFTER_PHASE_07_V1,
+    )
+    if not activation_eval.get("should_activate"):
+        reason = str(activation_eval.get("activation_reason") or "synthesis_not_activated")
+        skip_phase_v1(
+            session,
+            pipeline_run_id=prid,
+            phase_id=PHASE_08_SYNTHESIS,
+            reason=reason,
+        )
+        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
+            mark_continuation_completed_v1,
+        )
+        from vector.domains.cortex.substrate_pipeline.orchestrator import (
+            finalize_pipeline_if_complete_v1,
+        )
+
+        mark_continuation_completed_v1(session, pipeline_run_id=prid)
+        fin = finalize_pipeline_if_complete_v1(session, pipeline_run_id=prid)
+        return {
+            "skipped": True,
+            "reason": reason,
+            "activation_evaluation": activation_eval,
+            "finalize": fin,
+        }
+
     begin_phase_v1(session, pipeline_run_id=prid, phase_id=PHASE_08_SYNTHESIS)
     try:
         out = materialize_synthesis_for_pipeline_v1(

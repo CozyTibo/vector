@@ -452,7 +452,8 @@ def build_substrate_synthesis_activation_scheduling_catalog_v1() -> dict[str, An
         "celery_task_name": CELERY_SYNTHESIS_ACTIVATION_SCHEDULE_TASK_NAME_V1,
         "scheduler_entrypoint": "schedule_synthesis_activation_for_tenant_v1",
         "pass_entrypoint": "run_synthesis_activation_schedule_pass_v1",
-        "phase07_hook": "run_synthesis_activation_after_phase07_v1",
+        "phase08_entry_evaluation": "evaluate_synthesis_activation_schedule_v1",
+        "deprecated_phase07_hook": "run_synthesis_activation_after_phase07_v1",
         "schedule_triggers": [
             SYNTHESIS_ACTIVATION_TRIGGER_AFTER_PHASE_07_V1,
             SYNTHESIS_ACTIVATION_TRIGGER_MANUAL_V1,
@@ -489,10 +490,15 @@ def verify_gp085_syn01_static() -> dict[str, Any]:
         errors.append("orchestrator_missing_activation_chain")
 
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr
+    from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
 
     p07_src = inspect.getsource(pr.run_phase_07_retrieval_v1)
-    if "run_synthesis_activation_after_phase07_v1" not in p07_src:
-        errors.append("phase07_missing_activation_hook")
+    if "run_synthesis_activation_after_phase07_v1" in p07_src:
+        errors.append("phase07_must_not_call_synthesis_activation_p0_step1")
+
+    p08_src = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
+    if "evaluate_synthesis_activation_schedule_v1" not in p08_src:
+        errors.append("phase08_missing_synthesis_activation_evaluation_p0_step1")
 
     eval_src = inspect.getsource(evaluate_synthesis_activation_schedule_v1)
     if "synthesis_forbidden_backoff" not in eval_src:

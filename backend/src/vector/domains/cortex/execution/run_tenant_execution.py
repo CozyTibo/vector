@@ -333,11 +333,6 @@ def run_tenant_convergence_v1(
                 if policy == "retry_07":
                     phase = PHASE_07_RETRIEVAL
                     continue
-                activation = out.get("synthesis_activation") if isinstance(out, dict) else {}
-                chain = out.get("next_phase_chain") or (activation or {}).get("next_phase_chain")
-                if chain:
-                    phase = PHASE_08_SYNTHESIS
-                    continue
                 phase = PHASE_08_SYNTHESIS
                 continue
 

@@ -226,12 +226,14 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
     syn_src = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
     if "mark_continuation_completed_v1" not in syn_src:
         errors.append("phase08_runner_missing_mark_continuation_completed")
+    if "evaluate_synthesis_activation_schedule_v1" not in syn_src:
+        errors.append("phase08_runner_missing_synthesis_activation_evaluation_p0_step1")
 
     from vector.domains.cortex.substrate_pipeline import phase_runners as runners_mod
 
     p07_src = inspect.getsource(runners_mod.run_phase_07_retrieval_v1)
-    if "run_synthesis_activation_after_phase07_v1" not in p07_src:
-        errors.append("phase07_runner_missing_synthesis_activation_hook")
+    if "run_synthesis_activation_after_phase07_v1" in p07_src:
+        errors.append("phase07_runner_must_not_call_synthesis_activation_p0_step1")
     if "mark_continuation_completed_v1" in p07_src:
         errors.append("phase07_runner_must_not_mark_continuation_completed")
     if "continue_substrate_operational_progression_v1" in p07_src:

@@ -350,21 +350,7 @@ def run_phase_07_retrieval_v1(
         complete_phase_v1(
             session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_07_RETRIEVAL, output=out
         )
-        from vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling import (
-            run_synthesis_activation_after_phase07_v1,
-        )
-
-        activation = run_synthesis_activation_after_phase07_v1(
-            session,
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-            published_index_epoch=out.get("published_index_epoch") or out.get("index_epoch"),
-        )
-        return {
-            **out,
-            "synthesis_activation": activation,
-            "next_phase_chain": activation.get("next_phase_chain"),
-        }
+        return out
     except Exception as exc:  # noqa: BLE001
         fail_phase_v1(
             session,
