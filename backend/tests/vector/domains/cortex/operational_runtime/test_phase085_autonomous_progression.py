@@ -167,17 +167,29 @@ def test_on_tcre_pipeline_uses_resume_path(
         idempotency_key=f"p085resume-{uuid.uuid4().hex[:12]}",
     )
     job_id = uuid.uuid4()
-    cont = mark_pipeline_waiting_on_tcre_v1(
+    from vector.domains.cortex.execution.lease import mark_tenant_waiting_v1
+
+    mark_tenant_waiting_v1(
         db_session,
         tenant_id=tenant.id,
         pipeline_run_id=run.id,
-        tcre_job_id=job_id,
+        phase_cursor=PHASE_07_RETRIEVAL,
+        waiting_reason="tcre_async",
     )
-    assert cont.continuation_status == CONTINUATION_STATUS_WAITING
+
+    enqueue_calls: list[dict[str, object]] = []
+
+    def _capture_enqueue(**kwargs: object) -> dict[str, str]:
+        enqueue_calls.append(kwargs)
+        return {"phase_id": PHASE_07_RETRIEVAL}
 
     monkeypatch.setattr(
         "vector.domains.cortex.substrate_pipeline.orchestrator.enqueue_next_pipeline_phase_v1",
-        lambda **_k: {"phase_id": PHASE_07_RETRIEVAL},
+        _capture_enqueue,
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.execution.tcre_resume.enqueue_tenant_convergence_v1",
+        lambda *_a, **_k: {"enqueued": True},
     )
     out = on_tcre_job_completed_for_pipeline_v1(
         db_session,
@@ -188,5 +200,7 @@ def test_on_tcre_pipeline_uses_resume_path(
     )
     assert out is not None
     assert out.get("resumed") is True
+    assert out.get("path") == "convergence_lease"
+    assert enqueue_calls == []
 
 

@@ -22,7 +22,6 @@ from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
     WAITING_ON_TCRE_COMPLETION,
     get_continuation_for_pipeline_v1,
     list_stalled_continuations_v1,
-    resume_pipeline_after_tcre_completion_v1,
     touch_continuation_heartbeat_v1,
     transition_continuation_status_v1,
 )
@@ -308,7 +307,9 @@ def recover_stalled_pipeline_v1(
         )
 
     if job.status == "completed":
-        out = resume_pipeline_after_tcre_completion_v1(
+        from vector.domains.cortex.execution.tcre_resume import on_tcre_job_terminal_for_execution_v1
+
+        out = on_tcre_job_terminal_for_execution_v1(
             session,
             tenant_id=continuation.tenant_id,
             pipeline_run_id=pipeline_run_id,

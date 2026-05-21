@@ -399,9 +399,12 @@ def resume_convergence_from_waiting_v1(
     *,
     tenant_id: uuid.UUID,
     phase_cursor: str,
+    pipeline_run_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """After async gap (e.g. TCRE), mark dirty at resume cursor and allow worker pickup."""
     row = _get_or_create_lease(session, tenant_id=tenant_id)
+    if pipeline_run_id is not None:
+        row.pipeline_run_id = pipeline_run_id
     row.status = LEASE_STATUS_DIRTY
     row.phase_cursor = phase_cursor
     row.next_attempt_at = _now()

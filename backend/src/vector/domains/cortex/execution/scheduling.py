@@ -206,6 +206,36 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p0_step3_single_tcre_resume_path_v1() -> list[str]:
+    """Return error codes if TCRE completion still uses continuation resume (P0 step 3)."""
+    errors: list[str] = []
+    from vector.domains.cortex.execution import tcre_resume as tcre_mod
+    from vector.domains.cortex.substrate_pipeline import orchestrator as orch_mod
+
+    tcre_src = inspect.getsource(tcre_mod.on_tcre_job_terminal_for_execution_v1)
+    if "resume_pipeline_after_tcre_completion_v1" in tcre_src:
+        errors.append("tcre_resume_still_calls_continuation_resume")
+    if "resume_convergence_from_waiting_v1" not in tcre_src:
+        errors.append("tcre_resume_missing_convergence_lease_resume")
+    if "enqueue_tenant_convergence_v1" not in tcre_src:
+        errors.append("tcre_resume_missing_convergence_enqueue")
+
+    orch_src = inspect.getsource(orch_mod.on_tcre_job_completed_for_pipeline_v1)
+    if "resume_pipeline_after_tcre_completion_v1" in orch_src:
+        errors.append("on_tcre_pipeline_still_calls_continuation_resume")
+    if "on_tcre_job_terminal_for_execution_v1" not in orch_src:
+        errors.append("on_tcre_pipeline_missing_execution_terminal_resume")
+
+    from vector.domains.cortex.substrate_pipeline import stalled_pipeline_recovery as rec_mod
+
+    rec_src = inspect.getsource(rec_mod.recover_stalled_pipeline_v1)
+    if "resume_pipeline_after_tcre_completion_v1" in rec_src:
+        errors.append("stalled_recovery_still_calls_continuation_resume")
+    if "on_tcre_job_terminal_for_execution_v1" not in rec_src:
+        errors.append("stalled_recovery_missing_execution_terminal_resume")
+    return errors
+
+
 def verify_p0_step2_phase06_tcre_worker_boundary_v1() -> list[str]:
     """Return error codes if TCRE Celery worker still materializes retrieval (P0 step 2)."""
     import importlib.util

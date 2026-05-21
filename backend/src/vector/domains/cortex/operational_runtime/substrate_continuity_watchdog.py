@@ -43,7 +43,7 @@ WATCHDOG_ALGORITHM_STEP_IDS_V1: Final[tuple[str, ...]] = (
 
 AUTO_RECOVERY_ORDER_V1: Final[tuple[str, ...]] = (
     "phase_07_complete_mark_continuation_complete",
-    "tcre_completed_resume_pipeline_after_tcre",
+    "tcre_completed_execution_lease_resume",
     "rebind_latest_completed_tcre",
     "re_enqueue_phase_06_bounded",
     "dlq_operator_alert",

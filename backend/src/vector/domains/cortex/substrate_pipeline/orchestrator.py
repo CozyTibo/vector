@@ -202,7 +202,7 @@ def on_tcre_job_completed_for_pipeline_v1(
     tcre_job_id: uuid.UUID | None = None,
     tcre_job_status: str = "completed",
 ) -> dict[str, Any] | None:
-    """When TCRE completes with pipeline scope, resume phase 07 via continuation layer."""
+    """When TCRE completes with pipeline scope, resume phase 07 via execution lease only."""
     run_id_raw = job_scope.get("substrate_pipeline_run_id")
     if not run_id_raw:
         return None
@@ -221,9 +221,9 @@ def on_tcre_job_completed_for_pipeline_v1(
     if tcre_job_id is None:
         return None
 
-    from vector.domains.cortex.execution.tcre_resume import on_tcre_completed_for_convergence_v1
+    from vector.domains.cortex.execution.tcre_resume import on_tcre_job_terminal_for_execution_v1
 
-    return on_tcre_completed_for_convergence_v1(
+    return on_tcre_job_terminal_for_execution_v1(
         session,
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,

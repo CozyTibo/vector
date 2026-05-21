@@ -100,7 +100,7 @@ def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
             },
             {
                 "law_id": "PROG-TCRE-RESUME",
-                "description": "TCRE completion uses resume_pipeline_after_tcre_completion_v1.",
+                "description": "TCRE completion uses on_tcre_job_terminal_for_execution_v1 (execution lease only).",
             },
             {
                 "law_id": "PROG-07-PUBLISH",
@@ -153,7 +153,7 @@ def assert_tcre_completion_uses_resume_path_v1(
     if pipeline_scope and not has_tcre_job_id:
         raise SubstrateProgressionError(
             "tcre_pipeline_resume_requires_job_id",
-            detail={"required": "resume_pipeline_after_tcre_completion_v1"},
+            detail={"required": "on_tcre_job_terminal_for_execution_v1"},
         )
 
 
@@ -208,11 +208,10 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         errors.append("enqueue_next_missing_execution_slice_redirect")
 
     tcre_src = inspect.getsource(orch_mod.on_tcre_job_completed_for_pipeline_v1)
-    if (
-        "resume_pipeline_after_tcre_completion_v1" not in tcre_src
-        and "on_tcre_completed_for_convergence_v1" not in tcre_src
-    ):
-        errors.append("on_tcre_missing_resume_path")
+    if "resume_pipeline_after_tcre_completion_v1" in tcre_src:
+        errors.append("on_tcre_must_not_call_continuation_resume_p0_step3")
+    if "on_tcre_job_terminal_for_execution_v1" not in tcre_src:
+        errors.append("on_tcre_missing_execution_terminal_resume_p0_step3")
     if "assert_tcre_completion_uses_resume_path_v1" not in tcre_src:
         errors.append("on_tcre_missing_resume_path_guard")
 
@@ -231,9 +230,13 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
 
     from vector.domains.cortex.substrate_pipeline import phase_runners as runners_mod
 
-    from vector.domains.cortex.execution.scheduling import verify_p0_step2_phase06_tcre_worker_boundary_v1
+    from vector.domains.cortex.execution.scheduling import (
+        verify_p0_step2_phase06_tcre_worker_boundary_v1,
+        verify_p0_step3_single_tcre_resume_path_v1,
+    )
 
     errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
+    errors.extend(verify_p0_step3_single_tcre_resume_path_v1())
 
     p07_src = inspect.getsource(runners_mod.run_phase_07_retrieval_v1)
     if "run_synthesis_activation_after_phase07_v1" in p07_src:

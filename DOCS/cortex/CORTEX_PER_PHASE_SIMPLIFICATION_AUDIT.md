@@ -28,7 +28,7 @@ input → deterministic transform → explicit output → gate
 |------|--------|---------|
 | **1** | **Done** | Phase 07 = retrieval index only; synthesis activation evaluation moved to phase 08 entry |
 | **2** | **Done** | TCRE Celery worker no longer materializes retrieval; resume still delegates to phase 07 via convergence |
-| 3 | Pending | Single TCRE resume path |
+| **3** | **Done** | Single TCRE resume path — execution lease only (`on_tcre_job_terminal_for_execution_v1`); no continuation enqueue |
 | 4 | Pending | Drop continuation writes on execution hot path |
 | 5 | Pending | Canonical single drain |
 | 6 | Pending | Remove pass fairness on lease |
@@ -52,6 +52,18 @@ input → deterministic transform → explicit output → gate
 | `materialize_retrieval_index_incremental_after_tcre_v1` | Removed — TCRE index binding runs only in phase 07 via `materialize_retrieval_index_for_pipeline_v1` |
 | CI guard | `verify_p0_step2_phase06_tcre_worker_boundary_v1` + `test_p0_step2_phase06_boundary.py` |
 | Static gates | `verify_gp085_prog01` calls P0 step 2 boundary verifier |
+
+### P0 step 3 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `on_tcre_job_terminal_for_execution_v1` | Canonical TCRE terminal handler: `resume_convergence_from_waiting_v1` + `enqueue_tenant_convergence_v1` only |
+| `on_tcre_completed_for_convergence_v1` | Alias to terminal handler (no `resume_pipeline_after_tcre_completion_v1`) |
+| `on_tcre_job_completed_for_pipeline_v1` | Celery callback routes to execution terminal handler |
+| `recover_stalled_pipeline_v1` | Completed TCRE recovery uses same execution terminal path |
+| `resume_convergence_from_waiting_v1` | Accepts `pipeline_run_id` so lease cursor stays bound to the pipeline run |
+| CI guard | `verify_p0_step3_single_tcre_resume_path_v1` + `test_p0_step3_single_tcre_resume.py` |
+| Static gates | `verify_gp085_prog01` + **PROG-TCRE-RESUME** updated for execution-only resume |
 
 ---
 
