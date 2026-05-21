@@ -16,6 +16,8 @@ The substrate **production path** is now:
 
 **M5:** Runtime code lives under `vector.domains.cortex.execution` (lease + FSM + worker). `cortex_tenant_convergence_leases` gained `fsm_state` / `block_*`; append-only `cortex_execution_transition_log`. `vector.domains.cortex.convergence` is a deprecated re-export shim.
 
+**M6:** Authoritative Celery task is `vector.cortex.execution.run_slice` (inline phases under lease). `chain_after_phase_v1` removed; `enqueue_next_pipeline_phase_v1` redirects to execution slice. Legacy `substrate_pipeline.phase` / coordinator tasks are deprecated break-glass only (no chaining).
+
 **One owner per concern (target state):**
 
 | Concern | Authoritative owner |

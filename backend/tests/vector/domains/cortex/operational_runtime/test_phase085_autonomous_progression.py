@@ -24,7 +24,6 @@ from vector.domains.cortex.operational_runtime.substrate_autonomous_progression 
 )
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_06_TCRE, PHASE_07_RETRIEVAL
 from vector.domains.cortex.substrate_pipeline.orchestrator import (
-    chain_after_phase_v1,
     on_tcre_job_completed_for_pipeline_v1,
 )
 from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
@@ -56,22 +55,10 @@ def test_tcre_pipeline_scope_requires_job_id_for_resume() -> None:
     assert exc.value.code == "tcre_pipeline_resume_requires_job_id"
 
 
-def test_chain_after_phase06_returns_none_without_enqueue() -> None:
+def test_chain_after_phase_v1_removed_from_orchestrator() -> None:
     import vector.domains.cortex.substrate_pipeline.orchestrator as orch
 
-    mock_enqueue = MagicMock(return_value={"phase_id": PHASE_07_RETRIEVAL})
-    original = orch.enqueue_next_pipeline_phase_v1
-    orch.enqueue_next_pipeline_phase_v1 = mock_enqueue
-    try:
-        out = chain_after_phase_v1(
-            tenant_id=uuid.uuid4(),
-            pipeline_run_id=uuid.uuid4(),
-            completed_phase_id=PHASE_06_TCRE,
-        )
-        assert out is None
-        mock_enqueue.assert_not_called()
-    finally:
-        orch.enqueue_next_pipeline_phase_v1 = original
+    assert not hasattr(orch, "chain_after_phase_v1")
 
 
 @pytest.fixture
@@ -105,12 +92,7 @@ def test_pipe085_chain_after_phase06_requires_waiting_continuation(
         idempotency_key=f"p085pipe-{uuid.uuid4().hex[:12]}",
     )
     with pytest.raises(SubstrateProgressionError) as exc:
-        chain_after_phase_v1(
-            tenant_id=tenant.id,
-            pipeline_run_id=run.id,
-            completed_phase_id=PHASE_06_TCRE,
-            session=db_session,
-        )
+        assert_pipe085_chain_after_phase06_legal_v1(db_session, pipeline_run_id=run.id)
     assert exc.value.code == "pipe085_missing_continuation_after_phase06"
 
     mark_pipeline_waiting_on_tcre_v1(
@@ -119,15 +101,7 @@ def test_pipe085_chain_after_phase06_requires_waiting_continuation(
         pipeline_run_id=run.id,
         tcre_job_id=uuid.uuid4(),
     )
-    assert (
-        chain_after_phase_v1(
-            tenant_id=tenant.id,
-            pipeline_run_id=run.id,
-            completed_phase_id=PHASE_06_TCRE,
-            session=db_session,
-        )
-        is None
-    )
+    assert_pipe085_chain_after_phase06_legal_v1(db_session, pipeline_run_id=run.id)
 
 
 @pytest.mark.integration

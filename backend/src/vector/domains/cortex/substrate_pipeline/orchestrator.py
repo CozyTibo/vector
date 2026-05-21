@@ -156,65 +156,15 @@ def enqueue_next_pipeline_phase_v1(
     graph_projection_stable_hash: str | None = None,
     identity_substrate_trigger: str = "substrate_pipeline",
 ) -> dict[str, Any]:
-    from app.tasks.cortex_substrate_pipeline import (
-        run_cortex_substrate_pipeline_phase_task,
-    )
+    """M6: enqueue execution slice at ``phase_id`` (no per-phase Celery task)."""
+    del bundle_id, batch_limit, graph_projection_stable_hash, identity_substrate_trigger
+    from vector.domains.cortex.execution.enqueue import enqueue_execution_slice_at_phase_v1
 
-    kwargs: dict[str, Any] = {
-        "tenant_id": str(tenant_id),
-        "pipeline_run_id": str(pipeline_run_id),
-        "phase_id": phase_id,
-        "bundle_id": bundle_id,
-        "batch_limit": batch_limit,
-        "identity_substrate_trigger": identity_substrate_trigger,
-        "graph_projection_stable_hash": graph_projection_stable_hash,
-    }
-    async_result = run_cortex_substrate_pipeline_phase_task.apply_async(
-        kwargs=kwargs,
-        queue="vector",
-    )
-    return {"phase_id": phase_id, "celery_task_id": str(async_result.id)}
-
-
-def chain_after_phase_v1(
-    *,
-    tenant_id: uuid.UUID,
-    pipeline_run_id: uuid.UUID,
-    completed_phase_id: str,
-    bundle_id: str | None = None,
-    batch_limit: int | None = None,
-    graph_projection_stable_hash: str | None = None,
-    identity_substrate_trigger: str = "substrate_pipeline",
-    session: Session | None = None,
-) -> dict[str, Any] | None:
-    """Enqueue the next phase after ``completed_phase_id`` completes."""
-    order = list(SUBSTRATE_PIPELINE_PHASE_ORDER)
-    try:
-        idx = order.index(completed_phase_id)
-    except ValueError:
-        return None
-    if idx + 1 >= len(order):
-        return None
-    next_phase = order[idx + 1]
-    if completed_phase_id == PHASE_06_TCRE:
-        if session is not None:
-            from vector.domains.cortex.operational_runtime.substrate_autonomous_progression import (
-                assert_pipe085_chain_after_phase06_legal_v1,
-            )
-
-            assert_pipe085_chain_after_phase06_legal_v1(
-                session,
-                pipeline_run_id=pipeline_run_id,
-            )
-        return None
-    return enqueue_next_pipeline_phase_v1(
+    return enqueue_execution_slice_at_phase_v1(
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,
-        phase_id=next_phase,
-        bundle_id=bundle_id,
-        batch_limit=batch_limit,
-        graph_projection_stable_hash=graph_projection_stable_hash,
-        identity_substrate_trigger=identity_substrate_trigger,
+        phase_cursor=phase_id,
+        reason="legacy_enqueue_next_phase",
     )
 
 

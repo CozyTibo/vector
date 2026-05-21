@@ -74,6 +74,7 @@ celery_app = Celery(
         "app.tasks.cortex_tcre_reconstruction_jobs",
         "app.tasks.cortex_synthesis_jobs",
         "app.tasks.cortex_convergence",
+        "app.tasks.cortex_execution",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -95,6 +96,7 @@ celery_app.conf.imports = (
     "app.tasks.cortex_tcre_reconstruction_jobs",
     "app.tasks.cortex_synthesis_jobs",
     "app.tasks.cortex_convergence",
+    "app.tasks.cortex_execution",
 )
 
 # Phase 01 Step 2–3: live lane vs replay lane (orchestration-model.md, replay-strategy.md).
@@ -145,7 +147,8 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_substrate_operational_progression")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")
     importlib.import_module("app.tasks.cortex_convergence")
-    importlib.import_module("app.tasks.cortex_convergence")
+    importlib.import_module("app.tasks.cortex_execution")
+    importlib.import_module("app.tasks.cortex_execution")
 
 
 _register_tasks()
@@ -176,3 +179,4 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_substrate_operational_progression")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")
     importlib.import_module("app.tasks.cortex_convergence")
+    importlib.import_module("app.tasks.cortex_execution")

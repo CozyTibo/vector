@@ -107,7 +107,7 @@ def evaluate_legacy_canonical_chain_gate_v1(
     phase_output: dict[str, Any],
     gate_enabled: bool = True,
 ) -> dict[str, Any]:
-    """Legacy Celery: block ``chain_after_phase_v1`` after phase 02 when gate fails."""
+    """Legacy deprecated phase task: surface gate result (M6: no Celery phase chain)."""
     if not gate_enabled:
         return {"may_chain": True, "reason": None, "gate_enabled": False}
     may_advance, reason = canonical_may_advance_to_identity_v1(

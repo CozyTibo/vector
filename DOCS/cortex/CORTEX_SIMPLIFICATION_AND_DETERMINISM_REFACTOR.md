@@ -103,7 +103,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | **M3** | Disable legacy beat: `cortex_convergence_disable_legacy_progression_beat=true` (already default); delete watchdog/progression beat entries | Low | **Done** — beat = ingestion + convergence sweep only; removed `cortex_convergence_disable_legacy_progression_beat`; `verify_legacy_substrate_beats_absent_from_celery_beat_v1` |
 | **M4** | Stop enqueueing `run_cortex_substrate_pipeline_coordinator_task` from all callers; redirect to `enqueue_tenant_convergence_v1` | Medium | **Done** — `schedule_substrate_pipeline_v1` + legacy post-ingestion Celery task → dirty mark + convergence; coordinator deprecated (admin-only); `verify_schedule_substrate_pipeline_uses_convergence_v1` |
 | **M5** | Rename convergence → `execution` package; add FSM table or extend `CortexTenantConvergenceLease` with explicit `fsm_state` | Medium | **Done** — `execution/` package; lease `fsm_state` + `block_*`; `cortex_execution_transition_log`; `CortexTenantExecution` alias; `convergence/` re-export shims |
-| **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | Dual-run in staging only |
+| **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | **Done** — `vector.cortex.execution.run_slice`; `enqueue_execution_slice_at_phase_v1`; removed `chain_after_phase_v1`; legacy phase/coordinator tasks deprecated (no chain) |
 | **M7** | Delete `substrate_operational_progression.py` and callers; migrate retrieval retry to FSM `BLOCKED` + manual/admin rerun | High | Document operator playbook |
 | **M8** | Collapse admin execution endpoints (section 5) | Medium | Deprecation period with 410 + replacement routes |
 | **M9** | Delete dead modules (section 9) | Low after M6–M8 | CI grep for imports |
@@ -665,9 +665,9 @@ app/tasks/
 | Week | Deliverable |
 |------|-------------|
 | W1 | M1 P0 gate fix + M2 force convergence + telemetry |
-| W2 | **M4–M5 done**; M6 single slice Celery task |
-| W3 | FSM schema + transition log + engine package skeleton |
-| W4 | M6 single slice task; delete phase chain |
+| W2 | **M4–M6 done** |
+| W3 | M7 progression delete; M8 admin deprecation |
+| W4 | M9 sidecar deletion + replay contract |
 | W5 | M7 progression delete; M8 admin deprecation |
 | W6 | M9 sidecar deletion + replay contract |
 | W7 | Test rewrite + oper playbook + remove flags |

@@ -84,22 +84,24 @@ def test_resolve_octs_walk_payload_uses_durable_store_with_session(db_session: S
     assert resolved.get("walk_result")
 
 
-def test_chain_after_phase_skips_tcre_to_retrieval_directly() -> None:
-    from vector.domains.cortex.substrate_pipeline.constants import PHASE_06_TCRE
-    from vector.domains.cortex.substrate_pipeline.orchestrator import chain_after_phase_v1
+def test_enqueue_next_at_phase_07_uses_execution_slice(monkeypatch: pytest.MonkeyPatch) -> None:
+    from vector.domains.cortex.substrate_pipeline.constants import PHASE_07_RETRIEVAL
+    from vector.domains.cortex.substrate_pipeline.orchestrator import enqueue_next_pipeline_phase_v1
 
-    mock_enqueue = MagicMock(return_value={"phase_id": PHASE_07_RETRIEVAL})
-    import vector.domains.cortex.substrate_pipeline.orchestrator as orch
+    calls: list[str] = []
 
-    original = orch.enqueue_next_pipeline_phase_v1
-    orch.enqueue_next_pipeline_phase_v1 = mock_enqueue
-    try:
-        out = chain_after_phase_v1(
-            tenant_id=uuid.uuid4(),
-            pipeline_run_id=uuid.uuid4(),
-            completed_phase_id=PHASE_06_TCRE,
-        )
-        assert out is None
-        mock_enqueue.assert_not_called()
-    finally:
-        orch.enqueue_next_pipeline_phase_v1 = original
+    def _fake_enqueue(**kwargs: object) -> dict[str, str]:
+        calls.append(str(kwargs.get("phase_cursor")))
+        return {"path": "execution_slice", "phase_id": str(kwargs.get("phase_cursor"))}
+
+    monkeypatch.setattr(
+        "vector.domains.cortex.execution.enqueue.enqueue_execution_slice_at_phase_v1",
+        _fake_enqueue,
+    )
+    out = enqueue_next_pipeline_phase_v1(
+        tenant_id=uuid.uuid4(),
+        pipeline_run_id=uuid.uuid4(),
+        phase_id=PHASE_07_RETRIEVAL,
+    )
+    assert out["path"] == "execution_slice"
+    assert calls == [PHASE_07_RETRIEVAL]

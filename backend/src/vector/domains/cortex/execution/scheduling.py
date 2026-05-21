@@ -11,6 +11,7 @@ from vector.settings import Settings
 CELERY_CONVERGENCE_SWEEP_BEAT_KEY_V1: Final[str] = "cortex-convergence-sweep"
 CELERY_CONVERGENCE_SWEEP_TASK_NAME_V1: Final[str] = "vector.cortex.convergence.sweep"
 CELERY_CONVERGENCE_RUN_TASK_NAME_V1: Final[str] = "vector.cortex.convergence.run_tenant"
+CELERY_EXECUTION_SLICE_TASK_NAME_V1: Final[str] = "vector.cortex.execution.run_slice"
 
 
 def _env_flag(name: str, *, default: str = "true") -> bool:
@@ -49,9 +50,10 @@ def verify_legacy_substrate_beats_absent_from_celery_beat_v1() -> list[str]:
 def verify_convergence_sweep_in_celery_beat_v1() -> list[str]:
     """Return error codes if execution sweeper is not registered in beat schedule."""
     from app.celery_app import celery_app
-    from app.tasks import cortex_convergence as conv_mod
+    from app.tasks import cortex_execution as exec_mod
 
     errors: list[str] = []
+    errors.extend(verify_no_legacy_phase_chain_v1())
     beat = dict(celery_app.conf.beat_schedule or {})
     entry = beat.get(CELERY_CONVERGENCE_SWEEP_BEAT_KEY_V1)
     if entry is None:
@@ -59,12 +61,9 @@ def verify_convergence_sweep_in_celery_beat_v1() -> list[str]:
     elif str(entry.get("task")) != CELERY_CONVERGENCE_SWEEP_TASK_NAME_V1:
         errors.append("convergence_sweep_beat_task_mismatch")
 
-    sweep_src = inspect.getsource(conv_mod.run_convergence_sweep_task)
-    if "run_convergence_sweep_v1" not in sweep_src:
-        errors.append("convergence_sweep_task_missing_runner")
-    run_src = inspect.getsource(conv_mod.run_tenant_convergence_task)
-    if "run_tenant_convergence_v1" not in run_src:
-        errors.append("convergence_run_task_missing_runner")
+    slice_src = inspect.getsource(exec_mod.run_execution_slice_task)
+    if "run_tenant_convergence_v1" not in slice_src:
+        errors.append("execution_slice_task_missing_runner")
     errors.extend(verify_legacy_substrate_beats_absent_from_celery_beat_v1())
     errors.extend(verify_tenant_execution_fsm_on_lease_v1())
     return errors
@@ -110,4 +109,23 @@ def verify_tenant_execution_fsm_on_lease_v1() -> list[str]:
 
     if "record_execution_transition_v1" not in inspect.getsource(fsm_mod):
         errors.append("fsm_missing_transition_log_writer")
+    return errors
+
+
+def verify_no_legacy_phase_chain_v1() -> list[str]:
+    """Return error codes if M6 legacy phase chaining remains (M6)."""
+    from vector.domains.cortex.substrate_pipeline import orchestrator as orch
+
+    errors: list[str] = []
+    if hasattr(orch, "chain_after_phase_v1"):
+        errors.append("chain_after_phase_v1_still_exported")
+    enqueue_src = inspect.getsource(orch.enqueue_next_pipeline_phase_v1)
+    if "run_cortex_substrate_pipeline_phase_task" in enqueue_src:
+        errors.append("enqueue_next_still_uses_phase_celery_task")
+    if "enqueue_execution_slice_at_phase_v1" not in enqueue_src:
+        errors.append("enqueue_next_missing_execution_slice_redirect")
+    from vector.domains.cortex.execution import enqueue as enqueue_mod
+
+    if "run_execution_slice_task" not in inspect.getsource(enqueue_mod.enqueue_tenant_convergence_v1):
+        errors.append("enqueue_missing_execution_slice_task")
     return errors

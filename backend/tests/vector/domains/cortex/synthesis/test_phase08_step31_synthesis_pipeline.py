@@ -18,7 +18,8 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_08_SYNTHESIS,
     SUBSTRATE_PIPELINE_PHASE_ORDER,
 )
-from vector.domains.cortex.substrate_pipeline.orchestrator import chain_after_phase_v1
+from vector.domains.cortex.substrate_pipeline.constants import PHASE_08_SYNTHESIS
+from vector.domains.cortex.substrate_pipeline.orchestrator import enqueue_next_pipeline_phase_v1
 from vector.domains.cortex.substrate_pipeline.repository import (
     complete_phase_v1,
     compute_pipeline_idempotency_key_v1,
@@ -50,23 +51,23 @@ def test_pipeline_idempotency_key_includes_phase_order_version() -> None:
     assert len(key) == 64
 
 
-def test_chain_after_phase_07_enqueues_synthesis(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enqueue_next_at_synthesis_phase(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
     def _enqueue(**kwargs: object) -> dict[str, str]:
-        calls.append(str(kwargs.get("phase_id")))
-        return {"phase_id": str(kwargs.get("phase_id"))}
+        calls.append(str(kwargs.get("phase_cursor")))
+        return {"phase_id": str(kwargs.get("phase_cursor")), "path": "execution_slice"}
 
     monkeypatch.setattr(
-        "vector.domains.cortex.substrate_pipeline.orchestrator.enqueue_next_pipeline_phase_v1",
+        "vector.domains.cortex.execution.enqueue.enqueue_execution_slice_at_phase_v1",
         _enqueue,
     )
-    out = chain_after_phase_v1(
+    out = enqueue_next_pipeline_phase_v1(
         tenant_id=uuid.uuid4(),
         pipeline_run_id=uuid.uuid4(),
-        completed_phase_id=PHASE_07_RETRIEVAL,
+        phase_id=PHASE_08_SYNTHESIS,
     )
-    assert out is not None
+    assert out["path"] == "execution_slice"
     assert calls == [PHASE_08_SYNTHESIS]
 
 

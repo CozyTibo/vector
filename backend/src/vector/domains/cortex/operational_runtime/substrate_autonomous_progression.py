@@ -77,7 +77,7 @@ def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
         "async_wait_phase": PHASE_06_TCRE,
         "waiting_on": WAITING_ON_TCRE_COMPLETION,
         "orchestrator_symbols": {
-            "chain_after_phase_v1": "vector.domains.cortex.substrate_pipeline.orchestrator",
+            "enqueue_next_pipeline_phase_v1": "vector.domains.cortex.substrate_pipeline.orchestrator",
             "on_tcre_job_completed_for_pipeline_v1": "vector.domains.cortex.substrate_pipeline.orchestrator",
             "on_retrieval_publish_completed_for_pipeline_v1": (
                 "vector.domains.cortex.substrate_pipeline.orchestrator"
@@ -92,7 +92,7 @@ def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
         "progression_steps": [
             {
                 "law_id": "PROG-02-05-CHAIN",
-                "description": "Phases 02–05 chain via chain_after_phase_v1 after each completes.",
+                "description": "Phases 02–08 run inline under execution slice (M6; no Celery phase chain).",
             },
             {
                 "law_id": "PROG-06-WAIT",
@@ -112,7 +112,7 @@ def build_autonomous_progression_catalog_v1() -> dict[str, Any]:
             },
             {
                 "law_id": PIPE085_CHAIN_RULE_ID_V1,
-                "description": "chain_after_phase_v1(None) after phase 06 is legal when continuation row exists.",
+                "description": "Phase 06 stops inline chain; TCRE resume uses execution slice at phase 07.",
             },
         ],
     }
@@ -193,16 +193,19 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
     from vector.domains.cortex.substrate_pipeline import pipeline_continuation as cont_mod
 
     for name in (
-        "chain_after_phase_v1",
+        "enqueue_next_pipeline_phase_v1",
         "on_tcre_job_completed_for_pipeline_v1",
         "on_retrieval_publish_completed_for_pipeline_v1",
     ):
         if not callable(getattr(orch_mod, name, None)):
             errors.append(f"missing_orchestrator_symbol:{name}")
 
-    chain_src = inspect.getsource(orch_mod.chain_after_phase_v1)
-    if "PHASE_06_TCRE" not in chain_src or "return None" not in chain_src:
-        errors.append("chain_after_phase_v1_missing_phase06_none_return")
+    if hasattr(orch_mod, "chain_after_phase_v1"):
+        errors.append("chain_after_phase_v1_must_be_removed_m6")
+
+    enqueue_src = inspect.getsource(orch_mod.enqueue_next_pipeline_phase_v1)
+    if "enqueue_execution_slice_at_phase_v1" not in enqueue_src:
+        errors.append("enqueue_next_missing_execution_slice_redirect")
 
     tcre_src = inspect.getsource(orch_mod.on_tcre_job_completed_for_pipeline_v1)
     if (

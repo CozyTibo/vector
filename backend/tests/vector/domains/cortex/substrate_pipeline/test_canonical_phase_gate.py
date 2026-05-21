@@ -123,7 +123,6 @@ def test_legacy_phase_task_blocks_chain_after_canonical_waiting() -> None:
                 "gate_enabled": True,
             },
         ),
-        patch("app.tasks.cortex_substrate_pipeline.chain_after_phase_v1") as chain,
         patch("app.tasks.cortex_substrate_pipeline.get_settings") as gs,
     ):
         gs.return_value.cortex_substrate_pipeline_canonical_chain_gate_enabled = True
@@ -133,10 +132,12 @@ def test_legacy_phase_task_blocks_chain_after_canonical_waiting() -> None:
             str(prid),
             "phase_02_canonical",
         )
-    chain.assert_not_called()
     assert result["chained"] is False
-    assert result["chain_blocked"] is True
-    assert result["chain_block_reason"] == "canonical_topology_wait_zero_progress"
+    assert result.get("deprecated") is True
+    assert result.get("hint") == "blocked"
+    gate = result.get("canonical_chain_gate") or {}
+    assert gate.get("may_chain") is False
+    assert gate.get("reason") == "canonical_topology_wait_zero_progress"
     mock_session.commit.assert_called()
 
 
@@ -155,10 +156,6 @@ def test_legacy_phase_task_chains_when_gate_allows() -> None:
             "app.tasks.cortex_substrate_pipeline.evaluate_legacy_canonical_chain_gate_v1",
             return_value={"may_chain": True, "reason": None, "gate_enabled": True},
         ),
-        patch(
-            "app.tasks.cortex_substrate_pipeline.chain_after_phase_v1",
-            return_value={"phase_id": "phase_03_identity"},
-        ) as chain,
         patch("app.tasks.cortex_substrate_pipeline.get_settings") as gs,
     ):
         gs.return_value.cortex_substrate_pipeline_canonical_chain_gate_enabled = True
@@ -168,8 +165,9 @@ def test_legacy_phase_task_chains_when_gate_allows() -> None:
             str(prid),
             "phase_02_canonical",
         )
-    chain.assert_called_once()
-    assert result["chained"] is True
+    assert result["chained"] is False
+    assert result.get("deprecated") is True
+    assert result.get("hint") == "enqueue_execution_slice"
 
 
 def test_canonical_needs_more_work_partial_progress() -> None:
