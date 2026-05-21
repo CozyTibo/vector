@@ -337,7 +337,8 @@ def build_pipeline_overview_v1(
     ]
 
     recent_ingestion_runs: list[dict[str, Any]] = []
-    for row in list_recent_ingestion_runs(session, tenant_id, limit=10):
+    recent_rows, _recent_total = list_recent_ingestion_runs(session, tenant_id, limit=10)
+    for row in recent_rows:
         recent_ingestion_runs.append(
             {
                 "run_id": row["run_id"],

@@ -101,3 +101,15 @@ def test_incremental_uses_oldest_for_new_messages() -> None:
     )
     assert oldest == "300.1"
     assert latest is None
+
+
+def test_incremental_ignores_backfill_cursor_in_time_bounds() -> None:
+    """With a cursor, backfill paging omits oldest/latest; incremental must not use that path."""
+    oldest, latest = _slack_history_time_bounds(
+        sync_mode="incremental",
+        existing_history={"last_message_ts": "300.1", "next_cursor": "cursor-backfill"},
+        history_cursor="cursor-backfill",
+        backfill_oldest_ts="",
+    )
+    assert oldest == "300.1"
+    assert latest is None

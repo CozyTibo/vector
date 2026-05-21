@@ -747,6 +747,9 @@ class AdminCortexIngestionRecentRunsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     items: list[AdminCortexIngestionRecentRunItem]
+    total_count: int
+    offset: int
+    limit: int
 
 
 class AdminCortexConnectorRawRecordItem(BaseModel):

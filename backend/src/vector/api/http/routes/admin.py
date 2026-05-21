@@ -1684,13 +1684,24 @@ def build_admin_router() -> APIRouter:
     def admin_cortex_ingestion_recent_runs(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        limit: Annotated[int, Query(ge=1, le=100)] = 30,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+        connector: Annotated[str | None, Query()] = None,
     ) -> AdminCortexIngestionRecentRunsResponse:
         """Recent ingestion runs for drill-down (read-only)."""
         _assert_tenant(db, tenant_id)
-        rows = list_recent_ingestion_runs(db, tenant_id, limit=limit)
+        rows, total_count = list_recent_ingestion_runs(
+            db,
+            tenant_id,
+            limit=limit,
+            offset=offset,
+            connector=connector,
+        )
         return AdminCortexIngestionRecentRunsResponse(
             items=[AdminCortexIngestionRecentRunItem.model_validate(x) for x in rows],
+            total_count=total_count,
+            offset=offset,
+            limit=limit,
         )
 
     @r.get(

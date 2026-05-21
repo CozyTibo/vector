@@ -5,6 +5,7 @@ import { useParams } from "react-router-dom";
 import { adminFetch } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { CORTEX_MANUAL_SYNC_CONFIRM_PHRASE } from "./adminConstants";
+import { IngestionRunsTab } from "./cortex/IngestionRunsTab";
 import { PhaseExplorer } from "./cortex/PhaseExplorer";
 import { PhasePageShell, type PhaseSummaryPayload } from "./cortex/PhasePageShell";
 import { CortexOverview, formatRelativeAge, titleConnector } from "./cortexAdminTypes";
@@ -203,6 +204,7 @@ export default function AdminCortexIngestionPage() {
           </>
         );
       }}
+      runsContent={<IngestionRunsTab />}
       explorerContent={
         <div className="space-y-3">
           <label className="text-xs text-stone-600">

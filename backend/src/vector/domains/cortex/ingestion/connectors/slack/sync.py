@@ -411,6 +411,11 @@ def run_slack_connector_sync(
             history_cursor = existing_history.get("next_cursor")
             if not isinstance(history_cursor, str) or not history_cursor.strip():
                 history_cursor = None
+            # Incremental must use oldest=last_message_ts on the first history page.
+            # Slack ignores oldest/latest when ``cursor`` is set, so a leftover backfill
+            # cursor would replay old pages and miss same-day messages.
+            if sync_mode == "incremental":
+                history_cursor = None
             oldest, latest = slack_history_time_bounds(
                 sync_mode=sync_mode,
                 existing_history=existing_history,

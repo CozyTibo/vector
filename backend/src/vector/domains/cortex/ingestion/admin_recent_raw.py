@@ -116,20 +116,29 @@ def list_recent_ingestion_runs(
     tenant_id: uuid.UUID,
     *,
     limit: int = 30,
-) -> list[dict[str, Any]]:
-    cache_key = (str(tenant_id), int(limit))
+    offset: int = 0,
+    connector: str | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    cache_key = (str(tenant_id), int(limit), int(offset), (connector or "").strip() or None)
     now = time.monotonic()
     with _RECENT_RUNS_CACHE_LOCK:
         cached = _RECENT_RUNS_CACHE.get(cache_key)
         if cached is not None:
             ts, payload = cached
             if now - ts <= _RECENT_RUNS_CACHE_TTL_SECONDS:
-                return copy.deepcopy(payload)
+                items, total = payload
+                return copy.deepcopy(items), int(total)
 
+    filters = [IngestionRun.tenant_id == tenant_id]
+    conn = (connector or "").strip()
+    if conn:
+        filters.append(IngestionRun.connector == conn)
+    total_count = int(session.scalar(select(func.count()).select_from(IngestionRun).where(*filters)) or 0)
     stmt = (
         select(IngestionRun)
-        .where(IngestionRun.tenant_id == tenant_id)
+        .where(*filters)
         .order_by(IngestionRun.started_at.desc())
+        .offset(max(0, int(offset)))
         .limit(limit)
     )
     runs = list(session.scalars(stmt).all())
@@ -159,8 +168,8 @@ def list_recent_ingestion_runs(
             },
         )
     with _RECENT_RUNS_CACHE_LOCK:
-        _RECENT_RUNS_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(out))
-    return out
+        _RECENT_RUNS_CACHE[cache_key] = (time.monotonic(), (copy.deepcopy(out), total_count))
+    return out, total_count
 
 
 def build_connector_raw_rollups(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

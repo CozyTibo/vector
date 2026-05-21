@@ -129,6 +129,9 @@ export type CortexRecentRuns = {
     replay_job_id: string | null;
     replay_version: number | null;
   }>;
+  total_count: number;
+  offset: number;
+  limit: number;
 };
 
 export type CortexExhaustCoverage = {

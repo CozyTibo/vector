@@ -22,18 +22,47 @@ function statusTone(status: PhaseStatus): "ok" | "warn" | "bad" | "neutral" {
   return "warn";
 }
 
+type PhaseTab = "summary" | "explorer" | "runs";
+
 type Props = {
   phase: OperatorPhase;
   title: string;
   description: string;
   summaryContent: (summary: PhaseSummaryPayload) => React.ReactNode;
   explorerContent: React.ReactNode;
+  runsContent?: React.ReactNode;
 };
 
-export function PhasePageShell({ phase, title, description, summaryContent, explorerContent }: Props) {
+function resolvePhaseTab(tabParam: string | null, hasRunsTab: boolean): PhaseTab {
+  if (hasRunsTab && tabParam === "runs") return "runs";
+  if (tabParam === "explorer") return "explorer";
+  return "summary";
+}
+
+export function PhasePageShell({
+  phase,
+  title,
+  description,
+  summaryContent,
+  explorerContent,
+  runsContent,
+}: Props) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === "explorer" ? "explorer" : "summary";
+  const tab = resolvePhaseTab(searchParams.get("tab"), Boolean(runsContent));
+
+  const setTab = (next: PhaseTab) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (next === "summary") params.delete("tab");
+      else params.set("tab", next);
+      if (next !== "runs") {
+        params.delete("page");
+        params.delete("connector");
+      }
+      return params;
+    });
+  };
   const overviewPath = `/admin/tenants/${tenantId}/cortex/overview`;
 
   const summaryQ = useQuery({
@@ -85,10 +114,24 @@ export function PhasePageShell({ phase, title, description, summaryContent, expl
               ? "border-indigo-300 bg-indigo-100 text-indigo-900"
               : "border-stone-200 bg-white text-stone-700",
           ].join(" ")}
-          onClick={() => setSearchParams({ tab: "summary" })}
+          onClick={() => setTab("summary")}
         >
           Summary
         </button>
+        {runsContent ? (
+          <button
+            type="button"
+            className={[
+              "rounded-md border px-3 py-1.5 text-sm font-medium",
+              tab === "runs"
+                ? "border-indigo-300 bg-indigo-100 text-indigo-900"
+                : "border-stone-200 bg-white text-stone-700",
+            ].join(" ")}
+            onClick={() => setTab("runs")}
+          >
+            Runs
+          </button>
+        ) : null}
         <button
           type="button"
           className={[
@@ -97,13 +140,15 @@ export function PhasePageShell({ phase, title, description, summaryContent, expl
               ? "border-indigo-300 bg-indigo-100 text-indigo-900"
               : "border-stone-200 bg-white text-stone-700",
           ].join(" ")}
-          onClick={() => setSearchParams({ tab: "explorer" })}
+          onClick={() => setTab("explorer")}
         >
           Explorer
         </button>
       </nav>
 
-      {tab === "summary" ? (
+      {tab === "runs" && runsContent ? (
+        runsContent
+      ) : tab === "summary" ? (
         <div className="space-y-4">
           {s && s.blockers.length > 0 ? (
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
