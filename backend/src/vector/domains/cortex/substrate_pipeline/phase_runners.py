@@ -8,10 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canonical.forward_progress.drain_runtime import drain_forward_progress_backlog
-from vector.domains.cortex.canonical.transform_runtime import (
-    repair_tenant_materialization_oracle_determinism_drift,
-    resolve_default_bundle_id_for_stub_transform,
-)
+from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.identity.continuity_rebuild import (
     finalize_identity_substrate_operator_audit,
     run_identity_handles_and_candidates_refresh,
@@ -89,19 +86,10 @@ def run_phase_02_canonical_v1(
         settings=settings,
     )
     outcome = str(canonical_summary.get("canonical_outcome") or "")
-    repair_scan = min(5000, max(200, int(lim) * 4))
-    determinism_repair = repair_tenant_materialization_oracle_determinism_drift(
-        session,
-        tenant_id=tenant_id,
-        bundle_id=bid,
-        scan_limit=repair_scan,
-        dry_run=False,
-    )
     out = {
         "bundle_id": bid,
         "canonical_summary": canonical_summary,
         "canonical_outcome": outcome,
-        "determinism_repair": determinism_repair,
         "convergence_health": canonical_summary.get("convergence_health"),
     }
     if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT and int(canonical_summary.get("total_succeeded") or 0) == 0:

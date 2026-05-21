@@ -32,7 +32,7 @@ input → deterministic transform → explicit output → gate
 | **4** | **Done** | Execution hot path no longer writes `pipeline_continuation` (phase 06/08); PIPE-085-01 asserts execution lease |
 | **5** | **Done** | Phase 02 single `drain_forward_progress_backlog` call; removed slack preface dual drain |
 | **6** | **Done** | No `canonical_pass_index` / pass cooldowns on execution lease; slice-local drain only |
-| 7 | Pending | Determinism repair off hot path |
+| **7** | **Done** | Determinism repair removed from phase 02 runner; admin `run_canonical_determinism_repair_v1` + execution `/rerun?run_determinism_repair=` |
 
 ### P0 step 1 — done (2026-05-21)
 
@@ -93,6 +93,16 @@ input → deterministic transform → explicit output → gate
 | `run_phase_02_canonical_v1` | No pass-fairness parameters; each slice uses fresh in-drain pass rotation |
 | `operator_snapshot` | Pass cooldown hints read from phase 02 output, not lease |
 | CI guard | `verify_p0_step6_no_pass_fairness_on_lease_v1` + `test_p0_step6_pass_fairness_lease.py` |
+
+### P0 step 7 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `run_phase_02_canonical_v1` | No post-drain `repair_tenant_materialization_oracle_determinism_drift`; phase output is drain summary only |
+| `run_canonical_determinism_repair_v1` | New execution admin helper (also available via canonical verification admin route) |
+| `execution_rerun_v1` | Optional `run_determinism_repair` runs repair before clear+restart when requested |
+| `POST .../execution/rerun` | Query param `run_determinism_repair` (default false) |
+| CI guard | `verify_p0_step7_determinism_repair_off_hot_path_v1` + `test_p0_step7_determinism_repair_off_hot_path.py` |
 
 ---
 
@@ -266,7 +276,7 @@ resolve_connection
 | Orphan → deferral mapping | `map_orphan_class_to_deferral_reason` |
 | Convergence health labels | `_convergence_health_label` in drain |
 
-**Runner surface:** `run_phase_02_canonical_v1` — single `drain_forward_progress_backlog` + repair scan (repair off hot path in step 7).
+**Runner surface:** `run_phase_02_canonical_v1` — single `drain_forward_progress_backlog` only (determinism repair: admin only).
 
 ## C. COMPLEXITY CLASSIFICATION
 

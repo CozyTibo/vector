@@ -206,6 +206,26 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p0_step7_determinism_repair_off_hot_path_v1() -> list[str]:
+    """Return error codes if phase 02 still runs determinism repair inline (P0 step 7)."""
+    errors: list[str] = []
+    from vector.domains.cortex.execution import admin_commands as cmd_mod
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p02 = inspect.getsource(pr_mod.run_phase_02_canonical_v1)
+    if "repair_tenant_materialization_oracle_determinism_drift" in p02:
+        errors.append("phase02_still_runs_inline_determinism_repair")
+    if "determinism_repair" in p02:
+        errors.append("phase02_still_exports_determinism_repair_in_output")
+
+    if not callable(getattr(cmd_mod, "run_canonical_determinism_repair_v1", None)):
+        errors.append("missing_run_canonical_determinism_repair_v1_admin_hook")
+    rerun_src = inspect.getsource(cmd_mod.execution_rerun_v1)
+    if "run_determinism_repair" not in rerun_src:
+        errors.append("execution_rerun_missing_optional_determinism_repair")
+    return errors
+
+
 def verify_p0_step6_no_pass_fairness_on_lease_v1() -> list[str]:
     """Return error codes if execution lease still stores pass-fairness state (P0 step 6)."""
     errors: list[str] = []

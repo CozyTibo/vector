@@ -152,6 +152,38 @@ def restart_execution_from_phase_v1(
     )
 
 
+def run_canonical_determinism_repair_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str | None = None,
+    scan_limit: int = 5000,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Operator determinism repair — not on substrate execution hot path (P0 step 7).
+
+    Prefer this or ``POST .../cortex/canonical/verification/repair-determinism-drift`` over
+    phase 02 inline repair.
+    """
+    from vector.domains.cortex.canonical.transform_runtime import (
+        repair_tenant_materialization_oracle_determinism_drift,
+        resolve_default_bundle_id_for_stub_transform,
+    )
+
+    bid = (bundle_id or "").strip() or resolve_default_bundle_id_for_stub_transform(
+        session, tenant_id
+    )
+    if not bid:
+        return {"skipped": True, "reason": "no_transformable_bundle"}
+    return repair_tenant_materialization_oracle_determinism_drift(
+        session,
+        tenant_id=tenant_id,
+        bundle_id=bid,
+        scan_limit=max(1, min(int(scan_limit), 5000)),
+        dry_run=dry_run,
+    )
+
+
 def clear_derived_execution_outputs_v1(
     session: Session,
     *,
@@ -181,8 +213,12 @@ def execution_rerun_v1(
     force: bool = False,
     break_glass: bool = False,
     flush_all: bool = False,
+    run_determinism_repair: bool = False,
 ) -> dict[str, Any]:
     """Atomic clear + restart (replay contract §4.1)."""
+    determinism_repair: dict[str, Any] | None = None
+    if run_determinism_repair and not flush_all:
+        determinism_repair = run_canonical_determinism_repair_v1(session, tenant_id=tenant_id)
     cleared = clear_derived_execution_outputs_v1(
         session,
         tenant_id=tenant_id,
@@ -204,4 +240,5 @@ def execution_rerun_v1(
         "from_phase": (from_phase or "").strip().upper(),
         "cleared": cleared,
         "restarted": restarted,
+        "determinism_repair": determinism_repair,
     }

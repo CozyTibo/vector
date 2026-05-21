@@ -120,6 +120,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
         force: Annotated[bool, Query()] = False,
         break_glass: Annotated[bool, Query()] = False,
         flush_all: Annotated[bool, Query()] = False,
+        run_determinism_repair: Annotated[bool, Query()] = False,
     ) -> dict[str, Any]:
         """Atomic clear + restart (replaces flush-rerun and replay bypass endpoints)."""
         _assert_tenant(db, tenant_id)
@@ -133,6 +134,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
                 force=force,
                 break_glass=break_glass,
                 flush_all=flush_all,
+                run_determinism_repair=run_determinism_repair,
             )
             db.commit()
             return out
