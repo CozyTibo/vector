@@ -28,6 +28,10 @@ from vector.domains.cortex.completeness.traversal_completeness_projection import
 from vector.domains.cortex.execution.admin_commands import build_execution_inspect_v1
 from vector.domains.cortex.execution.tenant_constants import FSM_BLOCKED, LEASE_STATUS_RUNNING
 from vector.domains.cortex.ingestion.admin_overview import build_cortex_ingestion_admin_overview
+from vector.domains.cortex.ingestion.admin_recent_raw import list_recent_ingestion_runs
+from vector.domains.cortex.ingestion.ingestion_schedule_forecast import (
+    estimate_tenant_next_scheduled_ingestion_v1,
+)
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_03_IDENTITY,
@@ -115,6 +119,17 @@ def _substrate_to_status(substrate_state: str | None) -> PhaseStatus:
     if st == "degraded":
         return "degraded"
     return "healthy"
+
+
+def _ingestion_trigger_kind(*, source_trigger: str, replay_mode: bool) -> Literal["scheduled", "manual", "replay"]:
+    if replay_mode:
+        return "replay"
+    key = (source_trigger or "").strip().lower()
+    if key in ("scheduled", "scheduled_lane"):
+        return "scheduled"
+    if key in ("replay", "manual_admin_replay"):
+        return "replay"
+    return "manual"
 
 
 def _merge_status(a: PhaseStatus, b: PhaseStatus) -> PhaseStatus:
@@ -300,12 +315,40 @@ def build_pipeline_overview_v1(
         if row.get("cortex_routed") and row.get("connection_status") == "active"
     ]
 
+    recent_ingestion_runs: list[dict[str, Any]] = []
+    for row in list_recent_ingestion_runs(session, tenant_id, limit=10):
+        recent_ingestion_runs.append(
+            {
+                "run_id": row["run_id"],
+                "connector": row["connector"],
+                "status": row["status"],
+                "started_at": row["started_at"],
+                "finished_at": row.get("finished_at"),
+                "raw_rows_written": row.get("raw_rows_written"),
+                "trigger_kind": _ingestion_trigger_kind(
+                    source_trigger=str(row.get("source_trigger") or ""),
+                    replay_mode=bool(row.get("replay_mode")),
+                ),
+            }
+        )
+
+    global_scheduler = ingestion_admin.get("global_scheduler")
+    next_scheduled = estimate_tenant_next_scheduled_ingestion_v1(
+        session,
+        settings,
+        tenant_id=tenant_id,
+        scheduler=global_scheduler if isinstance(global_scheduler, dict) else None,
+        connector_rows=ingestion_admin.get("connectors") if isinstance(ingestion_admin.get("connectors"), list) else None,
+    )
+
     return {
         "surface_kind": "pipeline_overview",
         "tenant_id": str(tenant_id),
         "execution": execution,
         "phases": phases,
         "attention": attention,
-        "scheduler": ingestion_admin.get("global_scheduler"),
+        "scheduler": global_scheduler,
         "runnable_connectors": runnable,
+        "recent_ingestion_runs": recent_ingestion_runs,
+        "next_scheduled_ingestion": next_scheduled,
     }

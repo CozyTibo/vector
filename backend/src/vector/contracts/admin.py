@@ -4510,6 +4510,37 @@ class AdminCortexPipelineExecutionSnapshot(BaseModel):
     block_reason_code: str | None = None
 
 
+class AdminCortexPipelineRecentIngestionRunItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    run_id: uuid.UUID
+    connector: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    raw_rows_written: int | None = None
+    trigger_kind: Literal["scheduled", "manual", "replay"]
+
+
+class AdminCortexPipelineNextScheduledIngestion(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    status: Literal[
+        "disabled",
+        "paused",
+        "no_connectors",
+        "running",
+        "eligible_now",
+        "waiting_cooldown",
+    ]
+    next_at: datetime | None = None
+    summary: str
+    beat_interval_seconds: int = 0
+    min_gap_seconds: int = 0
+    next_connector: str | None = None
+    connectors_eligible_now: list[str] = Field(default_factory=list)
+
+
 class AdminCortexPipelineOverviewResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -4520,6 +4551,8 @@ class AdminCortexPipelineOverviewResponse(BaseModel):
     attention: list[str] = Field(default_factory=list)
     scheduler: AdminCortexGlobalScheduler | None = None
     runnable_connectors: list[str] = Field(default_factory=list)
+    recent_ingestion_runs: list[AdminCortexPipelineRecentIngestionRunItem] = Field(default_factory=list)
+    next_scheduled_ingestion: AdminCortexPipelineNextScheduledIngestion | None = None
 
 
 class AdminCortexPipelineRunRequest(BaseModel):

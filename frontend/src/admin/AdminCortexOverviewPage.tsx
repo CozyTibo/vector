@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
 import { PipelineActions } from "./cortex/PipelineActions";
+import { RecentIngestionRuns } from "./cortex/RecentIngestionRuns";
 import { PipelineStrip } from "./cortex/PipelineStrip";
 import type { PhaseOverview, PipelineOverview } from "./cortex/pipelineTypes";
 import { OPERATOR_PHASES } from "./cortex/pipelineTypes";
@@ -78,6 +79,12 @@ export default function AdminCortexOverviewPage() {
       ) : null}
 
       <PipelineActions runnableConnectors={overview.runnable_connectors} />
+
+      <RecentIngestionRuns
+        runs={overview.recent_ingestion_runs ?? []}
+        tenantId={tenantId}
+        nextScheduled={overview.next_scheduled_ingestion}
+      />
 
       <section className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">

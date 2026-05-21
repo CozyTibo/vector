@@ -28,6 +28,36 @@ export type PipelineOverviewPhase = {
   blockers: string[];
 };
 
+export type IngestionRunTriggerKind = "scheduled" | "manual" | "replay";
+
+export type PipelineRecentIngestionRun = {
+  run_id: string;
+  connector: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  raw_rows_written: number | null;
+  trigger_kind: IngestionRunTriggerKind;
+};
+
+export type NextScheduledIngestionStatus =
+  | "disabled"
+  | "paused"
+  | "no_connectors"
+  | "running"
+  | "eligible_now"
+  | "waiting_cooldown";
+
+export type PipelineNextScheduledIngestion = {
+  status: NextScheduledIngestionStatus;
+  next_at: string | null;
+  summary: string;
+  beat_interval_seconds: number;
+  min_gap_seconds: number;
+  next_connector?: string | null;
+  connectors_eligible_now?: string[];
+};
+
 export type PipelineOverview = {
   tenant_id: string;
   execution: {
@@ -45,6 +75,8 @@ export type PipelineOverview = {
     min_gap_seconds: number;
   };
   runnable_connectors: string[];
+  recent_ingestion_runs: PipelineRecentIngestionRun[];
+  next_scheduled_ingestion?: PipelineNextScheduledIngestion | null;
 };
 
 export const OPERATOR_PHASES: Array<{ phase: OperatorPhase; label: string; route: string }> = [

@@ -52,3 +52,12 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
     }
     assert "execution" in body
     assert isinstance(body["attention"], list)
+    assert isinstance(body["recent_ingestion_runs"], list)
+    assert body["next_scheduled_ingestion"]["status"] in {
+        "disabled",
+        "paused",
+        "no_connectors",
+        "running",
+        "eligible_now",
+        "waiting_cooldown",
+    }
