@@ -30,7 +30,7 @@ input → deterministic transform → explicit output → gate
 | **2** | **Done** | TCRE Celery worker no longer materializes retrieval; resume still delegates to phase 07 via convergence |
 | **3** | **Done** | Single TCRE resume path — execution lease only (`on_tcre_job_terminal_for_execution_v1`); no continuation enqueue |
 | **4** | **Done** | Execution hot path no longer writes `pipeline_continuation` (phase 06/08); PIPE-085-01 asserts execution lease |
-| 5 | Pending | Canonical single drain |
+| **5** | **Done** | Phase 02 single `drain_forward_progress_backlog` call; removed slack preface dual drain |
 | 6 | Pending | Remove pass fairness on lease |
 | 7 | Pending | Determinism repair off hot path |
 
@@ -75,6 +75,15 @@ input → deterministic transform → explicit output → gate
 | `assert_pipe085_chain_after_phase06_legal_v1` | Checks `AWAITING_TCRE` lease instead of continuation row |
 | `enforce_phase06_progression_law_v1` | Output contract only (async + `job_id`); no continuation assertion |
 | CI guard | `verify_p0_step4_no_continuation_on_execution_hot_path_v1` + `test_p0_step4_continuation_hot_path.py` |
+
+### P0 step 5 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `run_phase_02_canonical_v1` | One `drain_forward_progress_backlog` call (full backlog); removed slack-scoped preface + merge |
+| Imports | Phase runner imports `drain_forward_progress_backlog` directly, not `drain_stub_materialize_backlog` |
+| `drain_stub_materialize_backlog` | Retained as thin delegate for admin/ingestion/identity paths only |
+| CI guard | `verify_p0_step5_canonical_single_drain_v1` + `test_p0_step5_canonical_single_drain.py` |
 
 ---
 
@@ -248,7 +257,7 @@ resolve_connection
 | Orphan → deferral mapping | `map_orphan_class_to_deferral_reason` |
 | Convergence health labels | `_convergence_health_label` in drain |
 
-**Runner surface:** `run_phase_02_canonical_v1` — still calls `drain_stub_materialize_backlog` twice (slack preface) + repair scan.
+**Runner surface:** `run_phase_02_canonical_v1` — single `drain_forward_progress_backlog` + repair scan (repair off hot path in step 7).
 
 ## C. COMPLEXITY CLASSIFICATION
 

@@ -254,11 +254,19 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         verify_p0_step2_phase06_tcre_worker_boundary_v1,
         verify_p0_step3_single_tcre_resume_path_v1,
         verify_p0_step4_no_continuation_on_execution_hot_path_v1,
+        verify_p0_step5_canonical_single_drain_v1,
     )
 
     errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
     errors.extend(verify_p0_step3_single_tcre_resume_path_v1())
     errors.extend(verify_p0_step4_no_continuation_on_execution_hot_path_v1())
+    errors.extend(verify_p0_step5_canonical_single_drain_v1())
+
+    p02_src = inspect.getsource(runners_mod.run_phase_02_canonical_v1)
+    if "drain_stub_materialize_backlog" in p02_src:
+        errors.append("phase02_runner_must_not_call_drain_stub_p0_step5")
+    if p02_src.count("drain_forward_progress_backlog(") != 1:
+        errors.append("phase02_runner_must_single_drain_forward_progress_p0_step5")
 
     p06_src = inspect.getsource(runners_mod.run_phase_06_tcre_v1)
     if "pipeline_continuation" in p06_src or "mark_pipeline_waiting_on_tcre_v1" in p06_src:

@@ -206,6 +206,21 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p0_step5_canonical_single_drain_v1() -> list[str]:
+    """Return error codes if phase 02 still uses dual drain / drain_stub (P0 step 5)."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p02 = inspect.getsource(pr_mod.run_phase_02_canonical_v1)
+    if "drain_stub_materialize_backlog" in p02:
+        errors.append("phase02_still_calls_drain_stub_materialize_backlog")
+    if "slack_preface" in p02:
+        errors.append("phase02_still_has_slack_preface_dual_drain")
+    if p02.count("drain_forward_progress_backlog(") != 1:
+        errors.append("phase02_must_call_drain_forward_progress_backlog_exactly_once")
+    return errors
+
+
 def verify_p0_step4_no_continuation_on_execution_hot_path_v1() -> list[str]:
     """Return error codes if execution hot path still writes pipeline_continuation (P0 step 4)."""
     errors: list[str] = []
