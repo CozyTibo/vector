@@ -56,3 +56,28 @@ def test_wave1_nav_has_nine_operator_tabs() -> None:
         assert label in layout
     assert "Identity certification" not in layout
     assert "Traversal" not in layout or "Reconstruction" in layout
+
+
+def test_wave1_ingestion_no_replay_or_doctrine_tabs() -> None:
+    ingestion = (_frontend_admin() / "AdminCortexIngestionPage.tsx").read_text(encoding="utf-8")
+    assert "trigger-replay" not in ingestion
+    assert "CORTEX_REPLAY_CONFIRM_PHRASE" not in ingestion
+    assert '"replays"' not in ingestion
+    assert 'activeTab === "verification"' not in ingestion
+    assert 'activeTab === "coverage"' not in ingestion
+    assert 'activeTab === "metrics"' not in ingestion
+
+
+def test_wave1_reconstruction_no_bypass_post_buttons() -> None:
+    overview = (_frontend_admin() / "AdminCortexReasoningOverviewPage.tsx").read_text(encoding="utf-8")
+    job_detail = (_frontend_admin() / "AdminCortexReasoningJobDetailPage.tsx").read_text(encoding="utf-8")
+    assert "runtime/reconstruct" not in overview
+    assert "useMutation" not in overview
+    assert "replay-twin" not in job_detail
+    assert "useMutation" not in job_detail
+
+
+def test_wave1_canonical_health_no_materialize_mutations() -> None:
+    canonical = (_frontend_admin() / "AdminCortexCanonicalHealthPage.tsx").read_text(encoding="utf-8")
+    assert "useMutation" not in canonical
+    assert "materialize-backlog" not in canonical

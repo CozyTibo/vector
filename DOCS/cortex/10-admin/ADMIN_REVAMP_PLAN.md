@@ -1,6 +1,6 @@
 # Cortex Admin Revamp Plan
 
-**Status:** Wave 0 signed off · Wave 1 implemented (2026-05-21)  
+**Status:** Wave 0 signed off · Wave 1 complete (2026-05-21)  
 **Scope:** `/admin/tenants/:tenantId/cortex/*` only (not workspace, integrations, or global admin)  
 **Authoritative execution model:** `DOCS/cortex/CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md` (M8 done)  
 **Substrate prerequisite:** `DOCS/cortex/CORTEX_TRUE_P0_SIGN_OFF.md` (signed off)  
@@ -580,10 +580,13 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 3. [x] Overview: `PipelineStrip` + `PipelineActions` → `execution/state`, `execution/rerun`, `execution/clear`
 4. [x] Removed `flush-rerun-to-identity` from Overview
 5. [x] Redirects: `entity-resolution`→`identity`, `reasoning`→`reconstruction`, `traversal`→`graph`, legacy sub-routes→parent
+6. [x] **Kept-phase bypass cleanup (2026-05-21):** Ingestion tabs → dashboard/connectors/checkpoints/raw-explorer only; removed `trigger-replay`, verification/coverage/metrics tabs. Canonical health: read-only + link to Overview (no materialize/verification POST). Reconstruction: removed `runtime/reconstruct` and `replay-twin` CTAs; job detail shows stored diff only.
 
 **Delivered files:** `frontend/src/admin/cortex/{pipelineTypes,pipelinePhaseStatus,PipelineStrip,PipelineActions}.tsx`, `AdminCortexSettingsPage.tsx`, slim layouts.
 
-**Exit:** Operator cannot reach doctrine pages from nav; Overview has 3 POST action groups only.
+**Tests:** `backend/tests/vector/api/http/routes/test_admin_revamp_wave0_wave1.py` (7 static gates).
+
+**Exit:** Operator cannot reach doctrine pages from nav; Overview has 3 POST action groups only; kept phase pages have no transform bypass POSTs (ingestion sync-only; identity `execution/rerun` shortcut allowed per §6).
 
 ### Wave 2 — P1 Pipeline API + data model
 
@@ -649,3 +652,4 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 |------|--------|
 | 2026-05-21 | Initial draft from operator revamp requirements |
 | 2026-05-21 | Wave 0 signed off; Wave 1 surface kill implemented (frontend + tests) |
+| 2026-05-21 | Wave 1 gap closure: ingestion/canonical/reconstruction bypass CTAs removed; static test gates extended |

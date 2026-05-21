@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
@@ -91,7 +91,6 @@ function Collapsible({
 
 export default function AdminCortexReasoningJobDetailPage() {
   const { tenantId = "", jobId = "" } = useParams<{ tenantId: string; jobId: string }>();
-  const qc = useQueryClient();
 
   const viewQ = useQuery({
     queryKey: ["reasoning-operator-view", tenantId, jobId],
@@ -100,26 +99,6 @@ export default function AdminCortexReasoningJobDetailPage() {
         `/admin/tenants/${tenantId}/cortex/reasoning/runtime/jobs/${jobId}/operator-view`,
       ),
     enabled: Boolean(jobId),
-  });
-
-  const twin = useMutation({
-    mutationFn: () =>
-      adminJson<{
-        replay_equivalence_passed: boolean;
-        twin_job_id: string;
-        replay_diff?: OperatorView["replay_diff"];
-      }>(
-        `/admin/tenants/${tenantId}/cortex/reasoning/runtime/jobs/${jobId}/replay-twin`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: "{}",
-        },
-      ),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["reasoning-operator-view", tenantId, jobId] });
-      void qc.invalidateQueries({ queryKey: ["reasoning-runtime-health", tenantId] });
-    },
   });
 
   const v = viewQ.data;
@@ -181,38 +160,6 @@ export default function AdminCortexReasoningJobDetailPage() {
                   </dd>
                 </div>
               </dl>
-            )}
-            {v.status === "completed" && v.job_kind === "reconstruct" && (
-              <button
-                type="button"
-                className="mt-4 rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50"
-                disabled={twin.isPending}
-                onClick={() => twin.mutate()}
-              >
-                Run replay twin compare
-              </button>
-            )}
-            {twin.data && (
-              <div className="mt-4 space-y-2 text-sm">
-                <p className={twin.data.replay_equivalence_passed ? "text-green-800" : "text-red-700"}>
-                  Replay equivalence: {twin.data.replay_equivalence_passed ? "PASSED" : "FAILED"}
-                </p>
-                {twin.data.replay_diff && !twin.data.replay_diff.identical && (
-                  <ul className="list-inside list-disc text-stone-700">
-                    {twin.data.replay_diff.chronology_divergence.length > 0 && (
-                      <li>
-                        Chronology divergence: {twin.data.replay_diff.chronology_divergence.length}{" "}
-                        row(s)
-                      </li>
-                    )}
-                    {twin.data.replay_diff.edge_divergence.length > 0 && (
-                      <li>Edge divergence: {twin.data.replay_diff.edge_divergence.length} edge(s)</li>
-                    )}
-                    {twin.data.replay_diff.chain_divergence && <li>Chain divergence</li>}
-                    {twin.data.replay_diff.digest_mismatch && <li>Aggregate digest mismatch</li>}
-                  </ul>
-                )}
-              </div>
             )}
             {v.replay_diff && !v.replay_diff.identical && (
               <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">

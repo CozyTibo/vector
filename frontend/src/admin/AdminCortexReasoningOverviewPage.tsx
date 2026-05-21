@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
@@ -26,27 +26,11 @@ type Health = {
 
 export default function AdminCortexReasoningOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const qc = useQueryClient();
+  const overview = `/admin/tenants/${tenantId}/cortex/overview`;
 
   const healthQ = useQuery({
     queryKey: ["reasoning-runtime-health", tenantId],
     queryFn: () => adminJson<Health>(`/admin/tenants/${tenantId}/cortex/reasoning/runtime/health`),
-  });
-
-  const reconstruct = useMutation({
-    mutationFn: (sync: boolean) =>
-      adminJson<{ job_id: string; status: string }>(
-        `/admin/tenants/${tenantId}/cortex/reasoning/runtime/reconstruct`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ materialization_limit: 50, dry_run: false, run_sync: sync }),
-        },
-      ),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["reasoning-runtime-health", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["reasoning-runtime-jobs", tenantId] });
-    },
   });
 
   const h = healthQ.data;
@@ -78,7 +62,7 @@ export default function AdminCortexReasoningOverviewPage() {
               <dd>{h.queue_depth_proxy}</dd>
             </div>
             <div>
-              <dt className="text-stone-500">Replay equivalence</dt>
+              <dt className="text-stone-500">Equivalence status</dt>
               <dd>{h.replay_equivalence_status}</dd>
             </div>
             <div>
@@ -116,7 +100,7 @@ export default function AdminCortexReasoningOverviewPage() {
             Last success:{" "}
             <Link
               className="text-indigo-700 underline"
-              to={`/admin/tenants/${tenantId}/cortex/reasoning/jobs/${h.last_successful_job.job_id}`}
+              to={`/admin/tenants/${tenantId}/cortex/reconstruction/jobs/${h.last_successful_job.job_id}`}
             >
               {h.last_successful_job.job_id.slice(0, 8)}…
             </Link>
@@ -125,38 +109,15 @@ export default function AdminCortexReasoningOverviewPage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-stone-900">Run reconstruction</h2>
+      <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-stone-900">Execution</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Bounded slice over canonical materializations (default limit 50). Use sync for immediate
-          feedback in dev.
+          TCRE jobs are enqueued by the pipeline during phase 06. To re-run reconstruction, use Overview →
+          Start from step → Reconstruction.
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-            disabled={reconstruct.isPending}
-            onClick={() => reconstruct.mutate(true)}
-          >
-            Reconstruct (sync)
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 disabled:opacity-50"
-            disabled={reconstruct.isPending}
-            onClick={() => reconstruct.mutate(false)}
-          >
-            Enqueue (Celery)
-          </button>
-        </div>
-        {reconstruct.data && (
-          <p className="mt-3 text-sm text-green-800">
-            Job {reconstruct.data.job_id} — status {reconstruct.data.status}
-          </p>
-        )}
-        {reconstruct.error && (
-          <p className="mt-3 text-sm text-red-600">{(reconstruct.error as Error).message}</p>
-        )}
+        <Link className="mt-3 inline-block text-sm font-medium text-indigo-700 underline" to={overview}>
+          Open pipeline actions
+        </Link>
       </section>
     </div>
   );

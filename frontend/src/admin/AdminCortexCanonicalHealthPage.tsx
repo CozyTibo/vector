@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
-import type { CortexCanonicalControlPlane, CortexCanonicalMaterializeBacklogAsyncResponse } from "./cortexAdminTypes";
+import type { CortexCanonicalControlPlane } from "./cortexAdminTypes";
 import { formatRelativeAge, titleConnector } from "./cortexAdminTypes";
 import type { ConnectorRollup } from "./canonical/coverageMatrixTypes";
 import { StatusBadge } from "./ui/StatusBadge.tsx";
@@ -65,8 +65,7 @@ function StatCard(props: {
 
 export default function AdminCortexCanonicalHealthPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const base = `/admin/tenants/${tenantId}/cortex/canonical`;
-  const qc = useQueryClient();
+  const overview = `/admin/tenants/${tenantId}/cortex/overview`;
 
   const qCp = useQuery({
     queryKey: ["admin-cortex-canonical-control-plane", tenantId],
@@ -78,33 +77,6 @@ export default function AdminCortexCanonicalHealthPage() {
     queryKey: ["admin-cortex-canonical-failures", tenantId],
     queryFn: () => adminJson<FailuresPayload>(`/admin/tenants/${tenantId}/cortex/canonical/failures`),
     enabled: Boolean(tenantId),
-  });
-
-  const backlogAsyncMut = useMutation({
-    mutationFn: () =>
-      adminJson<CortexCanonicalMaterializeBacklogAsyncResponse>(
-        `/admin/tenants/${tenantId}/cortex/canonical/transform/materialize-backlog-async`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
-      ),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-control-plane", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-coverage-matrix", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-failures", tenantId] });
-    },
-  });
-
-  const verificationMut = useMutation({
-    mutationFn: () =>
-      adminJson<Record<string, unknown>>(`/admin/tenants/${tenantId}/cortex/canonical/verification/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persist: true, materialization_sample_limit: 50 }),
-      }),
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-control-plane", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-verification-runs", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-canonical-coverage-matrix", tenantId] });
-    },
   });
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
@@ -149,35 +121,30 @@ export default function AdminCortexCanonicalHealthPage() {
             label="Raw ingested rows"
             value={rawRowSum.toLocaleString()}
             tone="ok"
-            to={`${base}/coverage`}
             hint="Sum of raw rows across coverage pairs"
           />
           <StatCard
             label="Canonical materialized"
             value={h.materialization_row_count.toLocaleString()}
             tone={toneFromHealth(true, false)}
-            to={`${base}/advanced/runtime`}
             hint="Transform materialization rows"
           />
           <StatCard
             label="Untreated raw → canonical"
             value={untreated.toLocaleString()}
             tone={toneFromHealth(untreated === 0, untreated > 0)}
-            to={`${base}/coverage#untreated`}
-            hint="Routable gap + unsupported ingest volume (see Coverage)"
+            hint="Routable gap + unsupported ingest volume"
           />
           <StatCard
             label="Failed materializations (registry)"
             value={h.active_canonical_failure_count.toLocaleString()}
             tone={toneFromHealth(h.active_canonical_failure_count === 0, h.active_canonical_failure_count > 0)}
-            to={`${base}/failures`}
           />
           <StatCard
-            label="Replay drift (C3–C5)"
+            label="Divergence pressure (C3–C5)"
             value={driftBad > 0 ? `${driftBad} / ${driftTotal || 0}` : `${driftTotal || 0} classes`}
             tone={toneFromHealth(driftBad === 0, driftBad > 0)}
-            to={`${base}/advanced/replay`}
-            hint="Forbidden divergence tallies on recent completed replay jobs"
+            hint="Historical divergence tallies (read-only)"
           />
           <StatCard
             label="Last verification run"
@@ -194,8 +161,8 @@ export default function AdminCortexCanonicalHealthPage() {
             <h2 className="text-base font-semibold text-stone-900">Connector health</h2>
             <p className="mt-1 text-sm text-stone-600">Where backlog and replay pressure concentrate.</p>
           </div>
-          <Link className="text-sm font-medium text-indigo-700 hover:underline" to={`${base}/coverage`}>
-            Open coverage →
+          <Link className="text-sm font-medium text-indigo-700 hover:underline" to={overview}>
+            Pipeline overview →
           </Link>
         </div>
         <div className="mt-4 overflow-x-auto">
@@ -240,70 +207,24 @@ export default function AdminCortexCanonicalHealthPage() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-stone-900">Quick actions</h2>
-        <p className="mt-1 text-sm text-stone-600">One-click remediation; advanced parameters live under Advanced.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-900 disabled:opacity-50"
-            disabled={backlogAsyncMut.isPending}
-            onClick={() => void backlogAsyncMut.mutate()}
-          >
-            {backlogAsyncMut.isPending ? "Enqueueing…" : "Reprocess untreated (async backlog)"}
-          </button>
-          <Link
-            className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 shadow-sm hover:bg-stone-50"
-            to={`${base}/advanced/runtime`}
-          >
-            Retry / batch materialize
-          </Link>
-          <Link
-            className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 shadow-sm hover:bg-stone-50"
-            to={`${base}/advanced/replay`}
-          >
-            Replay job
-          </Link>
-          <button
-            type="button"
-            className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-950 shadow-sm hover:bg-indigo-100 disabled:opacity-50"
-            disabled={verificationMut.isPending}
-            onClick={() => void verificationMut.mutate()}
-          >
-            {verificationMut.isPending ? "Running…" : "Run verification"}
-          </button>
-          <Link
-            className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 shadow-sm hover:bg-stone-50"
-            to={`${base}/coverage#untreated`}
-          >
-            Open untreated explorer
-          </Link>
-          <Link
-            className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 shadow-sm hover:bg-stone-50"
-            to={`${base}/failures`}
-          >
-            Open failures
-          </Link>
-        </div>
-        {backlogAsyncMut.isSuccess ? (
-          <p className="mt-2 font-mono text-[11px] text-emerald-900">
-            task {backlogAsyncMut.data.celery_task_id} · bundle {backlogAsyncMut.data.bundle_id_used}
-          </p>
-        ) : null}
-        {backlogAsyncMut.isError ? (
-          <p className="mt-2 text-sm text-red-700">{(backlogAsyncMut.error as Error).message}</p>
-        ) : null}
-        {verificationMut.isError ? (
-          <p className="mt-2 text-sm text-red-700">{(verificationMut.error as Error).message}</p>
-        ) : null}
+      <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-stone-900">Remediation</h2>
+        <p className="mt-1 text-sm text-stone-600">
+          Canonical materialization runs on the execution engine only. Use Overview → Start from step → Canonical
+          (or Run from ingestion for a full refresh).
+        </p>
+        <Link
+          className="mt-3 inline-block rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800"
+          to={overview}
+        >
+          Open pipeline actions
+        </Link>
       </section>
 
       <section className="rounded-xl border border-red-100 bg-red-50/30 p-5 shadow-sm ring-1 ring-red-100">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-red-950">Recent failure signals</h2>
-          <Link className="text-sm font-medium text-indigo-800 hover:underline" to={`${base}/failures`}>
-            View all →
-          </Link>
+          <span className="text-sm text-stone-500">Read-only registry slice</span>
         </div>
         {qFailures.isPending ? (
           <p className="mt-2 text-sm text-stone-600">Loading failures…</p>
@@ -321,9 +242,7 @@ export default function AdminCortexCanonicalHealthPage() {
                   <span className="text-stone-800">{x.scope_kind}</span>
                   <p className="mt-0.5 text-xs text-stone-500">{x.source}</p>
                 </div>
-                <Link className="shrink-0 text-xs font-semibold text-indigo-700 hover:underline" to={`${base}/failures`}>
-                  Inspect
-                </Link>
+                <span className="shrink-0 text-xs text-stone-500">{x.degradation_state}</span>
               </li>
             ))}
           </ul>
