@@ -204,12 +204,9 @@ def test_admin_cortex_canonical_materialize_backlog_dry_run_ok(
         auth=("admin", "integration-admin-password"),
         json={"bundle_id": bundle_id, "batch_limit": 50, "dry_run": True},
     )
-    assert r.status_code == 200
-    body = r.json()
-    assert body["dry_run"] is True
-    assert body["attempted"] >= 0
-    assert isinstance(body["stub_resource_pairs_selected"], list)
-    assert body["stub_resource_pairs_selected"]
+    assert r.status_code == 410
+    assert r.json()["detail"]["error"] == "admin_endpoint_removed"
+    assert "execution/restart" in r.json()["detail"]["replacement"]
 
 
 def test_admin_cortex_canonical_materialize_backlog_async_ok(
@@ -238,18 +235,6 @@ def test_admin_cortex_canonical_materialize_backlog_async_ok(
             auth=("admin", "integration-admin-password"),
             json={},
         )
-        assert r.status_code == 200
-        body = r.json()
-        assert body["enqueued"] is True
-        assert body["celery_task_id"] == "celery-task-integration-test"
-        assert body["tenant_id"] == str(tid)
-        bundle_used = body["bundle_id_used"]
-        assert bundle_used
-        mock_delay.assert_called_once()
-        args = mock_delay.call_args.args
-        assert len(args) == 5
-        assert args[0] == str(tid)
-        assert args[1] == bundle_used
-        assert args[2] is None
-        assert args[3] is None
-        assert isinstance(args[4], int) and args[4] >= 1
+        assert r.status_code == 410
+        assert "execution/restart" in r.json()["detail"]["replacement"]
+        mock_delay.assert_not_called()

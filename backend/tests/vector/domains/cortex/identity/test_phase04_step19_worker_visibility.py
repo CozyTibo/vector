@@ -54,23 +54,8 @@ def test_replay_job_enqueue_sets_celery_id_and_pollable(
         auth=("admin", "integration-admin-password"),
         json={"job_kind": "authoritative_replay", "dry_run": False},
     )
-    assert post.status_code == 200
-    body = post.json()
-    assert body["celery_task_id"] == fake_id
-    assert body["job"]["celery_task_id"] == fake_id
-    assert body["job"]["status"] == "queued"
-    assert f"/admin/tenants/{tid}/cortex/identity/worker-tasks/{fake_id}" in body["worker_task_status_path"]
-
-    poll = client.get(
-        f"/admin/tenants/{tid}/cortex/identity/worker-tasks/{fake_id}",
-        auth=("admin", "integration-admin-password"),
-    )
-    assert poll.status_code == 200
-    st = poll.json()
-    assert st["tenant_id"] == str(tid)
-    assert st["celery_task_id"] == fake_id
-    assert st["bind_source"] == "replay_job"
-    assert st["job_id"] == body["job"]["id"]
+    assert post.status_code == 410
+    assert "execution/rerun" in post.json()["detail"]["replacement"]
 
 
 def test_worker_task_unknown_returns_404(
@@ -105,17 +90,8 @@ def test_legacy_regenerate_async_registers_dispatch(
         auth=("admin", "integration-admin-password"),
         json={"rule_version": "1.0.0-test"},
     )
-    assert post.status_code == 200
-    out = post.json()
-    assert out["celery_task_id"] == fake_id
-
-    poll = client.get(
-        f"/admin/tenants/{tid}/cortex/identity/worker-tasks/{fake_id}",
-        auth=("admin", "integration-admin-password"),
-    )
-    assert poll.status_code == 200
-    assert poll.json()["bind_source"] == "dispatch"
-    assert poll.json()["job_id"] is None
+    assert post.status_code == 410
+    assert "execution/restart" in post.json()["detail"]["replacement"]
 
 
 def test_projection_export_run_enqueues_graph_job(

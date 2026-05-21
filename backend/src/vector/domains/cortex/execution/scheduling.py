@@ -129,3 +129,39 @@ def verify_no_legacy_phase_chain_v1() -> list[str]:
     if "run_execution_slice_task" not in inspect.getsource(enqueue_mod.enqueue_tenant_convergence_v1):
         errors.append("enqueue_missing_execution_slice_task")
     return errors
+
+
+def verify_m8_admin_execution_surface_v1() -> list[str]:
+    """Return error codes if M8 consolidated admin execution routes are missing."""
+    errors: list[str] = []
+    try:
+        from vector.api.http.routes import admin_cortex_execution as exec_routes
+    except ImportError:
+        errors.append("missing_admin_cortex_execution_routes_module")
+        return errors
+
+    src = inspect.getsource(exec_routes.register_cortex_execution_routes)
+    for suffix in ("/state", "/restart", "/clear", "/rerun", "/transition-log"):
+        if suffix not in src:
+            errors.append(f"missing_execution_route:{suffix}")
+
+    from vector.domains.cortex.execution import admin_commands as cmd_mod
+
+    for sym in (
+        "build_execution_inspect_v1",
+        "restart_execution_from_phase_v1",
+        "clear_derived_execution_outputs_v1",
+        "execution_rerun_v1",
+    ):
+        if not callable(getattr(cmd_mod, sym, None)):
+            errors.append(f"missing_admin_command:{sym}")
+
+    import importlib
+
+    admin_mod = importlib.import_module("vector.api.http.routes.admin")
+    if "register_cortex_execution_routes" not in inspect.getsource(admin_mod.build_admin_router):
+        errors.append("admin_router_missing_execution_registration")
+    router_src = inspect.getsource(admin_mod.build_admin_router)
+    if "materialize-backlog" not in router_src or "raise_admin_endpoint_gone" not in router_src:
+        errors.append("materialize_backlog_missing_410_guard")
+    return errors

@@ -11,6 +11,18 @@ from sqlalchemy.orm import Session
 from starlette import status
 
 from vector.api.http.deps import get_db
+from vector.domains.cortex.execution.admin_deprecation import (
+    execution_admin_path_v1,
+    raise_admin_endpoint_gone,
+)
+
+
+def _raise_operational_sidecar_gone(*, path_suffix: str, from_phase: str) -> None:
+    raise_admin_endpoint_gone(
+        deprecated=f"/admin/tenants/{{tenant_id}}/cortex/operational-runtime{path_suffix}",
+        replacement=execution_admin_path_v1(f"/restart?from_phase={from_phase}"),
+        migration="Operational sidecar Celery passes removed (M8); use execution restart.",
+    )
 from vector.contracts.admin import (
     AdminCortexOperationalRuntimeGapMatrixCatalogResponse,
     AdminCortexOperationalRuntimePhaseBoundariesCatalogResponse,
@@ -468,6 +480,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 11 — synchronous lawful promotion pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/graph-density-promotion/run",
+            from_phase="GRAPH",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -484,6 +500,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 11 — evaluate backlog and enqueue async promotion pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/graph-density-promotion/schedule",
+            from_phase="GRAPH",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -623,6 +643,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 14 — enqueue async OCTS walk schedule pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/traversal-scheduling/schedule",
+            from_phase="TRAVERSAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -646,6 +670,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 14 — synchronous OCTS walk schedule pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/traversal-scheduling/run",
+            from_phase="TRAVERSAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -691,6 +719,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 15 — synchronous traversal retry + frontier heal pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/traversal-retry/run",
+            from_phase="TRAVERSAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -709,6 +741,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 15 — enqueue async traversal retry + frontier heal pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/traversal-retry/schedule",
+            from_phase="TRAVERSAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -759,6 +795,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 16 — synchronous stalled traversal recovery pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/stalled-traversal-recovery/run",
+            from_phase="TRAVERSAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -777,6 +817,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 16 — enqueue async stalled traversal recovery pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/stalled-traversal-recovery/schedule",
+            from_phase="TRAVERSAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -861,6 +905,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 18 — synchronous TCRE saturation schedule pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/tcre-saturation-scheduling/run",
+            from_phase="TCRE",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -884,6 +932,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 18 — enqueue async TCRE saturation schedule pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/tcre-saturation-scheduling/schedule",
+            from_phase="TCRE",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1115,6 +1167,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 24 — synchronous synthesis activation schedule pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/synthesis-activation-scheduling/run",
+            from_phase="RETRIEVAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1138,6 +1194,10 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
     ) -> JSONResponse | dict[str, object]:
         """Phase 08.5 Step 24 — enqueue async synthesis activation schedule pass."""
+        _raise_operational_sidecar_gone(
+            path_suffix="/synthesis-activation-scheduling/schedule",
+            from_phase="RETRIEVAL",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,

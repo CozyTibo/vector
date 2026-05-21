@@ -672,7 +672,8 @@ def test_admin_flush_rerun_requires_exact_confirmation(
             auth=("admin", "integration-admin-password"),
             json={"confirmation": "wrong phrase"},
         )
-        assert r.status_code == 400
+        assert r.status_code == 410
+        assert r.json()["detail"]["error"] == "admin_endpoint_removed"
     finally:
         get_settings.cache_clear()
 
@@ -682,28 +683,13 @@ def test_admin_flush_rerun_flushes_and_enqueues(
     client: TestClient,
     db_session: Session,
 ) -> None:
+    """Flush-rerun removed (M8); replacement is execution/rerun with flush_all."""
     monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
     get_settings.cache_clear()
     try:
         tid, uid = _tenant_with_owner(db_session)
         _seed_raw_rows_for_stats_filters(db_session, tid, uid)
-        conn = (
-            db_session.query(TenantConnection)
-            .filter(TenantConnection.tenant_id == tid, TenantConnection.provider == "github")
-            .order_by(TenantConnection.created_at.desc())
-            .first()
-        )
-        assert conn is not None
         db_session.commit()
-
-        import app.tasks.cortex_full_pipeline_rerun as pipeline_tasks
-
-        pipeline_called: list[tuple[object, ...]] = []
-        monkeypatch.setattr(
-            pipeline_tasks.run_cortex_flush_rerun_to_identity_task,
-            "delay",
-            lambda *args: pipeline_called.append(args) or SimpleNamespace(id="task-full-rerun-1"),
-        )
 
         r = client.post(
             f"/admin/tenants/{tid}/cortex/ingestion/actions/flush-rerun-to-identity",
@@ -713,27 +699,16 @@ def test_admin_flush_rerun_flushes_and_enqueues(
                 "canonical_batch_limit": 777,
             },
         )
-        assert r.status_code == 200
-        body = r.json()
-        assert body["tenant_id"] == str(tid)
-        assert body["deleted_rows_total"] > 0
-        assert body["canonical_backlog_task_id"] == "task-full-rerun-1"
-        assert "github" in body["enqueued_connectors"]
-        assert len(pipeline_called) == 1
-        assert pipeline_called[0][0] == str(tid)
-        assert pipeline_called[0][1]
-        assert isinstance(pipeline_called[0][2], list)
-        assert pipeline_called[0][2]
-        assert pipeline_called[0][2][0]["connector"] == "github"
-        assert pipeline_called[0][2][0]["connection_id"] == str(conn.id)
-        assert pipeline_called[0][3] == 777
+        assert r.status_code == 410
+        assert "execution/rerun" in r.json()["detail"]["replacement"]
+        assert "flush_all=true" in r.json()["detail"]["replacement"]
 
         remaining_raw = (
             db_session.query(RawIngestionRecord)
             .filter(RawIngestionRecord.tenant_id == tid)
             .count()
         )
-        assert remaining_raw == 0
+        assert remaining_raw > 0
     finally:
         get_settings.cache_clear()
 

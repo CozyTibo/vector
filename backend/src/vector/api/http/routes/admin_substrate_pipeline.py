@@ -11,6 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db
+from vector.domains.cortex.execution.admin_deprecation import (
+    execution_admin_path_v1,
+    raise_admin_endpoint_gone,
+)
 from vector.domains.cortex.retrieval.retrieval_truth_validation import (
     run_retrieval_truth_validation_suite_v1,
 )
@@ -271,6 +275,11 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
         action: Annotated[str, Query()] = "auto",
     ) -> dict[str, Any]:
+        raise_admin_endpoint_gone(
+            deprecated="/admin/catalog/cortex/substrate-pipeline/stalled/{pipeline_run_id}/recover",
+            replacement=execution_admin_path_v1("/restart?from_phase=TRAVERSAL"),
+            migration="Watchdog recovery removed; restart execution from cursor (M8).",
+        )
         from vector.domains.cortex.substrate_pipeline.stalled_pipeline_recovery import (
             recover_stalled_pipeline_v1,
         )
@@ -304,6 +313,11 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
     ) -> dict[str, Any]:
         """Operator trigger — one **G-P085-WATCH-01** watchdog tick (synchronous)."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/catalog/cortex/substrate-pipeline/continuity-watchdog/run",
+            replacement="/admin/catalog/cortex/substrate-pipeline/stalled",
+            migration="Auto-recover watchdog removed; inspect stalls read-only, use execution restart (M8).",
+        )
         from vector.domains.cortex.operational_runtime.substrate_continuity_watchdog import (
             get_watchdog_stall_threshold_seconds_v1,
         )
@@ -369,6 +383,11 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
         force: Annotated[bool, Query()] = False,
     ) -> dict[str, Any]:
         """Operator recovery — mark dirty and enqueue execution slice (M7)."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/substrate-pipeline/progression/continue",
+            replacement=execution_admin_path_v1("/rerun"),
+            migration="Progression coordinator removed (M7); use execution rerun (M8).",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
         from vector.domains.cortex.execution.admin_rerun import admin_rerun_substrate_execution_v1

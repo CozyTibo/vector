@@ -101,7 +101,22 @@ from vector.infrastructure.db.models.cortex_retrieval_query_audit import CortexR
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_artifact import (
     CortexTcreReconstructionArtifact,
 )
+from vector.infrastructure.db.models.cortex_synthesis_job import CortexSynthesisJob
+from vector.infrastructure.db.models.cortex_synthesis_job_receipt import CortexSynthesisJobReceipt
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import CortexTcreReconstructionJob
+
+# M8 replay matrix — FSM phase names → derived-state clear tier
+_CLEAR_FROM_PHASE_ALIASES: dict[str, str] = {
+    "CANONICAL": "CANONICAL",
+    "CANONICAL_DRAINING": "CANONICAL",
+    "IDENTITY": "IDENTITY",
+    "GRAPH": "GRAPH",
+    "TRAVERSAL": "TRAVERSAL",
+    "AWAITING_TCRE": "TCRE",
+    "TCRE": "TCRE",
+    "RETRIEVAL": "RETRIEVAL",
+    "SYNTHESIS": "SYNTHESIS",
+}
 
 
 def _dml_rowcount(session: Session, stmt: UpdateBase) -> int:
@@ -280,6 +295,81 @@ def _flush_phase05_through_phase07_tables(
     )
     session.flush()
     return deleted
+
+
+def _clear_canonical_derived_tables(session: Session, *, tenant_id: uuid.UUID) -> dict[str, int]:
+    """Canonical derived artifacts only (preserve raw ingest)."""
+    delete_plan: tuple[tuple[str, type[Any]], ...] = (
+        ("cortex_canonical_ambiguity_lifecycle_events", CortexCanonicalAmbiguityLifecycleEvent),
+        ("cortex_canonical_ambiguity_records", CortexCanonicalAmbiguityRecord),
+        ("cortex_canonical_remediation_validations", CortexCanonicalRemediationValidation),
+        ("cortex_canonical_failure_cases", CortexCanonicalFailureCase),
+        ("cortex_canonical_temporal_supersessions", CortexCanonicalTemporalSupersession),
+        ("cortex_canonical_identity_anchors", CortexCanonicalIdentityAnchor),
+        ("cortex_canonical_provenance_records", CortexCanonicalProvenanceRecord),
+        ("cortex_canonical_transform_materializations", CortexCanonicalTransformMaterialization),
+        ("cortex_canonical_replay_jobs", CortexCanonicalReplayJob),
+    )
+    deleted: dict[str, int] = {}
+    for table_name, model in delete_plan:
+        deleted[table_name] = _dml_rowcount(
+            session,
+            delete(model).where(model.tenant_id == tenant_id),
+        )
+    session.flush()
+    return deleted
+
+
+def _clear_synthesis_derived_tables(session: Session, *, tenant_id: uuid.UUID) -> dict[str, int]:
+    deleted: dict[str, int] = {}
+    job_ids = list(
+        session.scalars(
+            select(CortexSynthesisJob.id).where(CortexSynthesisJob.tenant_id == tenant_id),
+        ).all()
+    )
+    if job_ids:
+        deleted["cortex_synthesis_job_receipts"] = _dml_rowcount(
+            session,
+            delete(CortexSynthesisJobReceipt).where(CortexSynthesisJobReceipt.job_id.in_(job_ids)),
+        )
+    deleted["cortex_synthesis_jobs"] = _dml_rowcount(
+        session,
+        delete(CortexSynthesisJob).where(CortexSynthesisJob.tenant_id == tenant_id),
+    )
+    session.flush()
+    return deleted
+
+
+def clear_derived_outputs_from_phase_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    from_phase: str,
+    scope: str | None = None,
+) -> dict[str, Any]:
+    """Delete derived substrate outputs from ``from_phase`` onward (replay matrix §4.1)."""
+    _ = scope
+    key = _CLEAR_FROM_PHASE_ALIASES.get((from_phase or "").strip().upper())
+    if key is None:
+        msg = f"unsupported_from_phase:{from_phase}"
+        raise ValueError(msg)
+
+    deleted_by_table: dict[str, int] = {}
+    if key == "CANONICAL":
+        deleted_by_table.update(_clear_canonical_derived_tables(session, tenant_id=tenant_id))
+    elif key == "IDENTITY":
+        deleted_by_table.update(_flush_phase04_org_identity_tables(session, tenant_id=tenant_id))
+    elif key in ("GRAPH", "TRAVERSAL", "TCRE", "RETRIEVAL"):
+        deleted_by_table.update(_flush_phase05_through_phase07_tables(session, tenant_id=tenant_id))
+    elif key == "SYNTHESIS":
+        deleted_by_table.update(_clear_synthesis_derived_tables(session, tenant_id=tenant_id))
+
+    return {
+        "tenant_id": str(tenant_id),
+        "from_phase": key,
+        "deleted_rows_by_table": deleted_by_table,
+        "deleted_rows_total": sum(deleted_by_table.values()),
+    }
 
 
 def flush_tenant_cortex_pipeline_state(

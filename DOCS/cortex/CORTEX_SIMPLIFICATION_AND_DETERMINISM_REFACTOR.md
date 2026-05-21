@@ -105,7 +105,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | **M5** | Rename convergence → `execution` package; add FSM table or extend `CortexTenantConvergenceLease` with explicit `fsm_state` | Medium | **Done** — `execution/` package; lease `fsm_state` + `block_*`; `cortex_execution_transition_log`; `CortexTenantExecution` alias; `convergence/` re-export shims |
 | **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | **Done** — `vector.cortex.execution.run_slice`; `enqueue_execution_slice_at_phase_v1`; removed `chain_after_phase_v1`; legacy phase/coordinator tasks deprecated (no chain) |
 | **M7** | Delete `substrate_operational_progression.py` and callers; migrate retrieval retry to FSM `BLOCKED` + manual/admin rerun | High | **Done** — deleted coordinator + Celery tick task; `execution/progression_status.py`, `blocked.py`, `admin_rerun.py`; retrieval policy in `run_tenant_execution_v1`; admin `POST …/progression/continue` → `admin_rerun_substrate_execution_v1`; [operator playbook](#m7-operator-playbook) |
-| **M8** | Collapse admin execution endpoints (section 5) | Medium | Deprecation period with 410 + replacement routes |
+| **M8** | Collapse admin execution endpoints (section 5) | Medium | **Done** — `GET …/execution/state`, `POST …/execution/{restart,clear,rerun}`; bypass routes return **410 Gone** with replacement paths; `clear_derived_outputs_from_phase_v1` replay matrix |
 | **M9** | Delete dead modules (section 9) | Low after M6–M8 | CI grep for imports |
 
 ### 2.3 Temporary compatibility (short-lived only)
@@ -358,6 +358,18 @@ replay(tenant_id, from_phase, scope?) :=
 
 > Admin never runs transforms. Admin only **commands the execution engine** and **inspects state**.
 
+### M8 implementation notes
+
+| Operation | Route |
+|-----------|-------|
+| Inspect | `GET /admin/tenants/{tenant_id}/cortex/execution/state` |
+| Transition log | `GET …/execution/transition-log` |
+| Restart | `POST …/execution/restart?from_phase=` |
+| Clear derived | `POST …/execution/clear?from_phase=` (`flush_all=true` for full tenant flush) |
+| Rerun | `POST …/execution/rerun?from_phase=` (clear + restart) |
+
+Removed bypass endpoints return **HTTP 410** with JSON `detail.replacement` pointing at the execution routes above. Ingest `trigger-sync` / `trigger-replay` unchanged.
+
 ---
 
 ## 6. Sidecar collapse plan
@@ -496,7 +508,7 @@ Every slice ends with:
 | 4 | TCRE callback + progression + continuation triple resume | **P0** | `orchestrator.on_tcre_job_completed_*` | Merge to FSM handler |
 | 5 | Incremental retrieval in TCRE task (skips RETRIEVAL gate) | **P1 High** | `cortex_tcre_reconstruction_jobs.py` | Move to RETRIEVAL only |
 | 6 | Phase `completed` with zero processed | **P1** | `phase_runners`, repository | `completed_empty` / `BLOCKED` |
-| 7 | Admin materialize/backlog bypass topology | **P1** | `admin.py` | M8 delete endpoints |
+| 7 | Admin materialize/backlog bypass topology | **P1** | `admin.py` | **M8 done** — 410 + `execution/restart` |
 | 8 | Standalone backlog Celery task | **P1** | `cortex_canonical_materialize_backlog.py` | Delete |
 | 9 | Multiple replay job writers without tenant lock | **P1** | replay runtimes | Single replay contract + lease |
 | 10 | Sidecars schedule parallel work | **P2** | operational_runtime schedulers | Section 6 |
@@ -675,9 +687,9 @@ app/tasks/
 |------|-------------|
 | W1 | M1 P0 gate fix + M2 force convergence + telemetry |
 | W2 | **M4–M6 done** |
-| W3 | **M7 done**; M8 admin deprecation |
+| W3 | **M7–M8 done** |
 | W4 | M9 sidecar deletion + replay contract |
-| W5 | M8 admin deprecation |
+| W5 | M9 sidecar deletion + replay contract |
 | W6 | M9 sidecar deletion + replay contract |
 | W7 | Test rewrite + oper playbook + remove flags |
 

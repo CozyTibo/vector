@@ -185,27 +185,5 @@ def test_admin_org_link_replay_run_list_detail(
         auth=("admin", "integration-admin-password"),
         json={"job_kind": "authoritative_replay", "dry_run": False},
     )
-    assert post.status_code == 200
-    body = post.json()
-    assert body["org_link_replay_schema_version"] == ORG_LINK_REPLAY_SCHEMA_VERSION
-    job = body["job"]
-    assert job["status"] == "completed"
-    assert len(body["receipts"]) == 1
-
-    lst = client.get(
-        f"/admin/tenants/{tenant.id}/cortex/identity/replay-jobs",
-        auth=("admin", "integration-admin-password"),
-    )
-    assert lst.status_code == 200
-    data = lst.json()
-    assert data["jobs"]
-    assert data["jobs"][0]["id"] == job["id"]
-
-    jid = uuid.UUID(str(job["id"]))
-    det = client.get(
-        f"/admin/tenants/{tenant.id}/cortex/identity/replay-jobs/{jid}",
-        auth=("admin", "integration-admin-password"),
-    )
-    assert det.status_code == 200
-    d2 = det.json()
-    assert d2["job"]["id"] == job["id"]
+    assert post.status_code == 410
+    assert "execution/rerun" in post.json()["detail"]["replacement"]

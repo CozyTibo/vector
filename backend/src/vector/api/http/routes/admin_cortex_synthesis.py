@@ -11,6 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db
+from vector.domains.cortex.execution.admin_deprecation import (
+    execution_admin_path_v1,
+    raise_admin_endpoint_gone,
+)
 from vector.contracts.admin import (
     AdminCortexSynthesisAntiGoalsCatalogResponse,
     AdminCortexSynthesisCitationBindingInspectorResponse,
@@ -510,6 +514,11 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
         body: Annotated[dict[str, Any], Body(...)],
     ) -> JSONResponse | AdminCortexSynthesisJobRunResponse:
         """Phase 08 Step 06 — run synthesis job FSM (sync) or enqueue Celery stub."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/synthesis/jobs/run",
+            replacement=execution_admin_path_v1("/restart?from_phase=SYNTHESIS"),
+            migration="Direct synthesis job run removed; use execution restart from SYNTHESIS (M8).",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
         try:
@@ -890,6 +899,11 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
         body: Annotated[dict[str, Any], Body(...)],
     ) -> JSONResponse | dict[str, Any]:
         """Phase 08 Step 23 — W3 dangerous force re-synthesis."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/synthesis/jobs/resynthesize",
+            replacement=execution_admin_path_v1("/rerun?from_phase=SYNTHESIS"),
+            migration="Dangerous resynthesize bypass removed; use execution rerun from SYNTHESIS (M8).",
+        )
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
         try:

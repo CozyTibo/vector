@@ -1,4 +1,4 @@
-"""Phase 08 Step 06 — admin synthesis job run + detail HTTP surfaces."""
+"""Phase 08 Step 06 — synthesis job run admin route deprecated (M8)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ import pytest
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
-from vector.domains.cortex.synthesis.synthesis_orchestrator import SYNTHESIS_JOB_EXECUTION_PHASES_V1
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.models.user import User
@@ -33,7 +32,7 @@ def _tenant_with_owner(db: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_admin_post_synthesis_job_run_returns_execution_trace(
+def test_admin_post_synthesis_job_run_returns_410(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
@@ -53,25 +52,11 @@ def test_admin_post_synthesis_job_run_returns_execution_trace(
         },
         auth=("admin", "integration-admin-password"),
     )
-    assert r.status_code == 200
-    body = r.json()
-    assert body["surface_kind"] == "synthesis_job_run"
-    assert body["status"] == "completed"
-    assert [row["phase"] for row in body["execution_trace"]] == list(SYNTHESIS_JOB_EXECUTION_PHASES_V1)
-    job_id = body["job_id"]
-
-    g = client.get(
-        f"/admin/tenants/{tenant_id}/cortex/synthesis/jobs/{job_id}",
-        auth=("admin", "integration-admin-password"),
-    )
-    assert g.status_code == 200
-    detail = g.json()
-    assert detail["job_id"] == job_id
-    assert detail["status"] == "completed"
-    assert len(detail["execution_trace"]) == 9
+    assert r.status_code == 410
+    assert r.json()["detail"]["error"] == "admin_endpoint_removed"
 
 
-def test_admin_post_synthesis_job_run_rejects_forbidden_key(
+def test_admin_post_synthesis_job_run_rejects_forbidden_key_with_410(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
@@ -92,5 +77,4 @@ def test_admin_post_synthesis_job_run_rejects_forbidden_key(
         },
         auth=("admin", "integration-admin-password"),
     )
-    assert r.status_code == 403
-    assert "error" in r.json()
+    assert r.status_code == 410

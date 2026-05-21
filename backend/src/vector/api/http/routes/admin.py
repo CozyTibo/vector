@@ -16,6 +16,10 @@ from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
 from vector.api.http.deps import get_db, settings_dep
+from vector.domains.cortex.execution.admin_deprecation import (
+    execution_admin_path_v1,
+    raise_admin_endpoint_gone,
+)
 from vector.contracts.admin import (
     AdminConnectionsResponse,
     AdminConnectorConnectLinkResponse,
@@ -2231,6 +2235,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         body: AdminCortexReasoningReconstructionEnqueueRequest,
     ) -> AdminCortexReasoningReconstructionEnqueueResponse:
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/reasoning/runtime/reconstruct",
+            replacement=execution_admin_path_v1("/restart?from_phase=TCRE"),
+            migration="TCRE enqueue runs only via execution slice AWAITING_TCRE (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.reasoning.runtime import enqueue_reconstruction_job_v1
 
@@ -2426,6 +2435,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexMaterializeTransformResponse:
         """Phase 03 Step 6 — run deterministic stub transform + persist field lineage."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/transform/materialize",
+            replacement=execution_admin_path_v1("/restart?from_phase=CANONICAL"),
+            migration="Admin never runs transforms; restart canonical execution slice (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.execution.execution_path_telemetry import (
             emit_admin_bypass_telemetry_v1,
@@ -2489,6 +2503,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexMaterializeBacklogResponse:
         """Route-routable ingested rows missing a materialization for ``bundle_id`` (batched; scopeable)."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog",
+            replacement=execution_admin_path_v1("/restart?from_phase=CANONICAL"),
+            migration="Parallel backlog drain removed; use execution restart (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.execution.execution_path_telemetry import (
             emit_admin_bypass_telemetry_v1,
@@ -2550,6 +2569,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexMaterializeBacklogAsyncResponse:
         """Enqueue Celery drain of routable backlog until idle (scopeable connector/resource_type filters)."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog-async",
+            replacement=execution_admin_path_v1("/restart?from_phase=CANONICAL"),
+            migration="Async backlog drain removed; use execution restart (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from app.tasks.cortex_canonical_materialize_backlog import (
             drain_stub_materialize_backlog_task,
@@ -3008,6 +3032,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexIdentityLegacyCeleryAsyncDispatchResponse:
         """Phase 04 Step 19 — enqueue legacy candidate regen Celery task + dispatch registry row."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/identity/link-candidates/regenerate-async",
+            replacement=execution_admin_path_v1("/restart?from_phase=IDENTITY"),
+            migration="Identity side jobs removed; restart identity execution slice (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from app.tasks.cortex_org_link_jobs import (
             CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES,
@@ -3047,6 +3076,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexIdentityLegacyCeleryAsyncDispatchResponse:
         """Phase 04 Step 19 — enqueue legacy authoritative replay hash Celery task + dispatch row."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/identity/authoritative-replay-async",
+            replacement=execution_admin_path_v1("/rerun?from_phase=IDENTITY"),
+            migration="Authoritative replay universe removed; use execution rerun from IDENTITY (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from app.tasks.cortex_org_link_jobs import (
             CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS,
@@ -3211,6 +3245,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexOrgLinkReplayJobDetailResponse:
         """Phase 04 Step 10 — run org link continuity replay / candidate regen (job + L-class receipts)."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/identity/replay-jobs/run",
+            replacement=execution_admin_path_v1("/rerun?from_phase=GRAPH"),
+            migration="Org link replay jobs removed; use execution rerun from GRAPH (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.identity.org_link_replay_runtime import (
             ORG_LINK_REPLAY_SCHEMA_VERSION,
@@ -3310,6 +3349,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexOrgLinkReplayJobEnqueueResponse:
         """Phase 04 Step 19 — queue org link replay / projection export job + Celery worker."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/identity/replay-jobs/enqueue",
+            replacement=execution_admin_path_v1("/rerun?from_phase=GRAPH"),
+            migration="Org link replay enqueue removed; use execution rerun from GRAPH (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
         from vector.domains.cortex.identity.org_link_replay_runtime import (
@@ -4093,6 +4137,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexIdentityContinuityRebuildResponse:
         """Deterministic Phase 04 continuity rebuild: materialize drain → repair → anchor backfill → candidates."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/identity/rebuild-continuity",
+            replacement=execution_admin_path_v1("/rerun?from_phase=IDENTITY"),
+            migration="Parallel identity rebuild removed; use execution rerun from IDENTITY (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.execution.execution_path_telemetry import (
             emit_admin_bypass_telemetry_v1,
@@ -4455,6 +4504,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexReplayJobDetailResponse:
         """Phase 03 Step 10 — pinned-bundle rebuild/regeneration with C0–C5 divergence receipts."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/replay-jobs/run",
+            replacement=execution_admin_path_v1("/rerun?from_phase=CANONICAL"),
+            migration="Canonical replay job FSM removed; use execution rerun from CANONICAL (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.execution.execution_path_telemetry import (
             emit_admin_bypass_telemetry_v1,
@@ -4561,6 +4615,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexReplayJobDetailResponse:
         """Resume a failed replay job using the stored deterministic process order (Phase 03 hardening)."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/replay-jobs/{job_id}/resume",
+            replacement=execution_admin_path_v1("/rerun?from_phase=CANONICAL"),
+            migration="Replay job resume removed; use execution rerun from CANONICAL (M8).",
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.canonical.replay_runtime import (
             REPLAY_RUNTIME_SCHEMA_VERSION,
@@ -5258,6 +5317,13 @@ def build_admin_router() -> APIRouter:
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexFlushAndRerunResponse:
         """Flush tenant Cortex state, rerun connectors, then substrate refresh through Phase 07 retrieval."""
+        raise_admin_endpoint_gone(
+            deprecated="/admin/tenants/{tenant_id}/cortex/ingestion/actions/flush-rerun-to-identity",
+            replacement=execution_admin_path_v1("/rerun?from_phase=CANONICAL&flush_all=true"),
+            migration=(
+                "Use execution rerun with flush_all=true, then trigger ingestion sync separately (M8)."
+            ),
+        )
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.execution.execution_path_telemetry import (
             emit_admin_bypass_telemetry_v1,
@@ -5404,6 +5470,10 @@ def build_admin_router() -> APIRouter:
     from vector.api.http.routes.admin_substrate_pipeline import register_substrate_pipeline_routes
 
     register_substrate_pipeline_routes(r)
+
+    from vector.api.http.routes.admin_cortex_execution import register_cortex_execution_routes
+
+    register_cortex_execution_routes(r)
 
     from vector.api.http.routes.admin_cortex_synthesis import register_cortex_synthesis_routes
 

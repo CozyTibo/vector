@@ -71,15 +71,16 @@ def test_admin_retrieval_index_rebuild_requires_confirmation(
         json={"confirmation_phrase": "wrong"},
         auth=("admin", "integration-admin-password"),
     )
-    assert bad.status_code == 403
-    assert bad.json()["error"] == "confirmation_phrase_invalid"
+    assert bad.status_code == 410
+    assert bad.json()["detail"]["error"] == "admin_endpoint_removed"
 
     ok = client.post(
         f"/admin/tenants/{tid}/cortex/retrieval/index/rebuild",
         json={"confirmation_phrase": RETRIEVAL_INDEX_REBUILD_CONFIRM_PHRASE_V1},
         auth=("admin", "integration-admin-password"),
     )
-    assert ok.status_code in (200, 400)
+    assert ok.status_code == 410
+    assert "execution/rerun" in ok.json()["detail"]["replacement"]
 
 
 def test_admin_retrieval_index_bootstrap_ok(
@@ -96,7 +97,5 @@ def test_admin_retrieval_index_bootstrap_ok(
         json={},
         auth=("admin", "integration-admin-password"),
     )
-    assert r.status_code == 200
-    body = r.json()
-    assert body["build_state"] == "PUBLISHED"
-    assert "index_epoch" in body
+    assert r.status_code == 410
+    assert "execution/restart" in r.json()["detail"]["replacement"]
