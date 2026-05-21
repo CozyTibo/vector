@@ -7,7 +7,6 @@ import time
 import uuid
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canonical.forward_progress.constants import (
@@ -44,6 +43,9 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PIPELINE_TRIGGER_POST_INGESTION,
     SUBSTRATE_PIPELINE_PHASE_ORDER,
 )
+from vector.domains.cortex.substrate_pipeline.canonical_phase_gate import (
+    canonical_needs_more_work_v1,
+)
 from vector.domains.cortex.substrate_pipeline.orchestrator import (
     finalize_pipeline_if_complete_v1,
     start_substrate_pipeline_run_v1,
@@ -57,37 +59,17 @@ from vector.domains.cortex.substrate_pipeline.phase_runners import (
     run_phase_07_retrieval_v1,
     run_phase_08_synthesis_v1,
 )
-from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
-    CortexCanonicalTransformMaterialization,
-)
 from vector.infrastructure.db.models.cortex_tenant_convergence_lease import CortexTenantConvergenceLease
-from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.settings import Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _untreated_raw_exists(session: Session, *, tenant_id: uuid.UUID) -> bool:
-    mat_exists = (
-        select(CortexCanonicalTransformMaterialization.id)
-        .where(
-            CortexCanonicalTransformMaterialization.tenant_id == tenant_id,
-            CortexCanonicalTransformMaterialization.raw_record_id == RawIngestionRecord.id,
-        )
-        .correlate(RawIngestionRecord)
-        .exists()
-    )
-    stmt = (
-        select(RawIngestionRecord.id)
-        .where(RawIngestionRecord.tenant_id == tenant_id, ~mat_exists)
-        .limit(1)
-    )
-    return session.execute(stmt).first() is not None
-
-
 def _canonical_pass_index_from_lease(lease: CortexTenantConvergenceLease) -> int:
     detail = lease.detail_json if isinstance(lease.detail_json, dict) else {}
     raw = detail.get("canonical_pass_index")
+    if raw is None:
+        return 0
     try:
         return max(0, int(raw))
     except (TypeError, ValueError):
@@ -112,22 +94,6 @@ def _store_pass_fairness_on_lease(lease: CortexTenantConvergenceLease, summary: 
     if isinstance(health, str) and health.strip():
         detail["convergence_health"] = health.strip()
     lease.detail_json = detail
-
-
-def _canonical_needs_more_work(session: Session, *, canonical_summary: dict[str, Any], tenant_id: uuid.UUID) -> bool:
-    if bool(canonical_summary.get("skipped")):
-        return False
-    outcome = str(canonical_summary.get("canonical_outcome") or "")
-    if outcome in (CANONICAL_OUTCOME_TOPOLOGY_WAIT, CANONICAL_OUTCOME_PARTIAL_PROGRESS):
-        return True
-    if bool(canonical_summary.get("progress_made")):
-        if bool(canonical_summary.get("slice_budget_exhausted")) or bool(
-            canonical_summary.get("candidate_more_remain")
-        ):
-            return True
-    if bool(canonical_summary.get("hit_slice_cap")) and bool(canonical_summary.get("progress_made")):
-        return True
-    return _untreated_raw_exists(session, tenant_id=tenant_id)
 
 
 def _resolve_start_phase(lease: CortexTenantConvergenceLease) -> str:
@@ -216,12 +182,13 @@ def run_tenant_convergence_v1(
                     pass_cooldowns=parse_pass_cooldown_until(lease_detail),
                     pass_stall_counts=parse_pass_topology_stall_counts(lease_detail),
                 )
-                summary = out.get("canonical_summary") if isinstance(out.get("canonical_summary"), dict) else {}
+                raw_summary = out.get("canonical_summary")
+                summary: dict[str, Any] = raw_summary if isinstance(raw_summary, dict) else {}
                 next_pass = summary.get("pass_index_next")
                 if isinstance(next_pass, int):
                     _store_canonical_pass_index_on_lease(lease, next_pass)
                 _store_pass_fairness_on_lease(lease, summary)
-                if _canonical_needs_more_work(session, canonical_summary=summary, tenant_id=tenant_id):
+                if canonical_needs_more_work_v1(session, canonical_summary=summary, tenant_id=tenant_id):
                     outcome = str(summary.get("canonical_outcome") or "")
                     progress_made = bool(summary.get("progress_made"))
                     if progress_made or outcome == CANONICAL_OUTCOME_PARTIAL_PROGRESS:

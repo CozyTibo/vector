@@ -21,6 +21,9 @@ from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_LEGACY,
     emit_execution_path_telemetry_v1,
 )
+from vector.domains.cortex.substrate_pipeline.canonical_phase_gate import (
+    evaluate_legacy_canonical_chain_gate_v1,
+)
 from vector.domains.cortex.substrate_pipeline.orchestrator import (
     chain_after_phase_v1,
     enqueue_next_pipeline_phase_v1,
@@ -130,6 +133,7 @@ def run_cortex_substrate_pipeline_phase_task(
         phase_id,
     )
     graph_hash = graph_projection_stable_hash
+    chain_gate: dict[str, Any] | None = None
     with session_scope() as session:
         if phase_id == PHASE_02_CANONICAL:
             out = run_phase_02_canonical_v1(
@@ -140,6 +144,33 @@ def run_cortex_substrate_pipeline_phase_task(
                 bundle_id=bundle_id,
                 batch_limit=batch_limit,
             )
+            chain_gate = evaluate_legacy_canonical_chain_gate_v1(
+                session,
+                tenant_id=tid,
+                pipeline_run_id=prid,
+                phase_output=out,
+                gate_enabled=settings.cortex_substrate_pipeline_canonical_chain_gate_enabled,
+            )
+            session.commit()
+            if chain_gate is not None and not chain_gate.get("may_chain"):
+                _LOGGER.info(
+                    "substrate_pipeline_phase_chain_blocked tenant_id=%s pipeline_run_id=%s "
+                    "phase=%s reason=%s",
+                    tenant_id,
+                    pipeline_run_id,
+                    phase_id,
+                    chain_gate.get("reason"),
+                )
+                return {
+                    "tenant_id": tenant_id,
+                    "pipeline_run_id": pipeline_run_id,
+                    "phase_id": phase_id,
+                    "output": out,
+                    "chained": False,
+                    "chain_blocked": True,
+                    "chain_block_reason": chain_gate.get("reason"),
+                    "canonical_chain_gate": chain_gate,
+                }
         elif phase_id == PHASE_03_IDENTITY:
             out = run_phase_03_identity_v1(
                 session,
@@ -196,7 +227,8 @@ def run_cortex_substrate_pipeline_phase_task(
         else:
             msg = f"unknown_phase:{phase_id}"
             raise ValueError(msg)
-        session.commit()
+        if phase_id != PHASE_02_CANONICAL:
+            session.commit()
 
     next_chain = chain_after_phase_v1(
         tenant_id=tid,

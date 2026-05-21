@@ -98,7 +98,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | Step | Action | Risk | Mitigation |
 |------|--------|------|------------|
 | **M0** | Feature telemetry: log `execution_path=convergence\|legacy\|progression\|admin_bypass` per tenant run | Low | **Done** — `execution/execution_path_telemetry.py`, structured log `cortex_execution_path` |
-| **M1** | **P0 determinism fix:** In `run_cortex_substrate_pipeline_phase_task`, do not call `chain_after_phase_v1` after phase 02 if phase status is `waiting` or `failed` with zero successes | Medium | Ship behind flag; convergence already correct |
+| **M1** | **P0 determinism fix:** In `run_cortex_substrate_pipeline_phase_task`, do not call `chain_after_phase_v1` after phase 02 if phase status is `waiting` or `failed` with zero successes | Medium | **Done** — `canonical_phase_gate.py`; flag `CORTEX_SUBSTRATE_PIPELINE_CANONICAL_CHAIN_GATE_ENABLED` (default true) |
 | **M2** | Force `cortex_convergence_runtime_enabled=true` everywhere; remove flag branch in `post_ingestion_refresh_dispatch` | Low | Already default in `celery_app.py` |
 | **M3** | Disable legacy beat: `cortex_convergence_disable_legacy_progression_beat=true` (already default); delete watchdog/progression beat entries | Low | Verify stall handling via lease |
 | **M4** | Stop enqueueing `run_cortex_substrate_pipeline_coordinator_task` from all callers; redirect to `enqueue_tenant_convergence_v1` | Medium | Grep all `schedule_substrate_pipeline_v1` |

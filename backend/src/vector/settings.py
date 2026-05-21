@@ -433,6 +433,14 @@ class Settings(BaseSettings):
             "watchdog beat tasks (sweeper is the only scheduler)."
         ),
     )
+    cortex_substrate_pipeline_canonical_chain_gate_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SUBSTRATE_PIPELINE_CANONICAL_CHAIN_GATE_ENABLED",
+        description=(
+            "M1: legacy Celery phase chain must not advance to identity when canonical is "
+            "waiting/failed with zero progress or canonical backlog remains."
+        ),
+    )
     cortex_canonical_forward_progress_max_batches_per_slice: int = Field(
         default=120,
         ge=1,
