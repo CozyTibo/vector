@@ -1,6 +1,6 @@
 # Cortex Admin Revamp Plan
 
-**Status:** Wave 0 signed off · Wave 1 complete (2026-05-21)  
+**Status:** Wave 0 signed off · Wave 1 complete · Wave 2 complete (2026-05-21)  
 **Scope:** `/admin/tenants/:tenantId/cortex/*` only (not workspace, integrations, or global admin)  
 **Authoritative execution model:** `DOCS/cortex/CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md` (M8 done)  
 **Substrate prerequisite:** `DOCS/cortex/CORTEX_TRUE_P0_SIGN_OFF.md` (signed off)  
@@ -588,13 +588,17 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 
 **Exit:** Operator cannot reach doctrine pages from nav; Overview has 3 POST action groups only; kept phase pages have no transform bypass POSTs (ingestion sync-only; identity `execution/rerun` shortcut allowed per §6).
 
-### Wave 2 — P1 Pipeline API + data model
+### Wave 2 — P1 Pipeline API + data model — **Done**
 
-1. Implement `pipeline/overview` + `pipeline/run`
-2. `PhasePageShell` + migrate Ingestion + Canonical
-3. Execution truth: finish `include_legacy_continuation` default-off everywhere
+1. [x] `GET/POST …/cortex/pipeline/overview` + `pipeline/run` (`admin_cortex_pipeline.py`, `pipeline_admin_overview.py`, `pipeline_admin_run.py`)
+2. [x] `PhasePageShell` + Ingestion + Canonical migrated (`pipeline/phases/{phase}/summary|explorer`)
+3. [x] `include_legacy_continuation` explicit on substrate progression GET (default `false`)
 
-**Exit:** All Overview/phase data from one overview contract; no bypass POSTs from frontend.
+**Backend:** `backend/src/vector/domains/cortex/pipeline/*`, contracts in `admin.py`, tests `test_admin_cortex_pipeline_overview.py`, `test_admin_cortex_pipeline_run.py`.
+
+**Frontend:** Overview + `PipelineActions` use pipeline API only; removed client-side `pipelinePhaseStatus.ts`.
+
+**Exit:** Overview and kept phase pages use one overview contract; Overview POSTs go through `pipeline/run` only (per-connector sync remains on Ingestion rows).
 
 ### Wave 3 — P2 Remaining phases + explorers
 
@@ -653,3 +657,4 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 | 2026-05-21 | Initial draft from operator revamp requirements |
 | 2026-05-21 | Wave 0 signed off; Wave 1 surface kill implemented (frontend + tests) |
 | 2026-05-21 | Wave 1 gap closure: ingestion/canonical/reconstruction bypass CTAs removed; static test gates extended |
+| 2026-05-21 | Wave 2: pipeline overview/run API, PhasePageShell, Ingestion + Canonical migration |

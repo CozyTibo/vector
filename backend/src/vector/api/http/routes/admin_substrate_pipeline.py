@@ -361,6 +361,7 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
         pipeline_run_id: Annotated[uuid.UUID | None, Query()] = None,
+        include_legacy_continuation: Annotated[bool, Query()] = False,
     ) -> dict[str, Any]:
         """Answer: did ingest propagate downstream (retrieval/synthesis materially updated)?"""
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
@@ -373,6 +374,7 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
             db,
             tenant_id=tenant_id,
             pipeline_run_id=pipeline_run_id,
+            include_legacy_continuation=include_legacy_continuation,
         )
 
     @r.post("/progression/continue")

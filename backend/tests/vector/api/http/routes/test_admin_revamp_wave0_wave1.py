@@ -25,7 +25,20 @@ def test_wave1_overview_no_flush_rerun_in_frontend() -> None:
     overview = (_frontend_admin() / "AdminCortexOverviewPage.tsx").read_text(encoding="utf-8")
     assert "flush-rerun-to-identity" not in overview
     assert "Replay all connectors" not in overview
-    assert "execution/rerun" in overview or "PipelineActions" in overview
+    assert "pipeline/overview" in overview
+    assert "PipelineActions" in overview
+
+
+def test_wave2_overview_uses_pipeline_api() -> None:
+    actions = (_frontend_admin() / "cortex/PipelineActions.tsx").read_text(encoding="utf-8")
+    assert "pipeline/run" in actions
+    assert "execution/rerun" not in actions
+    assert "execution/clear" not in actions
+    assert (_frontend_admin() / "cortex/PhasePageShell.tsx").is_file()
+    ingestion = (_frontend_admin() / "AdminCortexIngestionPage.tsx").read_text(encoding="utf-8")
+    shell = (_frontend_admin() / "cortex/PhasePageShell.tsx").read_text(encoding="utf-8")
+    assert "PhasePageShell" in ingestion
+    assert "pipeline/phases/${phase}/summary" in shell or "pipeline/phases/" in shell
 
 
 def test_wave1_deleted_doctrine_pages_absent() -> None:

@@ -19,25 +19,32 @@ export type PhaseOverview = {
   route: string;
 };
 
-export type ExecutionInspect = {
+export type PipelineOverviewPhase = {
+  phase: OperatorPhase;
+  status: PhaseStatus;
+  processed_count: number | null;
+  backlog_count: number | null;
+  last_success_at: string | null;
+  blockers: string[];
+};
+
+export type PipelineOverview = {
   tenant_id: string;
-  lease: {
-    status: string | null;
+  execution: {
     fsm_state: string | null;
     phase_cursor: string | null;
+    lease_status: string | null;
     block_reason_code: string | null;
-    block_detail?: string | null;
-  } | null;
-  progression: {
-    phase_status?: Record<string, string>;
-    active_phase?: string | null;
-    stop_reason?: string | null;
-    progression_class?: string | null;
-    execution_lease?: {
-      last_phase_receipt_outcome?: string | null;
-      last_phase_receipt_hash?: string | null;
-    } | null;
-  } | null;
+  };
+  phases: PipelineOverviewPhase[];
+  attention: string[];
+  scheduler?: {
+    env_scheduler_enabled: boolean;
+    paused_via_redis: boolean;
+    beat_interval_seconds: number;
+    min_gap_seconds: number;
+  };
+  runnable_connectors: string[];
 };
 
 export const OPERATOR_PHASES: Array<{ phase: OperatorPhase; label: string; route: string }> = [

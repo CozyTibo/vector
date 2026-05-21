@@ -4481,3 +4481,105 @@ class AdminCortexIngestionExhaustCoverageResponse(BaseModel):
     connector_expansion_roadmap_doc: str
     connectors: list[AdminCortexExhaustConnectorCoverage]
 
+
+class AdminCortexPipelinePhaseOverview(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    phase: Literal[
+        "ingestion",
+        "canonical",
+        "identity",
+        "graph",
+        "reconstruction",
+        "retrieval",
+        "synthesis",
+    ]
+    status: Literal["healthy", "running", "waiting", "blocked", "degraded"]
+    processed_count: int | None = None
+    backlog_count: int | None = None
+    last_success_at: str | None = None
+    blockers: list[str] = Field(default_factory=list)
+
+
+class AdminCortexPipelineExecutionSnapshot(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    fsm_state: str | None = None
+    phase_cursor: str | None = None
+    lease_status: str | None = None
+    block_reason_code: str | None = None
+
+
+class AdminCortexPipelineOverviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "pipeline_overview"
+    tenant_id: uuid.UUID
+    execution: AdminCortexPipelineExecutionSnapshot
+    phases: list[AdminCortexPipelinePhaseOverview]
+    attention: list[str] = Field(default_factory=list)
+    scheduler: AdminCortexGlobalScheduler | None = None
+    runnable_connectors: list[str] = Field(default_factory=list)
+
+
+class AdminCortexPipelineRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["from_ingestion", "from_phase", "flush_and_run"]
+    start_phase: Literal[
+        "canonical",
+        "identity",
+        "graph",
+        "reconstruction",
+        "retrieval",
+        "synthesis",
+    ] | None = None
+    flush_mode: Literal["all", "derived_only"] | None = None
+    confirmation: str | None = None
+
+
+class AdminCortexPipelineRunResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "pipeline_run"
+    mode: str
+    tenant_id: uuid.UUID
+    flush_mode: str | None = None
+    start_phase: str | None = None
+    connector_syncs: list[dict[str, Any]] | None = None
+    execution: dict[str, Any] | None = None
+    hint: str | None = None
+
+
+class AdminCortexPipelinePhaseSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "phase_summary"
+    phase: str
+    tenant_id: uuid.UUID
+    status: str
+    processed_count: int | None = None
+    backlog_count: int | None = None
+    last_success_at: str | None = None
+    blockers: list[str] = Field(default_factory=list)
+    connectors: list[dict[str, Any]] | None = None
+    checkpoints: list[dict[str, Any]] | None = None
+    health: dict[str, Any] | None = None
+    forward_progress: dict[str, Any] | None = None
+    failure_count: int | None = None
+    connector_rollups: list[dict[str, Any]] | None = None
+
+
+class AdminCortexPipelinePhaseExplorerResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "phase_explorer"
+    phase: str
+    tenant_id: uuid.UUID
+    columns: list[str]
+    items: list[dict[str, Any]]
+    truncated: bool = False
+    total: int = 0
+    limit: int = 50
+    offset: int = 0
+
