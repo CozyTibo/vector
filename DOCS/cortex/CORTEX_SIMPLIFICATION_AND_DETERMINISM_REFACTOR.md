@@ -102,7 +102,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | **M2** | Force `cortex_convergence_runtime_enabled=true` everywhere; remove flag branch in `post_ingestion_refresh_dispatch` | Low | **Done** — convergence-only dispatch; removed `cortex_convergence_runtime_enabled` setting; TCRE resume via convergence only |
 | **M3** | Disable legacy beat: `cortex_convergence_disable_legacy_progression_beat=true` (already default); delete watchdog/progression beat entries | Low | **Done** — beat = ingestion + convergence sweep only; removed `cortex_convergence_disable_legacy_progression_beat`; `verify_legacy_substrate_beats_absent_from_celery_beat_v1` |
 | **M4** | Stop enqueueing `run_cortex_substrate_pipeline_coordinator_task` from all callers; redirect to `enqueue_tenant_convergence_v1` | Medium | **Done** — `schedule_substrate_pipeline_v1` + legacy post-ingestion Celery task → dirty mark + convergence; coordinator deprecated (admin-only); `verify_schedule_substrate_pipeline_uses_convergence_v1` |
-| **M5** | Rename convergence → `execution` package; add FSM table or extend `CortexTenantConvergenceLease` with explicit `fsm_state` | Medium | DB migration |
+| **M5** | Rename convergence → `execution` package; add FSM table or extend `CortexTenantConvergenceLease` with explicit `fsm_state` | Medium | **Done** — `execution/` package; lease `fsm_state` + `block_*`; `cortex_execution_transition_log`; `CortexTenantExecution` alias; `convergence/` re-export shims |
 | **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | Dual-run in staging only |
 | **M7** | Delete `substrate_operational_progression.py` and callers; migrate retrieval retry to FSM `BLOCKED` + manual/admin rerun | High | Document operator playbook |
 | **M8** | Collapse admin execution endpoints (section 5) | Medium | Deprecation period with 410 + replacement routes |
@@ -665,7 +665,7 @@ app/tasks/
 | Week | Deliverable |
 |------|-------------|
 | W1 | M1 P0 gate fix + M2 force convergence + telemetry |
-| W2 | **M4 done**; M5 FSM schema + transition log |
+| W2 | **M4–M5 done**; M6 single slice Celery task |
 | W3 | FSM schema + transition log + engine package skeleton |
 | W4 | M6 single slice task; delete phase chain |
 | W5 | M7 progression delete; M8 admin deprecation |

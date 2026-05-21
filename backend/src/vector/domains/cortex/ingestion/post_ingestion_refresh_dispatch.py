@@ -6,8 +6,8 @@ import logging
 import uuid
 from typing import Any
 
-from vector.domains.cortex.convergence.enqueue import enqueue_tenant_convergence_v1
-from vector.domains.cortex.convergence.lease import mark_tenant_dirty_v1
+from vector.domains.cortex.execution.enqueue import enqueue_tenant_convergence_v1
+from vector.domains.cortex.execution.lease import mark_tenant_dirty_v1
 from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_CONVERGENCE,
     emit_execution_path_telemetry_v1,

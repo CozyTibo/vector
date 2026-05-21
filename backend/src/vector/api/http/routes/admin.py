@@ -1532,7 +1532,7 @@ def build_admin_router() -> APIRouter:
     ) -> AdminSlackChannelsIngestApplyResponse:
         """Join selected public channels, persist ingest policy for subsequent syncs."""
         _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.convergence.lease import mark_tenant_dirty_v1
+        from vector.domains.cortex.execution.lease import mark_tenant_dirty_v1
         from vector.domains.cortex.connectors.slack.channel_ingest import (
             apply_slack_ingest_channel_selection,
             enqueue_slack_ingest_after_channel_apply,

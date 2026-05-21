@@ -8,8 +8,6 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.convergence.enqueue import enqueue_tenant_convergence_v1
-from vector.domains.cortex.convergence.lease import mark_tenant_dirty_v1
 from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_CONVERGENCE,
     emit_execution_path_telemetry_v1,
@@ -54,6 +52,9 @@ def schedule_substrate_pipeline_v1(
     reason: str = "ingestion",
 ) -> dict[str, Any]:
     """Mark tenant dirty and enqueue convergence (M4: no legacy coordinator/debounce/revoke)."""
+    from vector.domains.cortex.execution.enqueue import enqueue_tenant_convergence_v1
+    from vector.domains.cortex.execution.lease import mark_tenant_dirty_v1
+
     cfg = settings or get_settings()
     if not cfg.cortex_post_ingestion_substrate_refresh_enabled:
         return {"scheduled": False, "reason": "disabled"}
@@ -270,7 +271,7 @@ def on_tcre_job_completed_for_pipeline_v1(
     if tcre_job_id is None:
         return None
 
-    from vector.domains.cortex.convergence.tcre_resume import on_tcre_completed_for_convergence_v1
+    from vector.domains.cortex.execution.tcre_resume import on_tcre_completed_for_convergence_v1
 
     return on_tcre_completed_for_convergence_v1(
         session,

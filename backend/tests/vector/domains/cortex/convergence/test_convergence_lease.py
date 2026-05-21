@@ -7,12 +7,14 @@ import uuid
 import pytest
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.convergence.constants import (
+from vector.domains.cortex.execution.tenant_constants import (
+    FSM_CANONICAL_DRAINING,
+    FSM_IDLE,
     LEASE_STATUS_DIRTY,
     LEASE_STATUS_IDLE,
     LEASE_STATUS_RUNNING,
 )
-from vector.domains.cortex.convergence.lease import (
+from vector.domains.cortex.execution.lease import (
     complete_convergence_lease_v1,
     mark_tenant_dirty_v1,
     try_acquire_convergence_lease_v1,
@@ -41,6 +43,7 @@ def test_mark_dirty_bumps_epoch_and_acquire(db_session: Session, convergence_ten
     dirty = mark_tenant_dirty_v1(db_session, tenant_id=convergence_tenant_id, reason="test")
     assert dirty["obligation_epoch"] == 1
     assert dirty["status"] == LEASE_STATUS_DIRTY
+    assert dirty["fsm_state"] == FSM_CANONICAL_DRAINING
 
     lease, block = try_acquire_convergence_lease_v1(db_session, tenant_id=convergence_tenant_id)
     assert block == ""
@@ -50,6 +53,7 @@ def test_mark_dirty_bumps_epoch_and_acquire(db_session: Session, convergence_ten
 
     complete_convergence_lease_v1(db_session, lease=lease)
     assert lease.status == LEASE_STATUS_IDLE
+    assert lease.fsm_state == FSM_IDLE
 
     mark_tenant_dirty_v1(db_session, tenant_id=convergence_tenant_id, reason="second")
     lease2, block2 = try_acquire_convergence_lease_v1(db_session, tenant_id=convergence_tenant_id)

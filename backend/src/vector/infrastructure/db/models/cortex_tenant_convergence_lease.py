@@ -1,4 +1,4 @@
-"""Durable convergence ownership per tenant (Postgres-authoritative)."""
+"""Durable tenant execution ownership per tenant (Postgres-authoritative; M5 FSM)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ from vector.infrastructure.db.base import Base
 
 
 class CortexTenantConvergenceLease(Base):
+    """Per-tenant execution lease row (table name retained for migration compatibility)."""
+
     __tablename__ = "cortex_tenant_convergence_leases"
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -30,6 +32,9 @@ class CortexTenantConvergenceLease(Base):
         nullable=True,
     )
     phase_cursor: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    fsm_state: Mapped[str] = mapped_column(String(64), nullable=False, server_default="IDLE")
+    block_reason_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    block_detail: Mapped[str | None] = mapped_column(Text(), nullable=True)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -49,3 +54,7 @@ class CortexTenantConvergenceLease(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+# M5 alias — plan target name; ORM maps to cortex_tenant_convergence_leases until table rename.
+CortexTenantExecution = CortexTenantConvergenceLease

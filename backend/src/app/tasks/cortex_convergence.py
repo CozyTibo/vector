@@ -11,8 +11,8 @@ from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_CONVERGENCE,
     emit_execution_path_telemetry_v1,
 )
-from vector.domains.cortex.convergence.run_convergence import run_tenant_convergence_v1
-from vector.domains.cortex.convergence.sweep import run_convergence_sweep_v1
+from vector.domains.cortex.execution.run_tenant_execution import run_tenant_convergence_v1
+from vector.domains.cortex.execution.sweep import run_convergence_sweep_v1
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
 

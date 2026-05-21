@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vector.domains.cortex.convergence.scheduling import (
+from vector.domains.cortex.execution.scheduling import (
     verify_schedule_substrate_pipeline_uses_convergence_v1,
 )
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vector.domains.cortex.convergence.scheduling import (
+from vector.domains.cortex.execution.scheduling import (
     CELERY_CONVERGENCE_SWEEP_BEAT_KEY_V1,
     LEGACY_SUBSTRATE_BEAT_TASK_NAMES_V1,
     verify_convergence_sweep_in_celery_beat_v1,

@@ -40,8 +40,12 @@ from vector.infrastructure.db.models.cortex_substrate_pipeline_run import (
 from vector.infrastructure.db.models.cortex_canonical_materialization_deferral import (
     CortexCanonicalMaterializationDeferral,
 )
+from vector.infrastructure.db.models.cortex_execution_transition_log import (
+    CortexExecutionTransitionLog,
+)
 from vector.infrastructure.db.models.cortex_tenant_convergence_lease import (
     CortexTenantConvergenceLease,
+    CortexTenantExecution,
 )
 from vector.infrastructure.db.models.cortex_synthesis_activation_audit import (
     CortexSynthesisActivationAudit,
@@ -146,7 +150,9 @@ __all__ = [
     "CortexSubstratePhaseRun",
     "CortexSubstratePipelineRun",
     "CortexCanonicalMaterializationDeferral",
+    "CortexExecutionTransitionLog",
     "CortexTenantConvergenceLease",
+    "CortexTenantExecution",
     "CortexRetrievalIndexEntry",
     "CortexRetrievalIndexEpoch",
     "CortexPhase09ReadinessSignoff",

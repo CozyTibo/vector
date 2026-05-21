@@ -14,6 +14,8 @@ The substrate **production path** is now:
 
 **M4:** `schedule_substrate_pipeline_v1` and the legacy post-ingestion Celery task redirect to convergence (dirty lease + worker). Legacy coordinator remains **admin/break-glass only** (deprecated log). Beat-driven progression/watchdog beats removed (M3).
 
+**M5:** Runtime code lives under `vector.domains.cortex.execution` (lease + FSM + worker). `cortex_tenant_convergence_leases` gained `fsm_state` / `block_*`; append-only `cortex_execution_transition_log`. `vector.domains.cortex.convergence` is a deprecated re-export shim.
+
 **One owner per concern (target state):**
 
 | Concern | Authoritative owner |

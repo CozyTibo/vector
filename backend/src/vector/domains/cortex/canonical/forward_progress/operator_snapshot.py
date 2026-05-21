@@ -19,7 +19,7 @@ from vector.domains.cortex.canonical.forward_progress.candidate_selection import
     list_untreated_routable_count_estimate,
 )
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
-from vector.domains.cortex.convergence.lease import get_convergence_lease_v1
+from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1 as get_convergence_lease_v1
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_02_CANONICAL
 from vector.domains.cortex.substrate_pipeline.repository import get_phase_run_v1
 from vector.infrastructure.db.models.cortex_canonical_materialization_deferral import (
