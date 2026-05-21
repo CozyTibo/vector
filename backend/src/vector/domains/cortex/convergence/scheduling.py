@@ -18,20 +18,17 @@ def _env_flag(name: str, *, default: str = "true") -> bool:
 
 
 def convergence_runtime_authoritative_v1(settings: Settings | None = None) -> bool:
-    """True when Postgres lease + sweeper replace legacy debounce coordinator scheduling.
+    """True when convergence sweeper is on and legacy progression/watchdog beats are disabled.
 
-    Uses ``os.environ`` when *settings* is omitted so static gates match ``celery_app`` beat
-    construction without requiring a full Settings load (e.g. in unit tests).
+    Post-ingestion substrate refresh always uses the convergence lease (M2). Uses ``os.environ``
+    when *settings* is omitted so static gates match ``celery_app`` beat construction.
     """
     if settings is None:
-        return (
-            _env_flag("CORTEX_CONVERGENCE_RUNTIME_ENABLED")
-            and _env_flag("CORTEX_CONVERGENCE_SWEEPER_ENABLED")
-            and _env_flag("CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT")
+        return _env_flag("CORTEX_CONVERGENCE_SWEEPER_ENABLED") and _env_flag(
+            "CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT"
         )
     return bool(
-        settings.cortex_convergence_runtime_enabled
-        and settings.cortex_convergence_sweeper_enabled
+        settings.cortex_convergence_sweeper_enabled
         and settings.cortex_convergence_disable_legacy_progression_beat
     )
 

@@ -22,7 +22,6 @@ from vector.domains.cortex.substrate_pipeline.constants import (
 )
 from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_LEGACY,
-    EXECUTION_PATH_PROGRESSION,
     emit_execution_path_telemetry_v1,
 )
 from vector.domains.cortex.substrate_pipeline.repository import (
@@ -343,48 +342,15 @@ def on_tcre_job_completed_for_pipeline_v1(
     if tcre_job_id is None:
         return None
 
-    cfg = get_settings()
-    if cfg.cortex_convergence_runtime_enabled:
-        from vector.domains.cortex.convergence.tcre_resume import on_tcre_completed_for_convergence_v1
+    from vector.domains.cortex.convergence.tcre_resume import on_tcre_completed_for_convergence_v1
 
-        return on_tcre_completed_for_convergence_v1(
-            session,
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-            tcre_job_id=tcre_job_id,
-            tcre_job_status=tcre_job_status,
-        )
-
-    from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-        resume_pipeline_after_tcre_completion_v1,
-    )
-
-    resume_out = resume_pipeline_after_tcre_completion_v1(
+    return on_tcre_completed_for_convergence_v1(
         session,
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,
         tcre_job_id=tcre_job_id,
         tcre_job_status=tcre_job_status,
     )
-    from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
-        PROGRESSION_TRIGGER_TCRE_COMPLETED_V1,
-        continue_substrate_operational_progression_v1,
-    )
-
-    emit_execution_path_telemetry_v1(
-        tenant_id=tenant_id,
-        execution_path=EXECUTION_PATH_PROGRESSION,
-        trigger=PROGRESSION_TRIGGER_TCRE_COMPLETED_V1,
-        pipeline_run_id=pipeline_run_id,
-        detail={"hook": "on_tcre_job_completed_for_pipeline_v1"},
-    )
-    progression = continue_substrate_operational_progression_v1(
-        session,
-        tenant_id=tenant_id,
-        pipeline_run_id=pipeline_run_id,
-        trigger=PROGRESSION_TRIGGER_TCRE_COMPLETED_V1,
-    )
-    return {**resume_out, "progression": progression}
 
 
 def finalize_pipeline_if_complete_v1(

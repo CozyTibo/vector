@@ -29,7 +29,7 @@ def run_substrate_continuity_watchdog_task() -> dict[str, Any]:
     from vector.settings import get_settings
 
     cfg = get_settings()
-    if cfg.cortex_convergence_runtime_enabled and cfg.cortex_convergence_disable_legacy_progression_beat:
+    if cfg.cortex_convergence_disable_legacy_progression_beat:
         return {"skipped": True, "reason": "convergence_runtime_authoritative"}
 
     threshold = get_watchdog_stall_threshold_seconds_v1()

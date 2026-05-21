@@ -29,8 +29,6 @@ def run_tenant_convergence_task(
     reason: str = "worker",
 ) -> dict[str, Any]:
     cfg = get_settings()
-    if not cfg.cortex_convergence_runtime_enabled:
-        return {"skipped": True, "reason": "convergence_runtime_disabled"}
     tid = uuid.UUID(tenant_id)
     emit_execution_path_telemetry_v1(
         tenant_id=tid,
@@ -55,8 +53,6 @@ def run_tenant_convergence_task(
 @celery_app.task(name=_TASK_SWEEP, queue="vector")
 def run_convergence_sweep_task() -> dict[str, Any]:
     cfg = get_settings()
-    if not cfg.cortex_convergence_runtime_enabled:
-        return {"skipped": True, "reason": "convergence_runtime_disabled"}
     if not cfg.cortex_convergence_sweeper_enabled:
         return {"skipped": True, "reason": "sweeper_disabled"}
     _LOGGER.info("convergence_sweep_start")

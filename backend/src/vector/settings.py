@@ -380,14 +380,6 @@ class Settings(BaseSettings):
             "is active."
         ),
     )
-    cortex_convergence_runtime_enabled: bool = Field(
-        default=True,
-        validation_alias="CORTEX_CONVERGENCE_RUNTIME_ENABLED",
-        description=(
-            "Use Postgres convergence lease + worker as authoritative substrate progression "
-            "(replaces revoke/debounce coordinator scheduling)."
-        ),
-    )
     cortex_convergence_sweeper_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_CONVERGENCE_SWEEPER_ENABLED",
@@ -429,8 +421,8 @@ class Settings(BaseSettings):
         default=True,
         validation_alias="CORTEX_CONVERGENCE_DISABLE_LEGACY_PROGRESSION_BEAT",
         description=(
-            "When convergence runtime is enabled, skip legacy progression tick and continuity "
-            "watchdog beat tasks (sweeper is the only scheduler)."
+            "Skip legacy progression tick and continuity watchdog beat tasks; convergence "
+            "sweeper is the substrate scheduler (post-ingestion always uses convergence lease)."
         ),
     )
     cortex_substrate_pipeline_canonical_chain_gate_enabled: bool = Field(

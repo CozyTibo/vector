@@ -77,17 +77,18 @@ def test_post_ingestion_convergence_dispatch_includes_execution_path() -> None:
         (),
         {
             "cortex_post_ingestion_substrate_refresh_enabled": True,
-            "cortex_convergence_runtime_enabled": True,
         },
     )()
     with (
         patch(
-            "vector.domains.cortex.convergence.lease.mark_tenant_dirty_v1",
+            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_tenant_dirty_v1",
             return_value={"obligation_epoch": 1, "status": "dirty"},
         ),
-        patch("vector.infrastructure.db.session.session_scope"),
         patch(
-            "vector.domains.cortex.convergence.enqueue.enqueue_tenant_convergence_v1",
+            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.session_scope",
+        ),
+        patch(
+            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.enqueue_tenant_convergence_v1",
             return_value={"enqueued": True, "celery_task_id": "t1"},
         ),
     ):
@@ -99,35 +100,3 @@ def test_post_ingestion_convergence_dispatch_includes_execution_path() -> None:
     assert out["execution_path"] == EXECUTION_PATH_CONVERGENCE
     assert out["execution_path_telemetry"]["execution_path"] == EXECUTION_PATH_CONVERGENCE
 
-
-def test_post_ingestion_legacy_dispatch_includes_execution_path() -> None:
-    from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
-        schedule_post_ingestion_substrate_refresh,
-    )
-
-    tenant_id = uuid.uuid4()
-    cfg = type(
-        "Cfg",
-        (),
-        {
-            "cortex_post_ingestion_substrate_refresh_enabled": True,
-            "cortex_convergence_runtime_enabled": False,
-            "cortex_post_ingestion_substrate_refresh_debounce_seconds": 30,
-            "cortex_post_ingestion_canonical_batch_limit": 100,
-        },
-    )()
-    with patch(
-        "vector.domains.cortex.substrate_pipeline.orchestrator.schedule_substrate_pipeline_v1",
-        return_value={
-            "scheduled": True,
-            "celery_task_id": "legacy-1",
-            "schedule_action": "enqueue",
-        },
-    ):
-        out = schedule_post_ingestion_substrate_refresh(
-            tenant_id=tenant_id,
-            settings=cfg,
-            reason="incremental_sync_complete",
-        )
-    assert out["execution_path"] == EXECUTION_PATH_LEGACY
-    assert out["execution_path_telemetry"]["execution_path"] == EXECUTION_PATH_LEGACY

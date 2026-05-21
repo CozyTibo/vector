@@ -8,26 +8,25 @@ from unittest.mock import patch
 from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
     schedule_post_ingestion_substrate_refresh,
 )
-def test_post_ingestion_uses_convergence_path_when_enabled() -> None:
+def test_post_ingestion_uses_convergence_path() -> None:
     tenant_id = uuid.uuid4()
     cfg = type(
         "Cfg",
         (),
         {
             "cortex_post_ingestion_substrate_refresh_enabled": True,
-            "cortex_convergence_runtime_enabled": True,
         },
     )()
     with (
         patch(
-            "vector.domains.cortex.convergence.lease.mark_tenant_dirty_v1",
+            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_tenant_dirty_v1",
             return_value={"obligation_epoch": 1, "status": "dirty"},
         ) as mark_dirty,
         patch(
-            "vector.infrastructure.db.session.session_scope",
+            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.session_scope",
         ) as scope,
         patch(
-            "vector.domains.cortex.convergence.enqueue.enqueue_tenant_convergence_v1",
+            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.enqueue_tenant_convergence_v1",
             return_value={"enqueued": True, "celery_task_id": "t1"},
         ) as enqueue,
     ):
