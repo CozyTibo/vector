@@ -34,6 +34,12 @@ input → deterministic transform → explicit output → gate
 | **6** | **Done** | No `canonical_pass_index` / pass cooldowns on execution lease; slice-local drain only |
 | **7** | **Done** | Determinism repair removed from phase 02 runner; admin `run_canonical_determinism_repair_v1` + execution `/rerun?run_determinism_repair=` |
 
+## Implementation progress (P1)
+
+| Step | Status | Summary |
+|------|--------|---------|
+| **8** | **Done** | Phase 03 single `run_identity_substrate_projection_for_pipeline_v1`; no audit replay job on execution hot path |
+
 ### P0 step 1 — done (2026-05-21)
 
 | Change | Detail |
@@ -103,6 +109,16 @@ input → deterministic transform → explicit output → gate
 | `execution_rerun_v1` | Optional `run_determinism_repair` runs repair before clear+restart when requested |
 | `POST .../execution/rerun` | Query param `run_determinism_repair` (default false) |
 | CI guard | `verify_p0_step7_determinism_repair_off_hot_path_v1` + `test_p0_step7_determinism_repair_off_hot_path.py` |
+
+### P1 step 8 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `run_identity_substrate_projection_for_pipeline_v1` | Single phase-03 entry: refresh handles/candidates + inline audit receipt |
+| `build_identity_substrate_projection_receipt_v1` | Receipt JSON without `CortexOrgLinkReplayJob` row |
+| `run_phase_03_identity_v1` | Calls projection helper only; dropped `identity_substrate_audit_replay_job_id` |
+| `finalize_identity_substrate_operator_audit` | Retained for admin/ingest paths that still persist audit replay job rows |
+| CI guard | `verify_p1_step8_identity_projection_boundary_v1` + `test_p1_step8_identity_projection.py` |
 
 ---
 
@@ -389,7 +405,7 @@ gate: untreated_routable_count == 0 → pass
 | Control plane, readiness economics | certification |
 | Worker dispatch | Celery org link jobs |
 | `anchor_limit=5000` | hidden cap |
-| Phase runner creates replay job for audit | `identity_substrate_audit_replay_job_id` |
+| Phase runner creates replay job for audit | **Removed P1 step 8** — `run_identity_substrate_projection_for_pipeline_v1` |
 
 ## C. COMPLEXITY CLASSIFICATION
 
@@ -879,7 +895,7 @@ flowchart LR
 | `pipeline_continuation` write paths | 06, 05, 08 |
 | Synthesis activation inside phase 07 runner | 07 |
 | Determinism repair in every canonical slice | 02 |
-| Identity audit replay job enqueue | 03 |
+| Identity audit replay job enqueue | 03 — **done P1 step 8** (execution path) |
 | Verification slice in graph runner | 04 |
 | Explainability panel in traversal pass | 05 |
 | `enforce_phase06_progression_law` in runner | 06 |

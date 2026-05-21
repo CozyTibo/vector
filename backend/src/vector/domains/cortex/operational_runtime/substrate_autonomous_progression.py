@@ -257,6 +257,7 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         verify_p0_step5_canonical_single_drain_v1,
         verify_p0_step6_no_pass_fairness_on_lease_v1,
         verify_p0_step7_determinism_repair_off_hot_path_v1,
+        verify_p1_step8_identity_projection_boundary_v1,
     )
 
     errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
@@ -265,6 +266,13 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
     errors.extend(verify_p0_step5_canonical_single_drain_v1())
     errors.extend(verify_p0_step6_no_pass_fairness_on_lease_v1())
     errors.extend(verify_p0_step7_determinism_repair_off_hot_path_v1())
+    errors.extend(verify_p1_step8_identity_projection_boundary_v1())
+
+    p03_src = inspect.getsource(runners_mod.run_phase_03_identity_v1)
+    if "finalize_identity_substrate_operator_audit" in p03_src:
+        errors.append("phase03_runner_must_not_call_finalize_identity_substrate_operator_audit_p1_step8")
+    if "run_identity_substrate_projection_for_pipeline_v1" not in p03_src:
+        errors.append("phase03_runner_must_call_identity_projection_for_pipeline_p1_step8")
 
     p02_src = inspect.getsource(runners_mod.run_phase_02_canonical_v1)
     if "drain_stub_materialize_backlog" in p02_src:

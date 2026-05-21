@@ -206,6 +206,30 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_p1_step8_identity_projection_boundary_v1() -> list[str]:
+    """Return error codes if phase 03 still enqueues identity audit replay jobs (P1 step 8)."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p03 = inspect.getsource(pr_mod.run_phase_03_identity_v1)
+    if "finalize_identity_substrate_operator_audit" in p03:
+        errors.append("phase03_still_calls_finalize_identity_substrate_operator_audit")
+    if "identity_substrate_audit_replay_job_id" in p03:
+        errors.append("phase03_still_exports_audit_replay_job_id")
+    if "execute_org_link_replay_job" in p03:
+        errors.append("phase03_still_calls_org_link_replay_job")
+    if "run_identity_substrate_projection_for_pipeline_v1" not in p03:
+        errors.append("phase03_missing_run_identity_substrate_projection_for_pipeline_v1")
+
+    from vector.domains.cortex.identity import continuity_rebuild as id_mod
+
+    if not callable(getattr(id_mod, "run_identity_substrate_projection_for_pipeline_v1", None)):
+        errors.append("missing_run_identity_substrate_projection_for_pipeline_v1")
+    if not callable(getattr(id_mod, "build_identity_substrate_projection_receipt_v1", None)):
+        errors.append("missing_build_identity_substrate_projection_receipt_v1")
+    return errors
+
+
 def verify_p0_step7_determinism_repair_off_hot_path_v1() -> list[str]:
     """Return error codes if phase 02 still runs determinism repair inline (P0 step 7)."""
     errors: list[str] = []

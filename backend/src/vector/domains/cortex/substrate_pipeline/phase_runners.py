@@ -9,11 +9,7 @@ from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canonical.forward_progress.drain_runtime import drain_forward_progress_backlog
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
-from vector.domains.cortex.identity.continuity_rebuild import (
-    finalize_identity_substrate_operator_audit,
-    run_identity_handles_and_candidates_refresh,
-    substrate_counts,
-)
+from vector.domains.cortex.identity.continuity_rebuild import run_identity_substrate_projection_for_pipeline_v1
 from vector.domains.cortex.identity.org_link_replay_runtime import execute_org_link_replay_job
 from vector.domains.cortex.reasoning.runtime import enqueue_reconstruction_job_v1
 from vector.domains.cortex.retrieval.retrieval_index_materialization import (
@@ -128,26 +124,13 @@ def run_phase_03_identity_v1(
         out = {"skipped": True, "reason": "no_bundle"}
         complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_03_IDENTITY, output=out)
         return out
-    counts_before = substrate_counts(session, tenant_id=tenant_id)
-    identity_continuity = run_identity_handles_and_candidates_refresh(
-        session,
-        tenant_id=tenant_id,
-        dry_run=False,
-        anchor_limit=5_000,
-    )
-    audit_report, audit_job_id = finalize_identity_substrate_operator_audit(
+    out = run_identity_substrate_projection_for_pipeline_v1(
         session,
         tenant_id=tenant_id,
         bundle_id=bid,
-        substrate=identity_continuity,
         substrate_trigger=identity_substrate_trigger,
-        counts_before=counts_before,
+        anchor_limit=5_000,
     )
-    out = {
-        "identity_continuity_substrate": identity_continuity,
-        "identity_substrate_audit": audit_report,
-        "identity_substrate_audit_replay_job_id": str(audit_job_id),
-    }
     complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_03_IDENTITY, output=out)
     return out
 

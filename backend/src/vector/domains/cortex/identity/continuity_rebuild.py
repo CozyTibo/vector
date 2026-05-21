@@ -58,7 +58,7 @@ def run_identity_handles_and_candidates_refresh(
     return {**bf, "candidate_regeneration": cand, "identity_continuity_substrate_pipeline": "v1"}
 
 
-def finalize_identity_substrate_operator_audit(
+def build_identity_substrate_projection_receipt_v1(
     db: Session,
     *,
     tenant_id: uuid.UUID,
@@ -66,8 +66,8 @@ def finalize_identity_substrate_operator_audit(
     substrate: dict[str, Any],
     substrate_trigger: str,
     counts_before: dict[str, int] | None = None,
-) -> tuple[dict[str, Any], uuid.UUID]:
-    """Persist the same replay-job + L0 receipt envelope as admin continuity rebuild (substrate-only)."""
+) -> dict[str, Any]:
+    """Deterministic phase-03 receipt JSON — no org-link replay job row (P1 step 8)."""
     cand = substrate.get("candidate_regeneration") or {}
     auth_sha = compute_authoritative_link_set_sha256(db, tenant_id=tenant_id)
     after = substrate_counts(db, tenant_id=tenant_id)
@@ -76,7 +76,7 @@ def finalize_identity_substrate_operator_audit(
         for k, v in substrate.items()
         if k not in ("candidate_regeneration", "identity_continuity_substrate_pipeline")
     }
-    report: dict[str, Any] = {
+    return {
         "continuity_rebuild_schema_version": CONTINUITY_REBUILD_SCHEMA_VERSION,
         "engine_build_ref": CONTINUITY_REBUILD_ENGINE_BUILD_REF,
         "org_link_replay_schema_version": ORG_LINK_REPLAY_SCHEMA_VERSION,
@@ -97,6 +97,59 @@ def finalize_identity_substrate_operator_audit(
         "replay_lane": "anchor_continuity",
         "counts_after": after,
     }
+
+
+def run_identity_substrate_projection_for_pipeline_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    substrate_trigger: str,
+    anchor_limit: int = 5_000,
+) -> dict[str, Any]:
+    """Single phase-03 transform: handles/candidates refresh + inline audit receipt (no replay job)."""
+    counts_before = substrate_counts(db, tenant_id=tenant_id)
+    substrate = run_identity_handles_and_candidates_refresh(
+        db,
+        tenant_id=tenant_id,
+        dry_run=False,
+        anchor_limit=anchor_limit,
+    )
+    audit = build_identity_substrate_projection_receipt_v1(
+        db,
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        substrate=substrate,
+        substrate_trigger=substrate_trigger,
+        counts_before=counts_before,
+    )
+    return {
+        "identity_continuity_substrate": substrate,
+        "identity_substrate_audit": audit,
+        "anchor_limit_applied": anchor_limit,
+        "counts_before": counts_before,
+        "counts_after": audit.get("counts_after"),
+    }
+
+
+def finalize_identity_substrate_operator_audit(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    substrate: dict[str, Any],
+    substrate_trigger: str,
+    counts_before: dict[str, int] | None = None,
+) -> tuple[dict[str, Any], uuid.UUID]:
+    """Admin/ingest path: same receipt plus durable org-link replay job audit row."""
+    report = build_identity_substrate_projection_receipt_v1(
+        db,
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        substrate=substrate,
+        substrate_trigger=substrate_trigger,
+        counts_before=counts_before,
+    )
     audit_jid = uuid.uuid4()
     report["audit_replay_job_id"] = str(audit_jid)
     _persist_standalone_audit_job(db, tenant_id=tenant_id, bundle_id=bundle_id.strip(), report=dict(report), job_id=audit_jid)
