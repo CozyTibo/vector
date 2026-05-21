@@ -117,6 +117,7 @@ def drain_forward_progress_backlog(
     last_batch_meta: dict[str, Any] = {}
     candidate_more_remain = False
     raw_batch: dict[str, Any] = {}
+    drain_candidate_raw_ids: list[int] = []
 
     release_deferrals_with_materialized_parents(db, tenant_id=tenant_id, bundle_id=bundle_id)
 
@@ -281,6 +282,25 @@ def drain_forward_progress_backlog(
         full_rotation_topology_stall=full_rotation_topology_stall,
     )
 
+    from vector.domains.cortex.canonical.forward_progress.canonical_drain_receipt import (
+        build_canonical_drain_receipt_hash_v1,
+    )
+    from vector.domains.cortex.reasoning.reasoning_receipts_proof_artifacts import (
+        hash_reasoning_canonical_json_sha256_v1,
+    )
+
+    deferral_snapshot_id = hash_reasoning_canonical_json_sha256_v1(deferral_counts)[:32]
+    canonical_receipt_hash = build_canonical_drain_receipt_hash_v1(
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        canonical_outcome=canonical_outcome,
+        total_succeeded=total_succeeded,
+        total_failed_rows=total_failed_rows,
+        batches_run=batches_run,
+        batch_ids=drain_candidate_raw_ids,
+        deferral_snapshot_id=deferral_snapshot_id,
+    )
+
     return {
         "forward_progress_schema_version": FORWARD_PROGRESS_SCHEMA_VERSION,
         "transform_runtime_schema_version": raw_batch.get("transform_runtime_schema_version")
@@ -310,8 +330,10 @@ def drain_forward_progress_backlog(
         "topology_wait": canonical_outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT,
         "zero_progress_spin_detected": full_rotation_topology_stall and total_succeeded == 0,
         "canonical_outcome": canonical_outcome,
+        "canonical_receipt_hash": canonical_receipt_hash,
         "convergence_health": convergence_health,
-        "pass_index_next": cursor_pass_index,
+        "selection_mode": "deterministic_fifo_v1",
+        "pass_index_next": 0 if not scoped_drain else cursor_pass_index,
         "pass_productivity": pass_productivity,
         "pass_topology_skips": pass_topology_skips,
         "duration_ms": elapsed_ms,

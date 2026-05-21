@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
@@ -43,6 +44,15 @@ def resolve_pass_cursor(
     return c, rt, pk, nxt
 
 
+def _deterministic_raw_order_columns() -> tuple[Any, ...]:
+    return (
+        RawIngestionRecord.connector.asc(),
+        RawIngestionRecord.resource_type.asc(),
+        RawIngestionRecord.source_identity_key.asc(),
+        RawIngestionRecord.id.asc(),
+    )
+
+
 def list_forward_progress_candidate_ids(
     db: Session,
     *,
@@ -55,34 +65,24 @@ def list_forward_progress_candidate_ids(
     pass_cooldowns: dict[str, datetime] | None = None,
     pass_stall_counts: dict[str, int] | None = None,
 ) -> tuple[list[int], bool, dict[str, object]]:
-    """Select untreated routable raw ids with pass rotation and deferral exclusion."""
+    """Select untreated routable raw ids: global FIFO order + deferral exclusion."""
+    del pass_cooldowns, pass_stall_counts
     lim = max(1, fetch_limit)
-    meta: dict[str, object] = {}
+    meta: dict[str, object] = {"selection_mode": "deterministic_fifo_v1"}
     now = _now_utc()
 
     pass_key: str | None = None
-    next_index = pass_index
     if connector and resource_type:
         pairs = [(connector.strip(), resource_type.strip())]
         pass_key = pass_key_label(connector, resource_type)
+        meta["pass_index_next"] = pass_index
     elif connector:
         pairs = stub_routing_pairs(connector=connector, resource_type=None)
         pass_key = connector.strip()
+        meta["pass_index_next"] = pass_index
     else:
-        c, rt, pass_key, next_index, skipped_cooled = resolve_fair_pass_cursor(
-            pass_index,
-            pass_cooldowns=pass_cooldowns,
-            pass_stall_counts=pass_stall_counts,
-            now=now,
-        )
-        meta["pass_index_used"] = pass_index
-        meta["pass_index_next"] = next_index
-        meta["pass_key"] = pass_key
-        meta["skipped_pass_on_cooldown"] = skipped_cooled
-        if c and rt:
-            pairs = [(c, rt)]
-        else:
-            pairs = stub_routing_pairs(connector=None, resource_type=None)
+        pairs = stub_routing_pairs(connector=None, resource_type=None)
+        meta["pass_index_next"] = 0
 
     if not pairs:
         return [], False, meta
@@ -135,13 +135,12 @@ def list_forward_progress_candidate_ids(
             ~cooldown_deferral_block,
             ~permanent_deferral_block,
         )
-        .order_by(RawIngestionRecord.id.asc())
+        .order_by(*_deterministic_raw_order_columns())
         .limit(lim + 1)
     )
     rows = [int(x) for x in db.scalars(stmt).all()]
     more_remain = len(rows) > lim
     meta.setdefault("pass_key", pass_key)
-    meta.setdefault("pass_index_next", next_index)
     return rows[:lim], more_remain, meta
 
 

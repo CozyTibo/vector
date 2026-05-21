@@ -2216,6 +2216,7 @@ def materialize_stub_backlog(
         "succeeded_by_resource_type": succeeded_by_resource_type,
         "failures": failures,
         "raw_record_ids_sample": ids[:50],
+        "candidate_raw_ids": [int(x) for x in ids],
         "duration_ms": elapsed_ms,
         "throughput_rows_per_second": throughput,
         "topology_materialization": topo_meta,

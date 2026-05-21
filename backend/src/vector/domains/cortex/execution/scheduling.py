@@ -447,6 +447,7 @@ def verify_canonical_deterministic_selection_v1() -> list[str]:
     errors: list[str] = []
     from vector.domains.cortex.canonical.forward_progress import pass_fairness as pf
     from vector.domains.cortex.canonical.forward_progress import drain_runtime as dr
+    from vector.domains.cortex.canonical.forward_progress import candidate_selection as cs
 
     pf_src = inspect.getsource(pf.resolve_fair_pass_cursor)
     if "pass_is_on_cooldown" in pf_src:
@@ -454,11 +455,81 @@ def verify_canonical_deterministic_selection_v1() -> list[str]:
     if "candidates.sort" in pf_src:
         errors.append("resolve_fair_pass_cursor_still_deprioritizes_stall_counts")
 
+    cs_mod_src = inspect.getsource(cs)
+    if "resolve_fair_pass_cursor" in inspect.getsource(cs.list_forward_progress_candidate_ids):
+        errors.append("candidate_selection_still_uses_pass_rotation")
+    if "source_identity_key" not in cs_mod_src:
+        errors.append("candidate_selection_missing_source_identity_key_order")
+    if "deterministic_fifo_v1" not in cs_mod_src:
+        errors.append("candidate_selection_missing_deterministic_fifo_mode")
+
     drain_src = inspect.getsource(dr.drain_forward_progress_backlog)
     if "record_pass_topology_stall" in drain_src:
         errors.append("drain_still_records_pass_topology_stall")
     if "serialize_pass_cooldown_until" in drain_src:
         errors.append("drain_still_exports_pass_cooldown_state")
+    if "canonical_receipt_hash" not in drain_src:
+        errors.append("drain_missing_canonical_receipt_hash")
+    return errors
+
+
+def verify_unified_convergence_dispatch_v1() -> list[str]:
+    """Return error codes if post-ingest and pipeline schedule diverge."""
+    errors: list[str] = []
+    from vector.domains.cortex.execution import convergence_dispatch as cd
+    from vector.domains.cortex.ingestion import post_ingestion_refresh_dispatch as pid
+    from vector.domains.cortex.substrate_pipeline import orchestrator as orch
+
+    if not hasattr(cd, "mark_dirty_and_enqueue_convergence_v1"):
+        errors.append("missing_mark_dirty_and_enqueue_convergence_v1")
+    pid_src = inspect.getsource(pid.schedule_post_ingestion_substrate_refresh)
+    if "mark_dirty_and_enqueue_convergence_v1" not in pid_src:
+        errors.append("post_ingestion_dispatch_not_unified")
+    orch_src = inspect.getsource(orch.schedule_substrate_pipeline_v1)
+    if "mark_dirty_and_enqueue_convergence_v1" not in orch_src:
+        errors.append("schedule_substrate_pipeline_not_unified")
+    return errors
+
+
+def verify_pipeline_run_execution_mirror_v1() -> list[str]:
+    """Return error codes if pipeline runs are not marked execution mirrors."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import repository as repo
+
+    src = inspect.getsource(repo.create_pipeline_run_v1)
+    if "execution_mirror_v1" not in src:
+        errors.append("pipeline_run_missing_execution_mirror_flag")
+    if "authoritative_surface" not in src:
+        errors.append("pipeline_run_missing_authoritative_surface_marker")
+    repo_src = inspect.getsource(repo.complete_phase_v1)
+    if "_require_substrate_phase_receipt_in_output_v1" not in repo_src:
+        errors.append("complete_phase_missing_receipt_requirement")
+    return errors
+
+
+def verify_topology_blocked_not_phase_waiting_v1() -> list[str]:
+    """Return error codes if phase 02 topology defer still uses phase WAITING status."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p02 = inspect.getsource(pr_mod.run_phase_02_canonical_v1)
+    if "wait_phase_with_receipt_v1" in p02:
+        errors.append("phase02_still_uses_wait_phase_for_topology")
+    if "PHASE_OUTCOME_BLOCKED" not in p02:
+        errors.append("phase02_topology_missing_blocked_outcome")
+    return errors
+
+
+def verify_pipeline_continuation_writes_frozen_v1() -> list[str]:
+    """Return error codes if continuation writes lack a runtime freeze guard."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import pipeline_continuation as cont
+
+    if not hasattr(cont, "PipelineContinuationWriteFrozenError"):
+        errors.append("missing_continuation_write_frozen_error")
+    src = inspect.getsource(cont.mark_pipeline_waiting_on_tcre_v1)
+    if "_assert_continuation_write_allowed_v1" not in src:
+        errors.append("continuation_tcre_write_missing_freeze_guard")
     return errors
 
 
@@ -638,9 +709,9 @@ def verify_substrate_phase_receipt_contract_v1() -> list[str]:
         has_finish = has_complete or "skip_phase_with_receipt_v1" in src
         if not has_finish:
             errors.append(f"{name}_missing_receipt_helper")
-        if "fail_phase_with_receipt_v1" not in src and "wait_phase_with_receipt_v1" not in src:
-            if "try:" in src and name not in ("run_phase_03_identity_v1",):
-                errors.append(f"{name}_missing_fail_or_wait_receipt_helper")
+        if "fail_phase_with_receipt_v1" not in src:
+            if "try:" in src and name not in ("run_phase_03_identity_v1", "run_phase_02_canonical_v1"):
+                errors.append(f"{name}_missing_fail_receipt_helper")
 
     try:
         from vector.domains.cortex.substrate_pipeline import substrate_phase_receipt as spr
@@ -712,6 +783,10 @@ def verify_true_p0_substrate_signoff_v1() -> list[str]:
     errors.extend(verify_substrate_phase_receipt_contract_v1())
     errors.extend(verify_execution_blocked_semantics_v1())
     errors.extend(verify_canonical_deterministic_selection_v1())
+    errors.extend(verify_unified_convergence_dispatch_v1())
+    errors.extend(verify_pipeline_run_execution_mirror_v1())
+    errors.extend(verify_topology_blocked_not_phase_waiting_v1())
+    errors.extend(verify_pipeline_continuation_writes_frozen_v1())
     errors.extend(verify_execution_truth_unification_v1())
     errors.extend(verify_legacy_runtime_burial_v1())
     errors.extend(verify_execution_hot_path_no_cesp_imports_boundary_v1())
