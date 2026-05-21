@@ -259,6 +259,7 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         verify_p0_step7_determinism_repair_off_hot_path_v1,
         verify_p1_step8_identity_projection_boundary_v1,
         verify_p1_step9_graph_projection_export_boundary_v1,
+        verify_p1_step10_traversal_slice_boundary_v1,
     )
 
     errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
@@ -269,6 +270,7 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
     errors.extend(verify_p0_step7_determinism_repair_off_hot_path_v1())
     errors.extend(verify_p1_step8_identity_projection_boundary_v1())
     errors.extend(verify_p1_step9_graph_projection_export_boundary_v1())
+    errors.extend(verify_p1_step10_traversal_slice_boundary_v1())
 
     p03_src = inspect.getsource(runners_mod.run_phase_03_identity_v1)
     if "finalize_identity_substrate_operator_audit" in p03_src:
@@ -283,6 +285,14 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         errors.append("phase04_runner_must_call_graph_projection_export_for_pipeline_p1_step9")
     if "build_org_graph_traversal_verification_slice_v1" in p04_src:
         errors.append("phase04_runner_must_not_build_verification_slice_p1_step9")
+
+    p05_src = inspect.getsource(runners_mod.run_phase_05_traversal_v1)
+    if "run_octs_walk_schedule_pass_v1" in p05_src:
+        errors.append("phase05_runner_must_not_call_octs_walk_schedule_pass_p1_step10")
+    if "run_traversal_slice_for_pipeline_v1" not in p05_src:
+        errors.append("phase05_runner_must_call_traversal_slice_for_pipeline_p1_step10")
+    if "traversal_explainability_panel" in p05_src:
+        errors.append("phase05_runner_must_not_export_explainability_panel_p1_step10")
 
     p02_src = inspect.getsource(runners_mod.run_phase_02_canonical_v1)
     if "drain_stub_materialize_backlog" in p02_src:

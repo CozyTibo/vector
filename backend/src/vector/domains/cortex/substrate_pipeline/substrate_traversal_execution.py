@@ -52,9 +52,8 @@ def _pick_start_node_ids_v1(projection_inner: Mapping[str, Any], *, limit: int) 
         nid = str(node.get("id") or "").strip()
         if nid:
             ids.append(nid)
-        if len(ids) >= limit:
-            break
-    return ids
+    ids.sort()
+    return ids[: max(1, int(limit))]
 
 
 def _edge_fingerprints_for_visit_order_v1(
@@ -222,4 +221,49 @@ def run_substrate_traversal_materialization_v1(
         "primary_octs_walk_id": primary_walk_id,
         "skipped_idempotent": skipped,
         "graph_projection_stable_hash_sha256": stable_hash,
+    }
+
+
+def run_traversal_slice_for_pipeline_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    pipeline_run_id: uuid.UUID,
+    graph_projection_stable_hash: str | None = None,
+    max_starts: int = SUBSTRATE_TRAVERSAL_MAX_STARTS_V1,
+) -> dict[str, Any]:
+    """Single phase-05 transform: deterministic starts + walk materialization (P1 step 10)."""
+    export_doc = build_org_graph_projection_export_document(session, tenant_id=tenant_id)
+    inner = export_doc.get("projection")
+    if not isinstance(inner, dict):
+        return {
+            "ok": False,
+            "pipeline_run_id": str(pipeline_run_id),
+            "reason": "missing_projection",
+            "starts_selected": 0,
+            "selected_start_node_ids": [],
+            "walks_persisted": 0,
+            "walk_ids": [],
+            "primary_octs_walk_id": None,
+        }
+
+    starts = _pick_start_node_ids_v1(inner, limit=max(1, int(max_starts)))
+    mat = run_substrate_traversal_materialization_v1(
+        session,
+        tenant_id=tenant_id,
+        graph_projection_stable_hash=graph_projection_stable_hash,
+        max_starts=max_starts,
+        start_node_ids=starts,
+    )
+    return {
+        "ok": bool(mat.get("ok")),
+        "pipeline_run_id": str(pipeline_run_id),
+        "starts_selected": len(starts),
+        "selected_start_node_ids": starts,
+        "walks_persisted": int(mat.get("walks_persisted") or 0),
+        "walk_ids": list(mat.get("walk_ids") or []),
+        "primary_octs_walk_id": mat.get("primary_octs_walk_id"),
+        "skipped_idempotent": int(mat.get("skipped_idempotent") or 0),
+        "graph_projection_stable_hash_sha256": mat.get("graph_projection_stable_hash_sha256"),
+        "reason": mat.get("reason"),
     }

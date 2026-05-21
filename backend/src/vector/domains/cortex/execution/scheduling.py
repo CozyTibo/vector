@@ -189,8 +189,12 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     p05 = inspect.getsource(pr.run_phase_05_traversal_v1)
     if "schedule_octs_walks_for_tenant_v1" in p05:
         errors.append("phase05_still_schedules_celery_traversal_sidecar")
-    if "run_octs_walk_schedule_pass_v1" not in p05:
-        errors.append("phase05_missing_inline_traversal_pass")
+    if "run_traversal_slice_for_pipeline_v1" not in p05:
+        errors.append("phase05_missing_run_traversal_slice_for_pipeline_v1")
+    if "run_octs_walk_schedule_pass_v1" in p05:
+        errors.append("phase05_still_calls_octs_walk_schedule_pass")
+    if "run_substrate_traversal_materialization_v1" in p05:
+        errors.append("phase05_still_calls_substrate_traversal_materialization_directly")
     p06 = inspect.getsource(pr.run_phase_06_tcre_v1)
     if "run_tcre_saturation_after_phase06_v1" in p06:
         errors.append("phase06_still_runs_tcre_saturation_sidecar")
@@ -251,6 +255,35 @@ def verify_p1_step9_graph_projection_export_boundary_v1() -> list[str]:
 
     if not callable(getattr(pe_mod, "run_graph_projection_export_for_pipeline_v1", None)):
         errors.append("missing_run_graph_projection_export_for_pipeline_v1")
+    return errors
+
+
+def verify_p1_step10_traversal_slice_boundary_v1() -> list[str]:
+    """Return error codes if phase 05 still splits materialization + schedule pass (P1 step 10)."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p05 = inspect.getsource(pr_mod.run_phase_05_traversal_v1)
+    if "run_traversal_slice_for_pipeline_v1" not in p05:
+        errors.append("phase05_missing_run_traversal_slice_for_pipeline_v1")
+    if "run_octs_walk_schedule_pass_v1" in p05:
+        errors.append("phase05_still_calls_octs_walk_schedule_pass")
+    if "run_substrate_traversal_materialization_v1" in p05:
+        errors.append("phase05_still_calls_substrate_traversal_materialization_directly")
+    if "octs_walk_schedule" in p05:
+        errors.append("phase05_still_exports_octs_walk_schedule")
+    if "traversal_explainability_panel" in p05:
+        errors.append("phase05_still_exports_traversal_explainability_panel")
+    if "mark_pipeline_waiting_on_traversal_v1" in p05:
+        errors.append("phase05_still_writes_traversal_continuation_wait")
+
+    from vector.domains.cortex.substrate_pipeline import substrate_traversal_execution as ste_mod
+
+    if not callable(getattr(ste_mod, "run_traversal_slice_for_pipeline_v1", None)):
+        errors.append("missing_run_traversal_slice_for_pipeline_v1")
+    pick_src = inspect.getsource(ste_mod._pick_start_node_ids_v1)
+    if ".sort()" not in pick_src:
+        errors.append("pick_start_node_ids_must_sort_deterministically")
     return errors
 
 

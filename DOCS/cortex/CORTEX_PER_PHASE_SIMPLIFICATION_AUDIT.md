@@ -40,6 +40,7 @@ input → deterministic transform → explicit output → gate
 |------|--------|---------|
 | **8** | **Done** | Phase 03 single `run_identity_substrate_projection_for_pipeline_v1`; no audit replay job on execution hot path |
 | **9** | **Done** | Phase 04 direct `run_graph_projection_export_for_pipeline_v1`; no replay job or verification slice on execution hot path |
+| **10** | **Done** | Phase 05 single `run_traversal_slice_for_pipeline_v1`; no schedule pass or explainability on execution hot path |
 
 ### P0 step 1 — done (2026-05-21)
 
@@ -130,6 +131,16 @@ input → deterministic transform → explicit output → gate
 | Admin / ingest | `post_ingestion_substrate_refresh` still uses `execute_org_link_replay_job` + verification slice (non-execution) |
 | CI guard | `verify_p1_step9_graph_projection_export_boundary_v1` + `test_p1_step9_graph_projection_export.py` |
 | CI guard | `verify_p1_step8_identity_projection_boundary_v1` + `test_p1_step8_identity_projection.py` |
+
+### P1 step 10 — done (2026-05-21)
+
+| Change | Detail |
+|--------|--------|
+| `run_traversal_slice_for_pipeline_v1` | Single phase-05 entry: sorted start selection + walk materialization |
+| `_pick_start_node_ids_v1` | Deterministic ascending sort before cap |
+| `run_phase_05_traversal_v1` | Calls traversal slice only; dropped `octs_walk_schedule` nested pass |
+| `run_octs_walk_schedule_pass_v1` | Retained for admin scheduling (density frontiers + explainability panel) |
+| CI guard | `verify_p1_step10_traversal_slice_boundary_v1` + `test_p1_step10_traversal_slice.py` |
 
 ---
 
@@ -569,8 +580,8 @@ gate: hash present && node_count > 0 (or explicit empty-ok policy)
 | Item | Verdict | Why |
 |------|---------|-----|
 | Walk materialization | **KEEP** |
-| Inline schedule pass in runner | **SIMPLIFY** | Merge into single `run_traversal_slice` |
-| Explainability panel in hot path | **DELETE** | Admin inspect |
+| Inline schedule pass in runner | **Removed P1 step 10** — `run_traversal_slice_for_pipeline_v1` |
+| Explainability panel in hot path | **Removed P1 step 10** — admin `run_octs_walk_schedule_pass_v1` / HTTP panel |
 | Frontier density ranking sophistication | **SIMPLIFY** | Fixed policy: connected components, deterministic sort |
 | Retry/heal/stall recovery | **DELETE** (pipeline) | Done M9 |
 | Continuation wait for traversal | **DELETE** | Prefer sync completion in slice |
@@ -908,7 +919,7 @@ flowchart LR
 | Determinism repair in every canonical slice | 02 |
 | Identity audit replay job enqueue | 03 — **done P1 step 8** (execution path) |
 | Verification slice in graph runner | 04 — **done P1 step 9** (execution path) |
-| Explainability panel in traversal pass | 05 |
+| Explainability panel in traversal pass | 05 — **done P1 step 10** (execution path) |
 | `enforce_phase06_progression_law` in runner | 06 |
 | `drain_stub_materialize_backlog` duplicate | 02 |
 | Canonical replay job orchestration (runtime) | 02 |
@@ -918,7 +929,7 @@ flowchart LR
 | Item | Phase |
 |------|-------|
 | Split sync_executor | 01 |
-| Collapse traversal materialization + schedule | 05 |
+| Collapse traversal materialization + schedule | 05 — **done P1 step 10** |
 | Direct graph export (no replay job wrapper) | 04 — **done P1 step 9** |
 | Retrieval skip code taxonomy | 07 |
 | Single canonical drain entry | 02 |
@@ -986,7 +997,7 @@ def run_phase_XX_v1(session, *, tenant_id, pipeline_run_id, ...) -> PhaseResult:
 | 02 | `run_phase_02_canonical_v1` | `canonical/forward_progress/drain_runtime.py`, `canonical/transform_runtime.py` |
 | 03 | `run_phase_03_identity_v1` | `identity/continuity_rebuild.py` |
 | 04 | `run_phase_04_graph_v1` | `identity/projection_export.py` (`run_graph_projection_export_for_pipeline_v1`) |
-| 05 | `run_phase_05_traversal_v1` | `substrate_traversal_execution.py`, `operational_runtime/substrate_traversal_scheduling.py` |
+| 05 | `run_phase_05_traversal_v1` | `substrate_traversal_execution.py` (`run_traversal_slice_for_pipeline_v1`) |
 | 06 | `run_phase_06_tcre_v1` | `reasoning/runtime` enqueue, `pipeline_continuation.py` |
 | 07 | `run_phase_07_retrieval_v1` | `retrieval/retrieval_index_materialization.py`, `execution/blocked.py` |
 | 08 | `run_phase_08_synthesis_v1` | `synthesis/synthesis_pipeline.py` |

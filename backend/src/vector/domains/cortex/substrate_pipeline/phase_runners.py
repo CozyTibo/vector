@@ -34,7 +34,7 @@ from vector.domains.cortex.substrate_pipeline.repository import (
     wait_phase_v1,
 )
 from vector.domains.cortex.substrate_pipeline.substrate_traversal_execution import (
-    run_substrate_traversal_materialization_v1,
+    run_traversal_slice_for_pipeline_v1,
 )
 from vector.settings import Settings
 
@@ -162,20 +162,9 @@ def run_phase_05_traversal_v1(
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_05_TRAVERSAL)
     try:
-        out = run_substrate_traversal_materialization_v1(
+        out = run_traversal_slice_for_pipeline_v1(
             session,
             tenant_id=tenant_id,
-            graph_projection_stable_hash=graph_projection_stable_hash,
-        )
-        from vector.domains.cortex.operational_runtime.substrate_traversal_scheduling import (
-            TRAVERSAL_SCHEDULE_TRIGGER_AFTER_PHASE_05_V1,
-            run_octs_walk_schedule_pass_v1,
-        )
-
-        out["octs_walk_schedule"] = run_octs_walk_schedule_pass_v1(
-            session,
-            tenant_id=tenant_id,
-            trigger=TRAVERSAL_SCHEDULE_TRIGGER_AFTER_PHASE_05_V1,
             pipeline_run_id=pipeline_run_id,
             graph_projection_stable_hash=graph_projection_stable_hash,
         )
