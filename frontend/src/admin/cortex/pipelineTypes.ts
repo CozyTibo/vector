@@ -15,17 +15,21 @@ export type PhaseOverview = {
   phase: OperatorPhase;
   label: string;
   status: PhaseStatus;
-  detail: string | null;
+  statusLabel: string;
+  objectCountLabel: string | null;
   route: string;
 };
 
 export type PipelineOverviewPhase = {
   phase: OperatorPhase;
   status: PhaseStatus;
+  status_label: string;
   processed_count: number | null;
+  object_count_label: string | null;
   backlog_count: number | null;
   last_success_at: string | null;
   blockers: string[];
+  issues: string[];
 };
 
 export type IngestionRunTriggerKind = "scheduled" | "manual" | "replay";

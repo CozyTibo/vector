@@ -11,10 +11,6 @@ function statusTone(status: PhaseStatus): "ok" | "warn" | "bad" | "neutral" {
   return "warn";
 }
 
-function statusLabel(status: PhaseStatus): string {
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
-
 export function PipelineStrip({ phases }: { phases: PhaseOverview[] }) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const base = `/admin/tenants/${tenantId}/cortex`;
@@ -25,13 +21,15 @@ export function PipelineStrip({ phases }: { phases: PhaseOverview[] }) {
         <Link
           key={p.phase}
           to={`${base}/${p.route}`}
-          className="min-w-[7.5rem] flex-1 rounded-lg border border-stone-200 bg-stone-50 p-3 no-underline hover:border-indigo-200 hover:bg-indigo-50/40"
+          className="min-w-[6.5rem] flex-1 rounded-lg border border-stone-200 bg-stone-50 p-3 no-underline hover:border-indigo-200 hover:bg-indigo-50/40"
         >
           <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">{p.label}</p>
-          <div className="mt-1">
-            <StatusBadge tone={statusTone(p.status)}>{statusLabel(p.status)}</StatusBadge>
+          <div className="mt-1.5">
+            <StatusBadge tone={statusTone(p.status)}>{p.statusLabel}</StatusBadge>
           </div>
-          {p.detail ? <p className="mt-1 line-clamp-2 text-[11px] text-stone-600">{p.detail}</p> : null}
+          <p className="mt-2 text-xs font-medium tabular-nums text-stone-800">
+            {p.objectCountLabel ?? "—"}
+          </p>
         </Link>
       ))}
     </div>

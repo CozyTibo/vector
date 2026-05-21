@@ -96,9 +96,16 @@ def synthesis_golden_vectors_v1_root() -> Path:
 
 
 def synthesis_policy_pack_fixture_path_v1() -> Path:
-    return _repo_root_v1() / "DOCS" / "cortex" / "synthesis" / "fixtures" / (
-        f"{DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1}.json"
+    from vector.domains.cortex.synthesis.synthesis_query_plan import (
+        synthesis_policy_pack_fixture_path_v1 as resolve_policy_pack_fixture_v1,
     )
+
+    path = resolve_policy_pack_fixture_v1(policy_pack_id=DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1)
+    if path is None:
+        return _repo_root_v1() / "DOCS" / "cortex" / "synthesis" / "fixtures" / (
+            f"{DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1}.json"
+        )
+    return path
 
 
 def load_synthesis_policy_pack_fixture_v1() -> dict[str, Any]:

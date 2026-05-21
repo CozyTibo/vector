@@ -4495,10 +4495,13 @@ class AdminCortexPipelinePhaseOverview(BaseModel):
         "synthesis",
     ]
     status: Literal["healthy", "running", "waiting", "blocked", "degraded"]
+    status_label: str = ""
     processed_count: int | None = None
+    object_count_label: str | None = None
     backlog_count: int | None = None
     last_success_at: str | None = None
     blockers: list[str] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
 
 
 class AdminCortexPipelineExecutionSnapshot(BaseModel):

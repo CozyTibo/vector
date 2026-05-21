@@ -14,12 +14,12 @@ function phasesForStrip(overview: PipelineOverview): PhaseOverview[] {
   return OPERATOR_PHASES.map((meta) => {
     const row = overview.phases.find((p) => p.phase === meta.phase);
     const status = row?.status ?? "waiting";
-    const detail =
-      row?.blockers?.[0] ??
-      (row?.backlog_count != null && row.backlog_count > 0
-        ? `${row.backlog_count.toLocaleString()} backlog`
-        : null);
-    return { ...meta, status, detail };
+    return {
+      ...meta,
+      status,
+      statusLabel: row?.status_label ?? "Waiting",
+      objectCountLabel: row?.object_count_label ?? null,
+    };
   });
 }
 
@@ -69,8 +69,11 @@ export default function AdminCortexOverviewPage() {
 
       {overview.attention.length > 0 ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-amber-950">Attention</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+          <h3 className="text-sm font-semibold text-amber-950">What needs attention</h3>
+          <p className="mt-1 text-xs text-amber-800/90">
+            Plain-language reasons a step is waiting, blocked, or has gaps. Open the phase tab for detail.
+          </p>
+          <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-amber-900">
             {overview.attention.map((line) => (
               <li key={line}>{line}</li>
             ))}

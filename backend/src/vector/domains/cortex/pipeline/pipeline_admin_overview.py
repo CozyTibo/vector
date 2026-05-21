@@ -32,6 +32,12 @@ from vector.domains.cortex.ingestion.admin_recent_raw import list_recent_ingesti
 from vector.domains.cortex.ingestion.ingestion_schedule_forecast import (
     estimate_tenant_next_scheduled_ingestion_v1,
 )
+from vector.domains.cortex.pipeline.pipeline_phase_operator_copy import (
+    build_attention_lines,
+    humanize_phase_issues,
+    object_count_label,
+    phase_status_label,
+)
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_03_IDENTITY,
@@ -183,13 +189,24 @@ def _phase_from_completeness(
     backlog = envelope.get("unresolved_count")
     if backlog is None:
         backlog = envelope.get("omitted_count")
+    processed_n = int(processed) if processed is not None else None
+    backlog_n = int(backlog) if backlog is not None else None
+    issues = humanize_phase_issues(
+        operator_phase=operator_phase,
+        status=status,
+        blockers=blockers,
+        backlog_count=backlog_n,
+    )
     return {
         "phase": operator_phase,
         "status": status,
-        "processed_count": int(processed) if processed is not None else None,
-        "backlog_count": int(backlog) if backlog is not None else None,
+        "status_label": phase_status_label(status),
+        "processed_count": processed_n,
+        "object_count_label": object_count_label(processed_n),
+        "backlog_count": backlog_n,
         "last_success_at": envelope.get("last_successful_at"),
         "blockers": blockers,
+        "issues": issues,
     }
 
 
@@ -286,21 +303,12 @@ def build_pipeline_overview_v1(
             )
         )
 
-    attention: list[str] = []
-    for p in phases:
-        label = p["phase"].replace("_", " ").title()
-        if p["status"] == "blocked":
-            for b in p.get("blockers") or []:
-                attention.append(f"{label} blocked: {b}")
-            if not p.get("blockers"):
-                attention.append(f"{label} is blocked")
-        elif p["status"] == "degraded":
-            attention.append(f"{label} degraded")
+    exec_block: str | None = None
     if lease and isinstance(lease, dict):
         code = lease.get("block_reason_code")
-        if code and str(code) not in " ".join(attention):
-            attention.insert(0, f"Execution blocked: {code}")
-    attention = attention[:5]
+        if isinstance(code, str) and code.strip():
+            exec_block = code.strip()
+    attention = build_attention_lines(phases, execution_block_reason=exec_block)
 
     execution = {
         "fsm_state": lease.get("fsm_state") if isinstance(lease, dict) else None,

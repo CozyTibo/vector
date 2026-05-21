@@ -23,6 +23,9 @@ FAKE_LLM_STRUCT_COMPLETION_FIXTURE_V1: Final[str] = "FakeLlmStructCompletionV1_D
 _REQUIRED_COMPLETION_KEYS_V1: Final[frozenset[str]] = frozenset({"schema_version", "discourse_phrases"})
 
 
+_PACKAGE_FIXTURES_DIR_V1 = Path(__file__).resolve().parents[2] / "fixtures"
+
+
 def _repo_root_v1() -> Path:
     start = Path(__file__).resolve()
     for root in [start, *start.parents]:
@@ -32,8 +35,12 @@ def _repo_root_v1() -> Path:
 
 
 def load_fake_llm_struct_completion_fixture_v1() -> dict[str, Any]:
-    path = _repo_root_v1() / "DOCS" / "cortex" / "synthesis" / "fixtures" / FAKE_LLM_STRUCT_COMPLETION_FIXTURE_V1
-    if not path.is_file():
+    candidates = (
+        _PACKAGE_FIXTURES_DIR_V1 / FAKE_LLM_STRUCT_COMPLETION_FIXTURE_V1,
+        _repo_root_v1() / "DOCS" / "cortex" / "synthesis" / "fixtures" / FAKE_LLM_STRUCT_COMPLETION_FIXTURE_V1,
+    )
+    path = next((p for p in candidates if p.is_file()), None)
+    if path is None:
         raise LlmAdapterError("fake_llm_fixture_not_found", detail={"path": str(path)})
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):

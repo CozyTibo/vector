@@ -70,16 +70,15 @@ def synthesis_policy_pack_fixture_path_v1() -> Path:
     from vector.domains.cortex.synthesis.synthesis_job_contract import (
         DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1,
     )
-    from vector.domains.cortex.synthesis.synthesis_query_plan import _repo_root_v1
-
-    return (
-        Path(_repo_root_v1())
-        / "DOCS"
-        / "cortex"
-        / "synthesis"
-        / "fixtures"
-        / f"{DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1}.json"
+    from vector.domains.cortex.synthesis.synthesis_query_plan import (
+        synthesis_policy_pack_fixture_path_v1 as resolve_policy_pack_fixture_v1,
     )
+
+    path = resolve_policy_pack_fixture_v1(policy_pack_id=DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1)
+    if path is None:
+        msg = f"synthesis policy pack fixture not found: {DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1}"
+        raise FileNotFoundError(msg)
+    return path
 
 
 def _synthesis_canonical_json_obj_v1(obj: Any) -> Any:

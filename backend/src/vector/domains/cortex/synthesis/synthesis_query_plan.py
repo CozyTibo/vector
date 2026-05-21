@@ -75,6 +75,9 @@ class SynthesisQueryPlanError(ValueError):
         super().__init__(code)
 
 
+_PACKAGE_FIXTURES_DIR_V1 = Path(__file__).resolve().parent / "fixtures"
+
+
 def _repo_root_v1() -> Path:
     start = Path(__file__).resolve()
     for root in [start, *start.parents]:
@@ -83,17 +86,34 @@ def _repo_root_v1() -> Path:
     return start.parents[6]
 
 
+def synthesis_policy_pack_fixture_path_v1(
+    *,
+    policy_pack_id: str | None = None,
+) -> Path | None:
+    """Resolve policy pack JSON — packaged fixtures first (prod image), then repo DOCS."""
+    pack_id = policy_pack_id or DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1
+    filename = f"{pack_id}.json"
+    candidates = (
+        _PACKAGE_FIXTURES_DIR_V1 / filename,
+        _repo_root_v1() / "DOCS" / "cortex" / "synthesis" / "fixtures" / filename,
+    )
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
 def load_synthesis_policy_pack_v1(
     *,
     policy_pack_id: str | None = None,
 ) -> dict[str, Any]:
     """Load ``SynthesisPolicyPackV1`` fixture (default pack until pack service ships)."""
     pack_id = policy_pack_id or DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1
-    path = _repo_root_v1() / "DOCS" / "cortex" / "synthesis" / "fixtures" / f"{pack_id}.json"
-    if not path.is_file():
+    path = synthesis_policy_pack_fixture_path_v1(policy_pack_id=pack_id)
+    if path is None:
         raise SynthesisQueryPlanError(
             "synthesis_policy_pack_not_found",
-            detail={"policy_pack_id": pack_id, "path": str(path)},
+            detail={"policy_pack_id": pack_id},
         )
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
