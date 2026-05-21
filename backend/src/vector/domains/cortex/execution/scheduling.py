@@ -230,6 +230,30 @@ def verify_p1_step8_identity_projection_boundary_v1() -> list[str]:
     return errors
 
 
+def verify_p1_step9_graph_projection_export_boundary_v1() -> list[str]:
+    """Return error codes if phase 04 still uses replay jobs or verification slice (P1 step 9)."""
+    errors: list[str] = []
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p04 = inspect.getsource(pr_mod.run_phase_04_graph_v1)
+    if "execute_org_link_replay_job" in p04:
+        errors.append("phase04_still_calls_org_link_replay_job")
+    if "graph_projection_export_job_id" in p04:
+        errors.append("phase04_still_exports_graph_projection_export_job_id")
+    if "build_org_graph_traversal_verification_slice_v1" in p04:
+        errors.append("phase04_still_builds_org_graph_traversal_verification_slice")
+    if "org_graph_traversal_verification_slice" in p04:
+        errors.append("phase04_still_exports_org_graph_traversal_verification_slice")
+    if "run_graph_projection_export_for_pipeline_v1" not in p04:
+        errors.append("phase04_missing_run_graph_projection_export_for_pipeline_v1")
+
+    from vector.domains.cortex.identity import projection_export as pe_mod
+
+    if not callable(getattr(pe_mod, "run_graph_projection_export_for_pipeline_v1", None)):
+        errors.append("missing_run_graph_projection_export_for_pipeline_v1")
+    return errors
+
+
 def verify_p0_step7_determinism_repair_off_hot_path_v1() -> list[str]:
     """Return error codes if phase 02 still runs determinism repair inline (P0 step 7)."""
     errors: list[str] = []

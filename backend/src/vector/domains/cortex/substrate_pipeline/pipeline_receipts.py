@@ -62,8 +62,9 @@ def _summarize_phase_output(phase_id: str, output: dict[str, Any]) -> dict[str, 
         }
     if phase_id.endswith("graph"):
         return {
-            "graph_projection_export_job_id": output.get("graph_projection_export_job_id"),
             "graph_projection_stable_hash_sha256": output.get("graph_projection_stable_hash_sha256"),
+            "node_count": output.get("node_count"),
+            "edge_count": output.get("edge_count"),
         }
     return {k: output[k] for k in list(output.keys())[:12]}
 

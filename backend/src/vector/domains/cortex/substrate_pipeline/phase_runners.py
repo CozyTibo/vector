@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.canonical.forward_progress.drain_runtime import drain_forward_progress_backlog
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.identity.continuity_rebuild import run_identity_substrate_projection_for_pipeline_v1
-from vector.domains.cortex.identity.org_link_replay_runtime import execute_org_link_replay_job
+from vector.domains.cortex.identity.projection_export import run_graph_projection_export_for_pipeline_v1
 from vector.domains.cortex.reasoning.runtime import enqueue_reconstruction_job_v1
 from vector.domains.cortex.retrieval.retrieval_index_materialization import (
     materialize_retrieval_index_for_pipeline_v1,
@@ -35,10 +35,6 @@ from vector.domains.cortex.substrate_pipeline.repository import (
 )
 from vector.domains.cortex.substrate_pipeline.substrate_traversal_execution import (
     run_substrate_traversal_materialization_v1,
-)
-from vector.domains.cortex.traversal.tenant_verification_slice import (
-    build_org_graph_traversal_verification_slice_v1,
-    compute_octs_slice_hash_v1,
 )
 from vector.settings import Settings
 
@@ -142,25 +138,17 @@ def run_phase_04_graph_v1(
     pipeline_run_id: uuid.UUID,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_04_GRAPH)
-    projection_job = execute_org_link_replay_job(
-        session,
-        tenant_id=tenant_id,
-        job_kind="graph_projection_export",
-    )
-    session.flush()
-    slice_body = build_org_graph_traversal_verification_slice_v1(
-        session,
-        tenant_id=tenant_id,
-        verification_run_id=None,
-    )
-    slice_hash = compute_octs_slice_hash_v1(slice_body)
-    proj_summary = dict(projection_job.summary_json or {})
-    out = {
-        "graph_projection_export_job_id": str(projection_job.id),
-        "graph_projection_stable_hash_sha256": proj_summary.get("stable_hash_sha256"),
-        "org_graph_traversal_verification_slice": slice_body,
-        "org_graph_traversal_slice_hash": slice_hash,
-    }
+    try:
+        out = run_graph_projection_export_for_pipeline_v1(session, tenant_id=tenant_id)
+    except ValueError as exc:
+        fail_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_04_GRAPH,
+            error=str(exc),
+            output={},
+        )
+        raise
     complete_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_04_GRAPH, output=out)
     return out
 

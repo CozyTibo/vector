@@ -267,6 +267,32 @@ def build_org_graph_projection_export_document(
     }
 
 
+def run_graph_projection_export_for_pipeline_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Single phase-04 transform: direct projection export (no org-link replay job, P1 step 9)."""
+    doc = build_org_graph_projection_export_document(db, tenant_id=tenant_id)
+    stable = str(doc.get("stable_hash_sha256") or "").strip()
+    if not stable:
+        msg = "graph_projection_missing_stable_hash"
+        raise ValueError(msg)
+    inner = doc.get("projection")
+    projection = inner if isinstance(inner, dict) else {}
+    nodes = projection.get("nodes")
+    edges = projection.get("edges")
+    node_count = len(nodes) if isinstance(nodes, list) else 0
+    edge_count = len(edges) if isinstance(edges, list) else 0
+    return {
+        "graph_projection_stable_hash_sha256": stable,
+        "node_count": node_count,
+        "edge_count": edge_count,
+        "org_graph_projection_schema_version": doc.get("org_graph_projection_schema_version"),
+        "engine_build_ref": doc.get("engine_build_ref"),
+    }
+
+
 PROJECTION_PREVIEW_SCHEMA_VERSION: Final[int] = 1
 PROJECTION_PREVIEW_TOP_LEVEL_KEYS: Final[frozenset[str]] = frozenset(
     {
