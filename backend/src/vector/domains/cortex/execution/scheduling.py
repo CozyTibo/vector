@@ -574,6 +574,24 @@ def verify_phase07_retrieval_only_boundary_v1() -> list[str]:
     return errors
 
 
+def verify_execution_truth_unification_v1() -> list[str]:
+    """Return error codes if operator status still treats continuation as default truth."""
+    errors: list[str] = []
+    import inspect as _inspect
+
+    from vector.domains.cortex.execution import progression_status as ps
+
+    sig = _inspect.signature(ps.build_substrate_progression_status_v1)
+    if "include_legacy_continuation" not in sig.parameters:
+        errors.append("progression_status_missing_include_legacy_continuation_flag")
+    src = _inspect.getsource(ps.build_substrate_progression_status_v1)
+    if "authoritative" not in src:
+        errors.append("progression_status_lease_not_marked_authoritative")
+    if "last_phase_receipt_hash" not in src:
+        errors.append("progression_status_missing_last_phase_receipt_on_lease")
+    return errors
+
+
 def verify_execution_blocked_semantics_v1() -> list[str]:
     """Return error codes if execution worker lacks receipt-driven stop semantics."""
     errors: list[str] = []

@@ -34,6 +34,7 @@ from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
     CONTINUATION_STATUS_WAITING,
     get_continuation_for_pipeline_v1,
 )
+from vector.domains.cortex.execution.tenant_constants import LEASE_STATUS_WAITING
 from vector.domains.cortex.substrate_pipeline.repository import (
     get_phase_run_v1,
     get_running_pipeline_run_v1,
@@ -165,8 +166,9 @@ def build_substrate_progression_status_v1(
     *,
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID | None = None,
+    include_legacy_continuation: bool = False,
 ) -> dict[str, Any]:
-    """Operator-facing snapshot — answers 'did ingest propagate downstream?'"""
+    """Operator-facing snapshot — lease FSM is authoritative; pipeline run is mirror."""
     run = None
     if pipeline_run_id is not None:
         run = session.get(CortexSubstratePipelineRun, pipeline_run_id)
@@ -186,6 +188,7 @@ def build_substrate_progression_status_v1(
     continuation_payload: dict[str, Any] | None = None
     if run is not None:
         phase_status = phase_status_map_v1(session, pipeline_run_id=run.id)
+    if run is not None and include_legacy_continuation:
         cont = get_continuation_for_pipeline_v1(session, pipeline_run_id=run.id)
         if cont is not None:
             continuation_payload = {
@@ -207,12 +210,18 @@ def build_substrate_progression_status_v1(
     lease = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
     lease_payload: dict[str, Any] | None = None
     if lease is not None:
+        detail = dict(lease.detail_json or {})
         lease_payload = {
+            "authoritative": True,
             "status": lease.status,
             "fsm_state": lease.fsm_state,
             "phase_cursor": lease.phase_cursor,
             "block_reason_code": lease.block_reason_code,
             "block_detail": lease.block_detail,
+            "last_phase_receipt_hash": detail.get("last_phase_receipt_hash"),
+            "last_phase_outcome": detail.get("last_phase_outcome"),
+            "last_phase_id": detail.get("last_phase_id"),
+            "pipeline_run_id": str(lease.pipeline_run_id) if lease.pipeline_run_id else None,
         }
 
     published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
@@ -226,9 +235,14 @@ def build_substrate_progression_status_v1(
     if lease is not None and (lease.fsm_state or "").strip() == "BLOCKED":
         progression_class = TENANT_PROGRESSION_CLASS_DEGRADED_V1
         stop_reason = lease.block_reason_code or "execution_blocked"
+    elif lease is not None and lease.status == LEASE_STATUS_WAITING:
+        progression_class = TENANT_PROGRESSION_CLASS_WAITING_UPSTREAM_V1
+        stop_reason = "execution_lease_waiting"
     elif run is not None and run.status == PIPELINE_STATUS_RUNNING:
         progression_class = TENANT_PROGRESSION_CLASS_PROGRESSING_V1
-        if continuation_payload and continuation_payload.get("continuation_status") in (
+        if include_legacy_continuation and continuation_payload and continuation_payload.get(
+            "continuation_status"
+        ) in (
             CONTINUATION_STATUS_WAITING,
             CONTINUATION_STATUS_STALLED,
         ):
@@ -257,6 +271,7 @@ def build_substrate_progression_status_v1(
 
     return {
         "surface_kind": "substrate_operational_progression_status",
+        "execution_truth_owner": EXECUTION_OWNER_ID_V1,
         "progression_owner_id": EXECUTION_OWNER_ID_V1,
         "tenant_id": str(tenant_id),
         "pipeline_run_id": str(run.id) if run is not None else None,
