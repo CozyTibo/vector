@@ -29,15 +29,16 @@ def test_fair_rotation_interleaves_connectors() -> None:
     assert len(set(connectors)) > 1
 
 
-def test_resolve_pass_cursor_skips_cooled_pass() -> None:
+def test_resolve_pass_cursor_deterministic_rotation_ignores_cooldown() -> None:
     passes = all_canonical_passes_fair_rotation()
     assert passes
     first_key = f"{passes[0][0]}/{passes[0][1]}"
     now = datetime.now(UTC)
     cooldowns = {first_key: now + timedelta(hours=1)}
-    _c, _rt, pk, _nxt, skipped = resolve_fair_pass_cursor(0, pass_cooldowns=cooldowns, now=now)
-    assert skipped is True
-    assert pk != first_key
+    _c, _rt, pk, nxt, skipped = resolve_fair_pass_cursor(0, pass_cooldowns=cooldowns, now=now)
+    assert skipped is False
+    assert pk == first_key
+    assert nxt == 1 % len(passes)
 
 
 def test_record_pass_topology_stall_escalates() -> None:

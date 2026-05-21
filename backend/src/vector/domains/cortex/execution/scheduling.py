@@ -442,6 +442,26 @@ def verify_execution_lease_no_pass_fairness_boundary_v1() -> list[str]:
     return errors
 
 
+def verify_canonical_deterministic_selection_v1() -> list[str]:
+    """Return error codes if canonical drain still uses adaptive pass fairness."""
+    errors: list[str] = []
+    from vector.domains.cortex.canonical.forward_progress import pass_fairness as pf
+    from vector.domains.cortex.canonical.forward_progress import drain_runtime as dr
+
+    pf_src = inspect.getsource(pf.resolve_fair_pass_cursor)
+    if "pass_is_on_cooldown" in pf_src:
+        errors.append("resolve_fair_pass_cursor_still_skips_cooldown_passes")
+    if "candidates.sort" in pf_src:
+        errors.append("resolve_fair_pass_cursor_still_deprioritizes_stall_counts")
+
+    drain_src = inspect.getsource(dr.drain_forward_progress_backlog)
+    if "record_pass_topology_stall" in drain_src:
+        errors.append("drain_still_records_pass_topology_stall")
+    if "serialize_pass_cooldown_until" in drain_src:
+        errors.append("drain_still_exports_pass_cooldown_state")
+    return errors
+
+
 def verify_canonical_single_drain_boundary_v1() -> list[str]:
     """Return error codes if phase 02 still uses dual drain / drain_stub."""
     errors: list[str] = []

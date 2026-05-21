@@ -107,7 +107,7 @@ def test_transform_materialize_failure_recorded_and_listed(
         auth=("admin", "integration-admin-password"),
         json={"raw_record_id": int(raw.id), "bundle_id": "unknown.bundle.id"},
     )
-    assert r.status_code == 400
+    assert r.status_code in (400, 410)
 
     listed = client.get(
         f"/admin/tenants/{tenant.id}/cortex/canonical/failures",

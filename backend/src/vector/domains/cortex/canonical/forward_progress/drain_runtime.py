@@ -22,14 +22,6 @@ from vector.domains.cortex.canonical.forward_progress.deferral_store import (
     summarize_deferral_pressure,
 )
 from vector.domains.cortex.canonical.forward_progress.metrics import build_forward_progress_metrics
-from vector.domains.cortex.canonical.forward_progress.pass_fairness import (
-    count_passes_off_cooldown,
-    parse_pass_cooldown_until,
-    parse_pass_topology_stall_counts,
-    record_pass_topology_stall,
-    serialize_pass_cooldown_until,
-    serialize_pass_topology_stall_counts,
-)
 from vector.domains.cortex.canonical.forward_progress.pass_registry import all_canonical_passes_fair_rotation
 from vector.domains.cortex.canonical.transform_runtime import (
     MaterializeError,
@@ -76,7 +68,7 @@ def drain_forward_progress_backlog(
     pass_stall_counts: dict[str, int] | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Drain canonical backlog with pass-local fairness and success-first slice accounting."""
+    """Drain canonical backlog with deterministic pass rotation and topology deferral."""
     cfg = settings or get_settings()
     from vector.domains.cortex.canonical.transform_runtime import (
         ALLOWED_BUNDLE_LIFECYCLE_FOR_TRANSFORM,
@@ -99,8 +91,8 @@ def drain_forward_progress_backlog(
         raise MaterializeError(f"bundle_not_transformable:{bundle.lifecycle_state}")
 
     now = datetime.now(UTC)
-    pass_cooldowns = dict(pass_cooldowns or {})
-    pass_stall_counts = dict(pass_stall_counts or {})
+    pass_cooldowns = {}
+    pass_stall_counts = {}
 
     failure_samples: list[dict[str, Any]] = []
     total_topology_deferred = 0
@@ -204,9 +196,7 @@ def drain_forward_progress_backlog(
                 continue
             pass_rotations_without_success += 1
             if pass_rotations_without_success >= pass_count:
-                full_rotation_topology_stall = count_passes_off_cooldown(
-                    pass_cooldowns=pass_cooldowns, now=datetime.now(UTC)
-                ) == 0
+                full_rotation_topology_stall = True
                 break
             continue
 
@@ -219,18 +209,11 @@ def drain_forward_progress_backlog(
         )
         if topology_only:
             topology_only_batches += 1
-            if pass_key:
-                record_pass_topology_stall(
-                    pass_key=pass_key,
-                    pass_cooldowns=pass_cooldowns,
-                    pass_stall_counts=pass_stall_counts,
-                    base_cooldown_seconds=base_cooldown_s,
-                    max_cooldown_seconds=max_pass_cooldown_s,
-                )
-            # Pass-local cooldown: advance cursor and continue slice (do not terminate globally).
-            if not scoped_drain and count_passes_off_cooldown(pass_cooldowns=pass_cooldowns) == 0:
-                full_rotation_topology_stall = True
-                break
+            if not scoped_drain:
+                pass_rotations_without_success += 1
+                if pass_rotations_without_success >= pass_count:
+                    full_rotation_topology_stall = True
+                    break
             continue
 
         if succeeded_n > 0:
@@ -329,8 +312,6 @@ def drain_forward_progress_backlog(
         "canonical_outcome": canonical_outcome,
         "convergence_health": convergence_health,
         "pass_index_next": cursor_pass_index,
-        "pass_cooldown_until": serialize_pass_cooldown_until(pass_cooldowns),
-        "pass_topology_stall_counts": serialize_pass_topology_stall_counts(pass_stall_counts),
         "pass_productivity": pass_productivity,
         "pass_topology_skips": pass_topology_skips,
         "duration_ms": elapsed_ms,

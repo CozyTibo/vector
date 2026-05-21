@@ -99,39 +99,18 @@ def resolve_fair_pass_cursor(
 ) -> tuple[str, str, str, int, bool]:
     """Return (connector, resource_type, pass_key, next_index, skipped_cooled_pass).
 
-    Skips passes on cooldown; deprioritizes high stall-count passes when alternatives exist.
+    Execution hot path uses fixed round-robin only (TRUE P0C). Cooldown/stall args are
+    ignored; admin tooling may still use ``record_pass_topology_stall`` separately.
     """
+    _ = pass_cooldowns, pass_stall_counts, now
     passes = all_canonical_passes_fair_rotation()
     if not passes:
         return "", "", "", 0, False
-    now = now or _now()
-    cooldowns = pass_cooldowns or {}
-    stalls = pass_stall_counts or {}
     n = len(passes)
-    start = int(pass_index) % n
-
-    candidates: list[tuple[int, str, str, str, int]] = []
-    for offset in range(n):
-        idx = (start + offset) % n
-        c, rt = passes[idx]
-        pk = pass_key_label(c, rt)
-        if pass_is_on_cooldown(pk, pass_cooldowns=cooldowns, now=now):
-            continue
-        candidates.append((idx, c, rt, pk, int(stalls.get(pk, 0))))
-
-    skipped_cooled = len(candidates) < n and len(candidates) > 0
-
-    if candidates:
-        # Prefer productive passes: lowest topology stall count, then fair index order.
-        candidates.sort(key=lambda t: (t[4], t[0]))
-        idx, c, rt, pk, _ = candidates[0]
-        return c, rt, pk, (idx + 1) % n, skipped_cooled
-
-    # All passes on cooldown — fall back to cursor pass (batch may no-op quickly).
-    idx = start
+    idx = int(pass_index) % n
     c, rt = passes[idx]
     pk = pass_key_label(c, rt)
-    return c, rt, pk, (idx + 1) % n, True
+    return c, rt, pk, (idx + 1) % n, False
 
 
 def count_passes_off_cooldown(*, pass_cooldowns: dict[str, datetime], now: datetime | None = None) -> int:
