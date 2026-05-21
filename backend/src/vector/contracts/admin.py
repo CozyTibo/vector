@@ -3096,6 +3096,9 @@ class AdminCortexIdentityContinuityEvidenceInspectResponse(BaseModel):
     canonical_kind_counts: dict[str, int]
     org_entity_kind_counts: dict[str, int]
     identity_primitive_projection_metrics: dict[str, Any] = Field(default_factory=dict)
+    github_email_extraction_metrics: dict[str, Any] = Field(default_factory=dict)
+    continuity_gap_reasons: list[dict[str, Any]] = Field(default_factory=list)
+    continuity_join_reason_catalog: dict[str, str] = Field(default_factory=dict)
     rule_pack_semantic: str
     current_engine_candidate_row_count: int
     candidate_pair_evidence_accumulation: dict[str, Any] = Field(default_factory=dict)
@@ -3104,6 +3107,25 @@ class AdminCortexIdentityContinuityEvidenceInspectResponse(BaseModel):
     fixture_survival_sample: list[dict[str, Any]]
     hostile_continuity_dry_run_trace: dict[str, Any]
     notes: list[str]
+
+
+class AdminCortexIdentityContinuityHealthResponse(BaseModel):
+    """Lightweight identity continuity health (execution-derived, operator truth)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    identity_continuity_health_schema_version: int
+    tenant_id: str
+    anchor_count: int
+    identity_primitive_projection_metrics: dict[str, Any] = Field(default_factory=dict)
+    github_email_extraction_metrics: dict[str, Any] = Field(default_factory=dict)
+    continuity_gap_reasons: list[dict[str, Any]] = Field(default_factory=list)
+    continuity_join_reason_catalog: dict[str, str] = Field(default_factory=dict)
+    current_engine_candidate_row_count: int = 0
+    substrate_counters: dict[str, Any] = Field(default_factory=dict)
+    onboarding_continuity_seeds: dict[str, Any] = Field(default_factory=dict)
+    actor_gap_taxonomy: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
 
 
 class AdminCortexIdentityReadinessEconomicsResponse(BaseModel):

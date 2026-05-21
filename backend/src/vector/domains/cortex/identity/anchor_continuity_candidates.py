@@ -22,8 +22,10 @@ from vector.domains.cortex.identity.anchor_projection import (
 )
 from vector.domains.cortex.identity.identity_primitive_projection import (
     extract_identity_primitives,
+    github_emails_for_continuity,
     github_login_strings_for_continuity,
     linear_user_ids_for_continuity,
+    notion_user_ids_for_continuity,
     org_entity_id_for_identity_primitive,
 )
 from vector.domains.cortex.identity.candidate_generation import regenerate_link_candidates
@@ -46,6 +48,19 @@ RULE_CONTINUITY_FIXTURE_CLUSTER: Final[str] = "p04.candidate.continuity_fixture_
 RULE_FIXTURE_LINK_SUBJECT: Final[str] = "p04.candidate.fixture_declared_link_subject_v1"
 RULE_FIXTURE_STABLE_ACCOUNT_KEY: Final[str] = "p04.candidate.fixture_declared_stable_account_key_v1"
 RULE_LINEAR_USER_ID: Final[str] = "p04.candidate.exact_linear_user_id_v1"
+RULE_NOTION_USER_ID: Final[str] = "p04.candidate.exact_notion_user_id_v1"
+
+CONTINUITY_JOIN_REASON_BY_RULE: Final[dict[str, str]] = {
+    RULE_SLACK_USER_ID: "same_slack_user_id",
+    RULE_GITHUB_LOGIN: "same_github_login",
+    RULE_LINEAR_USER_ID: "same_linear_user_id",
+    RULE_NOTION_USER_ID: "same_notion_user_id",
+    RULE_EMAIL_EXACT: "same_email_localpart_domain_display",
+    RULE_EMAIL_NORM_CONTINUITY_EVIDENCE: "same_email_norm",
+    RULE_CONTINUITY_FIXTURE_CLUSTER: "same_continuity_fixture_cluster",
+    RULE_FIXTURE_LINK_SUBJECT: "same_fixture_link_subject",
+    RULE_FIXTURE_STABLE_ACCOUNT_KEY: "same_stable_account_key",
+}
 
 _DEFAULT_MANIFEST: Final[dict[str, Any]] = {
     "rule_pack_id": "p04.anchor_continuity.v1",
@@ -53,6 +68,7 @@ _DEFAULT_MANIFEST: Final[dict[str, Any]] = {
         {"rule_id": RULE_SLACK_USER_ID, "kind": "exact_provider_key"},
         {"rule_id": RULE_GITHUB_LOGIN, "kind": "exact_provider_key"},
         {"rule_id": RULE_LINEAR_USER_ID, "kind": "exact_linear_user_id"},
+        {"rule_id": RULE_NOTION_USER_ID, "kind": "exact_notion_user_id"},
         {"rule_id": RULE_EMAIL_EXACT, "kind": "exact_email"},
         {"rule_id": RULE_EMAIL_NORM_CONTINUITY_EVIDENCE, "kind": "email_norm_continuity_evidence"},
         {"rule_id": RULE_CONTINUITY_FIXTURE_CLUSTER, "kind": "fixture_declared_cluster"},
@@ -125,6 +141,10 @@ def _emit_cross_entity_pairs_from_bucket(
                     "target_entity_id": str(b_id),
                     "evidence_raw_record_ids": sorted({ra, rb}),
                     "rule_id": rule_id,
+                    "continuity_join_reason": CONTINUITY_JOIN_REASON_BY_RULE.get(
+                        rule_id,
+                        "deterministic_rule_match",
+                    ),
                 }
             )
             emitted += 1
@@ -208,6 +228,8 @@ def continuity_identity_signals_for_anchor(
         "slack_user_id": _slack_user_id(payload, prof),
         "github_login": _github_login(payload, prof),
         "github_logins": github_login_strings_for_continuity(payload, prof),
+        "github_emails": github_emails_for_continuity(payload, prof),
+        "notion_user_ids": notion_user_ids_for_continuity(payload),
         "linear_user_ids": linear_user_ids_for_continuity(payload, prof),
         "email_normalized": em,
         "email_domain": dom,
@@ -396,6 +418,7 @@ def build_anchor_continuity_candidate_rows(
     by_link_subject: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_stable_account: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_linear: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_notion: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_email_norm: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
 
     for a in anchors:
@@ -424,6 +447,11 @@ def build_anchor_continuity_candidate_rows(
                 lu = mat.get("linear_user_id")
                 if isinstance(lu, str) and lu.strip():
                     by_linear[lu.strip()].append((eid, rid, a))
+
+            if pk == "notion_user":
+                nid = mat.get("notion_user_id")
+                if isinstance(nid, str) and nid.strip():
+                    by_notion[nid.strip()].append((eid, rid, a))
 
             if pk == "email_display_identity":
                 em = mat.get("email_norm")
@@ -489,6 +517,7 @@ def build_anchor_continuity_candidate_rows(
         (RULE_SLACK_USER_ID, by_slack),
         (RULE_GITHUB_LOGIN, by_github),
         (RULE_LINEAR_USER_ID, by_linear),
+        (RULE_NOTION_USER_ID, by_notion),
         (RULE_EMAIL_EXACT, by_email_strict),
         (RULE_EMAIL_NORM_CONTINUITY_EVIDENCE, by_email_norm),
         (RULE_CONTINUITY_FIXTURE_CLUSTER, by_fixture),

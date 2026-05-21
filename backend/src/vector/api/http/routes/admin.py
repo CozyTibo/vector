@@ -67,6 +67,7 @@ from vector.contracts.admin import (
     AdminCortexIdentityBackfillRunItem,
     AdminCortexIdentityBackfillRunsListResponse,
     AdminCortexIdentityContinuityEvidenceInspectResponse,
+    AdminCortexIdentityContinuityHealthResponse,
     AdminCortexIdentityContinuityRebuildRequest,
     AdminCortexIdentityContinuityRebuildResponse,
     AdminCortexIdentityContinuityVerifyResponse,
@@ -4146,6 +4147,28 @@ def build_admin_router() -> APIRouter:
             fixture_survival_sample_limit=fixture_survival_sample_limit,
         )
         return AdminCortexIdentityContinuityEvidenceInspectResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/continuity-health",
+        response_model=AdminCortexIdentityContinuityHealthResponse,
+    )
+    def admin_cortex_identity_continuity_health(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        anchor_scan_limit: Annotated[int, Query(ge=1, le=100_000)] = 50_000,
+    ) -> AdminCortexIdentityContinuityHealthResponse:
+        """Read-only identity continuity health: primitives, gaps, onboarding seeds (no new runtime)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.identity_continuity_health import (
+            build_identity_continuity_health_v1,
+        )
+
+        raw = build_identity_continuity_health_v1(
+            db,
+            tenant_id=tenant_id,
+            anchor_scan_limit=anchor_scan_limit,
+        )
+        return AdminCortexIdentityContinuityHealthResponse.model_validate(raw)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/readiness-economics",

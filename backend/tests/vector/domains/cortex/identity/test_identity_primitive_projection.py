@@ -6,7 +6,10 @@ import uuid
 from types import SimpleNamespace
 
 from vector.domains.cortex.identity.identity_primitive_projection import (
+    aggregate_github_email_extraction_metrics,
     extract_identity_primitives,
+    github_emails_for_continuity,
+    notion_user_ids_for_continuity,
     org_entity_id_for_identity_primitive,
 )
 
@@ -78,6 +81,63 @@ def test_github_extracts_multiple_actor_logins_from_pr() -> None:
     )
     assert logins == ["alice", "bob", "charlie"]
     assert len({org_entity_id_for_identity_primitive(tenant_id=tid, projection=p) for p in projs if p.projection_kind == "github_user"}) == 3
+
+
+def test_github_commit_author_and_committer_emails_extracted() -> None:
+    anchor = SimpleNamespace(
+        canonical_entity_id=uuid.uuid4(),
+        provider_identity_hash="h-commit",
+        canonical_object_kind="commit",
+        connector="github",
+        raw_record_id=1,
+        provider_identity_json={},
+    )
+    raw = SimpleNamespace(
+        resource_type="github.commit",
+        payload_body={
+            "commit": {
+                "author": {"email": "author@nexora.test", "name": "A"},
+                "committer": {"email": "committer@nexora.test", "name": "C"},
+            }
+        },
+    )
+    emails = github_emails_for_continuity(raw.payload_body, {})
+    assert emails == ["author@nexora.test", "committer@nexora.test"]
+    projs = extract_identity_primitives(anchor=anchor, raw=raw)
+    email_kinds = [p for p in projs if p.projection_kind in ("email_identity", "email_display_identity")]
+    assert len(email_kinds) == 2
+    norms = sorted(p.identity_material["email_norm"] for p in email_kinds)
+    assert norms == ["author@nexora.test", "committer@nexora.test"]
+    metrics = aggregate_github_email_extraction_metrics(anchors=[anchor], raw_by_id={1: raw})
+    assert metrics["github_anchors_with_email_primitive"] == 1
+
+
+def test_notion_page_created_by_projects_notion_user_primitive() -> None:
+    tid = uuid.uuid4()
+    anchor = SimpleNamespace(
+        canonical_entity_id=uuid.uuid4(),
+        provider_identity_hash="h-notion",
+        canonical_object_kind="page",
+        connector="notion",
+        raw_record_id=2,
+        provider_identity_json={},
+    )
+    raw = SimpleNamespace(
+        resource_type="notion.page",
+        payload_body={
+            "page": {
+                "created_by": {"object": "user", "id": "notion-user-abc", "name": "Pat"},
+                "last_edited_by": {"object": "user", "id": "notion-user-abc"},
+            }
+        },
+    )
+    assert notion_user_ids_for_continuity(raw.payload_body) == ["notion-user-abc"]
+    projs = extract_identity_primitives(anchor=anchor, raw=raw)
+    notion = [p for p in projs if p.projection_kind == "notion_user"]
+    assert len(notion) == 1
+    assert notion[0].identity_material["notion_user_id"] == "notion-user-abc"
+    assert notion[0].identity_material.get("display_name") == "Pat"
+    assert org_entity_id_for_identity_primitive(tenant_id=tid, projection=notion[0])
 
 
 def test_cross_tool_cluster_primitive_distinct_from_slack() -> None:

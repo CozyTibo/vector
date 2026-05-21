@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.identity.anchor_continuity_candidates import (
     _DEFAULT_MANIFEST,
     ANCHOR_CONTINUITY_RULE_SEMANTIC,
+    CONTINUITY_JOIN_REASON_BY_RULE,
     RULE_CONTINUITY_FIXTURE_CLUSTER,
     RULE_EMAIL_EXACT,
     RULE_EMAIL_NORM_CONTINUITY_EVIDENCE,
@@ -25,6 +26,7 @@ from vector.domains.cortex.identity.anchor_continuity_candidates import (
     RULE_FIXTURE_STABLE_ACCOUNT_KEY,
     RULE_GITHUB_LOGIN,
     RULE_LINEAR_USER_ID,
+    RULE_NOTION_USER_ID,
     RULE_SLACK_USER_ID,
     _continuity_fixture_dict,
     _display_name,
@@ -47,6 +49,7 @@ from vector.domains.cortex.identity.continuity_candidate_evidence_accumulation i
 )
 from vector.domains.cortex.identity.entity_kind_mapping import resolve_org_entity_kind_for_anchor
 from vector.domains.cortex.identity.identity_primitive_projection import (
+    aggregate_github_email_extraction_metrics,
     aggregate_identity_primitive_metrics,
     extract_identity_primitives,
     org_entity_id_for_identity_primitive,
@@ -60,7 +63,7 @@ from vector.infrastructure.db.models.cortex_canonical_transform_materialization 
 )
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 
-CONTINUITY_EVIDENCE_INSPECT_SCHEMA_VERSION: Final[int] = 5
+CONTINUITY_EVIDENCE_INSPECT_SCHEMA_VERSION: Final[int] = 6
 
 _LOGGER = logging.getLogger("vector.cortex.identity.continuity_evidence_inspector")
 
@@ -138,6 +141,7 @@ def _build_join_buckets(
     dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
     dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
     dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
+    dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
     dict[tuple[str, str, str], list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
     dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
     dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
@@ -146,6 +150,7 @@ def _build_join_buckets(
     by_slack: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_github: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_linear: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_notion: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_email_norm: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_email_strict: dict[tuple[str, str, str], list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
     by_fixture: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
@@ -178,6 +183,11 @@ def _build_join_buckets(
                 lu = mat.get("linear_user_id")
                 if isinstance(lu, str) and lu.strip():
                     by_linear[lu.strip()].append((eid, rid, a))
+
+            if pk == "notion_user":
+                nid = mat.get("notion_user_id")
+                if isinstance(nid, str) and nid.strip():
+                    by_notion[nid.strip()].append((eid, rid, a))
 
             if pk == "email_display_identity":
                 em = mat.get("email_norm")
@@ -237,7 +247,17 @@ def _build_join_buckets(
             if sak:
                 by_stable_account[sak].append((eid, rid, a))
 
-    return by_slack, by_github, by_linear, by_email_norm, by_email_strict, by_fixture, by_link_subject, by_stable_account
+    return (
+        by_slack,
+        by_github,
+        by_linear,
+        by_notion,
+        by_email_norm,
+        by_email_strict,
+        by_fixture,
+        by_link_subject,
+        by_stable_account,
+    )
 
 
 def _eligible_rules_for_anchor(
@@ -248,6 +268,7 @@ def _eligible_rules_for_anchor(
     by_slack: dict[str, list[Any]],
     by_github: dict[str, list[Any]],
     by_linear: dict[str, list[Any]],
+    by_notion: dict[str, list[Any]],
     by_email_norm: dict[str, list[Any]],
     by_email_strict: dict[tuple[str, str, str], list[Any]],
     by_fixture: dict[str, list[Any]],
@@ -303,6 +324,21 @@ def _eligible_rules_for_anchor(
                 }
                 if len(distinct_eids) >= 2:
                     eligible.append(RULE_LINEAR_USER_ID)
+
+        if pk == "notion_user":
+            nid = mat.get("notion_user_id")
+            if isinstance(nid, str) and nid.strip():
+                k = nid.strip()
+                lst = by_notion.get(k, [])
+                distinct_eids = {t[0] for t in lst}
+                bucket_sizes[RULE_NOTION_USER_ID] = {
+                    "key": k,
+                    "anchor_rows_in_bucket": len(lst),
+                    "distinct_org_entities": len(distinct_eids),
+                    "continuity_join_reason": CONTINUITY_JOIN_REASON_BY_RULE[RULE_NOTION_USER_ID],
+                }
+                if len(distinct_eids) >= 2:
+                    eligible.append(RULE_NOTION_USER_ID)
 
         if pk in ("email_identity", "email_display_identity"):
             emn = mat.get("email_norm")
@@ -419,10 +455,17 @@ def _primary_skip_reason(
         return "raw_join_missing"
     if canonical_unmapped:
         return "unsupported_canonical_kind_unknown_org_mapping"
+    notion_ids = signals.get("notion_user_ids")
+    linear_ids = signals.get("linear_user_ids")
+    github_emails = signals.get("github_emails")
     has_any_key = bool(
         signals.get("slack_user_id")
         or signals.get("github_login")
+        or (isinstance(github_emails, list) and len(github_emails) > 0)
+        or signals.get("email_normalized")
         or signals.get("email_rule_tuple_ready")
+        or (isinstance(notion_ids, list) and len(notion_ids) > 0)
+        or (isinstance(linear_ids, list) and len(linear_ids) > 0)
         or signals.get("fixture_cluster_key")
         or signals.get("fixture_link_subject")
         or signals.get("fixture_stable_account_key")
@@ -471,6 +514,7 @@ def build_continuity_evidence_inspection(
         by_slack,
         by_github,
         by_linear,
+        by_notion,
         by_email_norm,
         by_email_strict,
         by_fixture,
@@ -568,6 +612,7 @@ def build_continuity_evidence_inspection(
             by_slack=by_slack,
             by_github=by_github,
             by_linear=by_linear,
+            by_notion=by_notion,
             by_email_norm=by_email_norm,
             by_email_strict=by_email_strict,
             by_fixture=by_fixture,
@@ -729,6 +774,7 @@ def build_continuity_evidence_inspection(
             by_slack=by_slack,
             by_github=by_github,
             by_linear=by_linear,
+            by_notion=by_notion,
             by_email_norm=by_email_norm,
             by_email_strict=by_email_strict,
             by_fixture=by_fixture,
@@ -796,6 +842,23 @@ def build_continuity_evidence_inspection(
     ]
 
     prim_metrics = aggregate_identity_primitive_metrics(anchors=anchors, raw_by_id=raw_by_id)
+    github_email_metrics = aggregate_github_email_extraction_metrics(
+        anchors=anchors,
+        raw_by_id=raw_by_id,
+    )
+    from vector.domains.cortex.identity.identity_continuity_health import (
+        build_identity_continuity_gap_reasons_v1,
+    )
+
+    gap_reasons = build_identity_continuity_gap_reasons_v1(
+        db,
+        tenant_id=tenant_id,
+        anchors_scanned=len(anchors),
+        primitive_metrics=prim_metrics,
+        github_email_metrics=github_email_metrics,
+        candidate_row_count=len(candidate_rows),
+        anchors_rule_eligible=counters["anchors_continuity_rule_eligible"],
+    )
 
     out: dict[str, Any] = {
         "continuity_evidence_inspect_schema_version": CONTINUITY_EVIDENCE_INSPECT_SCHEMA_VERSION,
@@ -814,6 +877,9 @@ def build_continuity_evidence_inspection(
         "fixture_survival_sample": fixture_survival,
         "hostile_continuity_dry_run_trace": dry_run,
         "identity_primitive_projection_metrics": prim_metrics,
+        "github_email_extraction_metrics": github_email_metrics,
+        "continuity_gap_reasons": gap_reasons,
+        "continuity_join_reason_catalog": dict(CONTINUITY_JOIN_REASON_BY_RULE),
         "notes": notes,
     }
 
