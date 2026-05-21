@@ -57,8 +57,18 @@ def run_cortex_substrate_pipeline_coordinator_task(
     batch_limit: int | None = None,
     reason: str = "ingestion",
 ) -> dict[str, Any]:
-    """Create durable pipeline run and enqueue phase 02 (canonical)."""
+    """Create durable pipeline run and enqueue phase 02 (canonical).
+
+    Deprecated (M4): not enqueued from ``schedule_substrate_pipeline_v1``; admin/break-glass only.
+    """
     tid = uuid.UUID(tenant_id)
+    _LOGGER.warning(
+        "DEPRECATED substrate_pipeline_coordinator invoked directly tenant_id=%s trigger=%s "
+        "(M4: use convergence lease); reason=%s",
+        tenant_id,
+        trigger_kind,
+        reason,
+    )
     from vector.infrastructure.cortex_substrate_pipeline_schedule import (
         clear_substrate_pipeline_schedule_anchor_v1,
     )

@@ -12,7 +12,7 @@ The substrate **production path** is now:
 
 **ingest → dirty convergence lease → sweeper/worker slices → phase 02–08 inside `run_tenant_convergence_v1`**.
 
-Legacy **debounced Redis coordinator** (`schedule_substrate_pipeline_v1`) and **beat-driven progression/watchdog** remain in code as **compatibility / break-glass** paths but are **disabled by default** when convergence is authoritative.
+**M4:** `schedule_substrate_pipeline_v1` and the legacy post-ingestion Celery task redirect to convergence (dirty lease + worker). Legacy coordinator remains **admin/break-glass only** (deprecated log). Beat-driven progression/watchdog beats removed (M3).
 
 **One owner per concern (target state):**
 

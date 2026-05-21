@@ -40,7 +40,7 @@ def run_post_ingestion_substrate_refresh(
     """Drain canonical backlog, repair determinism, refresh identity, run graph export.
 
     When ``bundle_id`` is omitted, resolves the default transformable bundle for the tenant.
-    Phases 06–07 run via ``schedule_substrate_pipeline_v1`` (Celery), not in this function.
+    Phases 06–07 run via convergence worker after post-ingest dispatch, not in this function.
     """
     bid = (bundle_id or "").strip() or None
     if bid is None:

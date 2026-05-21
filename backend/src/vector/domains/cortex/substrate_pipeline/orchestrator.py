@@ -8,6 +8,12 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.convergence.enqueue import enqueue_tenant_convergence_v1
+from vector.domains.cortex.convergence.lease import mark_tenant_dirty_v1
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_CONVERGENCE,
+    emit_execution_path_telemetry_v1,
+)
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_03_IDENTITY,
@@ -19,10 +25,6 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PIPELINE_TRIGGER_FLUSH_RERUN,
     PIPELINE_TRIGGER_POST_INGESTION,
     SUBSTRATE_PIPELINE_PHASE_ORDER,
-)
-from vector.domains.cortex.execution.execution_path_telemetry import (
-    EXECUTION_PATH_LEGACY,
-    emit_execution_path_telemetry_v1,
 )
 from vector.domains.cortex.substrate_pipeline.repository import (
     compute_pipeline_idempotency_key_v1,
@@ -51,23 +53,16 @@ def schedule_substrate_pipeline_v1(
     batch_limit: int | None = None,
     reason: str = "ingestion",
 ) -> dict[str, Any]:
-    """Debounce and enqueue full substrate pipeline (phases 02–08) for one tenant."""
+    """Mark tenant dirty and enqueue convergence (M4: no legacy coordinator/debounce/revoke)."""
     cfg = settings or get_settings()
     if not cfg.cortex_post_ingestion_substrate_refresh_enabled:
         return {"scheduled": False, "reason": "disabled"}
 
     from vector.domains.cortex.operational_runtime.substrate_runtime_economics import (
         evaluate_pipeline_concurrency_v1,
-        resolve_post_ingestion_debounce_countdown_v1,
     )
-
     from vector.domains.cortex.canonical.transform_runtime import (
         resolve_default_bundle_id_for_stub_transform,
-    )
-    from vector.infrastructure.cortex_substrate_pipeline_schedule import (
-        clear_substrate_pipeline_schedule_anchor_v1,
-        resolve_substrate_pipeline_schedule_action_v1,
-        write_substrate_pipeline_schedule_anchor_v1,
     )
 
     with session_scope() as session:
@@ -90,101 +85,34 @@ def schedule_substrate_pipeline_v1(
                     "reason": "no_transformable_bundle",
                 }
 
-    debounce_resolved = resolve_post_ingestion_debounce_countdown_v1(cfg)
-    debounce = int(debounce_resolved["effective_countdown_seconds"])
-    max_wait = int(cfg.cortex_post_ingestion_substrate_refresh_max_wait_seconds)
-    schedule_action, schedule_meta = resolve_substrate_pipeline_schedule_action_v1(
-        tenant_id,
-        debounce_seconds=debounce,
-        max_wait_seconds=max_wait,
-        settings=cfg,
-    )
-    task_id = substrate_pipeline_celery_task_id(tenant_id)
-
-    if schedule_action == "coalesce":
-        coalesce_telemetry = emit_execution_path_telemetry_v1(
-            tenant_id=tenant_id,
-            execution_path=EXECUTION_PATH_LEGACY,
-            trigger=f"schedule_substrate_pipeline_coalesce:{trigger_kind}",
-            detail={"reason": reason, "schedule_action": schedule_action},
-        )
-        _LOGGER.info(
-            "substrate_pipeline_schedule_coalesced tenant_id=%s trigger=%s elapsed_s=%s",
-            tenant_id,
-            trigger_kind,
-            schedule_meta.get("elapsed_seconds"),
-        )
-        return {
-            "scheduled": True,
-            "coalesced": True,
-            "coalesce_action": "preserve_pending_coordinator",
-            "reason": reason,
-            "trigger_kind": trigger_kind,
-            "execution_path": EXECUTION_PATH_LEGACY,
-            "task_id": task_id,
-            "countdown_seconds": debounce,
-            "post_ingestion_debounce": debounce_resolved,
-            "schedule_coalesce": schedule_meta,
-            "execution_path_telemetry": coalesce_telemetry,
-        }
-
-    if schedule_action == "force_now":
-        debounce = 0
-        clear_substrate_pipeline_schedule_anchor_v1(tenant_id, settings=cfg)
-
-    anchor_ttl = max_wait + debounce + 300
-    write_substrate_pipeline_schedule_anchor_v1(
-        tenant_id,
-        ttl_seconds=anchor_ttl,
-        settings=cfg,
-    )
-
-    from app.celery_app import celery_app
-    from app.tasks.cortex_substrate_pipeline import run_cortex_substrate_pipeline_coordinator_task
-
-    try:
-        celery_app.control.revoke(task_id, terminate=False)
-    except Exception:  # noqa: BLE001
-        pass
-
-    async_result = run_cortex_substrate_pipeline_coordinator_task.apply_async(
-        kwargs={
-            "tenant_id": str(tenant_id),
-            "trigger_kind": trigger_kind,
-            "bundle_id": bundle_id,
-            "batch_limit": batch_limit,
-            "reason": reason,
-        },
-        queue="vector",
-        countdown=debounce,
-        task_id=task_id,
-    )
+    schedule_reason = f"{trigger_kind}:{reason}"
+    with session_scope() as session:
+        dirty = mark_tenant_dirty_v1(session, tenant_id=tenant_id, reason=schedule_reason)
+        session.commit()
+    hint = enqueue_tenant_convergence_v1(tenant_id, reason=schedule_reason)
     telemetry = emit_execution_path_telemetry_v1(
         tenant_id=tenant_id,
-        execution_path=EXECUTION_PATH_LEGACY,
+        execution_path=EXECUTION_PATH_CONVERGENCE,
         trigger=f"schedule_substrate_pipeline:{trigger_kind}",
-        celery_task_id=str(async_result.id),
-        detail={"reason": reason, "schedule_action": schedule_action},
+        celery_task_id=hint.get("celery_task_id"),
+        detail={"reason": reason, "obligation_epoch": dirty.get("obligation_epoch")},
     )
     _LOGGER.info(
-        "substrate_pipeline_scheduled tenant_id=%s trigger=%s countdown_s=%s action=%s",
+        "substrate_pipeline_scheduled_convergence tenant_id=%s trigger=%s reason=%s",
         tenant_id,
         trigger_kind,
-        debounce,
-        schedule_action,
+        reason,
     )
     return {
         "scheduled": True,
+        "path": "convergence_lease",
         "coalesced": False,
-        "schedule_action": schedule_action,
         "reason": reason,
         "trigger_kind": trigger_kind,
-        "execution_path": EXECUTION_PATH_LEGACY,
-        "task_id": task_id,
-        "celery_task_id": str(async_result.id),
-        "countdown_seconds": debounce,
-        "post_ingestion_debounce": debounce_resolved,
-        "schedule_coalesce": schedule_meta,
+        "execution_path": EXECUTION_PATH_CONVERGENCE,
+        "task_id": substrate_pipeline_celery_task_id(tenant_id),
+        **dirty,
+        **hint,
         "execution_path_telemetry": telemetry,
     }
 

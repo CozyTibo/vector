@@ -56,7 +56,7 @@ Cortex is being refactored for **deterministic execution**, not feature complete
 | **E. Convergence TCRE resume** | **MERGE** | One `on_async_job_complete` handler on FSM |
 | **F. Operational progression** | **DELETE** | Recovery = `rerun_phase(from=X)` only |
 | **G. Watchdog (as orchestrator)** | **DELETE** | Stall → mark FSM `STALLED` + metric; optional admin rerun |
-| **H. Post-ingest fork** | **DELETE** | Always dirty-mark + enqueue execution engine |
+| **H. Post-ingest fork** | **DELETE** (**M2–M4 done**) | Always dirty-mark + enqueue execution engine |
 | **I. Ingestion scheduler** | **KEEP** | Triggers `INGESTING` only; no substrate phases |
 | **J. Standalone backlog task** | **DELETE** | Canonical only via `CANONICAL_DRAINING` phase |
 | **K. Flush-rerun** | **MERGE** | Admin: `clear_outputs(from=phase)` + `enqueue_rerun(from=phase)` |
@@ -101,7 +101,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | **M1** | **P0 determinism fix:** In `run_cortex_substrate_pipeline_phase_task`, do not call `chain_after_phase_v1` after phase 02 if phase status is `waiting` or `failed` with zero successes | Medium | **Done** — `canonical_phase_gate.py`; flag `CORTEX_SUBSTRATE_PIPELINE_CANONICAL_CHAIN_GATE_ENABLED` (default true) |
 | **M2** | Force `cortex_convergence_runtime_enabled=true` everywhere; remove flag branch in `post_ingestion_refresh_dispatch` | Low | **Done** — convergence-only dispatch; removed `cortex_convergence_runtime_enabled` setting; TCRE resume via convergence only |
 | **M3** | Disable legacy beat: `cortex_convergence_disable_legacy_progression_beat=true` (already default); delete watchdog/progression beat entries | Low | **Done** — beat = ingestion + convergence sweep only; removed `cortex_convergence_disable_legacy_progression_beat`; `verify_legacy_substrate_beats_absent_from_celery_beat_v1` |
-| **M4** | Stop enqueueing `run_cortex_substrate_pipeline_coordinator_task` from all callers; redirect to `enqueue_tenant_convergence_v1` | Medium | Grep all `schedule_substrate_pipeline_v1` |
+| **M4** | Stop enqueueing `run_cortex_substrate_pipeline_coordinator_task` from all callers; redirect to `enqueue_tenant_convergence_v1` | Medium | **Done** — `schedule_substrate_pipeline_v1` + legacy post-ingestion Celery task → dirty mark + convergence; coordinator deprecated (admin-only); `verify_schedule_substrate_pipeline_uses_convergence_v1` |
 | **M5** | Rename convergence → `execution` package; add FSM table or extend `CortexTenantConvergenceLease` with explicit `fsm_state` | Medium | DB migration |
 | **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | Dual-run in staging only |
 | **M7** | Delete `substrate_operational_progression.py` and callers; migrate retrieval retry to FSM `BLOCKED` + manual/admin rerun | High | Document operator playbook |
@@ -665,7 +665,7 @@ app/tasks/
 | Week | Deliverable |
 |------|-------------|
 | W1 | M1 P0 gate fix + M2 force convergence + telemetry |
-| W2 | M4 stop legacy coordinator enqueue (**M3 beat cleanup done**) |
+| W2 | **M4 done**; M5 FSM schema + transition log |
 | W3 | FSM schema + transition log + engine package skeleton |
 | W4 | M6 single slice task; delete phase chain |
 | W5 | M7 progression delete; M8 admin deprecation |

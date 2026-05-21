@@ -64,3 +64,18 @@ def verify_convergence_sweep_in_celery_beat_v1() -> list[str]:
         errors.append("convergence_run_task_missing_runner")
     errors.extend(verify_legacy_substrate_beats_absent_from_celery_beat_v1())
     return errors
+
+
+def verify_schedule_substrate_pipeline_uses_convergence_v1() -> list[str]:
+    """Return error codes if legacy coordinator scheduling remains in orchestrator (M4)."""
+    from vector.domains.cortex.substrate_pipeline import orchestrator as orch
+
+    errors: list[str] = []
+    src = inspect.getsource(orch.schedule_substrate_pipeline_v1)
+    if "run_cortex_substrate_pipeline_coordinator_task" in src:
+        errors.append("schedule_substrate_pipeline_enqueues_legacy_coordinator")
+    if "enqueue_tenant_convergence_v1" not in src:
+        errors.append("schedule_substrate_pipeline_missing_convergence_enqueue")
+    if "mark_tenant_dirty_v1" not in src:
+        errors.append("schedule_substrate_pipeline_missing_dirty_mark")
+    return errors
