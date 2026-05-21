@@ -4611,6 +4611,9 @@ def build_admin_router() -> APIRouter:
             connection_id=body.connection_id,
         )
         from app.tasks.cortex_ingestion_sync import run_cortex_connector_sync_task
+        from vector.domains.cortex.ingestion.admin_overview import (
+            invalidate_cortex_ingestion_admin_caches_v1,
+        )
 
         run_cortex_connector_sync_task.delay(
             str(tenant_id),
@@ -4630,6 +4633,7 @@ def build_admin_router() -> APIRouter:
             connector=body.connector,
             sync_mode=body.sync_mode,
         )
+        invalidate_cortex_ingestion_admin_caches_v1(tenant_id)
         return AdminCortexIngestionTriggerSyncResponse(
             connector=body.connector,
             connection_id=tc.id,

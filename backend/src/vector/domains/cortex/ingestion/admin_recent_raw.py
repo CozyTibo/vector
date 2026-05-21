@@ -23,6 +23,15 @@ _RECENT_RUNS_CACHE_LOCK = threading.Lock()
 _RECENT_RUNS_CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]]]] = {}
 
 
+def invalidate_recent_ingestion_runs_cache_v1(tenant_id: uuid.UUID) -> None:
+    """Clear cached recent-run lists for a tenant (any limit)."""
+    prefix = str(tenant_id)
+    with _RECENT_RUNS_CACHE_LOCK:
+        stale = [k for k in _RECENT_RUNS_CACHE if k[0] == prefix]
+        for k in stale:
+            _RECENT_RUNS_CACHE.pop(k, None)
+
+
 def _dt_key(v: datetime | None) -> str | None:
     return v.isoformat() if v is not None else None
 

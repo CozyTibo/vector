@@ -79,7 +79,13 @@ export function RecentIngestionRuns({ runs, tenantId, nextScheduled }: Props) {
               <>
                 <span className="font-mono">{nextIngestionHeadline(nextScheduled)}</span>
                 {nextScheduled.status === "eligible_now" ? (
-                  <span className="ml-2 font-normal text-stone-600">(eligible now)</span>
+                  <span className="ml-2 font-normal text-stone-600">
+                    {new Date(nextScheduled.next_at).getTime() > Date.now() + 60_000
+                      ? "(eligible · next beat)"
+                      : "(eligible now)"}
+                  </span>
+                ) : nextScheduled.status === "waiting_cooldown" ? (
+                  <span className="ml-2 font-normal text-stone-600">(next scheduled enqueue)</span>
                 ) : null}
               </>
             ) : (

@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.connectors.cortex_ingestion_policy import (
@@ -29,6 +29,9 @@ ForecastStatus = Literal[
 ]
 
 
+_SCHEDULED_SOURCE_TRIGGERS = ("scheduled", "scheduled_lane")
+
+
 def _parse_checkpoint_iso(raw: str | None) -> datetime | None:
     if not isinstance(raw, str) or not raw.strip():
         return None
@@ -40,6 +43,33 @@ def _parse_checkpoint_iso(raw: str | None) -> datetime | None:
         return dt.astimezone(UTC)
     except ValueError:
         return None
+
+
+def _estimate_next_scheduler_tick_at_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    beat_seconds: int,
+    now: datetime,
+) -> datetime:
+    """Best-effort next Celery Beat tick from the latest scheduled ingestion run."""
+    beat = max(60, int(beat_seconds))
+    last = session.scalar(
+        select(func.max(IngestionRun.started_at)).where(
+            IngestionRun.tenant_id == tenant_id,
+            IngestionRun.source_trigger.in_(_SCHEDULED_SOURCE_TRIGGERS),
+        )
+    )
+    if last is None:
+        return now + timedelta(seconds=beat)
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=UTC)
+    else:
+        last = last.astimezone(UTC)
+    next_tick = last + timedelta(seconds=beat)
+    while next_tick <= now:
+        next_tick += timedelta(seconds=beat)
+    return next_tick
 
 
 def _connector_rows_for_tenant(
@@ -177,13 +207,19 @@ def estimate_tenant_next_scheduled_ingestion_v1(
         next_by_connector.append((connector, at))
 
     if eligible_now:
+        next_tick = _estimate_next_scheduler_tick_at_v1(
+            session,
+            tenant_id=tenant_id,
+            beat_seconds=beat,
+            now=now,
+        )
         summary = (
             f"Eligible now ({', '.join(eligible_now)}). "
-            f"Scheduler ticks every {beat}s — expect a scheduled sync on the next tick."
+            f"Beat enqueues scheduled syncs every {beat}s — next tick at the time shown."
         )
         return {
             "status": "eligible_now",
-            "next_at": now,
+            "next_at": next_tick,
             "summary": summary,
             "beat_interval_seconds": beat,
             "min_gap_seconds": min_gap,
@@ -192,10 +228,17 @@ def estimate_tenant_next_scheduled_ingestion_v1(
 
     assert next_by_connector
     next_by_connector.sort(key=lambda x: x[1])
-    next_connector, next_at = next_by_connector[0]
+    next_connector, eligibility_at = next_by_connector[0]
+    next_tick = _estimate_next_scheduler_tick_at_v1(
+        session,
+        tenant_id=tenant_id,
+        beat_seconds=beat,
+        now=now,
+    )
+    next_at = max(eligibility_at, next_tick)
     summary = (
-        f"Next scheduled eligibility for {next_connector} at this time "
-        f"(min gap {min_gap}s). Scheduler ticks every {beat}s after that."
+        f"{next_connector} becomes eligible at the time shown "
+        f"(min gap {min_gap}s). Scheduled enqueue happens on the next Beat tick after that."
     )
     return {
         "status": "waiting_cooldown",

@@ -35,6 +35,18 @@ _OVERVIEW_CACHE_LOCK = threading.Lock()
 _OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
+def invalidate_cortex_ingestion_admin_caches_v1(tenant_id: uuid.UUID) -> None:
+    """Drop cached ingestion admin payloads so manual sync UI refreshes immediately."""
+    key = str(tenant_id)
+    with _OVERVIEW_CACHE_LOCK:
+        _OVERVIEW_CACHE.pop(key, None)
+    from vector.domains.cortex.ingestion.admin_recent_raw import (
+        invalidate_recent_ingestion_runs_cache_v1,
+    )
+
+    invalidate_recent_ingestion_runs_cache_v1(tenant_id)
+
+
 def _operator_scheduler_label(
     *,
     env_enabled: bool,

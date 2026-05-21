@@ -38,13 +38,46 @@ function ConnectorsSummary({ connectors }: { connectors: CortexOverview["connect
       return (await res.json()) as TriggerSyncResponse;
     },
     onSuccess: (data) => {
+      const label = titleConnector(data.connector);
       setFeedback({
         kind: "success",
-        message: `${titleConnector(data.connector)} sync queued on ${data.queue ?? "cortex_live"} (${data.sync_mode ?? "incremental"}). A worker will run it shortly — refresh this page in a minute to see last sync and checkpoint update.`,
+        message: `${label} sync queued on ${data.queue ?? "cortex_live"} (${data.sync_mode ?? "incremental"}). Waiting for the worker to finish…`,
       });
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-phase-summary", tenantId, "ingestion"] });
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-pipeline-overview", tenantId] });
-      void qc.invalidateQueries({ queryKey: ["admin-cortex-ingestion", tenantId] });
+      const poll = async (attempt: number) => {
+        await qc.refetchQueries({ queryKey: ["admin-cortex-phase-summary", tenantId, "ingestion"] });
+        void qc.invalidateQueries({ queryKey: ["admin-cortex-pipeline-overview", tenantId] });
+        const summary = qc.getQueryData<
+          PhaseSummaryPayload & { connectors?: CortexOverview["connectors"] }
+        >(["admin-cortex-phase-summary", tenantId, "ingestion"]);
+        const row = summary?.connectors?.find((c) => c.connector === data.connector);
+        const latest = row?.latest_run;
+        const runIsFresh =
+          latest?.started_at != null &&
+          Date.now() - new Date(latest.started_at).getTime() < 5 * 60_000;
+        if (latest && attempt > 0 && runIsFresh) {
+          const rows =
+            latest.raw_rows_written != null ? latest.raw_rows_written.toLocaleString() : "0";
+          const age = formatRelativeAge(latest.started_at);
+          const rowsNote =
+            latest.raw_rows_written === 0
+              ? " No new raw rows this run — incremental may be caught up, or check Slack channel selection and API rate limits."
+              : "";
+          setFeedback({
+            kind: "success",
+            message: `${label} sync finished: ${latest.status} (${age}), ${rows} row(s) written.${rowsNote}`,
+          });
+          return;
+        }
+        if (attempt < 24) {
+          window.setTimeout(() => void poll(attempt + 1), 5000);
+        } else {
+          setFeedback({
+            kind: "error",
+            message: `${label} was queued but no new run appeared after 2 minutes. Check the worker (cortex_live queue) and Overview → Recent ingestion runs.`,
+          });
+        }
+      };
+      void poll(0);
     },
     onError: (err: Error) => {
       setFeedback({
