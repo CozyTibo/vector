@@ -190,26 +190,3 @@ def test_on_tcre_pipeline_uses_resume_path(
     assert out.get("resumed") is True
 
 
-def test_continue_tcre_wait_skips_when_continuation_resumed() -> None:
-    from unittest.mock import MagicMock
-
-    from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
-        _continue_tcre_wait_v1,
-    )
-    from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-        CONTINUATION_STATUS_RESUMED,
-    )
-
-    continuation = MagicMock()
-    continuation.continuation_status = CONTINUATION_STATUS_RESUMED
-    out = _continue_tcre_wait_v1(
-        MagicMock(),
-        tenant_id=uuid.uuid4(),
-        pipeline_run_id=uuid.uuid4(),
-        continuation=continuation,
-        run=MagicMock(),
-    )
-    assert out == {
-        "action": "tcre_continuation_already_advanced",
-        "continuation_status": CONTINUATION_STATUS_RESUMED,
-    }

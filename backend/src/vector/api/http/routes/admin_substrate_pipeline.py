@@ -351,7 +351,7 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
         """Answer: did ingest propagate downstream (retrieval/synthesis materially updated)?"""
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
-        from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
+        from vector.domains.cortex.execution.progression_status import (
             build_substrate_progression_status_v1,
         )
 
@@ -368,19 +368,15 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
         pipeline_run_id: Annotated[uuid.UUID | None, Query()] = None,
         force: Annotated[bool, Query()] = False,
     ) -> dict[str, Any]:
-        """Operator recovery — invoke progression coordinator (not required for normal ingest)."""
+        """Operator recovery — mark dirty and enqueue execution slice (M7)."""
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
-        from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
-            PROGRESSION_TRIGGER_MANUAL_V1,
-            continue_substrate_operational_progression_v1,
-        )
+        from vector.domains.cortex.execution.admin_rerun import admin_rerun_substrate_execution_v1
 
-        out = continue_substrate_operational_progression_v1(
+        out = admin_rerun_substrate_execution_v1(
             db,
             tenant_id=tenant_id,
             pipeline_run_id=pipeline_run_id,
-            trigger=PROGRESSION_TRIGGER_MANUAL_V1,
             force=force,
         )
         db.commit()

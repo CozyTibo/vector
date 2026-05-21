@@ -537,27 +537,6 @@ class Settings(BaseSettings):
             "Legacy watchdog beat removed (M3); interval retained for admin one-shot watchdog runs only."
         ),
     )
-    cortex_substrate_operational_progression_tick_enabled: bool = Field(
-        default=True,
-        validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_TICK_ENABLED",
-        description=(
-            "Legacy progression beat removed (M3); when true, allows manual Celery task invoke only."
-        ),
-    )
-    cortex_substrate_operational_progression_interval_seconds: int = Field(
-        default=300,
-        ge=60,
-        le=3600,
-        validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_INTERVAL_SECONDS",
-        description="Legacy progression beat cadence (M3: not registered on Celery beat).",
-    )
-    cortex_substrate_operational_progression_tick_limit: int = Field(
-        default=50,
-        ge=1,
-        le=200,
-        validation_alias="CORTEX_SUBSTRATE_OPERATIONAL_PROGRESSION_TICK_LIMIT",
-        description="Max pipeline runs examined per progression tick.",
-    )
     cortex_graph_density_pending_candidate_threshold: int = Field(
         default=10,
         ge=0,

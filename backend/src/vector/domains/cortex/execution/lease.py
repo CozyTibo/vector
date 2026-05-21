@@ -16,6 +16,7 @@ from vector.domains.cortex.execution.fsm import (
 )
 from vector.domains.cortex.execution.tenant_constants import (
     FSM_AWAITING_TCRE,
+    FSM_BLOCKED,
     FSM_CANONICAL_DRAINING,
     FSM_IDLE,
     FSM_STALLED,
@@ -240,6 +241,10 @@ def try_acquire_convergence_lease_v1(
     if row.status == LEASE_STATUS_WAITING:
         return None, "waiting_on_async"
 
+    if (row.fsm_state or "").strip() == FSM_BLOCKED:
+        code = (row.block_reason_code or "execution_blocked").strip()
+        return None, f"execution_blocked:{code}"
+
     if row.status == LEASE_STATUS_IDLE and int(row.obligation_epoch) <= int(row.target_epoch):
         return None, "nothing_owed"
 
@@ -361,6 +366,7 @@ def list_tenants_for_convergence_sweep_v1(
 
     stmt = (
         select(CortexTenantConvergenceLease.tenant_id)
+        .where(CortexTenantConvergenceLease.fsm_state != FSM_BLOCKED)
         .where(
             or_(
                 (

@@ -234,6 +234,24 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
         errors.append("phase07_runner_missing_synthesis_activation_hook")
     if "mark_continuation_completed_v1" in p07_src:
         errors.append("phase07_runner_must_not_mark_continuation_completed")
+    if "continue_substrate_operational_progression_v1" in p07_src:
+        errors.append("phase07_runner_must_not_call_progression_coordinator_m7")
+
+    import importlib.util
+
+    if importlib.util.find_spec(
+        "vector.domains.cortex.operational_runtime.substrate_operational_progression"
+    ) is not None:
+        errors.append("substrate_operational_progression_module_must_be_deleted_m7")
+
+    from vector.domains.cortex.execution import admin_rerun as rerun_mod
+
+    if not callable(getattr(rerun_mod, "admin_rerun_substrate_execution_v1", None)):
+        errors.append("missing_admin_rerun_substrate_execution_v1")
+
+    exec_src = inspect.getsource(rerun_mod.admin_rerun_substrate_execution_v1)
+    if "enqueue_execution_slice_at_phase_v1" not in exec_src:
+        errors.append("admin_rerun_missing_execution_slice_enqueue")
 
     p06_src = inspect.getsource(runners_mod.run_phase_06_tcre_v1)
     if "enforce_phase06_progression_law_v1" not in p06_src:

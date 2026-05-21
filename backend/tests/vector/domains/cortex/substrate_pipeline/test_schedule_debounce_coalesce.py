@@ -109,11 +109,11 @@ def test_schedule_substrate_pipeline_enqueues_convergence_not_coordinator(
         _fake_scope,
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.substrate_pipeline.orchestrator.mark_tenant_dirty_v1",
+        "vector.domains.cortex.execution.lease.mark_tenant_dirty_v1",
         _mark_dirty,
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.substrate_pipeline.orchestrator.enqueue_tenant_convergence_v1",
+        "vector.domains.cortex.execution.enqueue.enqueue_tenant_convergence_v1",
         _enqueue,
     )
     monkeypatch.setattr(

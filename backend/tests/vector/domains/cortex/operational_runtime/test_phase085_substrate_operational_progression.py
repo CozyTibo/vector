@@ -1,4 +1,4 @@
-"""Substrate operational progression coordinator (runtime closure)."""
+"""M7 — execution progression status + admin rerun (progression coordinator deleted)."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
-    PROGRESSION_OWNER_ID_V1,
+from vector.domains.cortex.execution.admin_rerun import admin_rerun_substrate_execution_v1
+from vector.domains.cortex.execution.progression_status import (
+    EXECUTION_OWNER_ID_V1,
     TENANT_PROGRESSION_CLASS_IDLE_V1,
     build_substrate_operational_progression_catalog_v1,
     build_substrate_progression_status_v1,
     classify_retrieval_materialization_outcome_v1,
-    continue_substrate_operational_progression_v1,
 )
 
 
@@ -49,10 +49,10 @@ def test_classify_retrieval_materialization_outcome() -> None:
     )
 
 
-def test_progression_catalog() -> None:
+def test_progression_catalog_points_at_execution_rerun() -> None:
     cat = build_substrate_operational_progression_catalog_v1()
-    assert cat["progression_owner_id"] == PROGRESSION_OWNER_ID_V1
-    assert cat["entrypoint"] == "continue_substrate_operational_progression_v1"
+    assert cat["progression_owner_id"] == EXECUTION_OWNER_ID_V1
+    assert cat["entrypoint"] == "admin_rerun_substrate_execution_v1"
 
 
 @pytest.fixture
@@ -82,9 +82,9 @@ def test_progression_status_idle_without_pipeline(db_session: Session, tenant: A
 
 
 @pytest.mark.integration
-def test_continue_no_pipeline(db_session: Session, tenant: Any) -> None:
-    out = continue_substrate_operational_progression_v1(db_session, tenant_id=tenant.id)
-    assert out["continued"] is False
+def test_admin_rerun_no_pipeline(db_session: Session, tenant: Any) -> None:
+    out = admin_rerun_substrate_execution_v1(db_session, tenant_id=tenant.id)
+    assert out["reran"] is False
     assert out["reason"] == "no_active_pipeline_run"
 
 

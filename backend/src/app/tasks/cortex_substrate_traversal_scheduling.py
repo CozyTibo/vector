@@ -42,18 +42,6 @@ def run_octs_walk_schedule_pass_task(
             pipeline_run_id=prid,
             graph_projection_stable_hash=graph_projection_stable_hash,
         )
-        if prid is not None:
-            from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
-                PROGRESSION_TRIGGER_TRAVERSAL_PASS_V1,
-                continue_substrate_operational_progression_v1,
-            )
-
-            out["progression"] = continue_substrate_operational_progression_v1(
-                session,
-                tenant_id=tid,
-                pipeline_run_id=prid,
-                trigger=PROGRESSION_TRIGGER_TRAVERSAL_PASS_V1,
-            )
         session.commit()
     _LOGGER.info(
         "octs_walk_schedule_pass_done tenant_id=%s walks_persisted=%s",

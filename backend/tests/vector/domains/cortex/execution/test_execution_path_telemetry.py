@@ -12,7 +12,6 @@ from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_ADMIN_BYPASS,
     EXECUTION_PATH_CONVERGENCE,
     EXECUTION_PATH_LEGACY,
-    EXECUTION_PATH_PROGRESSION,
     EXECUTION_PATH_TELEMETRY_EVENT,
     emit_admin_bypass_telemetry_v1,
     emit_execution_path_telemetry_v1,
@@ -41,14 +40,14 @@ def test_emit_execution_path_telemetry_structured_payload(caplog: pytest.LogCapt
     prid = uuid.uuid4()
     payload = emit_execution_path_telemetry_v1(
         tenant_id=tid,
-        execution_path=EXECUTION_PATH_PROGRESSION,
-        trigger="progression_tick",
+        execution_path=EXECUTION_PATH_ADMIN_BYPASS,
+        trigger="admin_rerun",
         pipeline_run_id=prid,
         phase_id="phase_07_retrieval",
         detail={"force": False},
     )
     assert payload["event"] == EXECUTION_PATH_TELEMETRY_EVENT
-    assert payload["execution_path"] == EXECUTION_PATH_PROGRESSION
+    assert payload["execution_path"] == EXECUTION_PATH_ADMIN_BYPASS
     assert payload["tenant_id"] == str(tid)
     assert payload["pipeline_run_id"] == str(prid)
     assert payload["phase_id"] == "phase_07_retrieval"

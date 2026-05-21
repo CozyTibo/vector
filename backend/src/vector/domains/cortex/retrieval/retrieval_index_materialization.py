@@ -549,7 +549,7 @@ def materialize_retrieval_index_for_pipeline_v1(
     stats["entry_count"] = published.entry_count
     stats["output_index_hash"] = published.output_index_hash
     stats["ok"] = published.build_state == "PUBLISHED"
-    from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
+    from vector.domains.cortex.execution.progression_status import (
         classify_retrieval_materialization_outcome_v1,
     )
 

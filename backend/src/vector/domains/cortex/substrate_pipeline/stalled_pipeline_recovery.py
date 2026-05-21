@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.execution.execution_path_telemetry import (
-    EXECUTION_PATH_PROGRESSION,
+    EXECUTION_PATH_CONVERGENCE,
     emit_execution_path_telemetry_v1,
 )
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_06_TCRE, PHASE_07_RETRIEVAL
@@ -167,7 +167,7 @@ def recover_stalled_pipeline_v1(
     if run_row is not None:
         emit_execution_path_telemetry_v1(
             tenant_id=run_row.tenant_id,
-            execution_path=EXECUTION_PATH_PROGRESSION,
+            execution_path=EXECUTION_PATH_CONVERGENCE,
             trigger=f"recover_stalled_pipeline:{action}",
             pipeline_run_id=pipeline_run_id,
             detail={"recovery_action": action},
@@ -410,20 +410,6 @@ def run_stalled_pipeline_watchdog_v1(
                 recovered.append({"pipeline_run_id": str(prid), **rec})
                 if rec.get("recovered"):
                     increment_watchdog_metric_v1("substrate_watchdog_recoveries_succeeded_total")
-                    from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
-                        PROGRESSION_TRIGGER_WATCHDOG_V1,
-                        continue_substrate_operational_progression_v1,
-                    )
-
-                    run_row = session.get(CortexSubstratePipelineRun, prid)
-                    if run_row is not None:
-                        prog = continue_substrate_operational_progression_v1(
-                            session,
-                            tenant_id=run_row.tenant_id,
-                            pipeline_run_id=prid,
-                            trigger=PROGRESSION_TRIGGER_WATCHDOG_V1,
-                        )
-                        rec["progression"] = prog
                 else:
                     increment_watchdog_metric_v1("substrate_watchdog_recoveries_failed_total")
             except Exception as exc:  # noqa: BLE001

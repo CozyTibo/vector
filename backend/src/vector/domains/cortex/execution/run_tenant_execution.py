@@ -310,6 +310,29 @@ def run_tenant_convergence_v1(
                     tenant_id=tenant_id,
                     pipeline_run_id=pipeline_run_id,
                 )
+                from vector.domains.cortex.execution.blocked import (
+                    apply_post_phase07_retrieval_policy_v1,
+                )
+
+                policy = apply_post_phase07_retrieval_policy_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    pipeline_run_id=pipeline_run_id,
+                    phase07_output=out if isinstance(out, dict) else {},
+                )
+                if policy == "blocked":
+                    session.commit()
+                    return {
+                        "tenant_id": str(tenant_id),
+                        "acquired": True,
+                        "outcome": "blocked_retrieval_starvation",
+                        "pipeline_run_id": str(pipeline_run_id),
+                        "fsm_state": lease.fsm_state,
+                        "block_reason_code": lease.block_reason_code,
+                    }
+                if policy == "retry_07":
+                    phase = PHASE_07_RETRIEVAL
+                    continue
                 activation = out.get("synthesis_activation") if isinstance(out, dict) else {}
                 chain = out.get("next_phase_chain") or (activation or {}).get("next_phase_chain")
                 if chain:

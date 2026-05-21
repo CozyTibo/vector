@@ -104,7 +104,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | **M4** | Stop enqueueing `run_cortex_substrate_pipeline_coordinator_task` from all callers; redirect to `enqueue_tenant_convergence_v1` | Medium | **Done** — `schedule_substrate_pipeline_v1` + legacy post-ingestion Celery task → dirty mark + convergence; coordinator deprecated (admin-only); `verify_schedule_substrate_pipeline_uses_convergence_v1` |
 | **M5** | Rename convergence → `execution` package; add FSM table or extend `CortexTenantConvergenceLease` with explicit `fsm_state` | Medium | **Done** — `execution/` package; lease `fsm_state` + `block_*`; `cortex_execution_transition_log`; `CortexTenantExecution` alias; `convergence/` re-export shims |
 | **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | **Done** — `vector.cortex.execution.run_slice`; `enqueue_execution_slice_at_phase_v1`; removed `chain_after_phase_v1`; legacy phase/coordinator tasks deprecated (no chain) |
-| **M7** | Delete `substrate_operational_progression.py` and callers; migrate retrieval retry to FSM `BLOCKED` + manual/admin rerun | High | Document operator playbook |
+| **M7** | Delete `substrate_operational_progression.py` and callers; migrate retrieval retry to FSM `BLOCKED` + manual/admin rerun | High | **Done** — deleted coordinator + Celery tick task; `execution/progression_status.py`, `blocked.py`, `admin_rerun.py`; retrieval policy in `run_tenant_execution_v1`; admin `POST …/progression/continue` → `admin_rerun_substrate_execution_v1`; [operator playbook](#m7-operator-playbook) |
 | **M8** | Collapse admin execution endpoints (section 5) | Medium | Deprecation period with 410 + replacement routes |
 | **M9** | Delete dead modules (section 9) | Low after M6–M8 | CI grep for imports |
 
@@ -121,7 +121,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | `cortex_convergence_runtime_enabled` | Remove (always on) |
 | `cortex_convergence_disable_legacy_progression_beat` | **Removed (M3)** |
 | `cortex_substrate_continuity_watchdog_auto_recover_enabled` | Remove (no auto-orchestration recovery) |
-| `cortex_substrate_operational_progression_tick_enabled` | Remove |
+| `cortex_substrate_operational_progression_tick_*` | **Removed (M7)** |
 | Debounce/coalesce settings for legacy coordinator | Remove |
 | `cortex_substrate_pipeline_max_concurrent_per_tenant` | Replace with single lease (already 1 writer) |
 
@@ -146,6 +146,15 @@ trigger (ingest complete | admin rerun | sweeper)
 | Admin scripts using materialize/backlog | Publish migration guide before M8 |
 | Long canonical topology_wait | FSM `BLOCKED` with reason; no fake advance to identity |
 | Test suite tied to PIPE-085 progression laws | Delete or rewrite tests that assert shadow orchestration |
+
+### M7 operator playbook
+
+When a tenant is stuck after ingest with **retrieval operational starvation** (upstream TCRE/walks/org-link work exists but published index has zero rows):
+
+1. **Inspect** `GET /admin/tenants/{tenant_id}/cortex/substrate-pipeline/progression-status` — check `execution_lease.fsm_state`, `block_reason_code`, `phase_status`, and `retrieval_index_row_count`.
+2. **If `fsm_state` is `BLOCKED`** with `retrieval_retry_exhausted`: fix upstream data (TCRE completion, walks, org links), then **`POST …/progression/continue`** (optional `force=true`) — clears block, marks dirty, enqueues `vector.cortex.execution.run_slice` at the first incomplete phase (or current cursor).
+3. **Do not** invoke removed Celery task `vector.cortex.operational_runtime.substrate_progression_tick`; convergence sweeper + execution slice are authoritative.
+4. **Bounded retries** (`MAX_RETRIEVAL_MATERIALIZATION_RETRIES_V1=3`) run inside the execution slice only; further automatic re-enqueue stops at `BLOCKED`.
 
 ---
 
@@ -483,7 +492,7 @@ Every slice ends with:
 |---|-----------|----------|----------|-----|
 | 1 | Celery chains identity while canonical `waiting` | **P0 Critical** | `cortex_substrate_pipeline.py` + `chain_after_phase_v1` | M1 gate or delete chain |
 | 2 | Two post-ingest runtimes (convergence vs legacy) | **P0** | `post_ingestion_refresh_dispatch.py` | M2–M4 single path |
-| 3 | Progression re-enqueues phases independently | **P0** | `substrate_operational_progression.py` | M7 delete |
+| 3 | Progression re-enqueues phases independently | **P0** | ~~`substrate_operational_progression.py`~~ | **M7 done** — execution slice + admin rerun |
 | 4 | TCRE callback + progression + continuation triple resume | **P0** | `orchestrator.on_tcre_job_completed_*` | Merge to FSM handler |
 | 5 | Incremental retrieval in TCRE task (skips RETRIEVAL gate) | **P1 High** | `cortex_tcre_reconstruction_jobs.py` | Move to RETRIEVAL only |
 | 6 | Phase `completed` with zero processed | **P1** | `phase_runners`, repository | `completed_empty` / `BLOCKED` |
@@ -666,9 +675,9 @@ app/tasks/
 |------|-------------|
 | W1 | M1 P0 gate fix + M2 force convergence + telemetry |
 | W2 | **M4–M6 done** |
-| W3 | M7 progression delete; M8 admin deprecation |
+| W3 | **M7 done**; M8 admin deprecation |
 | W4 | M9 sidecar deletion + replay contract |
-| W5 | M7 progression delete; M8 admin deprecation |
+| W5 | M8 admin deprecation |
 | W6 | M9 sidecar deletion + replay contract |
 | W7 | Test rewrite + oper playbook + remove flags |
 

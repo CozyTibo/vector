@@ -382,22 +382,10 @@ def run_phase_07_retrieval_v1(
             pipeline_run_id=pipeline_run_id,
             published_index_epoch=out.get("published_index_epoch") or out.get("index_epoch"),
         )
-        from vector.domains.cortex.operational_runtime.substrate_operational_progression import (
-            PROGRESSION_TRIGGER_RETRIEVAL_PUBLISHED_V1,
-            continue_substrate_operational_progression_v1,
-        )
-
-        progression = continue_substrate_operational_progression_v1(
-            session,
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-            trigger=PROGRESSION_TRIGGER_RETRIEVAL_PUBLISHED_V1,
-        )
         return {
             **out,
             "synthesis_activation": activation,
             "next_phase_chain": activation.get("next_phase_chain"),
-            "progression": progression,
         }
     except Exception as exc:  # noqa: BLE001
         fail_phase_v1(
