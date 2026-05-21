@@ -1,4 +1,4 @@
-"""Compatibility shim — prefer ``sync_router`` and ``connectors.*`` (P2 step 11)."""
+"""Compatibility shim — prefer ``sync_router`` and ``connectors.*`` ."""
 
 from __future__ import annotations
 

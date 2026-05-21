@@ -1,16 +1,16 @@
-"""P1 step 8 — phase 03 identity projection without org-link replay job enqueue."""
+"""Phase 03 identity projection without org-link replay job enqueue."""
 
 from __future__ import annotations
 
 import inspect
 
-from vector.domains.cortex.execution.scheduling import verify_p1_step8_identity_projection_boundary_v1
+from vector.domains.cortex.execution.scheduling import verify_phase03_identity_projection_boundary_v1
 from vector.domains.cortex.identity import continuity_rebuild as id_mod
 from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
 
-def test_verify_p1_step8_identity_projection_boundary() -> None:
-    assert verify_p1_step8_identity_projection_boundary_v1() == []
+def test_verify_phase03_identity_projection_boundary() -> None:
+    assert verify_phase03_identity_projection_boundary_v1() == []
 
 
 def test_phase03_runner_uses_single_projection_entrypoint() -> None:

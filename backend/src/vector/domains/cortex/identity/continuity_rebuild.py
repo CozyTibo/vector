@@ -67,7 +67,7 @@ def build_identity_substrate_projection_receipt_v1(
     substrate_trigger: str,
     counts_before: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Deterministic phase-03 receipt JSON — no org-link replay job row (P1 step 8)."""
+    """Deterministic phase-03 receipt JSON — no org-link replay job row ."""
     cand = substrate.get("candidate_regeneration") or {}
     auth_sha = compute_authoritative_link_set_sha256(db, tenant_id=tenant_id)
     after = substrate_counts(db, tenant_id=tenant_id)

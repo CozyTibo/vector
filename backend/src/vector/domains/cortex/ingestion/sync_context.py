@@ -18,7 +18,7 @@ class IngestionSyncContext:
     ``replay:<replay_job_id>`` scope so live cursors are never advanced from replay work.
 
     ``backfill_lane`` selects the checkpoint backfill writer without a separate top-level
-    sync mode (P2 step 11: collapse to live | replay only).
+    sync mode (live | replay only).
     """
 
     sync_mode: str

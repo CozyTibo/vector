@@ -232,7 +232,7 @@ def run_traversal_slice_for_pipeline_v1(
     graph_projection_stable_hash: str | None = None,
     max_starts: int = SUBSTRATE_TRAVERSAL_MAX_STARTS_V1,
 ) -> dict[str, Any]:
-    """Single phase-05 transform: deterministic starts + walk materialization (P1 step 10)."""
+    """Single phase-05 transform: deterministic starts + walk materialization ."""
     export_doc = build_org_graph_projection_export_document(session, tenant_id=tenant_id)
     inner = export_doc.get("projection")
     if not isinstance(inner, dict):

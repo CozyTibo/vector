@@ -1,16 +1,16 @@
-"""P1 step 10 — phase 05 collapsed traversal slice (no schedule pass / explainability)."""
+"""Phase 05 collapsed traversal slice (no schedule pass / explainability)."""
 
 from __future__ import annotations
 
 import inspect
 
-from vector.domains.cortex.execution.scheduling import verify_p1_step10_traversal_slice_boundary_v1
+from vector.domains.cortex.execution.scheduling import verify_phase05_traversal_slice_boundary_v1
 from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 from vector.domains.cortex.substrate_pipeline import substrate_traversal_execution as ste_mod
 
 
-def test_verify_p1_step10_traversal_slice_boundary() -> None:
-    assert verify_p1_step10_traversal_slice_boundary_v1() == []
+def test_verify_phase05_traversal_slice_boundary() -> None:
+    assert verify_phase05_traversal_slice_boundary_v1() == []
 
 
 def test_phase05_runner_calls_collapsed_traversal_slice_only() -> None:

@@ -153,9 +153,9 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
 
     tcre_src = inspect.getsource(orch_mod.on_tcre_job_completed_for_pipeline_v1)
     if "resume_pipeline_after_tcre_completion_v1" in tcre_src:
-        errors.append("on_tcre_must_not_call_continuation_resume_p0_step3")
+        errors.append("on_tcre_must_not_call_continuation_resume")
     if "on_tcre_job_terminal_for_execution_v1" not in tcre_src:
-        errors.append("on_tcre_missing_execution_terminal_resume_p0_step3")
+        errors.append("on_tcre_missing_execution_terminal_resume")
     if "assert_tcre_completion_uses_resume_path_v1" not in tcre_src:
         errors.append("on_tcre_missing_resume_path_guard")
 
@@ -168,73 +168,73 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
 
     syn_src = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
     if "mark_continuation_completed_v1" in syn_src:
-        errors.append("phase08_runner_must_not_mark_continuation_completed_p0_step4")
+        errors.append("phase08_runner_must_not_mark_continuation_completed")
     if "evaluate_synthesis_activation_schedule_v1" not in syn_src:
-        errors.append("phase08_runner_missing_synthesis_activation_evaluation_p0_step1")
+        errors.append("phase08_runner_missing_synthesis_activation_evaluation")
 
     from vector.domains.cortex.substrate_pipeline import phase_runners as runners_mod
 
     from vector.domains.cortex.execution.scheduling import (
-        verify_p0_step2_phase06_tcre_worker_boundary_v1,
-        verify_p0_step3_single_tcre_resume_path_v1,
-        verify_p0_step4_no_continuation_on_execution_hot_path_v1,
-        verify_p0_step5_canonical_single_drain_v1,
-        verify_p0_step6_no_pass_fairness_on_lease_v1,
-        verify_p0_step7_determinism_repair_off_hot_path_v1,
-        verify_p1_step8_identity_projection_boundary_v1,
-        verify_p1_step9_graph_projection_export_boundary_v1,
-        verify_p1_step10_traversal_slice_boundary_v1,
-        verify_p3_step12_cesp_frozen_off_execution_hot_path_v1,
+        verify_tcre_worker_no_retrieval_materialization_boundary_v1,
+        verify_single_tcre_execution_resume_boundary_v1,
+        verify_execution_hot_path_no_continuation_boundary_v1,
+        verify_canonical_single_drain_boundary_v1,
+        verify_execution_lease_no_pass_fairness_boundary_v1,
+        verify_canonical_no_inline_determinism_repair_boundary_v1,
+        verify_phase03_identity_projection_boundary_v1,
+        verify_phase04_graph_projection_export_boundary_v1,
+        verify_phase05_traversal_slice_boundary_v1,
+        verify_execution_hot_path_no_cesp_imports_boundary_v1,
     )
 
-    errors.extend(verify_p0_step2_phase06_tcre_worker_boundary_v1())
-    errors.extend(verify_p0_step3_single_tcre_resume_path_v1())
-    errors.extend(verify_p0_step4_no_continuation_on_execution_hot_path_v1())
-    errors.extend(verify_p0_step5_canonical_single_drain_v1())
-    errors.extend(verify_p0_step6_no_pass_fairness_on_lease_v1())
-    errors.extend(verify_p0_step7_determinism_repair_off_hot_path_v1())
-    errors.extend(verify_p1_step8_identity_projection_boundary_v1())
-    errors.extend(verify_p1_step9_graph_projection_export_boundary_v1())
-    errors.extend(verify_p1_step10_traversal_slice_boundary_v1())
-    errors.extend(verify_p3_step12_cesp_frozen_off_execution_hot_path_v1())
+    errors.extend(verify_tcre_worker_no_retrieval_materialization_boundary_v1())
+    errors.extend(verify_single_tcre_execution_resume_boundary_v1())
+    errors.extend(verify_execution_hot_path_no_continuation_boundary_v1())
+    errors.extend(verify_canonical_single_drain_boundary_v1())
+    errors.extend(verify_execution_lease_no_pass_fairness_boundary_v1())
+    errors.extend(verify_canonical_no_inline_determinism_repair_boundary_v1())
+    errors.extend(verify_phase03_identity_projection_boundary_v1())
+    errors.extend(verify_phase04_graph_projection_export_boundary_v1())
+    errors.extend(verify_phase05_traversal_slice_boundary_v1())
+    errors.extend(verify_execution_hot_path_no_cesp_imports_boundary_v1())
 
     p03_src = inspect.getsource(runners_mod.run_phase_03_identity_v1)
     if "finalize_identity_substrate_operator_audit" in p03_src:
-        errors.append("phase03_runner_must_not_call_finalize_identity_substrate_operator_audit_p1_step8")
+        errors.append("phase03_runner_must_not_call_finalize_identity_substrate_operator_audit")
     if "run_identity_substrate_projection_for_pipeline_v1" not in p03_src:
-        errors.append("phase03_runner_must_call_identity_projection_for_pipeline_p1_step8")
+        errors.append("phase03_runner_must_call_identity_projection_for_pipeline")
 
     p04_src = inspect.getsource(runners_mod.run_phase_04_graph_v1)
     if "execute_org_link_replay_job" in p04_src:
-        errors.append("phase04_runner_must_not_call_org_link_replay_job_p1_step9")
+        errors.append("phase04_runner_must_not_call_org_link_replay_job")
     if "run_graph_projection_export_for_pipeline_v1" not in p04_src:
-        errors.append("phase04_runner_must_call_graph_projection_export_for_pipeline_p1_step9")
+        errors.append("phase04_runner_must_call_graph_projection_export_for_pipeline")
     if "build_org_graph_traversal_verification_slice_v1" in p04_src:
-        errors.append("phase04_runner_must_not_build_verification_slice_p1_step9")
+        errors.append("phase04_runner_must_not_build_verification_slice")
 
     p05_src = inspect.getsource(runners_mod.run_phase_05_traversal_v1)
     if "run_octs_walk_schedule_pass_v1" in p05_src:
-        errors.append("phase05_runner_must_not_call_octs_walk_schedule_pass_p1_step10")
+        errors.append("phase05_runner_must_not_call_octs_walk_schedule_pass")
     if "run_traversal_slice_for_pipeline_v1" not in p05_src:
-        errors.append("phase05_runner_must_call_traversal_slice_for_pipeline_p1_step10")
+        errors.append("phase05_runner_must_call_traversal_slice_for_pipeline")
     if "traversal_explainability_panel" in p05_src:
-        errors.append("phase05_runner_must_not_export_explainability_panel_p1_step10")
+        errors.append("phase05_runner_must_not_export_explainability_panel")
 
     p02_src = inspect.getsource(runners_mod.run_phase_02_canonical_v1)
     if "drain_stub_materialize_backlog" in p02_src:
-        errors.append("phase02_runner_must_not_call_drain_stub_p0_step5")
+        errors.append("phase02_runner_must_not_call_drain_stub")
     if p02_src.count("drain_forward_progress_backlog(") != 1:
-        errors.append("phase02_runner_must_single_drain_forward_progress_p0_step5")
+        errors.append("phase02_runner_must_single_drain_forward_progress")
     if "repair_tenant_materialization_oracle_determinism_drift" in p02_src:
-        errors.append("phase02_runner_must_not_run_determinism_repair_p0_step7")
+        errors.append("phase02_runner_must_not_run_determinism_repair")
 
     p06_src = inspect.getsource(runners_mod.run_phase_06_tcre_v1)
     if "pipeline_continuation" in p06_src or "mark_pipeline_waiting_on_tcre_v1" in p06_src:
-        errors.append("phase06_runner_must_not_write_pipeline_continuation_p0_step4")
+        errors.append("phase06_runner_must_not_write_pipeline_continuation")
 
     p07_src = inspect.getsource(runners_mod.run_phase_07_retrieval_v1)
     if "run_synthesis_activation_after_phase07_v1" in p07_src:
-        errors.append("phase07_runner_must_not_call_synthesis_activation_p0_step1")
+        errors.append("phase07_runner_must_not_call_synthesis_activation")
     if "mark_continuation_completed_v1" in p07_src:
         errors.append("phase07_runner_must_not_mark_continuation_completed")
     if "continue_substrate_operational_progression_v1" in p07_src:
@@ -258,9 +258,9 @@ def verify_gp085_prog01_progression_static() -> dict[str, Any]:
 
     p06_src = inspect.getsource(runners_mod.run_phase_06_tcre_v1)
     if "execution.phase06_contract" not in p06_src:
-        errors.append("phase06_runner_must_import_execution_phase06_contract_p3_step12")
+        errors.append("phase06_runner_must_import_execution_phase06_contract")
     if "operational_runtime" in p06_src:
-        errors.append("phase06_runner_must_not_import_operational_runtime_p3_step12")
+        errors.append("phase06_runner_must_not_import_operational_runtime")
     if "enforce_phase06_progression_law_v1" not in p06_src:
         errors.append("phase06_runner_missing_progression_enforcement")
 

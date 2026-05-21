@@ -272,7 +272,7 @@ def run_graph_projection_export_for_pipeline_v1(
     *,
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
-    """Single phase-04 transform: direct projection export (no org-link replay job, P1 step 9)."""
+    """Single phase-04 transform: direct projection export (no org-link replay job)."""
     doc = build_org_graph_projection_export_document(db, tenant_id=tenant_id)
     stable = str(doc.get("stable_hash_sha256") or "").strip()
     if not stable:

@@ -385,15 +385,15 @@ def verify_gp085_syn01_static() -> dict[str, Any]:
 
     p07_src = inspect.getsource(pr.run_phase_07_retrieval_v1)
     if "run_synthesis_activation_after_phase07_v1" in p07_src:
-        errors.append("phase07_must_not_call_synthesis_activation_p0_step1")
+        errors.append("phase07_must_not_call_synthesis_activation")
 
     p08_src = inspect.getsource(syn_mod.run_substrate_phase_08_synthesis_v1)
     if "operational_runtime" in p08_src:
-        errors.append("phase08_must_not_import_operational_runtime_p3_step12")
+        errors.append("phase08_must_not_import_operational_runtime")
     if "phase08_activation_gate" not in p08_src:
-        errors.append("phase08_must_import_phase08_activation_gate_p3_step12")
+        errors.append("phase08_must_import_phase08_activation_gate")
     if "evaluate_synthesis_activation_schedule_v1" not in p08_src:
-        errors.append("phase08_missing_synthesis_activation_evaluation_p0_step1")
+        errors.append("phase08_missing_synthesis_activation_evaluation")
 
     from vector.domains.cortex.synthesis.phase08_activation_gate import (
         evaluate_synthesis_activation_schedule_v1 as phase08_evaluate_v1,

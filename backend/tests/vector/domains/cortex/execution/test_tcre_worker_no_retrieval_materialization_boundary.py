@@ -1,4 +1,4 @@
-"""P0 step 2 — TCRE Celery worker must not materialize retrieval (phase 07 only)."""
+"""TCRE Celery worker must not materialize retrieval (phase 07 only)."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ import inspect
 from pathlib import Path
 
 from vector.domains.cortex.execution.scheduling import (
-    verify_p0_step2_phase06_tcre_worker_boundary_v1,
+    verify_tcre_worker_no_retrieval_materialization_boundary_v1,
 )
 
 
-def test_verify_p0_step2_phase06_tcre_worker_boundary() -> None:
-    assert verify_p0_step2_phase06_tcre_worker_boundary_v1() == []
+def test_verify_tcre_worker_no_retrieval_materialization_boundary() -> None:
+    assert verify_tcre_worker_no_retrieval_materialization_boundary_v1() == []
 
 
 def test_tcre_celery_task_has_no_retrieval_side_effects() -> None:

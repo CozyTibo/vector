@@ -160,7 +160,7 @@ def run_canonical_determinism_repair_v1(
     scan_limit: int = 5000,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Operator determinism repair — not on substrate execution hot path (P0 step 7).
+    """Operator determinism repair — not on substrate execution hot path .
 
     Prefer this or ``POST .../cortex/canonical/verification/repair-determinism-drift`` over
     phase 02 inline repair.

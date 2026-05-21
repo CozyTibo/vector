@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-off splitter: sync_executor.py → connectors/* + sync_shared + router (P2 step 11)."""
+"""One-off splitter: sync_executor.py → connectors/* + sync_shared + router ."""
 
 from __future__ import annotations
 
@@ -126,7 +126,7 @@ from vector.domains.cortex.ingestion.sync_shared import (
     router_text = router_text.replace("_slack_sync(", "run_slack_connector_sync(")
     router_text = router_text.replace("_notion_sync(", "run_notion_connector_sync(")
     router_text = router_text.replace("_calls_sync(", "run_calls_connector_sync(")
-    router_header = '''"""Thin connector sync router (P2 step 11)."""
+    router_header = '''"""Thin connector sync router ."""
 
 from __future__ import annotations
 
@@ -170,12 +170,12 @@ _logger = logging.getLogger("app")
 
 '''
     (conn / "__init__.py").write_text(
-        '"""Per-connector ingestion sync adapters (P2 step 11)."""\n',
+        '"""Per-connector ingestion sync adapters ."""\n',
         encoding="utf-8",
     )
     (OUT / "sync_router.py").write_text(router_header + router_text, encoding="utf-8")
 
-    shim = '''"""Compatibility shim — prefer ``sync_router`` and ``connectors.*`` (P2 step 11)."""
+    shim = '''"""Compatibility shim — prefer ``sync_router`` and ``connectors.*`` ."""
 
 from vector.domains.cortex.ingestion.connectors.github.sync import (
     ensure_github_workflow_run_repository_metadata,

@@ -1,4 +1,4 @@
-"""Phase 06 TCRE output + post-enqueue lease contract (execution slice, P3 step 12)."""
+"""Phase 06 TCRE output + post-enqueue lease contract (execution slice)."""
 
 from __future__ import annotations
 

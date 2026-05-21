@@ -1,4 +1,4 @@
-"""Thin connector sync router (P2 step 11)."""
+"""Thin connector sync router ."""
 
 from __future__ import annotations
 

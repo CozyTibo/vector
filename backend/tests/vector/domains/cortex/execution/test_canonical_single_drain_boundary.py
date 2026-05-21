@@ -1,15 +1,15 @@
-"""P0 step 5 — phase 02 must use a single drain_forward_progress_backlog entry."""
+"""Phase 02 must use a single drain_forward_progress_backlog entry."""
 
 from __future__ import annotations
 
 import inspect
 
-from vector.domains.cortex.execution.scheduling import verify_p0_step5_canonical_single_drain_v1
+from vector.domains.cortex.execution.scheduling import verify_canonical_single_drain_boundary_v1
 from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
 
-def test_verify_p0_step5_canonical_single_drain() -> None:
-    assert verify_p0_step5_canonical_single_drain_v1() == []
+def test_verify_canonical_single_drain_boundary() -> None:
+    assert verify_canonical_single_drain_boundary_v1() == []
 
 
 def test_phase02_runner_single_forward_progress_drain() -> None:

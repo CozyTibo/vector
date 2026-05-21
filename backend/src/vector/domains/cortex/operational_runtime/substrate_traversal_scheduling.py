@@ -363,7 +363,7 @@ def verify_gp085_walk01_static() -> dict[str, Any]:
     if "run_traversal_slice_for_pipeline_v1" not in pr_src:
         errors.append("phase_05_missing_run_traversal_slice_for_pipeline_v1")
     if "run_octs_walk_schedule_pass_v1" in pr_src:
-        errors.append("phase_05_must_not_call_octs_walk_schedule_pass_p1_step10")
+        errors.append("phase_05_must_not_call_octs_walk_schedule_pass")
     if "schedule_octs_walks_for_tenant_v1" in pr_src:
         errors.append("phase_05_must_not_schedule_celery_traversal_sidecar_m9")
 

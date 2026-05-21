@@ -1,16 +1,16 @@
-"""P1 step 9 — phase 04 direct graph projection export (no replay job / verification slice)."""
+"""Phase 04 direct graph projection export (no replay job / verification slice)."""
 
 from __future__ import annotations
 
 import inspect
 
-from vector.domains.cortex.execution.scheduling import verify_p1_step9_graph_projection_export_boundary_v1
+from vector.domains.cortex.execution.scheduling import verify_phase04_graph_projection_export_boundary_v1
 from vector.domains.cortex.identity import projection_export as pe_mod
 from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
 
-def test_verify_p1_step9_graph_projection_export_boundary() -> None:
-    assert verify_p1_step9_graph_projection_export_boundary_v1() == []
+def test_verify_phase04_graph_projection_export_boundary() -> None:
+    assert verify_phase04_graph_projection_export_boundary_v1() == []
 
 
 def test_phase04_runner_calls_direct_export_only() -> None:

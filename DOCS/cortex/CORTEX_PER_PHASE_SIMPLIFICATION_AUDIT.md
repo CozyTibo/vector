@@ -65,7 +65,7 @@ input → deterministic transform → explicit output → gate
 | `synthesis_pipeline.run_substrate_phase_08_synthesis_v1` | Imports `phase08_activation_gate` only (no `operational_runtime`) |
 | `substrate_autonomous_progression` | Re-exports phase 06 helpers from execution; `verify_gp085_prog01` calls P3 boundary verifier |
 | `substrate_synthesis_activation_scheduling` | Admin/CI wrapper adds `gate_id`; core evaluate delegates to `phase08_activation_gate` |
-| CI guard | `verify_p3_step12_cesp_frozen_off_execution_hot_path_v1` + `test_p3_step12_cesp_frozen_off_hot_path.py` |
+| CI guard | `verify_execution_hot_path_no_cesp_imports_boundary_v1` + `test_execution_hot_path_no_cesp_imports_boundary.py` |
 | Static gates | `verify_gp085_prog01` / `verify_gp085_syn01` enforce hot-path import boundaries |
 
 ### P0 step 1 — done (2026-05-21)
@@ -75,7 +75,7 @@ input → deterministic transform → explicit output → gate
 | `run_phase_07_retrieval_v1` | Returns retrieval materialization output only (no `run_synthesis_activation_after_phase07_v1`) |
 | `run_substrate_phase_08_synthesis_v1` | Calls `evaluate_synthesis_activation_schedule_v1` before synthesis work; skips phase 08 when activation not allowed (e.g. forbidden backoff) |
 | `run_tenant_convergence_v1` | No longer reads `synthesis_activation` / `next_phase_chain` from phase 07 output |
-| CI guard | `verify_p0_step1_phase07_retrieval_boundary_v1` + `test_p0_step1_phase07_boundary.py` |
+| CI guard | `verify_phase07_retrieval_only_boundary_v1` + `test_phase07_retrieval_only_boundary.py` |
 | Static gates | `verify_gp085_prog01`, `verify_gp085_syn01` updated for new boundaries |
 
 ### P0 step 2 — done (2026-05-21)
@@ -84,7 +84,7 @@ input → deterministic transform → explicit output → gate
 |--------|--------|
 | `run_tcre_reconstruction_job_task` | On `completed`, only `on_tcre_job_completed_for_pipeline_v1` (no retrieval materialization) |
 | `materialize_retrieval_index_incremental_after_tcre_v1` | Removed — TCRE index binding runs only in phase 07 via `materialize_retrieval_index_for_pipeline_v1` |
-| CI guard | `verify_p0_step2_phase06_tcre_worker_boundary_v1` + `test_p0_step2_phase06_boundary.py` |
+| CI guard | `verify_tcre_worker_no_retrieval_materialization_boundary_v1` + `test_tcre_worker_no_retrieval_materialization_boundary.py` |
 | Static gates | `verify_gp085_prog01` calls P0 step 2 boundary verifier |
 
 ### P0 step 3 — done (2026-05-21)
@@ -96,7 +96,7 @@ input → deterministic transform → explicit output → gate
 | `on_tcre_job_completed_for_pipeline_v1` | Celery callback routes to execution terminal handler |
 | `recover_stalled_pipeline_v1` | Completed TCRE recovery uses same execution terminal path |
 | `resume_convergence_from_waiting_v1` | Accepts `pipeline_run_id` so lease cursor stays bound to the pipeline run |
-| CI guard | `verify_p0_step3_single_tcre_resume_path_v1` + `test_p0_step3_single_tcre_resume.py` |
+| CI guard | `verify_single_tcre_execution_resume_boundary_v1` + `test_single_tcre_execution_resume_boundary.py` |
 | Static gates | `verify_gp085_prog01` + **PROG-TCRE-RESUME** updated for execution-only resume |
 
 ### P0 step 4 — done (2026-05-21)
@@ -108,7 +108,7 @@ input → deterministic transform → explicit output → gate
 | `run_tenant_convergence_v1` | After phase 06, `mark_tenant_waiting_v1` + `assert_pipe085_chain_after_phase06_legal_v1` (lease-based) |
 | `assert_pipe085_chain_after_phase06_legal_v1` | Checks `AWAITING_TCRE` lease instead of continuation row |
 | `enforce_phase06_progression_law_v1` | Output contract only (async + `job_id`); no continuation assertion |
-| CI guard | `verify_p0_step4_no_continuation_on_execution_hot_path_v1` + `test_p0_step4_continuation_hot_path.py` |
+| CI guard | `verify_execution_hot_path_no_continuation_boundary_v1` + `test_execution_hot_path_no_continuation_boundary.py` |
 
 ### P0 step 5 — done (2026-05-21)
 
@@ -117,7 +117,7 @@ input → deterministic transform → explicit output → gate
 | `run_phase_02_canonical_v1` | One `drain_forward_progress_backlog` call (full backlog); removed slack-scoped preface + merge |
 | Imports | Phase runner imports `drain_forward_progress_backlog` directly, not `drain_stub_materialize_backlog` |
 | `drain_stub_materialize_backlog` | Retained as thin delegate for admin/ingestion/identity paths only |
-| CI guard | `verify_p0_step5_canonical_single_drain_v1` + `test_p0_step5_canonical_single_drain.py` |
+| CI guard | `verify_canonical_single_drain_boundary_v1` + `test_canonical_single_drain_boundary.py` |
 
 ### P0 step 6 — done (2026-05-21)
 
@@ -126,7 +126,7 @@ input → deterministic transform → explicit output → gate
 | `run_tenant_convergence_v1` | Dropped lease `canonical_pass_index`, `pass_cooldown_until`, `pass_topology_stall_counts`; stores `last_canonical_outcome` + `convergence_health` only |
 | `run_phase_02_canonical_v1` | No pass-fairness parameters; each slice uses fresh in-drain pass rotation |
 | `operator_snapshot` | Pass cooldown hints read from phase 02 output, not lease |
-| CI guard | `verify_p0_step6_no_pass_fairness_on_lease_v1` + `test_p0_step6_pass_fairness_lease.py` |
+| CI guard | `verify_execution_lease_no_pass_fairness_boundary_v1` + `test_execution_lease_no_pass_fairness_boundary.py` |
 
 ### P0 step 7 — done (2026-05-21)
 
@@ -136,7 +136,7 @@ input → deterministic transform → explicit output → gate
 | `run_canonical_determinism_repair_v1` | New execution admin helper (also available via canonical verification admin route) |
 | `execution_rerun_v1` | Optional `run_determinism_repair` runs repair before clear+restart when requested |
 | `POST .../execution/rerun` | Query param `run_determinism_repair` (default false) |
-| CI guard | `verify_p0_step7_determinism_repair_off_hot_path_v1` + `test_p0_step7_determinism_repair_off_hot_path.py` |
+| CI guard | `verify_canonical_no_inline_determinism_repair_boundary_v1` + `test_canonical_no_inline_determinism_repair_boundary.py` |
 
 ### P1 step 8 — done (2026-05-21)
 
@@ -155,8 +155,8 @@ input → deterministic transform → explicit output → gate
 | `run_phase_04_graph_v1` | Calls export helper only; dropped replay job + `org_graph_traversal_verification_slice` from output |
 | `pipeline_receipts` | Graph phase receipt: `stable_hash`, `node_count`, `edge_count` (no `graph_projection_export_job_id`) |
 | Admin / ingest | `post_ingestion_substrate_refresh` still uses `execute_org_link_replay_job` + verification slice (non-execution) |
-| CI guard | `verify_p1_step9_graph_projection_export_boundary_v1` + `test_p1_step9_graph_projection_export.py` |
-| CI guard | `verify_p1_step8_identity_projection_boundary_v1` + `test_p1_step8_identity_projection.py` |
+| CI guard | `verify_phase04_graph_projection_export_boundary_v1` + `test_phase04_graph_projection_export_boundary.py` |
+| CI guard | `verify_phase03_identity_projection_boundary_v1` + `test_phase03_identity_projection_boundary.py` |
 
 ### P1 step 10 — done (2026-05-21)
 
@@ -166,7 +166,7 @@ input → deterministic transform → explicit output → gate
 | `_pick_start_node_ids_v1` | Deterministic ascending sort before cap |
 | `run_phase_05_traversal_v1` | Calls traversal slice only; dropped `octs_walk_schedule` nested pass |
 | `run_octs_walk_schedule_pass_v1` | Retained for admin scheduling (density frontiers + explainability panel) |
-| CI guard | `verify_p1_step10_traversal_slice_boundary_v1` + `test_p1_step10_traversal_slice.py` |
+| CI guard | `verify_phase05_traversal_slice_boundary_v1` + `test_phase05_traversal_slice_boundary.py` |
 
 ### P2 step 11 — done (2026-05-21)
 
@@ -178,7 +178,7 @@ input → deterministic transform → explicit output → gate
 | `sync_executor.py` | Compatibility shim re-exporting router + test hooks |
 | `IngestionSyncContext` | Top-level modes **live** \| **replay**; `backfill_lane` + `checkpoint_sync_mode` for checkpoint lanes |
 | Celery ingest tasks | No substrate phase imports; post-ingest refresh on live incremental completion |
-| CI guard | `verify_p2_step11_ingestion_sync_split_boundary_v1` + `test_p2_step11_sync_executor_split.py` |
+| CI guard | `verify_ingestion_sync_split_boundary_v1` + `test_ingestion_sync_split_boundary.py` |
 | Tests | Connector exhaust tests patch `connectors.*.sync.httpx` instead of monolithic module |
 
 ---

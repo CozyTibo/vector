@@ -1,18 +1,18 @@
-"""P2 step 11 — split sync_executor into per-connector modules; live | replay modes."""
+"""Ingestion sync split into per-connector modules; live | replay modes."""
 
 from __future__ import annotations
 
 import uuid
 from pathlib import Path
 
-from vector.domains.cortex.execution.scheduling import verify_p2_step11_ingestion_sync_split_boundary_v1
+from vector.domains.cortex.execution.scheduling import verify_ingestion_sync_split_boundary_v1
 from vector.domains.cortex.ingestion import sync_context as sc_mod
 from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
 from vector.domains.cortex.ingestion.sync_router import execute_connector_sync as router_execute
 
 
-def test_verify_p2_step11_ingestion_sync_split_boundary() -> None:
-    assert verify_p2_step11_ingestion_sync_split_boundary_v1() == []
+def test_verify_ingestion_sync_split_boundary() -> None:
+    assert verify_ingestion_sync_split_boundary_v1() == []
 
 
 def test_sync_executor_shim_delegates_to_router() -> None:

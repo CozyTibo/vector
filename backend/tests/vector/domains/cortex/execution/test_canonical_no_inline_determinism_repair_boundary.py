@@ -1,16 +1,16 @@
-"""P0 step 7 — determinism repair must not run on phase 02 execution hot path."""
+"""Determinism repair must not run on phase 02 execution hot path."""
 
 from __future__ import annotations
 
 import inspect
 
 from vector.domains.cortex.execution import admin_commands as cmd_mod
-from vector.domains.cortex.execution.scheduling import verify_p0_step7_determinism_repair_off_hot_path_v1
+from vector.domains.cortex.execution.scheduling import verify_canonical_no_inline_determinism_repair_boundary_v1
 from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
 
-def test_verify_p0_step7_determinism_repair_off_hot_path() -> None:
-    assert verify_p0_step7_determinism_repair_off_hot_path_v1() == []
+def test_verify_canonical_no_inline_determinism_repair_boundary() -> None:
+    assert verify_canonical_no_inline_determinism_repair_boundary_v1() == []
 
 
 def test_phase02_runner_has_no_inline_determinism_repair() -> None:

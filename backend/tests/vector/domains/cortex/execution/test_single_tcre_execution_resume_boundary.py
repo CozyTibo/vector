@@ -1,4 +1,4 @@
-"""P0 step 3 — single TCRE resume path via execution lease (no continuation enqueue)."""
+"""Single TCRE resume path via execution lease (no continuation enqueue)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from vector.domains.cortex.execution.lease import (
     get_tenant_execution_lease_v1,
     mark_tenant_waiting_v1,
 )
-from vector.domains.cortex.execution.scheduling import verify_p0_step3_single_tcre_resume_path_v1
+from vector.domains.cortex.execution.scheduling import verify_single_tcre_execution_resume_boundary_v1
 from vector.domains.cortex.execution.tenant_constants import FSM_AWAITING_TCRE, LEASE_STATUS_DIRTY
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_07_RETRIEVAL
 from vector.domains.cortex.substrate_pipeline.orchestrator import on_tcre_job_completed_for_pipeline_v1
@@ -26,7 +26,7 @@ def tenant(db_session: Session) -> Any:
 
     slug = f"p0s3-{uuid.uuid4().hex[:8]}"
     row = Tenant(
-        company_name="P0 Step 3 TCRE Resume",
+        company_name="TCRE Resume Boundary",
         primary_email=f"{slug}@example.com",
         email_domain="example.com",
         slug=slug,
@@ -38,8 +38,8 @@ def tenant(db_session: Session) -> Any:
     return row
 
 
-def test_verify_p0_step3_single_tcre_resume_path() -> None:
-    assert verify_p0_step3_single_tcre_resume_path_v1() == []
+def test_verify_single_tcre_execution_resume_boundary() -> None:
+    assert verify_single_tcre_execution_resume_boundary_v1() == []
 
 
 def test_tcre_resume_module_has_no_continuation_coupling() -> None:

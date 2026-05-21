@@ -210,8 +210,8 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
-def verify_p1_step8_identity_projection_boundary_v1() -> list[str]:
-    """Return error codes if phase 03 still enqueues identity audit replay jobs (P1 step 8)."""
+def verify_phase03_identity_projection_boundary_v1() -> list[str]:
+    """Return error codes if phase 03 still enqueues identity audit replay jobs ."""
     errors: list[str] = []
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
@@ -234,8 +234,8 @@ def verify_p1_step8_identity_projection_boundary_v1() -> list[str]:
     return errors
 
 
-def verify_p1_step9_graph_projection_export_boundary_v1() -> list[str]:
-    """Return error codes if phase 04 still uses replay jobs or verification slice (P1 step 9)."""
+def verify_phase04_graph_projection_export_boundary_v1() -> list[str]:
+    """Return error codes if phase 04 still uses replay jobs or verification slice ."""
     errors: list[str] = []
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
@@ -258,8 +258,8 @@ def verify_p1_step9_graph_projection_export_boundary_v1() -> list[str]:
     return errors
 
 
-def verify_p1_step10_traversal_slice_boundary_v1() -> list[str]:
-    """Return error codes if phase 05 still splits materialization + schedule pass (P1 step 10)."""
+def verify_phase05_traversal_slice_boundary_v1() -> list[str]:
+    """Return error codes if phase 05 still splits materialization + schedule pass ."""
     errors: list[str] = []
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
@@ -287,8 +287,8 @@ def verify_p1_step10_traversal_slice_boundary_v1() -> list[str]:
     return errors
 
 
-def verify_p2_step11_ingestion_sync_split_boundary_v1() -> list[str]:
-    """Return error codes if sync_executor is still monolithic or modes not collapsed (P2 step 11)."""
+def verify_ingestion_sync_split_boundary_v1() -> list[str]:
+    """Return error codes if sync_executor is still monolithic or modes not collapsed ."""
     errors: list[str] = []
     import importlib.util
     from pathlib import Path
@@ -358,8 +358,8 @@ EXECUTION_HOT_PATH_FORBIDDEN_IMPORT_MARKERS_V1: Final[tuple[str, ...]] = (
 )
 
 
-def verify_p3_step12_cesp_frozen_off_execution_hot_path_v1() -> list[str]:
-    """Return error codes if execution/phase bodies import CESP doctrine (P3 step 12)."""
+def verify_execution_hot_path_no_cesp_imports_boundary_v1() -> list[str]:
+    """Return error codes if execution/phase bodies import CESP doctrine ."""
     import importlib
 
     errors: list[str] = []
@@ -394,8 +394,8 @@ def verify_p3_step12_cesp_frozen_off_execution_hot_path_v1() -> list[str]:
     return errors
 
 
-def verify_p0_step7_determinism_repair_off_hot_path_v1() -> list[str]:
-    """Return error codes if phase 02 still runs determinism repair inline (P0 step 7)."""
+def verify_canonical_no_inline_determinism_repair_boundary_v1() -> list[str]:
+    """Return error codes if phase 02 still runs determinism repair inline ."""
     errors: list[str] = []
     from vector.domains.cortex.execution import admin_commands as cmd_mod
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
@@ -414,8 +414,8 @@ def verify_p0_step7_determinism_repair_off_hot_path_v1() -> list[str]:
     return errors
 
 
-def verify_p0_step6_no_pass_fairness_on_lease_v1() -> list[str]:
-    """Return error codes if execution lease still stores pass-fairness state (P0 step 6)."""
+def verify_execution_lease_no_pass_fairness_boundary_v1() -> list[str]:
+    """Return error codes if execution lease still stores pass-fairness state ."""
     errors: list[str] = []
     from vector.domains.cortex.execution import run_tenant_execution as exec_mod
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
@@ -442,8 +442,8 @@ def verify_p0_step6_no_pass_fairness_on_lease_v1() -> list[str]:
     return errors
 
 
-def verify_p0_step5_canonical_single_drain_v1() -> list[str]:
-    """Return error codes if phase 02 still uses dual drain / drain_stub (P0 step 5)."""
+def verify_canonical_single_drain_boundary_v1() -> list[str]:
+    """Return error codes if phase 02 still uses dual drain / drain_stub."""
     errors: list[str] = []
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 
@@ -457,8 +457,8 @@ def verify_p0_step5_canonical_single_drain_v1() -> list[str]:
     return errors
 
 
-def verify_p0_step4_no_continuation_on_execution_hot_path_v1() -> list[str]:
-    """Return error codes if execution hot path still writes pipeline_continuation (P0 step 4)."""
+def verify_execution_hot_path_no_continuation_boundary_v1() -> list[str]:
+    """Return error codes if execution hot path still writes pipeline_continuation."""
     errors: list[str] = []
     from vector.domains.cortex.execution import run_tenant_execution as exec_mod
     from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
@@ -483,8 +483,8 @@ def verify_p0_step4_no_continuation_on_execution_hot_path_v1() -> list[str]:
     return errors
 
 
-def verify_p0_step3_single_tcre_resume_path_v1() -> list[str]:
-    """Return error codes if TCRE completion still uses continuation resume (P0 step 3)."""
+def verify_single_tcre_execution_resume_boundary_v1() -> list[str]:
+    """Return error codes if TCRE completion still uses continuation resume."""
     errors: list[str] = []
     from vector.domains.cortex.execution import tcre_resume as tcre_mod
     from vector.domains.cortex.substrate_pipeline import orchestrator as orch_mod
@@ -513,8 +513,8 @@ def verify_p0_step3_single_tcre_resume_path_v1() -> list[str]:
     return errors
 
 
-def verify_p0_step2_phase06_tcre_worker_boundary_v1() -> list[str]:
-    """Return error codes if TCRE Celery worker still materializes retrieval (P0 step 2)."""
+def verify_tcre_worker_no_retrieval_materialization_boundary_v1() -> list[str]:
+    """Return error codes if TCRE Celery worker still materializes retrieval."""
     import importlib.util
 
     errors: list[str] = []
@@ -534,8 +534,8 @@ def verify_p0_step2_phase06_tcre_worker_boundary_v1() -> list[str]:
     return errors
 
 
-def verify_p0_step1_phase07_retrieval_boundary_v1() -> list[str]:
-    """Return error codes if phase 07 still runs synthesis activation (P0 step 1)."""
+def verify_phase07_retrieval_only_boundary_v1() -> list[str]:
+    """Return error codes if phase 07 still runs synthesis activation."""
     from vector.domains.cortex.synthesis import synthesis_pipeline as syn_mod
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
 

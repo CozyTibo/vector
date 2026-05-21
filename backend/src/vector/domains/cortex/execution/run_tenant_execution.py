@@ -68,7 +68,7 @@ def _store_canonical_slice_outcome_on_lease(
     outcome: str,
     convergence_health: str | None = None,
 ) -> None:
-    """Persist slice outcome hints only — no pass-fairness cursor state on the lease (P0 step 6)."""
+    """Persist slice outcome hints only — no pass-fairness cursor state on the lease ."""
     detail = dict(lease.detail_json or {})
     for stale in ("canonical_pass_index", "pass_cooldown_until", "pass_topology_stall_counts"):
         detail.pop(stale, None)
