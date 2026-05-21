@@ -6,6 +6,11 @@ import logging
 import uuid
 from typing import Any
 
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_CONVERGENCE,
+    emit_execution_path_telemetry_v1,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -22,6 +27,12 @@ def enqueue_tenant_convergence_v1(
         kwargs={"tenant_id": str(tid), "reason": reason},
         queue="vector",
     )
+    telemetry = emit_execution_path_telemetry_v1(
+        tenant_id=tid,
+        execution_path=EXECUTION_PATH_CONVERGENCE,
+        trigger=f"convergence_enqueue:{reason}",
+        celery_task_id=str(async_result.id),
+    )
     _LOGGER.info(
         "convergence_worker_enqueued tenant_id=%s reason=%s celery_task_id=%s",
         tid,
@@ -33,4 +44,6 @@ def enqueue_tenant_convergence_v1(
         "tenant_id": str(tid),
         "reason": reason,
         "celery_task_id": str(async_result.id),
+        "execution_path": EXECUTION_PATH_CONVERGENCE,
+        "execution_path_telemetry": telemetry,
     }

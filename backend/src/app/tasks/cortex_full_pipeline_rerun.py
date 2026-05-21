@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 from app.celery_app import celery_app
+from vector.domains.cortex.execution.execution_path_telemetry import emit_admin_bypass_telemetry_v1
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PIPELINE_TRIGGER_FLUSH_RERUN,
@@ -31,6 +32,12 @@ def run_cortex_flush_rerun_to_identity_task(
 ) -> dict[str, Any]:
     """Ingest syncs, substrate refresh (canonical → identity → graph → TCRE → retrieval index)."""
     tid = uuid.UUID(tenant_id)
+    emit_admin_bypass_telemetry_v1(
+        tenant_id=tid,
+        admin_action="flush_rerun_to_identity",
+        celery_task_id=str(run_cortex_flush_rerun_to_identity_task.request.id),
+        detail={"bundle_id": bundle_id, "connector_count": len(connectors)},
+    )
     settings = get_settings()
     sync_results: list[dict[str, Any]] = []
     with session_scope() as session:

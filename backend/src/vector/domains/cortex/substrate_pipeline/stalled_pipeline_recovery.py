@@ -10,6 +10,10 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_PROGRESSION,
+    emit_execution_path_telemetry_v1,
+)
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_06_TCRE, PHASE_07_RETRIEVAL
 from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
     CONTINUATION_STATUS_RECOVERING,
@@ -159,6 +163,15 @@ def recover_stalled_pipeline_v1(
     action: str = "auto",
 ) -> dict[str, Any]:
     """Replay-safe recovery for one stalled pipeline."""
+    run_row = session.get(CortexSubstratePipelineRun, pipeline_run_id)
+    if run_row is not None:
+        emit_execution_path_telemetry_v1(
+            tenant_id=run_row.tenant_id,
+            execution_path=EXECUTION_PATH_PROGRESSION,
+            trigger=f"recover_stalled_pipeline:{action}",
+            pipeline_run_id=pipeline_run_id,
+            detail={"recovery_action": action},
+        )
     continuation = get_continuation_for_pipeline_v1(session, pipeline_run_id=pipeline_run_id)
     if continuation is None:
         return {"recovered": False, "reason": "continuation_not_found"}

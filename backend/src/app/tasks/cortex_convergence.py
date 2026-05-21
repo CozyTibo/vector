@@ -7,6 +7,10 @@ import uuid
 from typing import Any
 
 from app.celery_app import celery_app
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_CONVERGENCE,
+    emit_execution_path_telemetry_v1,
+)
 from vector.domains.cortex.convergence.run_convergence import run_tenant_convergence_v1
 from vector.domains.cortex.convergence.sweep import run_convergence_sweep_v1
 from vector.infrastructure.db.session import session_scope
@@ -28,6 +32,12 @@ def run_tenant_convergence_task(
     if not cfg.cortex_convergence_runtime_enabled:
         return {"skipped": True, "reason": "convergence_runtime_disabled"}
     tid = uuid.UUID(tenant_id)
+    emit_execution_path_telemetry_v1(
+        tenant_id=tid,
+        execution_path=EXECUTION_PATH_CONVERGENCE,
+        trigger=f"convergence_worker:{reason}",
+        celery_task_id=str(self.request.id),
+    )
     _LOGGER.info("convergence_worker_start tenant_id=%s reason=%s", tenant_id, reason)
     with session_scope() as session:
         out = run_tenant_convergence_v1(

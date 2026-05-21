@@ -2427,6 +2427,15 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexMaterializeTransformResponse:
         """Phase 03 Step 6 — run deterministic stub transform + persist field lineage."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution.execution_path_telemetry import (
+            emit_admin_bypass_telemetry_v1,
+        )
+
+        emit_admin_bypass_telemetry_v1(
+            tenant_id=tenant_id,
+            admin_action="canonical_transform_materialize",
+            detail={"bundle_id": body.bundle_id, "raw_record_id": str(body.raw_record_id)},
+        )
         from vector.domains.cortex.canonical.transform_runtime import (
             MaterializeError,
             materialization_public_dict,
@@ -2481,6 +2490,15 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexMaterializeBacklogResponse:
         """Route-routable ingested rows missing a materialization for ``bundle_id`` (batched; scopeable)."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution.execution_path_telemetry import (
+            emit_admin_bypass_telemetry_v1,
+        )
+
+        emit_admin_bypass_telemetry_v1(
+            tenant_id=tenant_id,
+            admin_action="canonical_transform_materialize_backlog",
+            detail={"bundle_id": body.bundle_id, "dry_run": body.dry_run},
+        )
         from vector.domains.cortex.canonical.transform_runtime import (
             MaterializeError,
             materialize_stub_backlog,
@@ -2550,6 +2568,10 @@ def build_admin_router() -> APIRouter:
                 ),
             )
         enqueued_batch_limit = body.batch_limit if body.batch_limit is not None else 400
+        from vector.domains.cortex.execution.execution_path_telemetry import (
+            emit_admin_bypass_telemetry_v1,
+        )
+
         try:
             async_result = drain_stub_materialize_backlog_task.delay(
                 str(tenant_id),
@@ -2564,6 +2586,12 @@ def build_admin_router() -> APIRouter:
                 detail=f"celery_enqueue_failed:{exc}",
             ) from exc
 
+        emit_admin_bypass_telemetry_v1(
+            tenant_id=tenant_id,
+            admin_action="canonical_transform_materialize_backlog_async",
+            celery_task_id=str(async_result.id),
+            detail={"bundle_id": resolved},
+        )
         return AdminCortexMaterializeBacklogAsyncResponse(
             enqueued=True,
             celery_task_id=str(async_result.id),
@@ -4066,6 +4094,15 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexIdentityContinuityRebuildResponse:
         """Deterministic Phase 04 continuity rebuild: materialize drain → repair → anchor backfill → candidates."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution.execution_path_telemetry import (
+            emit_admin_bypass_telemetry_v1,
+        )
+
+        emit_admin_bypass_telemetry_v1(
+            tenant_id=tenant_id,
+            admin_action="identity_rebuild_continuity",
+            detail={"bundle_id": body.bundle_id.strip(), "dry_run": body.dry_run},
+        )
         from vector.domains.cortex.canonical.transform_runtime import MaterializeError
         from vector.domains.cortex.identity.continuity_rebuild import (
             run_identity_continuity_rebuild,
@@ -4419,6 +4456,15 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexReplayJobDetailResponse:
         """Phase 03 Step 10 — pinned-bundle rebuild/regeneration with C0–C5 divergence receipts."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution.execution_path_telemetry import (
+            emit_admin_bypass_telemetry_v1,
+        )
+
+        emit_admin_bypass_telemetry_v1(
+            tenant_id=tenant_id,
+            admin_action="canonical_replay_job_run",
+            detail={"job_kind": body.job_kind, "pinned_bundle_id": body.pinned_bundle_id},
+        )
         from vector.domains.cortex.canonical.replay_runtime import (
             REPLAY_RUNTIME_SCHEMA_VERSION,
             ReplayJobError,
@@ -5213,6 +5259,14 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexFlushAndRerunResponse:
         """Flush tenant Cortex state, rerun connectors, then substrate refresh through Phase 07 retrieval."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution.execution_path_telemetry import (
+            emit_admin_bypass_telemetry_v1,
+        )
+
+        emit_admin_bypass_telemetry_v1(
+            tenant_id=tenant_id,
+            admin_action="flush_rerun_to_identity_enqueue",
+        )
         if not _flush_rerun_confirmation_ok(body.confirmation):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,

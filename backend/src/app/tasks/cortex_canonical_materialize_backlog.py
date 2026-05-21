@@ -8,6 +8,7 @@ from typing import Any
 
 from app.celery_app import celery_app
 from vector.domains.cortex.canonical.transform_runtime import drain_stub_materialize_backlog
+from vector.domains.cortex.execution.execution_path_telemetry import emit_admin_bypass_telemetry_v1
 from vector.infrastructure.db.session import session_scope
 
 _LOGGER = logging.getLogger("app")
@@ -26,6 +27,12 @@ def drain_stub_materialize_backlog_task(
     """Process all route-routable missing materializations for ``bundle_id`` (batched loop)."""
     tid = uuid.UUID(tenant_id)
     bid = bundle_id.strip()
+    emit_admin_bypass_telemetry_v1(
+        tenant_id=tid,
+        admin_action="canonical_materialize_backlog_async",
+        celery_task_id=str(drain_stub_materialize_backlog_task.request.id),
+        detail={"bundle_id": bid, "connector": connector, "resource_type": resource_type},
+    )
     _LOGGER.info(
         "canonical_stub_backlog_drain_start tenant_id=%s bundle_id=%s connector=%s resource_type=%s batch_limit=%s",
         tenant_id,

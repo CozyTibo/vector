@@ -39,5 +39,7 @@ def test_post_ingestion_uses_convergence_path_when_enabled() -> None:
         )
     assert out["scheduled"] is True
     assert out["path"] == "convergence_lease"
+    assert out["execution_path"] == "convergence"
+    assert out["execution_path_telemetry"]["event"] == "cortex_execution_path"
     mark_dirty.assert_called_once()
     enqueue.assert_called_once()

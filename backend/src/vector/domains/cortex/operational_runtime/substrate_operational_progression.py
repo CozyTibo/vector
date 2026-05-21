@@ -14,6 +14,10 @@ from typing import Any, Final
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_PROGRESSION,
+    emit_execution_path_telemetry_v1,
+)
 from vector.domains.cortex.operational_runtime.normative import PHASE085_NORMATIVE_TREE_V1
 from vector.domains.cortex.retrieval.retrieval_index_materialization import (
     get_published_index_epoch_v1,
@@ -600,6 +604,13 @@ def continue_substrate_operational_progression_v1(
     force: bool = False,
 ) -> dict[str, Any]:
     """Drive lawful downstream continuation for one tenant (async-safe, idempotent)."""
+    emit_execution_path_telemetry_v1(
+        tenant_id=tenant_id,
+        execution_path=EXECUTION_PATH_PROGRESSION,
+        trigger=trigger,
+        pipeline_run_id=pipeline_run_id,
+        detail={"force": force},
+    )
     run = None
     if pipeline_run_id is not None:
         run = session.get(CortexSubstratePipelineRun, pipeline_run_id)

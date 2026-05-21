@@ -20,6 +20,11 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PIPELINE_TRIGGER_POST_INGESTION,
     SUBSTRATE_PIPELINE_PHASE_ORDER,
 )
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_LEGACY,
+    EXECUTION_PATH_PROGRESSION,
+    emit_execution_path_telemetry_v1,
+)
 from vector.domains.cortex.substrate_pipeline.repository import (
     compute_pipeline_idempotency_key_v1,
     create_pipeline_run_v1,
@@ -98,6 +103,12 @@ def schedule_substrate_pipeline_v1(
     task_id = substrate_pipeline_celery_task_id(tenant_id)
 
     if schedule_action == "coalesce":
+        coalesce_telemetry = emit_execution_path_telemetry_v1(
+            tenant_id=tenant_id,
+            execution_path=EXECUTION_PATH_LEGACY,
+            trigger=f"schedule_substrate_pipeline_coalesce:{trigger_kind}",
+            detail={"reason": reason, "schedule_action": schedule_action},
+        )
         _LOGGER.info(
             "substrate_pipeline_schedule_coalesced tenant_id=%s trigger=%s elapsed_s=%s",
             tenant_id,
@@ -110,10 +121,12 @@ def schedule_substrate_pipeline_v1(
             "coalesce_action": "preserve_pending_coordinator",
             "reason": reason,
             "trigger_kind": trigger_kind,
+            "execution_path": EXECUTION_PATH_LEGACY,
             "task_id": task_id,
             "countdown_seconds": debounce,
             "post_ingestion_debounce": debounce_resolved,
             "schedule_coalesce": schedule_meta,
+            "execution_path_telemetry": coalesce_telemetry,
         }
 
     if schedule_action == "force_now":
@@ -147,6 +160,13 @@ def schedule_substrate_pipeline_v1(
         countdown=debounce,
         task_id=task_id,
     )
+    telemetry = emit_execution_path_telemetry_v1(
+        tenant_id=tenant_id,
+        execution_path=EXECUTION_PATH_LEGACY,
+        trigger=f"schedule_substrate_pipeline:{trigger_kind}",
+        celery_task_id=str(async_result.id),
+        detail={"reason": reason, "schedule_action": schedule_action},
+    )
     _LOGGER.info(
         "substrate_pipeline_scheduled tenant_id=%s trigger=%s countdown_s=%s action=%s",
         tenant_id,
@@ -160,11 +180,13 @@ def schedule_substrate_pipeline_v1(
         "schedule_action": schedule_action,
         "reason": reason,
         "trigger_kind": trigger_kind,
+        "execution_path": EXECUTION_PATH_LEGACY,
         "task_id": task_id,
         "celery_task_id": str(async_result.id),
         "countdown_seconds": debounce,
         "post_ingestion_debounce": debounce_resolved,
         "schedule_coalesce": schedule_meta,
+        "execution_path_telemetry": telemetry,
     }
 
 
@@ -349,6 +371,13 @@ def on_tcre_job_completed_for_pipeline_v1(
         continue_substrate_operational_progression_v1,
     )
 
+    emit_execution_path_telemetry_v1(
+        tenant_id=tenant_id,
+        execution_path=EXECUTION_PATH_PROGRESSION,
+        trigger=PROGRESSION_TRIGGER_TCRE_COMPLETED_V1,
+        pipeline_run_id=pipeline_run_id,
+        detail={"hook": "on_tcre_job_completed_for_pipeline_v1"},
+    )
     progression = continue_substrate_operational_progression_v1(
         session,
         tenant_id=tenant_id,

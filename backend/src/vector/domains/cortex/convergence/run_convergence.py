@@ -19,6 +19,10 @@ from vector.domains.cortex.canonical.forward_progress.pass_fairness import (
     parse_pass_topology_stall_counts,
 )
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_CONVERGENCE,
+    emit_execution_path_telemetry_v1,
+)
 from vector.domains.cortex.convergence.constants import LEASE_STATUS_DIRTY
 from vector.domains.cortex.convergence.lease import (
     complete_convergence_lease_v1,
@@ -149,6 +153,15 @@ def run_tenant_convergence_v1(
     lease, block_reason = try_acquire_convergence_lease_v1(session, tenant_id=tenant_id, settings=cfg)
     if lease is None:
         return {"tenant_id": str(tenant_id), "acquired": False, "reason": block_reason}
+
+    emit_execution_path_telemetry_v1(
+        tenant_id=tenant_id,
+        execution_path=EXECUTION_PATH_CONVERGENCE,
+        trigger=f"convergence_slice:{reason}",
+        pipeline_run_id=lease.pipeline_run_id,
+        celery_task_id=celery_task_id,
+        detail={"phase_cursor": lease.phase_cursor, "lease_status": lease.status},
+    )
 
     pipeline_run_id: uuid.UUID | None = lease.pipeline_run_id
     bundle_id: str | None = None

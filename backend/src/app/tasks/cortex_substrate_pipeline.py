@@ -17,6 +17,10 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_08_SYNTHESIS,
     PIPELINE_TRIGGER_POST_INGESTION,
 )
+from vector.domains.cortex.execution.execution_path_telemetry import (
+    EXECUTION_PATH_LEGACY,
+    emit_execution_path_telemetry_v1,
+)
 from vector.domains.cortex.substrate_pipeline.orchestrator import (
     chain_after_phase_v1,
     enqueue_next_pipeline_phase_v1,
@@ -57,6 +61,13 @@ def run_cortex_substrate_pipeline_coordinator_task(
     )
 
     clear_substrate_pipeline_schedule_anchor_v1(tid)
+    emit_execution_path_telemetry_v1(
+        tenant_id=tid,
+        execution_path=EXECUTION_PATH_LEGACY,
+        trigger=f"substrate_pipeline_coordinator:{trigger_kind}",
+        celery_task_id=str(run_cortex_substrate_pipeline_coordinator_task.request.id),
+        detail={"reason": reason},
+    )
     _LOGGER.info(
         "substrate_pipeline_coordinator_start tenant_id=%s trigger=%s reason=%s",
         tenant_id,
@@ -103,6 +114,15 @@ def run_cortex_substrate_pipeline_phase_task(
     tid = uuid.UUID(tenant_id)
     prid = uuid.UUID(pipeline_run_id)
     settings = get_settings()
+    emit_execution_path_telemetry_v1(
+        tenant_id=tid,
+        execution_path=EXECUTION_PATH_LEGACY,
+        trigger=f"substrate_pipeline_phase:{phase_id}",
+        pipeline_run_id=prid,
+        phase_id=phase_id,
+        celery_task_id=str(self.request.id),
+        detail={"identity_substrate_trigger": identity_substrate_trigger},
+    )
     _LOGGER.info(
         "substrate_pipeline_phase_start tenant_id=%s pipeline_run_id=%s phase=%s",
         tenant_id,
