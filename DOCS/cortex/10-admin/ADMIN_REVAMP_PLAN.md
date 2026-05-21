@@ -1,6 +1,6 @@
 # Cortex Admin Revamp Plan
 
-**Status:** Wave 0 signed off · Wave 1 complete · Wave 2 complete · Wave 3 complete (2026-05-21)  
+**Status:** Wave 0 signed off · Wave 1 complete · Wave 2 complete · Wave 3 complete · Wave 4 complete (2026-05-21)  
 **Scope:** `/admin/tenants/:tenantId/cortex/*` only (not workspace, integrations, or global admin)  
 **Authoritative execution model:** `DOCS/cortex/CORTEX_SIMPLIFICATION_AND_DETERMINISM_REFACTOR.md` (M8 done)  
 **Substrate prerequisite:** `DOCS/cortex/CORTEX_TRUE_P0_SIGN_OFF.md` (signed off)  
@@ -611,14 +611,14 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 
 **Exit:** Every phase has Summary + Explorer; ≤1 phase CTA. **Met.**
 
-### Wave 4 — P3 Code deletion
+### Wave 4 — P3 Code deletion — **Done** (2026-05-21)
 
-1. Delete frontend files §9.1
-2. Remove backend handlers for 410 endpoints (not just stub)
-3. Remove unused admin catalog routes from OpenAPI tags
-4. CI: `verify_no_admin_bypass_routes_registered_v1`
+1. [x] Frontend §9.1 already removed in Wave 1 (static gates extended)
+2. [x] Deleted bypass POST handlers (not 410 stubs) from `admin.py`, substrate pipeline, retrieval, synthesis, operational-runtime sidecars
+3. [x] OpenAPI surface: removed routes no longer registered (no orphan mutation paths)
+4. [x] CI: `verify_no_admin_bypass_routes_registered_v1` in `admin_bypass_guard.py`, wired into `verify_m8_admin_execution_surface_v1`
 
-**Exit:** `rg 'materialize-backlog|flush-rerun|progression/continue'` clean in admin routes.
+**Exit:** `rg 'materialize-backlog|flush-rerun|progression/continue'` clean in `backend/src/vector/api/http/routes/admin*.py`. **Met.**
 
 ---
 
@@ -662,3 +662,4 @@ Deprecate admin **enqueue** paths; keep transform functions for engine-invoked r
 | 2026-05-21 | Wave 1 gap closure: ingestion/canonical/reconstruction bypass CTAs removed; static test gates extended |
 | 2026-05-21 | Wave 2: pipeline overview/run API, PhasePageShell, Ingestion + Canonical migration |
 | 2026-05-21 | Wave 3: all seven phase pages, `pipeline_phase_views` summary/explorer, `PhaseExplorer`/`PhaseRerunCta`, dead UI removed |
+| 2026-05-21 | Wave 4: bypass route handlers deleted, `verify_no_admin_bypass_routes_registered_v1`, tests updated to 404 |

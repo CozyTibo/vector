@@ -11,10 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db
-from vector.domains.cortex.execution.admin_deprecation import (
-    execution_admin_path_v1,
-    raise_admin_endpoint_gone,
-)
 from vector.contracts.admin import (
     AdminCortexSynthesisAntiGoalsCatalogResponse,
     AdminCortexSynthesisCitationBindingInspectorResponse,
@@ -507,96 +503,6 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
 
     sr = APIRouter(prefix="/tenants/{tenant_id}/cortex/synthesis", tags=["admin-cortex-synthesis"])
 
-    @sr.post("/jobs/run", response_model=None)
-    def post_synthesis_job_run(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        body: Annotated[dict[str, Any], Body(...)],
-    ) -> JSONResponse | AdminCortexSynthesisJobRunResponse:
-        """Phase 08 Step 06 — run synthesis job FSM (sync) or enqueue Celery stub."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/synthesis/jobs/run",
-            replacement=execution_admin_path_v1("/restart?from_phase=SYNTHESIS"),
-            migration="Direct synthesis job run removed; use execution restart from SYNTHESIS (M8).",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
-        try:
-            if bool(body.get("async")):
-                from vector.domains.cortex.synthesis.synthesis_job_envelope import (
-                    coerce_body_to_synthesis_job_envelope_v1,
-                    compute_synthesis_job_envelope_digest_v1,
-                )
-
-                envelope = coerce_body_to_synthesis_job_envelope_v1(body, tenant_id=tenant_id)
-                digest = compute_synthesis_job_envelope_digest_v1(envelope)
-                job = create_synthesis_job_row_v1(
-                    db,
-                    tenant_id=tenant_id,
-                    envelope=envelope,
-                    envelope_digest=digest,
-                )
-                from app.tasks.cortex_synthesis_jobs import run_synthesis_job_task
-
-                async_result = run_synthesis_job_task.delay(str(tenant_id), str(job.id))
-                job.celery_task_id = async_result.id
-                db.flush()
-                raw = {
-                    "surface_kind": "synthesis_job_run",
-                    "phase08_synthesis_orchestrator_runtime_schema_version": 1,
-                    "job_id": str(job.id),
-                    "tenant_id": str(tenant_id),
-                    "status": "queued",
-                    "synthesis_workload_class": job.synthesis_workload_class,
-                    "synthesis_intent": job.synthesis_intent,
-                    "execution_partition": job.execution_partition,
-                    "synthesis_legality_class": "synthesis_partial",
-                    "synthesis_job_replay_identity": "",
-                    "retrieval_ingress_digest": None,
-                    "synthesis_orchestrator_build_id": job.synthesis_orchestrator_build_id,
-                    "execution_trace": [],
-                    "synthesis_job_receipt": {},
-                    "idempotent_replay": False,
-                    "execution_phases": [],
-                    "celery_task_id": async_result.id,
-                }
-                return AdminCortexSynthesisJobRunResponse.model_validate(raw)
-            out = execute_synthesis_job_envelope_v1(db, tenant_id=tenant_id, body=body)
-            db.commit()
-            return AdminCortexSynthesisJobRunResponse.model_validate(out)
-        except SynthesisOrchestratorError as exc:
-            db.rollback()
-            return JSONResponse(
-                status_code=exc.http_status,
-                content={"error": exc.code, "detail": exc.detail},
-            )
-        except (
-            SynthesisJobEnvelopeError,
-            SynthesisJobContractError,
-            SynthesisAntiGoalViolationError,
-            SynthesisIngressError,
-            SynthesisLegalityError,
-            SynthesisReplayEquivalenceError,
-            SynthesisReplayEquivalenceProofsError,
-            SynthesisEvidenceBindingError,
-            SynthesisQueryPlanError,
-            SynthesisLlmRouterError,
-            SynthesisPromptAssemblyError,
-            SynthesisBoundedCapsError,
-            SynthesisArtifactMaterializationError,
-            SynthesisBindingsError,
-            SynthesisLineageError,
-        ) as exc:
-            db.rollback()
-            return JSONResponse(
-                status_code=getattr(exc, "http_status", 403),
-                content={
-                    "error": getattr(exc, "code", str(exc)),
-                    "synthesis_legality_class": SYNTHESIS_FORBIDDEN_LEGALITY_CLASS_V1,
-                    "detail": getattr(exc, "detail", None),
-                },
-            )
-
     @sr.get(
         "/artifacts",
         response_model=AdminCortexSynthesisArtifactListResponse,
@@ -889,45 +795,6 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
             db.rollback()
             return JSONResponse(
                 status_code=400,
-                content={"error": exc.code, "detail": exc.detail},
-            )
-
-    @sr.post("/jobs/resynthesize", response_model=None)
-    def post_synthesis_resynthesize(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        body: Annotated[dict[str, Any], Body(...)],
-    ) -> JSONResponse | dict[str, Any]:
-        """Phase 08 Step 23 — W3 dangerous force re-synthesis."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/synthesis/jobs/resynthesize",
-            replacement=execution_admin_path_v1("/rerun?from_phase=SYNTHESIS"),
-            migration="Dangerous resynthesize bypass removed; use execution rerun from SYNTHESIS (M8).",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
-        try:
-            slug = resolve_tenant_slug_v1(db, tenant_id=tenant_id)
-            out = run_dangerous_resynthesize_v1(
-                db,
-                tenant_id=tenant_id,
-                tenant_slug=slug,
-                confirmation_phrase=body.get("confirmation_phrase"),
-                body=body,
-            )
-            db.commit()
-            return out
-        except SynthesisOperatorWorkflowsError as exc:
-            db.rollback()
-            status_code = 403 if exc.code == "confirmation_phrase_invalid" else 400
-            return JSONResponse(
-                status_code=status_code,
-                content={"error": exc.code, "detail": exc.detail},
-            )
-        except SynthesisOrchestratorError as exc:
-            db.rollback()
-            return JSONResponse(
-                status_code=exc.http_status,
                 content={"error": exc.code, "detail": exc.detail},
             )
 

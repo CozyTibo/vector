@@ -122,7 +122,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
         flush_all: Annotated[bool, Query()] = False,
         run_determinism_repair: Annotated[bool, Query()] = False,
     ) -> dict[str, Any]:
-        """Atomic clear + restart (replaces flush-rerun and replay bypass endpoints)."""
+        """Atomic clear + restart (replaces legacy admin bypass mutations)."""
         _assert_tenant(db, tenant_id)
         try:
             out = execution_rerun_v1(

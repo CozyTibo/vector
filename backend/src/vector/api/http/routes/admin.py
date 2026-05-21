@@ -16,10 +16,6 @@ from sqlalchemy.orm import Session
 
 from vector.api.http.admin_deps import require_admin_basic
 from vector.api.http.deps import get_db, settings_dep
-from vector.domains.cortex.execution.admin_deprecation import (
-    execution_admin_path_v1,
-    raise_admin_endpoint_gone,
-)
 from vector.contracts.admin import (
     AdminConnectionsResponse,
     AdminConnectorConnectLinkResponse,
@@ -2227,42 +2223,6 @@ def build_admin_router() -> APIRouter:
         )
 
     @r.post(
-        "/tenants/{tenant_id}/cortex/reasoning/runtime/reconstruct",
-        response_model=AdminCortexReasoningReconstructionEnqueueResponse,
-    )
-    def admin_cortex_reasoning_runtime_reconstruct(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        body: AdminCortexReasoningReconstructionEnqueueRequest,
-    ) -> AdminCortexReasoningReconstructionEnqueueResponse:
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/reasoning/runtime/reconstruct",
-            replacement=execution_admin_path_v1("/restart?from_phase=TCRE"),
-            migration="TCRE enqueue runs only via execution slice AWAITING_TCRE (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.reasoning.runtime import enqueue_reconstruction_job_v1
-
-        scope: dict[str, Any] = {}
-        if body.materialization_limit is not None:
-            scope["materialization_limit"] = body.materialization_limit
-        if body.bundle_id:
-            scope["bundle_id"] = body.bundle_id
-        if body.octs_walk_id:
-            scope["octs_walk_id"] = body.octs_walk_id
-        if body.octs_strict_binding:
-            scope["octs_strict_binding"] = True
-        raw = enqueue_reconstruction_job_v1(
-            db,
-            tenant_id=tenant_id,
-            scope=scope,
-            dry_run=body.dry_run,
-            run_sync=body.run_sync,
-        )
-        db.commit()
-        return AdminCortexReasoningReconstructionEnqueueResponse.model_validate(raw)
-
-    @r.post(
         "/tenants/{tenant_id}/cortex/reasoning/runtime/jobs/{job_id}/replay-twin",
         response_model=AdminCortexReasoningReplayTwinResponse,
     )
@@ -2425,60 +2385,6 @@ def build_admin_router() -> APIRouter:
         raw = build_tenant_mapping_registry_public_document(db=db, tenant_id=tenant_id)
         return AdminCortexMappingRegistryResponse.model_validate(raw)
 
-    @r.post(
-        "/tenants/{tenant_id}/cortex/canonical/transform/materialize",
-        response_model=AdminCortexMaterializeTransformResponse,
-    )
-    def admin_cortex_canonical_transform_materialize(
-        tenant_id: uuid.UUID,
-        body: AdminCortexMaterializeTransformRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexMaterializeTransformResponse:
-        """Phase 03 Step 6 — run deterministic stub transform + persist field lineage."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/transform/materialize",
-            replacement=execution_admin_path_v1("/restart?from_phase=CANONICAL"),
-            migration="Admin never runs transforms; restart canonical execution slice (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.execution.execution_path_telemetry import (
-            emit_admin_bypass_telemetry_v1,
-        )
-
-        emit_admin_bypass_telemetry_v1(
-            tenant_id=tenant_id,
-            admin_action="canonical_transform_materialize",
-            detail={"bundle_id": body.bundle_id, "raw_record_id": str(body.raw_record_id)},
-        )
-        from vector.domains.cortex.canonical.transform_runtime import (
-            MaterializeError,
-            materialization_public_dict,
-            materialize_raw_record,
-        )
-
-        try:
-            mat = materialize_raw_record(
-                db,
-                tenant_id=tenant_id,
-                bundle_id=body.bundle_id,
-                raw_record_id=body.raw_record_id,
-            )
-        except MaterializeError as exc:
-            from vector.domains.cortex.canonical.failure_remediation_runtime import (
-                record_transform_materialize_failure,
-            )
-
-            record_transform_materialize_failure(
-                db,
-                tenant_id=tenant_id,
-                bundle_id=body.bundle_id,
-                raw_record_id=body.raw_record_id,
-                message=str(exc),
-            )
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        payload = {"materialization": materialization_public_dict(mat)}
-        return AdminCortexMaterializeTransformResponse.model_validate(payload)
-
     @r.get("/tenants/{tenant_id}/cortex/canonical/forward-progress")
     def admin_cortex_canonical_forward_progress(
         tenant_id: uuid.UUID,
@@ -2492,88 +2398,6 @@ def build_admin_router() -> APIRouter:
         )
 
         return build_canonical_forward_progress_snapshot(db, tenant_id=tenant_id, bundle_id=bundle_id)
-
-    @r.post(
-        "/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog",
-        response_model=AdminCortexMaterializeBacklogResponse,
-    )
-    def admin_cortex_canonical_transform_materialize_backlog(
-        tenant_id: uuid.UUID,
-        body: AdminCortexMaterializeBacklogRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexMaterializeBacklogResponse:
-        """Route-routable ingested rows missing a materialization for ``bundle_id`` (batched; scopeable)."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog",
-            replacement=execution_admin_path_v1("/restart?from_phase=CANONICAL"),
-            migration="Parallel backlog drain removed; use execution restart (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.execution.execution_path_telemetry import (
-            emit_admin_bypass_telemetry_v1,
-        )
-
-        emit_admin_bypass_telemetry_v1(
-            tenant_id=tenant_id,
-            admin_action="canonical_transform_materialize_backlog",
-            detail={"bundle_id": body.bundle_id, "dry_run": body.dry_run},
-        )
-        from vector.domains.cortex.canonical.transform_runtime import (
-            MaterializeError,
-            materialize_stub_backlog,
-        )
-
-        try:
-            raw = materialize_stub_backlog(
-                db,
-                tenant_id=tenant_id,
-                bundle_id=body.bundle_id,
-                connector=body.connector,
-                resource_type=body.resource_type,
-                batch_limit=body.batch_limit,
-                dry_run=body.dry_run,
-            )
-        except MaterializeError as exc:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-        failures = [
-            AdminCortexMaterializeBacklogFailureItem.model_validate(x) for x in raw["failures"]
-        ]
-        return AdminCortexMaterializeBacklogResponse(
-            transform_runtime_schema_version=raw["transform_runtime_schema_version"],
-            tenant_id=raw["tenant_id"],
-            bundle_id=raw["bundle_id"],
-            dry_run=raw["dry_run"],
-            stub_resource_pairs_selected=raw["stub_resource_pairs_selected"],
-            scope_connector=raw.get("scope_connector"),
-            scope_resource_type=raw.get("scope_resource_type"),
-            batch_limit_applied=raw["batch_limit_applied"],
-            candidate_more_remain=raw["candidate_more_remain"],
-            attempted=raw["attempted"],
-            attempted_by_resource_type=raw.get("attempted_by_resource_type") or {},
-            succeeded=raw["succeeded"],
-            succeeded_by_resource_type=raw.get("succeeded_by_resource_type") or {},
-            failures=failures,
-            raw_record_ids_sample=raw["raw_record_ids_sample"],
-            duration_ms=raw.get("duration_ms"),
-            throughput_rows_per_second=raw.get("throughput_rows_per_second"),
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog-async",
-        response_model=AdminCortexMaterializeBacklogAsyncResponse,
-    )
-    def admin_cortex_canonical_transform_materialize_backlog_async(
-        tenant_id: uuid.UUID,
-        body: AdminCortexMaterializeBacklogAsyncRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexMaterializeBacklogAsyncResponse:
-        """Enqueue Celery drain of routable backlog until idle (scopeable connector/resource_type filters)."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/transform/materialize-backlog-async",
-            replacement=execution_admin_path_v1("/restart?from_phase=CANONICAL"),
-            migration="Async backlog drain removed; use execution restart (M8).",
-        )
 
     @r.get(
         "/tenants/{tenant_id}/cortex/canonical/transform/lineage",
@@ -2971,95 +2795,6 @@ def build_admin_router() -> APIRouter:
             batches=summaries,
         )
 
-    @r.post(
-        "/tenants/{tenant_id}/cortex/identity/link-candidates/regenerate-async",
-        response_model=AdminCortexIdentityLegacyCeleryAsyncDispatchResponse,
-    )
-    def admin_cortex_identity_link_candidates_regenerate_async(
-        tenant_id: uuid.UUID,
-        body: AdminCortexIdentityLinkCandidatesRegenerateAsyncRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexIdentityLegacyCeleryAsyncDispatchResponse:
-        """Phase 04 Step 19 — enqueue legacy candidate regen Celery task + dispatch registry row."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/identity/link-candidates/regenerate-async",
-            replacement=execution_admin_path_v1("/restart?from_phase=IDENTITY"),
-            migration="Identity side jobs removed; restart identity execution slice (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from app.tasks.cortex_org_link_jobs import (
-            CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES,
-            regenerate_link_candidates_task,
-        )
-        from vector.domains.cortex.identity.worker_dispatch import append_identity_celery_dispatch
-
-        try:
-            ar = regenerate_link_candidates_task.delay(str(tenant_id), body.rule_version.strip())
-        except Exception as exc:
-            raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"celery_enqueue_failed:{exc}",
-            ) from exc
-        append_identity_celery_dispatch(
-            db,
-            tenant_id=tenant_id,
-            celery_task_id=str(ar.id),
-            task_name=CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES,
-            request_summary={"rule_version": body.rule_version.strip()},
-        )
-        db.commit()
-        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{ar.id}"
-        return AdminCortexIdentityLegacyCeleryAsyncDispatchResponse(
-            tenant_id=str(tenant_id),
-            celery_task_id=str(ar.id),
-            task_name=CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES,
-            worker_task_status_path=path,
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/cortex/identity/authoritative-replay-async",
-        response_model=AdminCortexIdentityLegacyCeleryAsyncDispatchResponse,
-    )
-    def admin_cortex_identity_authoritative_replay_async(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexIdentityLegacyCeleryAsyncDispatchResponse:
-        """Phase 04 Step 19 — enqueue legacy authoritative replay hash Celery task + dispatch row."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/identity/authoritative-replay-async",
-            replacement=execution_admin_path_v1("/rerun?from_phase=IDENTITY"),
-            migration="Authoritative replay universe removed; use execution rerun from IDENTITY (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from app.tasks.cortex_org_link_jobs import (
-            CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS,
-            replay_authoritative_links_task,
-        )
-        from vector.domains.cortex.identity.worker_dispatch import append_identity_celery_dispatch
-
-        try:
-            ar = replay_authoritative_links_task.delay(str(tenant_id))
-        except Exception as exc:
-            raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"celery_enqueue_failed:{exc}",
-            ) from exc
-        append_identity_celery_dispatch(
-            db,
-            tenant_id=tenant_id,
-            celery_task_id=str(ar.id),
-            task_name=CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS,
-            request_summary={},
-        )
-        db.commit()
-        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{ar.id}"
-        return AdminCortexIdentityLegacyCeleryAsyncDispatchResponse(
-            tenant_id=str(tenant_id),
-            celery_task_id=str(ar.id),
-            task_name=CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS,
-            worker_task_status_path=path,
-        )
-
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/merges",
         response_model=AdminCortexOrgMergeListResponse,
@@ -3184,54 +2919,6 @@ def build_admin_router() -> APIRouter:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         return AdminCortexBundleEquivalenceDeclarationItem.model_validate(bundle_equivalence_public_dict(row))
 
-    @r.post(
-        "/tenants/{tenant_id}/cortex/identity/replay-jobs/run",
-        response_model=AdminCortexOrgLinkReplayJobDetailResponse,
-    )
-    def admin_cortex_identity_org_link_replay_job_run(
-        tenant_id: uuid.UUID,
-        body: AdminCortexOrgLinkReplayJobRunRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexOrgLinkReplayJobDetailResponse:
-        """Phase 04 Step 10 — run org link continuity replay / candidate regen (job + L-class receipts)."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/identity/replay-jobs/run",
-            replacement=execution_admin_path_v1("/rerun?from_phase=GRAPH"),
-            migration="Org link replay jobs removed; use execution rerun from GRAPH (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.identity.org_link_replay_runtime import (
-            ORG_LINK_REPLAY_SCHEMA_VERSION,
-            OrgLinkReplayError,
-            execute_org_link_replay_job,
-            org_link_replay_job_public_dict,
-            org_link_replay_receipt_public_dict,
-        )
-
-        try:
-            job = execute_org_link_replay_job(
-                db,
-                tenant_id=tenant_id,
-                job_kind=body.job_kind,
-                pinned_rule_version=body.pinned_rule_version,
-                dry_run=body.dry_run,
-                scope_json=body.scope_json,
-            )
-            db.commit()
-        except OrgLinkReplayError as exc:
-            db.rollback()
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        receipts = sorted(job.receipts, key=lambda r: r.id)
-        return AdminCortexOrgLinkReplayJobDetailResponse(
-            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
-            tenant_id=str(tenant_id),
-            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
-            receipts=[
-                AdminCortexOrgLinkReplayJobReceiptItem.model_validate(org_link_replay_receipt_public_dict(r))
-                for r in receipts
-            ],
-        )
-
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/replay-jobs",
         response_model=AdminCortexOrgLinkReplayJobListResponse,
@@ -3286,70 +2973,6 @@ def build_admin_router() -> APIRouter:
                 AdminCortexOrgLinkReplayJobReceiptItem.model_validate(org_link_replay_receipt_public_dict(r))
                 for r in receipts
             ],
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/cortex/identity/replay-jobs/enqueue",
-        response_model=AdminCortexOrgLinkReplayJobEnqueueResponse,
-    )
-    def admin_cortex_identity_org_link_replay_job_enqueue(
-        tenant_id: uuid.UUID,
-        body: AdminCortexOrgLinkReplayJobEnqueueRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexOrgLinkReplayJobEnqueueResponse:
-        """Phase 04 Step 19 — queue org link replay / projection export job + Celery worker."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/identity/replay-jobs/enqueue",
-            replacement=execution_admin_path_v1("/rerun?from_phase=GRAPH"),
-            migration="Org link replay enqueue removed; use execution rerun from GRAPH (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
-        from vector.domains.cortex.identity.org_link_replay_runtime import (
-            ORG_LINK_REPLAY_SCHEMA_VERSION,
-            OrgLinkReplayError,
-            create_queued_org_link_replay_job,
-            org_link_replay_job_public_dict,
-        )
-
-        try:
-            job = create_queued_org_link_replay_job(
-                db,
-                tenant_id=tenant_id,
-                job_kind=body.job_kind,
-                pinned_rule_version=body.pinned_rule_version,
-                dry_run=body.dry_run,
-                scope_json=body.scope_json,
-            )
-            db.flush()
-        except OrgLinkReplayError as exc:
-            db.rollback()
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        try:
-            async_result = run_org_link_replay_job_task.delay(
-                str(tenant_id),
-                body.job_kind,
-                body.pinned_rule_version,
-                body.dry_run,
-                body.scope_json,
-                str(job.id),
-            )
-        except Exception as exc:
-            db.rollback()
-            raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"celery_enqueue_failed:{exc}",
-            ) from exc
-        job.celery_task_id = str(async_result.id)
-        db.commit()
-        db.refresh(job)
-        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{async_result.id}"
-        return AdminCortexOrgLinkReplayJobEnqueueResponse(
-            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
-            tenant_id=str(tenant_id),
-            celery_task_id=str(async_result.id),
-            worker_task_status_path=path,
-            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
         )
 
     @r.get(
@@ -4076,59 +3699,6 @@ def build_admin_router() -> APIRouter:
         raw = build_identity_control_plane(db, tenant_id=tenant_id)
         return AdminCortexIdentityControlPlaneResponse.model_validate(raw)
 
-    @r.post(
-        "/tenants/{tenant_id}/cortex/identity/rebuild-continuity",
-        response_model=AdminCortexIdentityContinuityRebuildResponse,
-    )
-    def admin_cortex_identity_rebuild_continuity(
-        tenant_id: uuid.UUID,
-        body: AdminCortexIdentityContinuityRebuildRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexIdentityContinuityRebuildResponse:
-        """Deterministic Phase 04 continuity rebuild: materialize drain → repair → anchor backfill → candidates."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/identity/rebuild-continuity",
-            replacement=execution_admin_path_v1("/rerun?from_phase=IDENTITY"),
-            migration="Parallel identity rebuild removed; use execution rerun from IDENTITY (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.execution.execution_path_telemetry import (
-            emit_admin_bypass_telemetry_v1,
-        )
-
-        emit_admin_bypass_telemetry_v1(
-            tenant_id=tenant_id,
-            admin_action="identity_rebuild_continuity",
-            detail={"bundle_id": body.bundle_id.strip(), "dry_run": body.dry_run},
-        )
-        from vector.domains.cortex.canonical.transform_runtime import MaterializeError
-        from vector.domains.cortex.identity.continuity_rebuild import (
-            run_identity_continuity_rebuild,
-        )
-
-        try:
-            report = run_identity_continuity_rebuild(
-                db,
-                tenant_id=tenant_id,
-                bundle_id=body.bundle_id.strip(),
-                materialize_batch_limit=body.materialize_batch_limit,
-                anchor_limit=body.anchor_limit,
-                run_determinism_repair=body.run_determinism_repair,
-                dry_run=body.dry_run,
-                replay_job=None,
-            )
-            db.commit()
-        except MaterializeError as exc:
-            db.rollback()
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        except Exception as exc:
-            db.rollback()
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"identity_continuity_rebuild_failed:{exc}",
-            ) from exc
-        return AdminCortexIdentityContinuityRebuildResponse(rebuild=report)
-
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/continuity-fixture-verify",
         response_model=AdminCortexIdentityContinuityVerifyResponse,
@@ -4443,64 +4013,6 @@ def build_admin_router() -> APIRouter:
             validation=AdminCortexOrgRemediationValidationItem.model_validate(raw["validation"]),
         )
 
-    @r.post(
-        "/tenants/{tenant_id}/cortex/canonical/replay-jobs/run",
-        response_model=AdminCortexReplayJobDetailResponse,
-    )
-    def admin_cortex_canonical_replay_job_run(
-        tenant_id: uuid.UUID,
-        body: AdminCortexReplayJobRunRequest,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexReplayJobDetailResponse:
-        """Phase 03 Step 10 — pinned-bundle rebuild/regeneration with C0–C5 divergence receipts."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/replay-jobs/run",
-            replacement=execution_admin_path_v1("/rerun?from_phase=CANONICAL"),
-            migration="Canonical replay job FSM removed; use execution rerun from CANONICAL (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.execution.execution_path_telemetry import (
-            emit_admin_bypass_telemetry_v1,
-        )
-
-        emit_admin_bypass_telemetry_v1(
-            tenant_id=tenant_id,
-            admin_action="canonical_replay_job_run",
-            detail={"job_kind": body.job_kind, "pinned_bundle_id": body.pinned_bundle_id},
-        )
-        from vector.domains.cortex.canonical.replay_runtime import (
-            REPLAY_RUNTIME_SCHEMA_VERSION,
-            ReplayJobError,
-            execute_canonical_replay_job,
-            replay_job_public_dict,
-            replay_receipt_public_dict,
-        )
-
-        try:
-            job = execute_canonical_replay_job(
-                db,
-                tenant_id=tenant_id,
-                pinned_bundle_id=body.pinned_bundle_id,
-                job_kind=body.job_kind,
-                raw_record_ids=body.raw_record_ids,
-                source_bundle_id=body.source_bundle_id,
-                dry_run=body.dry_run,
-                connector=body.connector,
-                resource_type=body.resource_type,
-                include_dependency_neighborhood=body.include_dependency_neighborhood,
-                subtree_anchor_raw_record_id=body.subtree_anchor_raw_record_id,
-                parent_anchor_raw_record_id=body.parent_anchor_raw_record_id,
-            )
-        except ReplayJobError as exc:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        receipts = sorted(job.receipts, key=lambda r: r.id)
-        return AdminCortexReplayJobDetailResponse(
-            replay_runtime_schema_version=REPLAY_RUNTIME_SCHEMA_VERSION,
-            tenant_id=str(tenant_id),
-            job=AdminCortexReplayJobItem.model_validate(replay_job_public_dict(job)),
-            receipts=[AdminCortexReplayJobReceiptItem.model_validate(replay_receipt_public_dict(r)) for r in receipts],
-        )
-
     @r.get(
         "/tenants/{tenant_id}/cortex/canonical/replay-jobs",
         response_model=AdminCortexReplayJobListResponse,
@@ -4546,45 +4058,6 @@ def build_admin_router() -> APIRouter:
         job = get_replay_job(db, tenant_id=tenant_id, job_id=job_id)
         if job is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="replay_job_not_found")
-        receipts = sorted(job.receipts, key=lambda r: r.id)
-        return AdminCortexReplayJobDetailResponse(
-            replay_runtime_schema_version=REPLAY_RUNTIME_SCHEMA_VERSION,
-            tenant_id=str(tenant_id),
-            job=AdminCortexReplayJobItem.model_validate(replay_job_public_dict(job)),
-            receipts=[AdminCortexReplayJobReceiptItem.model_validate(replay_receipt_public_dict(r)) for r in receipts],
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/cortex/canonical/replay-jobs/{job_id}/resume",
-        response_model=AdminCortexReplayJobDetailResponse,
-    )
-    def admin_cortex_canonical_replay_job_resume(
-        tenant_id: uuid.UUID,
-        job_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminCortexReplayJobDetailResponse:
-        """Resume a failed replay job using the stored deterministic process order (Phase 03 hardening)."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/canonical/replay-jobs/{job_id}/resume",
-            replacement=execution_admin_path_v1("/rerun?from_phase=CANONICAL"),
-            migration="Replay job resume removed; use execution rerun from CANONICAL (M8).",
-        )
-        _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.canonical.replay_runtime import (
-            REPLAY_RUNTIME_SCHEMA_VERSION,
-            ReplayJobError,
-            get_replay_job,
-            replay_job_public_dict,
-            replay_receipt_public_dict,
-            resume_canonical_replay_job,
-        )
-
-        try:
-            job = resume_canonical_replay_job(db, tenant_id=tenant_id, job_id=job_id)
-        except ReplayJobError as exc:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        job = get_replay_job(db, tenant_id=tenant_id, job_id=job_id)
-        assert job is not None
         receipts = sorted(job.receipts, key=lambda r: r.id)
         return AdminCortexReplayJobDetailResponse(
             replay_runtime_schema_version=REPLAY_RUNTIME_SCHEMA_VERSION,
@@ -5253,25 +4726,6 @@ def build_admin_router() -> APIRouter:
             tenant_id=tenant_id,
             replay_version=body.replay_version,
             enforcement=enforcement,
-        )
-
-    @r.post(
-        "/tenants/{tenant_id}/cortex/ingestion/actions/flush-rerun-to-identity",
-        response_model=AdminCortexFlushAndRerunResponse,
-    )
-    def admin_cortex_flush_rerun_to_identity(
-        tenant_id: uuid.UUID,
-        body: AdminCortexFlushAndRerunRequest,
-        db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> AdminCortexFlushAndRerunResponse:
-        """Flush tenant Cortex state, rerun connectors, then substrate refresh through Phase 07 retrieval."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/ingestion/actions/flush-rerun-to-identity",
-            replacement=execution_admin_path_v1("/rerun?from_phase=CANONICAL&flush_all=true"),
-            migration=(
-                "Use execution rerun with flush_all=true, then trigger ingestion sync separately (M8)."
-            ),
         )
 
     @r.post(

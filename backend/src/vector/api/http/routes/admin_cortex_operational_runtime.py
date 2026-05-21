@@ -11,18 +11,6 @@ from sqlalchemy.orm import Session
 from starlette import status
 
 from vector.api.http.deps import get_db
-from vector.domains.cortex.execution.admin_deprecation import (
-    execution_admin_path_v1,
-    raise_admin_endpoint_gone,
-)
-
-
-def _raise_operational_sidecar_gone(*, path_suffix: str, from_phase: str) -> None:
-    raise_admin_endpoint_gone(
-        deprecated=f"/admin/tenants/{{tenant_id}}/cortex/operational-runtime{path_suffix}",
-        replacement=execution_admin_path_v1(f"/restart?from_phase={from_phase}"),
-        migration="Operational sidecar Celery passes removed (M8); use execution restart.",
-    )
 from vector.contracts.admin import (
     AdminCortexOperationalRuntimeGapMatrixCatalogResponse,
     AdminCortexOperationalRuntimePhaseBoundariesCatalogResponse,
@@ -471,55 +459,6 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
         """Phase 08.5 Step 11 — static **G-P085-PROMO-01** gate."""
         return verify_gp085_promotion_gate_static()
 
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/graph-density-promotion/run",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_graph_density_promotion_run(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 11 — synchronous lawful promotion pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/graph-density-promotion/run",
-            from_phase="GRAPH",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return run_graph_density_promotion_pass_v1(db, tenant_id=tenant_id)
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/graph-density-promotion/schedule",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_graph_density_promotion_schedule(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 11 — evaluate backlog and enqueue async promotion pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/graph-density-promotion/schedule",
-            from_phase="GRAPH",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        eval_out = evaluate_promotion_backlog_schedule_v1(db, tenant_id=tenant_id)
-        if not eval_out.get("should_schedule"):
-            return {
-                "scheduled": False,
-                "evaluation": eval_out,
-            }
-        return schedule_graph_density_pass_v1(
-            tenant_id=tenant_id,
-            trigger="backlog_threshold",
-        )
-
     @router.get(
         "/catalog/cortex/operational-runtime/graph-orphan-continuity",
         response_model=None,
@@ -552,135 +491,6 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
             )
         return classify_tenant_graph_orphans_v1(db, tenant_id=tenant_id)
 
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/graph-orphan-continuity/stitch",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_graph_orphan_continuity_stitch(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        dry_run: bool = False,
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 12 — run continuity stitching pass (classify + lawful actions)."""
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return run_continuity_stitching_pass_v1(
-            db,
-            tenant_id=tenant_id,
-            dry_run=dry_run,
-        )
-
-    @router.get(
-        "/catalog/cortex/operational-runtime/graph-completeness-propagation",
-        response_model=None,
-    )
-    def admin_catalog_cortex_operational_runtime_graph_completeness_propagation() -> dict[str, object]:
-        """Phase 08.5 Step 13 — graph completeness propagation catalog (**G-P085-GRAPH-PROP-01**)."""
-        return build_graph_completeness_propagation_catalog_v1()
-
-    @router.get(
-        "/catalog/cortex/operational-runtime/graph-completeness-propagation-gate",
-        response_model=None,
-    )
-    def admin_catalog_cortex_operational_runtime_graph_completeness_propagation_gate() -> dict[str, object]:
-        """Phase 08.5 Step 13 — static **G-P085-GRAPH-PROP-01** gate."""
-        return verify_gp085_graph_propagation_gate_static()
-
-    @router.get(
-        "/tenants/{tenant_id}/cortex/operational-runtime/graph-completeness-propagation",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_graph_completeness_propagation(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 13 — propagated graph completeness stage card."""
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return propagate_graph_completeness_stage_v1(db, tenant_id=tenant_id)
-
-    @router.get("/catalog/cortex/operational-runtime/traversal-scheduling", response_model=None)
-    def admin_catalog_cortex_operational_runtime_traversal_scheduling() -> dict[str, object]:
-        """Phase 08.5 Step 14 — traversal walk scheduling catalog (**G-P085-WALK-01**)."""
-        return build_substrate_traversal_scheduling_catalog_v1()
-
-    @router.get(
-        "/catalog/cortex/operational-runtime/traversal-scheduling-gate",
-        response_model=None,
-    )
-    def admin_catalog_cortex_operational_runtime_traversal_scheduling_gate() -> dict[str, object]:
-        """Phase 08.5 Step 14 — static **G-P085-WALK-01** gate."""
-        return verify_gp085_traversal_scheduling_gate_static()
-
-    @router.get(
-        "/tenants/{tenant_id}/cortex/operational-runtime/traversal-scheduling",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_traversal_scheduling(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 14 — evaluate traversal schedule eligibility."""
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return evaluate_traversal_schedule_v1(db, tenant_id=tenant_id)
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/traversal-scheduling/schedule",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_traversal_scheduling_schedule(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 14 — enqueue async OCTS walk schedule pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/traversal-scheduling/schedule",
-            from_phase="TRAVERSAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        eval_out = evaluate_traversal_schedule_v1(db, tenant_id=tenant_id)
-        if not eval_out.get("should_schedule"):
-            return {"scheduled": False, "evaluation": eval_out}
-        return schedule_octs_walks_for_tenant_v1(
-            tenant_id=tenant_id,
-            trigger="manual",
-            force=True,
-        )
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/traversal-scheduling/run",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_traversal_scheduling_run(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 14 — synchronous OCTS walk schedule pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/traversal-scheduling/run",
-            from_phase="TRAVERSAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return run_octs_walk_schedule_pass_v1(db, tenant_id=tenant_id)
-
     @router.get("/catalog/cortex/operational-runtime/traversal-retry", response_model=None)
     def admin_catalog_cortex_operational_runtime_traversal_retry() -> dict[str, object]:
         """Phase 08.5 Step 15 — traversal retry + frontier heal catalog (**G-P085-WALK-02**)."""
@@ -709,48 +519,6 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
                 content={"error": "tenant_not_found"},
             )
         return run_traversal_retry_and_heal_pass_v1(db, tenant_id=tenant_id)
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/traversal-retry/run",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_traversal_retry_run(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 15 — synchronous traversal retry + frontier heal pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/traversal-retry/run",
-            from_phase="TRAVERSAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        out = run_traversal_retry_and_heal_pass_v1(db, tenant_id=tenant_id)
-        db.commit()
-        return out
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/traversal-retry/schedule",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_traversal_retry_schedule(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 15 — enqueue async traversal retry + frontier heal pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/traversal-retry/schedule",
-            from_phase="TRAVERSAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return schedule_traversal_retry_and_heal_pass_v1(tenant_id=tenant_id)
 
     @router.get(
         "/catalog/cortex/operational-runtime/stalled-traversal-recovery",
@@ -785,48 +553,6 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
                 content={"error": "tenant_not_found"},
             )
         return evaluate_tenant_traversal_stall_v1(db, tenant_id=tenant_id)
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/stalled-traversal-recovery/run",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_stalled_traversal_recovery_run(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 16 — synchronous stalled traversal recovery pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/stalled-traversal-recovery/run",
-            from_phase="TRAVERSAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        out = run_stalled_traversal_recovery_pass_v1(db, tenant_id=tenant_id)
-        db.commit()
-        return out
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/stalled-traversal-recovery/schedule",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_stalled_traversal_recovery_schedule(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 16 — enqueue async stalled traversal recovery pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/stalled-traversal-recovery/schedule",
-            from_phase="TRAVERSAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return schedule_stalled_traversal_recovery_pass_v1(tenant_id=tenant_id)
 
     @router.get(
         "/catalog/cortex/operational-runtime/traversal-explainability",
@@ -895,53 +621,6 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
                 content={"error": "tenant_not_found"},
             )
         return evaluate_tcre_saturation_schedule_v1(db, tenant_id=tenant_id)
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/tcre-saturation-scheduling/run",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_tcre_saturation_scheduling_run(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 18 — synchronous TCRE saturation schedule pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/tcre-saturation-scheduling/run",
-            from_phase="TCRE",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        out = run_tcre_saturation_schedule_pass_v1(
-            db,
-            tenant_id=tenant_id,
-            trigger="manual",
-            skip_if_saturated=False,
-        )
-        db.commit()
-        return out
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/tcre-saturation-scheduling/schedule",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_tcre_saturation_scheduling_schedule(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 18 — enqueue async TCRE saturation schedule pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/tcre-saturation-scheduling/schedule",
-            from_phase="TCRE",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return schedule_tcre_saturation_for_tenant_v1(tenant_id=tenant_id, force=True)
 
     @router.get("/catalog/cortex/operational-runtime/tcre-density", response_model=None)
     def admin_catalog_cortex_operational_runtime_tcre_density() -> dict[str, object]:
@@ -1157,53 +836,6 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
                 content={"error": "tenant_not_found"},
             )
         return evaluate_synthesis_activation_schedule_v1(db, tenant_id=tenant_id)
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/synthesis-activation-scheduling/run",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_synthesis_activation_scheduling_run(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 24 — synchronous synthesis activation schedule pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/synthesis-activation-scheduling/run",
-            from_phase="RETRIEVAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        out = run_synthesis_activation_schedule_pass_v1(
-            db,
-            tenant_id=tenant_id,
-            trigger="manual",
-            force=False,
-        )
-        db.commit()
-        return out
-
-    @router.post(
-        "/tenants/{tenant_id}/cortex/operational-runtime/synthesis-activation-scheduling/schedule",
-        response_model=None,
-    )
-    def admin_tenant_cortex_operational_runtime_synthesis_activation_scheduling_schedule(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> JSONResponse | dict[str, object]:
-        """Phase 08.5 Step 24 — enqueue async synthesis activation schedule pass."""
-        _raise_operational_sidecar_gone(
-            path_suffix="/synthesis-activation-scheduling/schedule",
-            from_phase="RETRIEVAL",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content={"error": "tenant_not_found"},
-            )
-        return schedule_synthesis_activation_for_tenant_v1(tenant_id=tenant_id, force=True)
 
     @router.get(
         "/catalog/cortex/operational-runtime/synthesis-idle-classification",

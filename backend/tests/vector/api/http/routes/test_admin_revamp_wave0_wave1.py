@@ -136,6 +136,25 @@ def test_wave3_synthesis_no_retry_mutation() -> None:
     assert "/retry" not in detail
 
 
+def test_wave4_admin_routes_have_no_bypass_fragments() -> None:
+    from pathlib import Path
+
+    routes_dir = _repo_root() / "backend" / "src" / "vector" / "api" / "http" / "routes"
+    forbidden = ("materialize-backlog", "flush-rerun", "progression/continue")
+    for path in routes_dir.glob("admin*.py"):
+        text = path.read_text(encoding="utf-8")
+        for frag in forbidden:
+            assert frag not in text, f"{path.name} still references {frag}"
+
+
+def test_wave4_bypass_guard_passes() -> None:
+    from vector.domains.cortex.execution.admin_bypass_guard import (
+        verify_no_admin_bypass_routes_registered_v1,
+    )
+
+    assert verify_no_admin_bypass_routes_registered_v1() == []
+
+
 def test_wave1_canonical_health_no_materialize_mutations() -> None:
     canonical = (_frontend_admin() / "AdminCortexCanonicalHealthPage.tsx").read_text(encoding="utf-8")
     assert "useMutation" not in canonical

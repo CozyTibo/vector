@@ -204,9 +204,7 @@ def test_admin_cortex_canonical_materialize_backlog_dry_run_ok(
         auth=("admin", "integration-admin-password"),
         json={"bundle_id": bundle_id, "batch_limit": 50, "dry_run": True},
     )
-    assert r.status_code == 410
-    assert r.json()["detail"]["error"] == "admin_endpoint_removed"
-    assert "execution/restart" in r.json()["detail"]["replacement"]
+    assert r.status_code == 404
 
 
 def test_admin_cortex_canonical_materialize_backlog_async_ok(
@@ -231,5 +229,4 @@ def test_admin_cortex_canonical_materialize_backlog_async_ok(
         auth=("admin", "integration-admin-password"),
         json={},
     )
-    assert r.status_code == 410
-    assert "execution/restart" in r.json()["detail"]["replacement"]
+    assert r.status_code == 404

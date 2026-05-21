@@ -672,8 +672,7 @@ def test_admin_flush_rerun_requires_exact_confirmation(
             auth=("admin", "integration-admin-password"),
             json={"confirmation": "wrong phrase"},
         )
-        assert r.status_code == 410
-        assert r.json()["detail"]["error"] == "admin_endpoint_removed"
+        assert r.status_code == 404
     finally:
         get_settings.cache_clear()
 
@@ -699,9 +698,7 @@ def test_admin_flush_rerun_flushes_and_enqueues(
                 "canonical_batch_limit": 777,
             },
         )
-        assert r.status_code == 410
-        assert "execution/rerun" in r.json()["detail"]["replacement"]
-        assert "flush_all=true" in r.json()["detail"]["replacement"]
+        assert r.status_code == 404
 
         remaining_raw = (
             db_session.query(RawIngestionRecord)

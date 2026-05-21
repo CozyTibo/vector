@@ -10,10 +10,6 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import get_db
-from vector.domains.cortex.execution.admin_deprecation import (
-    execution_admin_path_v1,
-    raise_admin_endpoint_gone,
-)
 from vector.domains.cortex.continuity.runtime.continuity_topology_graph import (
     build_continuity_topology_v1,
 )
@@ -202,62 +198,6 @@ def register_cortex_retrieval_routes(router: APIRouter) -> None:
         catalog = build_retrieval_index_catalog_v1(tenant_id=tenant_id)
         catalog["index_lag_epochs"] = compute_index_lag_epochs_v1(db, tenant_id=tenant_id)
         return catalog
-
-    @r.post("/index/rebuild", response_model=None)
-    def post_retrieval_index_rebuild(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        body: Annotated[dict[str, Any], Body(default_factory=dict)],
-    ) -> JSONResponse | dict[str, Any]:
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/retrieval/index/rebuild",
-            replacement=execution_admin_path_v1("/rerun?from_phase=RETRIEVAL"),
-            migration="Direct index rebuild removed; use execution rerun from RETRIEVAL (M8).",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
-        try:
-            assert_retrieval_index_rebuild_confirmation_v1(body.get("confirmation_phrase"))
-            result = run_retrieval_index_rebuild_v1(
-                db,
-                tenant_id=tenant_id,
-                index_epoch=str(body.get("index_epoch")).strip() if body.get("index_epoch") else None,
-            )
-            db.commit()
-            return result
-        except RetrievalOperatorWorkflowsError as exc:
-            return JSONResponse(status_code=403, content={"error": exc.code, "detail": exc.detail})
-        except RetrievalIndexMaterializationError as exc:
-            db.rollback()
-            return JSONResponse(status_code=400, content={"error": exc.code, "detail": exc.detail})
-
-    @r.post("/index/bootstrap", response_model=None)
-    def post_retrieval_index_bootstrap(
-        tenant_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-        body: Annotated[dict[str, Any], Body(default_factory=dict)],
-    ) -> JSONResponse | dict[str, Any]:
-        """Materialize index from completed TCRE jobs / walks / org links, then publish epoch."""
-        raise_admin_endpoint_gone(
-            deprecated="/admin/tenants/{tenant_id}/cortex/retrieval/index/bootstrap",
-            replacement=execution_admin_path_v1("/restart?from_phase=RETRIEVAL"),
-            migration="Retrieval bootstrap bypass removed; use execution restart from RETRIEVAL (M8).",
-        )
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
-        try:
-            result = bootstrap_retrieval_index_from_upstream_v1(
-                db,
-                tenant_id=tenant_id,
-                index_epoch=str(body.get("index_epoch")).strip() if body.get("index_epoch") else None,
-                max_tcre_jobs=int(body.get("max_tcre_jobs") or 100),
-                max_graph_links=int(body.get("max_graph_links") or 500),
-            )
-            db.commit()
-            return result
-        except RetrievalIndexMaterializationError as exc:
-            db.rollback()
-            return JSONResponse(status_code=400, content={"error": exc.code, "detail": exc.detail})
 
     @r.get("/omission-explorer", response_model=None)
     def get_retrieval_omission_explorer(

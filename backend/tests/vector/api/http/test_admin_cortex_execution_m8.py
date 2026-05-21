@@ -46,7 +46,7 @@ def test_execution_state_inspect_ok(
 
 
 @pytest.mark.integration
-def test_materialize_backlog_returns_410_with_replacement(
+def test_materialize_backlog_route_not_registered(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
@@ -59,14 +59,11 @@ def test_materialize_backlog_returns_410_with_replacement(
         auth=("admin", "integration-admin-password"),
         json={"bundle_id": "bundle-test", "batch_limit": 10, "dry_run": True},
     )
-    assert r.status_code == 410
-    detail = r.json()["detail"]
-    assert detail["error"] == "admin_endpoint_removed"
-    assert "execution/restart" in detail["replacement"]
+    assert r.status_code == 404
 
 
 @pytest.mark.integration
-def test_graph_density_promotion_run_returns_410(
+def test_graph_density_promotion_run_route_not_registered(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
@@ -78,5 +75,4 @@ def test_graph_density_promotion_run_returns_410(
         f"/admin/tenants/{tid}/cortex/operational-runtime/graph-density-promotion/run",
         auth=("admin", "integration-admin-password"),
     )
-    assert r.status_code == 410
-    assert "execution/restart" in r.json()["detail"]["replacement"]
+    assert r.status_code == 404

@@ -756,9 +756,12 @@ def verify_m8_admin_execution_surface_v1() -> list[str]:
     admin_mod = importlib.import_module("vector.api.http.routes.admin")
     if "register_cortex_execution_routes" not in inspect.getsource(admin_mod.build_admin_router):
         errors.append("admin_router_missing_execution_registration")
-    router_src = inspect.getsource(admin_mod.build_admin_router)
-    if "materialize-backlog" not in router_src or "raise_admin_endpoint_gone" not in router_src:
-        errors.append("materialize_backlog_missing_410_guard")
+
+    from vector.domains.cortex.execution.admin_bypass_guard import (
+        verify_no_admin_bypass_routes_registered_v1,
+    )
+
+    errors.extend(verify_no_admin_bypass_routes_registered_v1())
     return errors
 
 
