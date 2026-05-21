@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
-from app.celery_app import celery_app
 from vector.domains.cortex.operational_runtime.cesp_stalled_traversal_gate import (
     verify_gp085_stalled_traversal_gate_static,
 )
@@ -40,12 +39,6 @@ def test_stalled_traversal_catalog() -> None:
 def test_verify_gp085_walk03_static_passes() -> None:
     assert verify_gp085_walk03_static()["passed"] is True
     assert verify_gp085_stalled_traversal_gate_static()["passed"] is True
-
-
-def test_celery_registers_stalled_traversal_recovery_task() -> None:
-    from app.tasks import cortex_substrate_stalled_traversal_recovery  # noqa: F401
-
-    assert CELERY_STALLED_TRAVERSAL_RECOVERY_TASK_NAME_V1 in celery_app.tasks
 
 
 def test_detect_stalled_traversal() -> None:
@@ -139,22 +132,20 @@ def test_apply_stalled_walk_recovery_poison_cancel(monkeypatch: pytest.MonkeyPat
     assert out["action"] == RECOVERY_ACTION_CANCEL_POISON_DLQ_V1
 
 
-def test_schedule_stalled_traversal_recovery_enqueues_celery(
+def test_schedule_stalled_traversal_recovery_runs_inline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tid = uuid.uuid4()
 
-    class _FakeAsync:
-        id = "stall-recovery-task"
-
     monkeypatch.setattr(
-        "app.tasks.cortex_substrate_stalled_traversal_recovery."
-        "run_stalled_traversal_recovery_pass_task.apply_async",
-        lambda **kwargs: _FakeAsync(),  # noqa: ARG005
+        "vector.domains.cortex.operational_runtime.substrate_stalled_traversal_recovery."
+        "run_stalled_traversal_recovery_pass_v1",
+        lambda *_a, **_k: {"gate_id": "G-P085-WALK-03", "recovered": False},
     )
     out = schedule_stalled_traversal_recovery_pass_v1(tenant_id=tid)
     assert out["scheduled"] is True
-    assert out["celery_task_id"] == "stall-recovery-task"
+    assert out["path"] == "inline_execution_slice"
+    assert "pass" in out
 
 
 @pytest.mark.integration

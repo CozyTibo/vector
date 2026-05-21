@@ -226,15 +226,10 @@ def test_admin_cortex_canonical_materialize_backlog_async_ok(
     bundles = reg.json()["bundles"]
     assert bundles
 
-    with patch(
-        "app.tasks.cortex_canonical_materialize_backlog.drain_stub_materialize_backlog_task.delay",
-    ) as mock_delay:
-        mock_delay.return_value = MagicMock(id="celery-task-integration-test")
-        r = client.post(
-            f"/admin/tenants/{tid}/cortex/canonical/transform/materialize-backlog-async",
-            auth=("admin", "integration-admin-password"),
-            json={},
-        )
-        assert r.status_code == 410
-        assert "execution/restart" in r.json()["detail"]["replacement"]
-        mock_delay.assert_not_called()
+    r = client.post(
+        f"/admin/tenants/{tid}/cortex/canonical/transform/materialize-backlog-async",
+        auth=("admin", "integration-admin-password"),
+        json={},
+    )
+    assert r.status_code == 410
+    assert "execution/restart" in r.json()["detail"]["replacement"]

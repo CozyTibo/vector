@@ -106,7 +106,7 @@ trigger (ingest complete | admin rerun | sweeper)
 | **M6** | Replace per-phase Celery tasks with single slice task; delete `chain_after_phase_v1` | High | **Done** — `vector.cortex.execution.run_slice`; `enqueue_execution_slice_at_phase_v1`; removed `chain_after_phase_v1`; legacy phase/coordinator tasks deprecated (no chain) |
 | **M7** | Delete `substrate_operational_progression.py` and callers; migrate retrieval retry to FSM `BLOCKED` + manual/admin rerun | High | **Done** — deleted coordinator + Celery tick task; `execution/progression_status.py`, `blocked.py`, `admin_rerun.py`; retrieval policy in `run_tenant_execution_v1`; admin `POST …/progression/continue` → `admin_rerun_substrate_execution_v1`; [operator playbook](#m7-operator-playbook) |
 | **M8** | Collapse admin execution endpoints (section 5) | Medium | **Done** — `GET …/execution/state`, `POST …/execution/{restart,clear,rerun}`; bypass routes return **410 Gone** with replacement paths; `clear_derived_outputs_from_phase_v1` replay matrix |
-| **M9** | Delete dead modules (section 9) | Low after M6–M8 | CI grep for imports |
+| **M9** | Delete dead modules (section 9) | Low after M6–M8 | **Done** — `verify_m9_dead_celery_modules_absent_v1`; 12 Celery task modules removed; phase runners inline traversal / drop density+TCRE saturation hooks; schedule debounce infra deleted |
 
 ### 2.3 Temporary compatibility (short-lived only)
 
@@ -369,6 +369,20 @@ replay(tenant_id, from_phase, scope?) :=
 | Rerun | `POST …/execution/rerun?from_phase=` (clear + restart) |
 
 Removed bypass endpoints return **HTTP 410** with JSON `detail.replacement` pointing at the execution routes above. Ingest `trigger-sync` / `trigger-replay` unchanged.
+
+### M9 implementation notes
+
+| Area | Action |
+|------|--------|
+| Celery tasks deleted | `cortex_graph_density_promotion`, `cortex_substrate_traversal_scheduling`, `cortex_substrate_traversal_retry`, `cortex_substrate_stalled_traversal_recovery`, `cortex_orphan_continuity_stitch`, `cortex_substrate_tcre_saturation_scheduling`, `cortex_substrate_synthesis_activation_scheduling`, `cortex_canonical_materialize_backlog`, `cortex_post_ingestion_substrate_refresh`, `cortex_substrate_continuity_watchdog`, `cortex_full_pipeline_rerun`, `cortex_substrate_pipeline` |
+| Infra deleted | `vector/infrastructure/cortex_substrate_pipeline_schedule.py` (legacy debounce) |
+| Phase runners | Phase 04: no graph-density schedule; phase 05: inline `run_octs_walk_schedule_pass_v1`; phase 06: no TCRE saturation hook |
+| Traversal pass | No retry/heal or stalled-recovery sidecars in `run_octs_walk_schedule_pass_v1` |
+| Admin schedule APIs | `schedule_*` helpers run inline passes (no Celery `apply_async`) |
+| CI guard | `execution/scheduling.py` → `verify_m9_dead_celery_modules_absent_v1` (also wired into `verify_convergence_sweep_in_celery_beat_v1`) |
+| Celery worker | `celery_app` / `worker` include only ingest, TCRE jobs, synthesis jobs, convergence sweep, execution slice |
+
+**Remaining Celery substrate surface:** `vector.cortex.execution.run_slice`, `vector.cortex.convergence.sweep`, `cortex_tcre_reconstruction_jobs`, `cortex_synthesis_jobs`, ingestion sync/scheduler.
 
 ---
 
@@ -688,9 +702,9 @@ app/tasks/
 | W1 | M1 P0 gate fix + M2 force convergence + telemetry |
 | W2 | **M4–M6 done** |
 | W3 | **M7–M8 done** |
-| W4 | M9 sidecar deletion + replay contract |
-| W5 | M9 sidecar deletion + replay contract |
-| W6 | M9 sidecar deletion + replay contract |
+| W4 | **M9 done** |
+| W5 | Test rewrite + oper playbook + remove flags |
+| W6 | Test rewrite + oper playbook + remove flags |
 | W7 | Test rewrite + oper playbook + remove flags |
 
 ---

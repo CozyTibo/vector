@@ -347,28 +347,22 @@ def schedule_tcre_saturation_for_tenant_v1(
             "evaluation": eval_out,
         }
 
-    cd = 0 if countdown is None else max(0, int(countdown))
-    from app.tasks.cortex_substrate_tcre_saturation_scheduling import (
-        run_tcre_saturation_schedule_pass_task,
-    )
-
-    async_result = run_tcre_saturation_schedule_pass_task.apply_async(
-        kwargs={
-            "tenant_id": str(tenant_id),
-            "pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None,
-            "octs_walk_id": octs_walk_id,
-            "trigger": trigger,
-            "force": force,
-        },
-        queue="vector",
-        countdown=cd,
-    )
+    _ = countdown
+    with session_scope() as session:
+        pass_out = run_tcre_saturation_schedule_pass_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            octs_walk_id=octs_walk_id,
+            trigger=trigger,
+            skip_if_saturated=not force,
+        )
+        session.commit()
     return {
         "scheduled": True,
-        "celery_task_id": async_result.id,
-        "task_name": CELERY_TCRE_SATURATION_SCHEDULE_TASK_NAME_V1,
-        "countdown_seconds": cd,
+        "path": "inline_execution_slice",
         "evaluation": eval_out,
+        "pass": pass_out,
     }
 
 
@@ -480,27 +474,13 @@ def verify_gp085_tcre01_static() -> dict[str, Any]:
 
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr
 
-    if "run_tcre_saturation_after_phase06_v1" not in inspect.getsource(pr.run_phase_06_tcre_v1):
-        errors.append("phase_06_missing_saturation_hook")
+    if "run_tcre_saturation_after_phase06_v1" in inspect.getsource(pr.run_phase_06_tcre_v1):
+        errors.append("phase_06_must_not_run_tcre_saturation_sidecar_m9")
 
-    from vector.domains.cortex.substrate_pipeline import stalled_pipeline_recovery as spr
+    import importlib.util
 
-    if "run_tcre_saturation_watchdog_hook_v1" not in inspect.getsource(
-        spr.run_stalled_pipeline_watchdog_v1
-    ):
-        errors.append("watchdog_missing_saturation_hook")
-
-    try:
-        from app.celery_app import celery_app
-
-        if CELERY_TCRE_SATURATION_SCHEDULE_TASK_NAME_V1 not in celery_app.tasks:
-            import importlib
-
-            importlib.import_module("app.tasks.cortex_substrate_tcre_saturation_scheduling")
-        if CELERY_TCRE_SATURATION_SCHEDULE_TASK_NAME_V1 not in celery_app.tasks:
-            errors.append("celery_task_not_registered")
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"celery_import:{exc}")
+    if importlib.util.find_spec("app.tasks.cortex_substrate_tcre_saturation_scheduling") is not None:
+        errors.append("celery_tcre_saturation_module_must_be_deleted_m9")
 
     passed = not errors
     return {

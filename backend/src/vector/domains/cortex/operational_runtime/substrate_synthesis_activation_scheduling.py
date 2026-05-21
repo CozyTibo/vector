@@ -415,28 +415,22 @@ def schedule_synthesis_activation_for_tenant_v1(
             "evaluation": eval_out,
         }
 
-    cd = 0 if countdown is None else max(0, int(countdown))
-    from app.tasks.cortex_substrate_synthesis_activation_scheduling import (
-        run_synthesis_activation_schedule_pass_task,
-    )
-
-    async_result = run_synthesis_activation_schedule_pass_task.apply_async(
-        kwargs={
-            "tenant_id": str(tenant_id),
-            "pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None,
-            "published_index_epoch": published_index_epoch,
-            "trigger": trigger,
-            "force": force,
-        },
-        queue="vector",
-        countdown=cd,
-    )
+    _ = countdown
+    with session_scope() as session:
+        pass_out = run_synthesis_activation_schedule_pass_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            published_index_epoch=published_index_epoch,
+            trigger=trigger,
+            force=force,
+        )
+        session.commit()
     return {
         "scheduled": True,
-        "celery_task_id": async_result.id,
-        "task_name": CELERY_SYNTHESIS_ACTIVATION_SCHEDULE_TASK_NAME_V1,
-        "countdown_seconds": cd,
+        "path": "inline_execution_slice",
         "evaluation": eval_out,
+        "pass": pass_out,
     }
 
 
@@ -504,17 +498,10 @@ def verify_gp085_syn01_static() -> dict[str, Any]:
     if "synthesis_forbidden_backoff" not in eval_src:
         errors.append("evaluate_missing_forbidden_backoff")
 
-    try:
-        from app.celery_app import celery_app
+    import importlib.util
 
-        if CELERY_SYNTHESIS_ACTIVATION_SCHEDULE_TASK_NAME_V1 not in celery_app.tasks:
-            import importlib
-
-            importlib.import_module("app.tasks.cortex_substrate_synthesis_activation_scheduling")
-        if CELERY_SYNTHESIS_ACTIVATION_SCHEDULE_TASK_NAME_V1 not in celery_app.tasks:
-            errors.append("celery_task_not_registered")
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"celery_import:{exc}")
+    if importlib.util.find_spec("app.tasks.cortex_substrate_synthesis_activation_scheduling") is not None:
+        errors.append("celery_synthesis_activation_module_must_be_deleted_m9")
 
     passed = not errors
     return {

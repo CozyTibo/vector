@@ -521,17 +521,10 @@ def verify_gp085_orphan01_static() -> dict[str, Any]:
     if RET_SKIP_GRAPH_DISCONNECTED_V1 not in rsr.RET_SKIP_CODES_V1:
         errors.append("ret_skip_graph_disconnected_missing")
 
-    try:
-        from app.celery_app import celery_app
+    import importlib.util
 
-        if CELERY_ORPHAN_CONTINUITY_STITCH_TASK_NAME_V1 not in celery_app.tasks:
-            import importlib
-
-            importlib.import_module("app.tasks.cortex_orphan_continuity_stitch")
-        if CELERY_ORPHAN_CONTINUITY_STITCH_TASK_NAME_V1 not in celery_app.tasks:
-            errors.append("celery_task_not_registered")
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"celery_import:{exc}")
+    if importlib.util.find_spec("app.tasks.cortex_orphan_continuity_stitch") is not None:
+        errors.append("celery_orphan_stitch_module_must_be_deleted_m9")
 
     passed = not errors
     return {

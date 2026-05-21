@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
-from app.celery_app import celery_app
 from vector.domains.cortex.operational_runtime.cesp_tcre_saturation_gate import (
     verify_gp085_tcre_saturation_gate_static,
 )
@@ -41,12 +40,6 @@ def test_tcre_saturation_catalog() -> None:
 def test_verify_gp085_tcre01_static_passes() -> None:
     assert verify_gp085_tcre01_static()["passed"] is True
     assert verify_gp085_tcre_saturation_gate_static()["passed"] is True
-
-
-def test_celery_registers_tcre_saturation_task() -> None:
-    from app.tasks import cortex_substrate_tcre_saturation_scheduling  # noqa: F401
-
-    assert CELERY_TCRE_SATURATION_SCHEDULE_TASK_NAME_V1 in celery_app.tasks
 
 
 def test_normalize_scope_preserves_pipeline_run_id() -> None:
@@ -91,11 +84,8 @@ def test_evaluate_schedule_no_materializations(monkeypatch: pytest.MonkeyPatch) 
     assert out["schedule_reason"] == "no_canonical_materializations"
 
 
-def test_schedule_tcre_saturation_enqueues_celery(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schedule_tcre_saturation_runs_inline(monkeypatch: pytest.MonkeyPatch) -> None:
     tid = uuid.uuid4()
-
-    class _FakeAsync:
-        id = "tcre-sat-task"
 
     monkeypatch.setattr(
         "vector.domains.cortex.operational_runtime.substrate_tcre_saturation_scheduling."
@@ -103,9 +93,9 @@ def test_schedule_tcre_saturation_enqueues_celery(monkeypatch: pytest.MonkeyPatc
         lambda *_a, **_k: {"should_schedule": True, "schedule_reason": "test"},
     )
     monkeypatch.setattr(
-        "app.tasks.cortex_substrate_tcre_saturation_scheduling."
-        "run_tcre_saturation_schedule_pass_task.apply_async",
-        lambda **kwargs: _FakeAsync(),  # noqa: ARG005
+        "vector.domains.cortex.operational_runtime.substrate_tcre_saturation_scheduling."
+        "run_tcre_saturation_schedule_pass_v1",
+        lambda *_a, **_k: {"gate_id": "G-P085-TCRE-01", "jobs_enqueued": 0},
     )
     out = schedule_tcre_saturation_for_tenant_v1(
         tenant_id=tid,
@@ -113,7 +103,8 @@ def test_schedule_tcre_saturation_enqueues_celery(monkeypatch: pytest.MonkeyPatc
         force=True,
     )
     assert out["scheduled"] is True
-    assert out["celery_task_id"] == "tcre-sat-task"
+    assert out["path"] == "inline_execution_slice"
+    assert "pass" in out
 
 
 @pytest.mark.integration

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Any, Final, NoReturn
 
 from fastapi import HTTPException, status
 
@@ -26,7 +26,7 @@ def raise_admin_endpoint_gone(
     deprecated: str,
     replacement: str,
     migration: str | None = None,
-) -> None:
+) -> NoReturn:
     """Raise HTTP 410 with replacement route guidance (M8 deprecation contract)."""
     detail: dict[str, Any] = {
         "error": "admin_endpoint_removed",

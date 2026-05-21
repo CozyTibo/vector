@@ -255,18 +255,6 @@ def run_octs_walk_schedule_pass_v1(
         start_node_ids=starts,
     )
 
-    from vector.domains.cortex.operational_runtime.substrate_traversal_retry import (
-        run_traversal_retry_and_heal_pass_v1,
-    )
-
-    retry_pass = run_traversal_retry_and_heal_pass_v1(session, tenant_id=tenant_id)
-
-    from vector.domains.cortex.operational_runtime.substrate_stalled_traversal_recovery import (
-        run_stalled_traversal_recovery_pass_v1,
-    )
-
-    stall_recovery_pass = run_stalled_traversal_recovery_pass_v1(session, tenant_id=tenant_id)
-
     from vector.domains.cortex.operational_runtime.substrate_traversal_explainability import (
         build_traversal_explainability_panel_v1,
     )
@@ -281,8 +269,6 @@ def run_octs_walk_schedule_pass_v1(
         "frontier_meta": frontier_meta,
         "selected_start_node_ids": starts,
         "materialization": materialized,
-        "traversal_retry_pass": retry_pass,
-        "stalled_traversal_recovery_pass": stall_recovery_pass,
         "traversal_explainability_panel": explainability_panel,
         "pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None,
     }
@@ -296,68 +282,46 @@ def schedule_octs_walks_for_tenant_v1(
     graph_projection_stable_hash: str | None = None,
     countdown: int | None = None,
     force: bool = False,
+    session: Session | None = None,
 ) -> dict[str, Any]:
-    """Enqueue async OCTS walk scheduling pass (after phase 05 or graph ≥ G1)."""
-    from vector.infrastructure.db.session import session_scope
+    """M9: synchronous inline pass only (Celery sidecar removed)."""
+    _ = countdown
 
-    with session_scope() as session:
+    def _run(sess: Session) -> dict[str, Any]:
         eval_out = evaluate_traversal_schedule_v1(
-            session,
+            sess,
             tenant_id=tenant_id,
             trigger=trigger,
         )
-    if not force and not eval_out.get("should_schedule"):
-        return {
-            "scheduled": False,
-            "reason": eval_out.get("schedule_reason"),
-            "evaluation": eval_out,
-        }
-
-    cd = countdown if countdown is not None else get_traversal_schedule_countdown_seconds_v1()
-    from app.tasks.cortex_substrate_traversal_scheduling import (
-        run_octs_walk_schedule_pass_task,
-    )
-
-    async_result = run_octs_walk_schedule_pass_task.apply_async(
-        kwargs={
-            "tenant_id": str(tenant_id),
-            "trigger": trigger,
-            "pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None,
-            "graph_projection_stable_hash": graph_projection_stable_hash,
-        },
-        queue="vector",
-        countdown=max(0, int(cd)),
-    )
-
-    out: dict[str, Any] = {
-        "scheduled": True,
-        "celery_task_id": async_result.id,
-        "task_name": CELERY_TRAVERSAL_SCHEDULE_TASK_NAME_V1,
-        "countdown_seconds": cd,
-        "trigger": trigger,
-        "evaluation": eval_out,
-    }
-    if pipeline_run_id is not None:
-        from vector.infrastructure.db.session import session_scope
-        from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
-            mark_pipeline_waiting_on_traversal_v1,
+        if not force and not eval_out.get("should_schedule"):
+            return {
+                "scheduled": False,
+                "reason": eval_out.get("schedule_reason"),
+                "evaluation": eval_out,
+            }
+        pass_out = run_octs_walk_schedule_pass_v1(
+            sess,
+            tenant_id=tenant_id,
+            trigger=trigger,
+            pipeline_run_id=pipeline_run_id,
+            graph_projection_stable_hash=graph_projection_stable_hash,
         )
-
-        with session_scope() as session:
-            cont = mark_pipeline_waiting_on_traversal_v1(
-                session,
-                tenant_id=tenant_id,
-                pipeline_run_id=pipeline_run_id,
-                walk_batch_id=uuid.uuid4(),
-                celery_task_id=async_result.id,
-                scheduled_start_count=0,
-            )
-            session.commit()
-        out["continuation"] = {
-            "continuation_id": str(cont.id),
-            "waiting_on": WAITING_ON_TRAVERSAL_COMPLETION_V1,
+        return {
+            "scheduled": True,
+            "path": "inline_execution_slice",
+            "trigger": trigger,
+            "evaluation": eval_out,
+            "pass": pass_out,
         }
-    return out
+
+    if session is not None:
+        return _run(session)
+    from vector.infrastructure.db.session import session_scope
+
+    with session_scope() as scoped:
+        out = _run(scoped)
+        scoped.commit()
+        return out
 
 
 def build_substrate_traversal_scheduling_catalog_v1() -> dict[str, Any]:
@@ -396,24 +360,25 @@ def verify_gp085_walk01_static() -> dict[str, Any]:
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr
 
     pr_src = inspect.getsource(pr.run_phase_05_traversal_v1)
-    if "schedule_octs_walks_for_tenant_v1" not in pr_src:
-        errors.append("phase_05_missing_schedule_octs_walks")
+    if "run_octs_walk_schedule_pass_v1" not in pr_src:
+        errors.append("phase_05_missing_inline_traversal_pass")
+    if "schedule_octs_walks_for_tenant_v1" in pr_src:
+        errors.append("phase_05_must_not_schedule_celery_traversal_sidecar_m9")
 
     ste_src = inspect.getsource(run_substrate_traversal_materialization_v1)
     if "start_node_ids" not in ste_src:
         errors.append("substrate_traversal_missing_start_node_ids_override")
 
-    try:
-        from app.celery_app import celery_app
+    pass_src = inspect.getsource(run_octs_walk_schedule_pass_v1)
+    if "run_traversal_retry_and_heal_pass_v1" in pass_src:
+        errors.append("traversal_pass_must_not_integrate_retry_sidecar_m9")
+    if "run_stalled_traversal_recovery_pass_v1" in pass_src:
+        errors.append("traversal_pass_must_not_integrate_stall_recovery_sidecar_m9")
 
-        if CELERY_TRAVERSAL_SCHEDULE_TASK_NAME_V1 not in celery_app.tasks:
-            import importlib
+    import importlib.util
 
-            importlib.import_module("app.tasks.cortex_substrate_traversal_scheduling")
-        if CELERY_TRAVERSAL_SCHEDULE_TASK_NAME_V1 not in celery_app.tasks:
-            errors.append("celery_task_not_registered")
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"celery_import:{exc}")
+    if importlib.util.find_spec("app.tasks.cortex_substrate_traversal_scheduling") is not None:
+        errors.append("celery_traversal_schedule_module_must_be_deleted_m9")
 
     passed = not errors
     return {

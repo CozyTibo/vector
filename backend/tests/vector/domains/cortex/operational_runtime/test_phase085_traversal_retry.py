@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
-from app.celery_app import celery_app
 from vector.domains.cortex.operational_runtime.cesp_traversal_retry_gate import (
     verify_gp085_traversal_retry_gate_static,
 )
@@ -81,12 +80,6 @@ def test_verify_gp085_walk02_static_passes() -> None:
     assert verify_gp085_traversal_retry_gate_static()["passed"] is True
 
 
-def test_celery_registers_traversal_retry_task() -> None:
-    from app.tasks import cortex_substrate_traversal_retry  # noqa: F401
-
-    assert CELERY_TRAVERSAL_RETRY_TASK_NAME_V1 in celery_app.tasks
-
-
 def test_backoff_and_retry_limits() -> None:
     base = get_traversal_retry_backoff_base_seconds_v1()
     assert compute_retry_backoff_seconds_v1(1) == base
@@ -149,19 +142,18 @@ def test_build_walk_failure_explanation_shape() -> None:
     assert exp["walk_id"] == str(wid)
 
 
-def test_schedule_traversal_retry_enqueues_celery(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schedule_traversal_retry_runs_inline(monkeypatch: pytest.MonkeyPatch) -> None:
     tid = uuid.uuid4()
 
-    class _FakeAsync:
-        id = "retry-heal-task"
-
     monkeypatch.setattr(
-        "app.tasks.cortex_substrate_traversal_retry.run_traversal_retry_and_heal_pass_task.apply_async",
-        lambda **kwargs: _FakeAsync(),  # noqa: ARG005
+        "vector.domains.cortex.operational_runtime.substrate_traversal_retry."
+        "run_traversal_retry_and_heal_pass_v1",
+        lambda *_a, **_k: {"gate_id": "G-P085-WALK-02", "records_scanned": 0},
     )
     out = schedule_traversal_retry_and_heal_pass_v1(tenant_id=tid)
     assert out["scheduled"] is True
-    assert out["celery_task_id"] == "retry-heal-task"
+    assert out["path"] == "inline_execution_slice"
+    assert "pass" in out
 
 
 @pytest.mark.integration

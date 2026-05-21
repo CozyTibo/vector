@@ -66,6 +66,7 @@ def verify_convergence_sweep_in_celery_beat_v1() -> list[str]:
         errors.append("execution_slice_task_missing_runner")
     errors.extend(verify_legacy_substrate_beats_absent_from_celery_beat_v1())
     errors.extend(verify_tenant_execution_fsm_on_lease_v1())
+    errors.extend(verify_m9_dead_celery_modules_absent_v1())
     return errors
 
 
@@ -128,6 +129,80 @@ def verify_no_legacy_phase_chain_v1() -> list[str]:
 
     if "run_execution_slice_task" not in inspect.getsource(enqueue_mod.enqueue_tenant_convergence_v1):
         errors.append("enqueue_missing_execution_slice_task")
+    return errors
+
+
+M9_DEAD_CELERY_TASK_MODULES_V1: Final[tuple[str, ...]] = (
+    "app.tasks.cortex_graph_density_promotion",
+    "app.tasks.cortex_substrate_traversal_scheduling",
+    "app.tasks.cortex_substrate_traversal_retry",
+    "app.tasks.cortex_substrate_stalled_traversal_recovery",
+    "app.tasks.cortex_orphan_continuity_stitch",
+    "app.tasks.cortex_substrate_tcre_saturation_scheduling",
+    "app.tasks.cortex_substrate_synthesis_activation_scheduling",
+    "app.tasks.cortex_canonical_materialize_backlog",
+    "app.tasks.cortex_post_ingestion_substrate_refresh",
+    "app.tasks.cortex_substrate_continuity_watchdog",
+    "app.tasks.cortex_full_pipeline_rerun",
+    "app.tasks.cortex_substrate_pipeline",
+)
+
+
+M9_DEAD_CELERY_TASK_NAMES_V1: Final[tuple[str, ...]] = (
+    "vector.cortex.operational_runtime.graph_density_promotion_pass",
+    "vector.cortex.operational_runtime.schedule_octs_walks_for_tenant",
+    "vector.cortex.operational_runtime.traversal_retry_and_heal_pass",
+    "vector.cortex.operational_runtime.stalled_traversal_recovery_pass",
+    "vector.cortex.operational_runtime.orphan_continuity_stitch_pass",
+    "vector.cortex.operational_runtime.schedule_tcre_saturation_for_tenant",
+    "vector.cortex.operational_runtime.schedule_synthesis_activation_for_tenant",
+    "vector.cortex.canonical.drain_stub_materialize_backlog",
+    "vector.cortex.post_ingestion_substrate_refresh",
+    "vector.cortex.substrate_pipeline.continuity_watchdog",
+    "vector.cortex.ingestion.flush_rerun_to_identity",
+    "vector.cortex.substrate_pipeline.coordinator",
+    "vector.cortex.substrate_pipeline.phase",
+    "vector.cortex.substrate_pipeline.phase_08_synthesis",
+)
+
+
+def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
+    """Return error codes if M9 sidecar / legacy Celery task modules still exist (M9)."""
+    import importlib.util
+
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr
+
+    errors: list[str] = []
+    for mod in M9_DEAD_CELERY_TASK_MODULES_V1:
+        if importlib.util.find_spec(mod) is not None:
+            errors.append(f"dead_celery_module_still_present:{mod}")
+
+    from app.celery_app import celery_app
+
+    for task_name in M9_DEAD_CELERY_TASK_NAMES_V1:
+        if task_name in celery_app.tasks:
+            errors.append(f"dead_celery_task_still_registered:{task_name}")
+
+    p04 = inspect.getsource(pr.run_phase_04_graph_v1)
+    if "schedule_graph_density_pass_v1" in p04:
+        errors.append("phase04_still_schedules_graph_density_sidecar")
+    p05 = inspect.getsource(pr.run_phase_05_traversal_v1)
+    if "schedule_octs_walks_for_tenant_v1" in p05:
+        errors.append("phase05_still_schedules_celery_traversal_sidecar")
+    if "run_octs_walk_schedule_pass_v1" not in p05:
+        errors.append("phase05_missing_inline_traversal_pass")
+    p06 = inspect.getsource(pr.run_phase_06_tcre_v1)
+    if "run_tcre_saturation_after_phase06_v1" in p06:
+        errors.append("phase06_still_runs_tcre_saturation_sidecar")
+
+    from vector.domains.cortex.operational_runtime import substrate_traversal_scheduling as sts
+
+    sched_src = inspect.getsource(sts.run_octs_walk_schedule_pass_v1)
+    if "run_traversal_retry_and_heal_pass_v1" in sched_src:
+        errors.append("traversal_pass_still_integrates_retry_sidecar")
+    if "run_stalled_traversal_recovery_pass_v1" in sched_src:
+        errors.append("traversal_pass_still_integrates_stall_recovery_sidecar")
+
     return errors
 
 

@@ -66,11 +66,7 @@ celery_app = Celery(
         "app.tasks.cortex_ingestion_sync",
         "app.tasks.cortex_ingestion_scheduler",
         "app.tasks.cortex_ingestion_verify",
-        "app.tasks.cortex_canonical_materialize_backlog",
-        "app.tasks.cortex_full_pipeline_rerun",
         "app.tasks.cortex_org_link_jobs",
-        "app.tasks.cortex_post_ingestion_substrate_refresh",
-        "app.tasks.cortex_substrate_pipeline",
         "app.tasks.cortex_tcre_reconstruction_jobs",
         "app.tasks.cortex_synthesis_jobs",
         "app.tasks.cortex_convergence",
@@ -89,10 +85,7 @@ celery_app.conf.imports = (
     "app.tasks.cortex_ingestion_sync",
     "app.tasks.cortex_ingestion_scheduler",
     "app.tasks.cortex_ingestion_verify",
-    "app.tasks.cortex_canonical_materialize_backlog",
-    "app.tasks.cortex_full_pipeline_rerun",
     "app.tasks.cortex_org_link_jobs",
-    "app.tasks.cortex_post_ingestion_substrate_refresh",
     "app.tasks.cortex_tcre_reconstruction_jobs",
     "app.tasks.cortex_synthesis_jobs",
     "app.tasks.cortex_convergence",
@@ -130,23 +123,10 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
-    importlib.import_module("app.tasks.cortex_canonical_materialize_backlog")
-    importlib.import_module("app.tasks.cortex_full_pipeline_rerun")
     importlib.import_module("app.tasks.cortex_org_link_jobs")
-    importlib.import_module("app.tasks.cortex_post_ingestion_substrate_refresh")
     importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
-    importlib.import_module("app.tasks.cortex_substrate_pipeline")
-    importlib.import_module("app.tasks.cortex_substrate_continuity_watchdog")
-    importlib.import_module("app.tasks.cortex_graph_density_promotion")
-    importlib.import_module("app.tasks.cortex_orphan_continuity_stitch")
-    importlib.import_module("app.tasks.cortex_substrate_traversal_scheduling")
-    importlib.import_module("app.tasks.cortex_substrate_traversal_retry")
-    importlib.import_module("app.tasks.cortex_substrate_stalled_traversal_recovery")
-    importlib.import_module("app.tasks.cortex_substrate_tcre_saturation_scheduling")
-    importlib.import_module("app.tasks.cortex_substrate_synthesis_activation_scheduling")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")
     importlib.import_module("app.tasks.cortex_convergence")
-    importlib.import_module("app.tasks.cortex_execution")
     importlib.import_module("app.tasks.cortex_execution")
 
 
@@ -161,20 +141,8 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
-    importlib.import_module("app.tasks.cortex_canonical_materialize_backlog")
-    importlib.import_module("app.tasks.cortex_full_pipeline_rerun")
     importlib.import_module("app.tasks.cortex_org_link_jobs")
-    importlib.import_module("app.tasks.cortex_post_ingestion_substrate_refresh")
     importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
-    importlib.import_module("app.tasks.cortex_substrate_pipeline")
-    importlib.import_module("app.tasks.cortex_substrate_continuity_watchdog")
-    importlib.import_module("app.tasks.cortex_graph_density_promotion")
-    importlib.import_module("app.tasks.cortex_orphan_continuity_stitch")
-    importlib.import_module("app.tasks.cortex_substrate_traversal_scheduling")
-    importlib.import_module("app.tasks.cortex_substrate_traversal_retry")
-    importlib.import_module("app.tasks.cortex_substrate_stalled_traversal_recovery")
-    importlib.import_module("app.tasks.cortex_substrate_tcre_saturation_scheduling")
-    importlib.import_module("app.tasks.cortex_substrate_synthesis_activation_scheduling")
     importlib.import_module("app.tasks.cortex_synthesis_jobs")
     importlib.import_module("app.tasks.cortex_convergence")
     importlib.import_module("app.tasks.cortex_execution")

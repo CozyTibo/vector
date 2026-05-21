@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
-from app.celery_app import celery_app
 from vector.domains.cortex.operational_runtime.cesp_synthesis_activation_gate import (
     verify_gp085_synthesis_activation_gate_static,
 )
@@ -34,12 +33,6 @@ def test_synthesis_activation_catalog() -> None:
 def test_verify_gp085_syn01_static_passes() -> None:
     assert verify_gp085_syn01_static()["passed"] is True
     assert verify_gp085_synthesis_activation_gate_static()["passed"] is True
-
-
-def test_celery_registers_synthesis_activation_task() -> None:
-    from app.tasks import cortex_substrate_synthesis_activation_scheduling  # noqa: F401
-
-    assert CELERY_SYNTHESIS_ACTIVATION_SCHEDULE_TASK_NAME_V1 in celery_app.tasks
 
 
 def test_min_jobs_target_formula() -> None:
@@ -144,11 +137,8 @@ def test_evaluate_schedule_forbidden_backoff(monkeypatch: pytest.MonkeyPatch) ->
     assert out["activation_reason"] == "synthesis_forbidden_backoff"
 
 
-def test_schedule_synthesis_activation_enqueues_celery(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schedule_synthesis_activation_runs_inline(monkeypatch: pytest.MonkeyPatch) -> None:
     tid = uuid.uuid4()
-
-    class _FakeAsync:
-        id = "syn-act-task"
 
     monkeypatch.setattr(
         "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
@@ -156,9 +146,9 @@ def test_schedule_synthesis_activation_enqueues_celery(monkeypatch: pytest.Monke
         lambda *_a, **_k: {"should_activate": True, "activation_reason": "test"},
     )
     monkeypatch.setattr(
-        "app.tasks.cortex_substrate_synthesis_activation_scheduling."
-        "run_synthesis_activation_schedule_pass_task.apply_async",
-        lambda **kwargs: _FakeAsync(),  # noqa: ARG005
+        "vector.domains.cortex.operational_runtime.substrate_synthesis_activation_scheduling."
+        "run_synthesis_activation_schedule_pass_v1",
+        lambda *_a, **_k: {"gate_id": "G-P085-SYN-01", "jobs_enqueued": 0},
     )
     out = schedule_synthesis_activation_for_tenant_v1(
         tenant_id=tid,
@@ -166,7 +156,8 @@ def test_schedule_synthesis_activation_enqueues_celery(monkeypatch: pytest.Monke
         force=True,
     )
     assert out["scheduled"] is True
-    assert out["celery_task_id"] == "syn-act-task"
+    assert out["path"] == "inline_execution_slice"
+    assert "pass" in out
 
 
 @pytest.mark.integration

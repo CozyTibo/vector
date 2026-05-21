@@ -214,8 +214,6 @@ def build_substrate_continuity_watchdog_catalog_v1() -> dict[str, Any]:
         "runtime_entrypoints": [
             "vector.domains.cortex.substrate_pipeline.stalled_pipeline_recovery."
             "run_stalled_pipeline_watchdog_v1",
-            "app.tasks.cortex_substrate_continuity_watchdog."
-            "run_substrate_continuity_watchdog_task",
         ],
         "operational_metrics": list(_WATCHDOG_METRIC_NAMES_V1),
         "operational_metrics_snapshot": snapshot_watchdog_metrics_v1(),
@@ -227,8 +225,6 @@ def verify_gp085_watch01_static() -> dict[str, Any]:
     cat = build_substrate_continuity_watchdog_catalog_v1()
     if cat["primary_gate_id"] != GP085_WATCH01_GATE_ID_V1:
         errors.append("primary_gate_id_mismatch")
-    if cat["celery_task_name"] != CELERY_CONTINUITY_WATCHDOG_TASK_NAME_V1:
-        errors.append("celery_task_name_mismatch")
     if int(cat["default_interval_seconds"]) != DEFAULT_WATCHDOG_INTERVAL_SECONDS_V1:
         errors.append("default_interval_not_600")
 
@@ -268,13 +264,10 @@ def verify_gp085_watch01_static() -> dict[str, Any]:
         if needle not in watch_src:
             errors.append(f"watchdog_missing:{needle}")
 
-    from app.tasks import cortex_substrate_continuity_watchdog as task_mod
+    import importlib.util
 
-    task_src = inspect.getsource(task_mod.run_substrate_continuity_watchdog_task)
-    if "run_stalled_pipeline_watchdog_v1" not in task_src:
-        errors.append("celery_task_missing_watchdog_runner")
-    if "continuity_watchdog" not in task_src:
-        errors.append("celery_task_missing_continuity_watchdog_binding")
+    if importlib.util.find_spec("app.tasks.cortex_substrate_continuity_watchdog") is not None:
+        errors.append("celery_continuity_watchdog_module_must_be_deleted_m9")
 
     passed = not errors
     return {

@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.orm import Session
 
-from app.celery_app import celery_app
 from vector.domains.cortex.operational_runtime.cesp_traversal_scheduling_gate import (
     verify_gp085_traversal_scheduling_gate_static,
 )
@@ -40,12 +39,6 @@ def test_traversal_scheduling_catalog() -> None:
 def test_verify_gp085_walk01_static_passes() -> None:
     assert verify_gp085_walk01_static()["passed"] is True
     assert verify_gp085_traversal_scheduling_gate_static()["passed"] is True
-
-
-def test_celery_registers_traversal_schedule_task() -> None:
-    from app.tasks import cortex_substrate_traversal_scheduling  # noqa: F401
-
-    assert CELERY_TRAVERSAL_SCHEDULE_TASK_NAME_V1 in celery_app.tasks
 
 
 def test_traversal_propagation_blocked_when_disconnected() -> None:
@@ -110,23 +103,23 @@ def test_rank_frontiers_from_components(monkeypatch: pytest.MonkeyPatch) -> None
     assert meta["connected_component_count"] == 2
 
 
-def test_schedule_octs_walks_enqueues_celery(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schedule_octs_walks_runs_inline(monkeypatch: pytest.MonkeyPatch) -> None:
     tid = uuid.uuid4()
 
-    class _FakeAsync:
-        id = "walk-sched-task"
-
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling.evaluate_traversal_schedule_v1",
-        lambda *_a, **_k: {"should_schedule": True, "schedule_reason": "test"},
+        "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."
+        "run_octs_walk_schedule_pass_v1",
+        lambda *_a, **_k: {"gate_id": "G-P085-WALK-01", "scheduled": True},
     )
     monkeypatch.setattr(
-        "app.tasks.cortex_substrate_traversal_scheduling.run_octs_walk_schedule_pass_task.apply_async",
-        lambda **kwargs: _FakeAsync(),  # noqa: ARG005
+        "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."
+        "evaluate_traversal_schedule_v1",
+        lambda *_a, **_k: {"should_schedule": True, "schedule_reason": "test"},
     )
     out = schedule_octs_walks_for_tenant_v1(tenant_id=tid, force=True)
     assert out["scheduled"] is True
-    assert out["celery_task_id"] == "walk-sched-task"
+    assert out["path"] == "inline_execution_slice"
+    assert "pass" in out
 
 
 @pytest.mark.integration

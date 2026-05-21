@@ -492,24 +492,20 @@ def schedule_traversal_retry_and_heal_pass_v1(
     *,
     tenant_id: uuid.UUID,
     countdown: int | None = None,
+    session: Session | None = None,
 ) -> dict[str, Any]:
-    """Enqueue async traversal retry + frontier heal pass."""
-    from app.tasks.cortex_substrate_traversal_retry import (
-        run_traversal_retry_and_heal_pass_task,
-    )
+    """M9: synchronous inline pass only (admin; not execution slice)."""
+    _ = countdown
 
-    cd = 0 if countdown is None else max(0, int(countdown))
-    async_result = run_traversal_retry_and_heal_pass_task.apply_async(
-        kwargs={"tenant_id": str(tenant_id)},
-        queue="vector",
-        countdown=cd,
-    )
-    return {
-        "scheduled": True,
-        "celery_task_id": async_result.id,
-        "task_name": CELERY_TRAVERSAL_RETRY_TASK_NAME_V1,
-        "countdown_seconds": cd,
-    }
+    if session is not None:
+        pass_out = run_traversal_retry_and_heal_pass_v1(session, tenant_id=tenant_id)
+        return {"scheduled": True, "path": "inline_execution_slice", "pass": pass_out}
+    from vector.infrastructure.db.session import session_scope
+
+    with session_scope() as scoped:
+        pass_out = run_traversal_retry_and_heal_pass_v1(scoped, tenant_id=tenant_id)
+        scoped.commit()
+        return {"scheduled": True, "path": "inline_execution_slice", "pass": pass_out}
 
 
 def build_substrate_traversal_retry_catalog_v1() -> dict[str, Any]:
@@ -555,23 +551,10 @@ def verify_gp085_walk02_static() -> dict[str, Any]:
     if "random" in src.lower():
         errors.append("probabilistic_retry_forbidden")
 
-    from vector.domains.cortex.operational_runtime import substrate_traversal_scheduling as sts
+    import importlib.util
 
-    sts_src = inspect.getsource(sts.run_octs_walk_schedule_pass_v1)
-    if "run_traversal_retry_and_heal_pass_v1" not in sts_src:
-        errors.append("schedule_pass_missing_retry_integration")
-
-    try:
-        from app.celery_app import celery_app
-
-        if CELERY_TRAVERSAL_RETRY_TASK_NAME_V1 not in celery_app.tasks:
-            import importlib
-
-            importlib.import_module("app.tasks.cortex_substrate_traversal_retry")
-        if CELERY_TRAVERSAL_RETRY_TASK_NAME_V1 not in celery_app.tasks:
-            errors.append("celery_task_not_registered")
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"celery_import:{exc}")
+    if importlib.util.find_spec("app.tasks.cortex_substrate_traversal_retry") is not None:
+        errors.append("celery_traversal_retry_module_must_be_deleted_m9")
 
     passed = not errors
     return {

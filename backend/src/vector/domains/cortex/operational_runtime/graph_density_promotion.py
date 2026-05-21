@@ -398,43 +398,41 @@ def schedule_graph_density_pass_v1(
     pipeline_run_id: uuid.UUID | None = None,
     countdown: int | None = None,
     force: bool = False,
+    session: Session | None = None,
 ) -> dict[str, Any]:
-    """Enqueue async promotion pass (after phase 04 or backlog threshold)."""
-    from vector.infrastructure.db.session import session_scope
+    """M9: synchronous inline pass only (admin / catalog; not wired from phase 04)."""
+    _ = countdown
+    _ = pipeline_run_id
 
-    with session_scope() as session:
+    def _run(sess: Session) -> dict[str, Any]:
         eval_out = evaluate_promotion_backlog_schedule_v1(
-            session,
+            sess,
             tenant_id=tenant_id,
             trigger=trigger,
         )
-    if not force and not eval_out.get("should_schedule"):
+        if not force and not eval_out.get("should_schedule"):
+            return {
+                "scheduled": False,
+                "reason": eval_out.get("schedule_reason"),
+                "evaluation": eval_out,
+            }
+        pass_out = run_graph_density_promotion_pass_v1(sess, tenant_id=tenant_id, trigger=trigger)
         return {
-            "scheduled": False,
-            "reason": eval_out.get("schedule_reason"),
+            "scheduled": True,
+            "path": "inline_execution_slice",
+            "trigger": trigger,
             "evaluation": eval_out,
+            "pass": pass_out,
         }
 
-    cd = countdown if countdown is not None else get_promotion_schedule_countdown_seconds_v1()
-    from app.tasks.cortex_graph_density_promotion import run_graph_density_promotion_pass_task
+    if session is not None:
+        return _run(session)
+    from vector.infrastructure.db.session import session_scope
 
-    async_result = run_graph_density_promotion_pass_task.apply_async(
-        kwargs={
-            "tenant_id": str(tenant_id),
-            "trigger": trigger,
-            "pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None,
-        },
-        queue="vector",
-        countdown=max(0, int(cd)),
-    )
-    return {
-        "scheduled": True,
-        "celery_task_id": async_result.id,
-        "task_name": CELERY_GRAPH_DENSITY_PROMOTION_TASK_NAME_V1,
-        "countdown_seconds": cd,
-        "trigger": trigger,
-        "evaluation": eval_out,
-    }
+    with session_scope() as scoped:
+        out = _run(scoped)
+        scoped.commit()
+        return out
 
 
 def build_graph_density_promotion_catalog_v1() -> dict[str, Any]:
@@ -488,10 +486,8 @@ def verify_gp085_promo01_static() -> dict[str, Any]:
     from vector.domains.cortex.substrate_pipeline import phase_runners as pr
 
     pr_src = inspect.getsource(pr.run_phase_04_graph_v1)
-    if "schedule_graph_density_pass_v1" not in pr_src:
-        errors.append("phase_04_missing_schedule_graph_density_pass")
-
-    from vector.domains.cortex.identity import org_link_replay_runtime as orr
+    if "schedule_graph_density_pass_v1" in pr_src:
+        errors.append("phase_04_must_not_schedule_graph_density_sidecar_m9")
 
     from vector.domains.cortex.identity import org_link_replay_lane_registry as reg
     from vector.domains.cortex.identity import org_link_replay_runtime as orr
@@ -503,16 +499,10 @@ def verify_gp085_promo01_static() -> dict[str, Any]:
     if ORG_LINK_JOB_KIND_LAWFUL_EDGE_PROMOTION_V1 not in orr_src:
         errors.append("org_link_replay_missing_lawful_edge_promotion_lane")
 
-    try:
-        from app.celery_app import celery_app
+    import importlib.util
 
-        if CELERY_GRAPH_DENSITY_PROMOTION_TASK_NAME_V1 not in celery_app.tasks:
-            importlib = __import__("importlib")
-            importlib.import_module("app.tasks.cortex_graph_density_promotion")
-        if CELERY_GRAPH_DENSITY_PROMOTION_TASK_NAME_V1 not in celery_app.tasks:
-            errors.append("celery_task_not_registered")
-    except Exception as exc:  # noqa: BLE001
-        errors.append(f"celery_import:{exc}")
+    if importlib.util.find_spec("app.tasks.cortex_graph_density_promotion") is not None:
+        errors.append("celery_graph_density_promotion_module_must_be_deleted_m9")
 
     passed = not errors
     return {

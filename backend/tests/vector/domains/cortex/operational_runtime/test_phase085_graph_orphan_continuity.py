@@ -8,7 +8,6 @@ from typing import Any
 import pytest
 from sqlalchemy.orm import Session
 
-from app.celery_app import celery_app
 from vector.domains.cortex.identity.authoritative_writer import create_promotion_policy, promote_candidate_to_authoritative_link
 from vector.domains.cortex.identity.candidate_generation import regenerate_link_candidates
 from vector.domains.cortex.identity.link_ledger import append_authoritative_org_link
@@ -43,12 +42,6 @@ def test_orphan_continuity_catalog() -> None:
 def test_verify_gp085_orphan01_static_passes() -> None:
     assert verify_gp085_orphan01_static()["passed"] is True
     assert verify_gp085_orphan_gate_static()["passed"] is True
-
-
-def test_celery_registers_orphan_continuity_stitch_task() -> None:
-    from app.tasks import cortex_orphan_continuity_stitch  # noqa: F401
-
-    assert "vector.cortex.operational_runtime.orphan_continuity_stitch_pass" in celery_app.tasks
 
 
 @pytest.fixture

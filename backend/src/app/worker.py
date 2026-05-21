@@ -15,10 +15,11 @@ importlib.import_module("app.tasks.onboarding_activation_task")
 importlib.import_module("app.tasks.cortex_ingestion_sync")
 importlib.import_module("app.tasks.cortex_ingestion_scheduler")
 importlib.import_module("app.tasks.cortex_ingestion_verify")
-importlib.import_module("app.tasks.cortex_canonical_materialize_backlog")
-importlib.import_module("app.tasks.cortex_full_pipeline_rerun")
 importlib.import_module("app.tasks.cortex_org_link_jobs")
 importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
+importlib.import_module("app.tasks.cortex_synthesis_jobs")
+importlib.import_module("app.tasks.cortex_convergence")
+importlib.import_module("app.tasks.cortex_execution")
 
 _REQUIRED_EMAIL_TASKS = (
     "vector.email.send",

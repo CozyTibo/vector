@@ -434,16 +434,6 @@ def run_stalled_pipeline_watchdog_v1(
                     }
                 )
 
-    from vector.domains.cortex.operational_runtime.substrate_tcre_saturation_scheduling import (
-        run_tcre_saturation_watchdog_hook_v1,
-    )
-
-    tcre_saturation_outcomes = run_tcre_saturation_watchdog_hook_v1(
-        session,
-        stalled_pipelines=stalled,
-        limit=limit,
-    )
-
     audit = build_watchdog_audit_record_v1(
         watchdog_run_id=run_id,
         stall_threshold_seconds=stall_threshold_seconds,
@@ -467,6 +457,6 @@ def run_stalled_pipeline_watchdog_v1(
         "stalled_count": len(stalled),
         "stalled": stalled,
         "recovered": recovered,
-        "tcre_saturation_outcomes": tcre_saturation_outcomes,
+        "tcre_saturation_outcomes": [],
         "audit": audit,
     }

@@ -8,7 +8,6 @@ from typing import Any
 import pytest
 from sqlalchemy.orm import Session
 
-from app.celery_app import celery_app
 from vector.domains.cortex.identity.candidate_generation import regenerate_link_candidates
 from vector.domains.cortex.identity.org_entities import upsert_org_entity
 from vector.domains.cortex.identity.org_link_replay_runtime import (
@@ -40,12 +39,6 @@ def test_promotion_catalog() -> None:
 def test_verify_gp085_promo01_static_passes() -> None:
     assert verify_gp085_promo01_static()["passed"] is True
     assert verify_gp085_promotion_gate_static()["passed"] is True
-
-
-def test_celery_registers_graph_density_promotion_task() -> None:
-    from app.tasks import cortex_graph_density_promotion  # noqa: F401
-
-    assert "vector.cortex.operational_runtime.graph_density_promotion_pass" in celery_app.tasks
 
 
 @pytest.fixture
@@ -150,20 +143,15 @@ def test_evaluate_and_schedule_backlog(
     eval_out = evaluate_promotion_backlog_schedule_v1(db_session, tenant_id=tenant.id)
     assert eval_out["should_schedule"] is True
 
-    class _FakeAsync:
-        id = "fake-task-id"
-
-    monkeypatch.setattr(
-        "app.tasks.cortex_graph_density_promotion.run_graph_density_promotion_pass_task.apply_async",
-        lambda **kwargs: _FakeAsync(),  # noqa: ARG005
-    )
     sched = schedule_graph_density_pass_v1(
         tenant_id=tenant.id,
         trigger="backlog_threshold",
         force=True,
+        session=db_session,
     )
     assert sched["scheduled"] is True
-    assert sched["celery_task_id"] == "fake-task-id"
+    assert sched["path"] == "inline_execution_slice"
+    assert "pass" in sched
 
 
 @pytest.mark.integration

@@ -1,82 +1,11 @@
-"""Substrate pipeline schedule coalesce — debounce without perpetual starvation."""
+"""M4/M9: substrate pipeline schedule uses convergence only (debounce infra removed)."""
 
 from __future__ import annotations
 
-import time
 import uuid
 from unittest.mock import MagicMock
 
 import pytest
-
-
-def test_resolve_action_schedule_when_no_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://test:test@localhost:5432/vector_test",
-    )
-    monkeypatch.setattr(
-        "vector.infrastructure.cortex_substrate_pipeline_schedule."
-        "read_substrate_pipeline_schedule_anchor_v1",
-        lambda *_a, **_k: None,
-    )
-    from vector.infrastructure.cortex_substrate_pipeline_schedule import (
-        resolve_substrate_pipeline_schedule_action_v1,
-    )
-
-    action, meta = resolve_substrate_pipeline_schedule_action_v1(
-        uuid.uuid4(),
-        debounce_seconds=120,
-        max_wait_seconds=900,
-    )
-    assert action == "schedule"
-    assert meta["anchor_unix"] is None
-
-
-def test_resolve_action_coalesce_within_max_wait(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://test:test@localhost:5432/vector_test",
-    )
-    anchor = time.time() - 60
-    monkeypatch.setattr(
-        "vector.infrastructure.cortex_substrate_pipeline_schedule."
-        "read_substrate_pipeline_schedule_anchor_v1",
-        lambda *_a, **_k: anchor,
-    )
-    from vector.infrastructure.cortex_substrate_pipeline_schedule import (
-        resolve_substrate_pipeline_schedule_action_v1,
-    )
-
-    action, meta = resolve_substrate_pipeline_schedule_action_v1(
-        uuid.uuid4(),
-        debounce_seconds=120,
-        max_wait_seconds=900,
-    )
-    assert action == "coalesce"
-    assert float(meta["elapsed_seconds"]) >= 59
-
-
-def test_resolve_action_force_now_after_max_wait(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://test:test@localhost:5432/vector_test",
-    )
-    anchor = time.time() - 1000
-    monkeypatch.setattr(
-        "vector.infrastructure.cortex_substrate_pipeline_schedule."
-        "read_substrate_pipeline_schedule_anchor_v1",
-        lambda *_a, **_k: anchor,
-    )
-    from vector.infrastructure.cortex_substrate_pipeline_schedule import (
-        resolve_substrate_pipeline_schedule_action_v1,
-    )
-
-    action, _meta = resolve_substrate_pipeline_schedule_action_v1(
-        uuid.uuid4(),
-        debounce_seconds=120,
-        max_wait_seconds=900,
-    )
-    assert action == "force_now"
 
 
 def test_schedule_substrate_pipeline_enqueues_convergence_not_coordinator(
