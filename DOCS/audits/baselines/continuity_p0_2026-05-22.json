@@ -1636,5 +1636,46 @@
       "execution_lane_status": "HEALTHY"
     },
     "trace_only": true
+  },
+  "step_2_2_continuity_proof_panel": {
+    "validated_at": "2026-05-22T23:09:22.168527+00:00",
+    "closure_git_sha": "601878038e943e81b5c849bd1b8282facca80d6f",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p2_2_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "panel_surface_kind": true,
+      "all_aa_gates_evaluated": true,
+      "panel_prints_aa1": true,
+      "panel_prints_aa2": true,
+      "panel_prints_aa3": true,
+      "panel_prints_aa4": true,
+      "panel_prints_aa5": true,
+      "panel_prints_aa6": true,
+      "panel_prints_aa7": true,
+      "panel_summary_line_present": true
+    },
+    "checks_advisory": {
+      "m3_autonomously_alive": true,
+      "aa_gates_pass_count": 7
+    },
+    "panel_summary": {
+      "pass_count": 7,
+      "fail_count": 0,
+      "advisory_count": 0,
+      "total_gates": 7,
+      "m3_autonomously_alive": true,
+      "metric_tier": "M3"
+    },
+    "gate_verdicts": {
+      "AA1": "PASS",
+      "AA2": "PASS",
+      "AA3": "PASS",
+      "AA4": "PASS",
+      "AA5": "PASS",
+      "AA6": "PASS",
+      "AA7": "PASS"
+    },
+    "trace_only": true
   }
 }
