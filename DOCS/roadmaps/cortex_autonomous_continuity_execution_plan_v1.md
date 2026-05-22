@@ -334,7 +334,7 @@ run_tenant_convergence_v1:
 |------|------|-------|-----------|--------|
 | 0.1 | Implement P0-A schema packaging + CI smoke | Backend | CI + staging worker walk validate | **Done** (see §Phase 0.1 completion below) |
 | 0.2 | Deploy worker + API images | Ops | Prod deploy SHA recorded | **Done** (see §Phase 0.2 completion) |
-| 0.3 | P0-C new pipeline run or recovery | Ops | New run id, not `failed` | Pending |
+| 0.3 | P0-C new pipeline run or recovery | Ops | New run id, not `failed` | **Done** (see §Phase 0.3 completion) |
 | 0.4 | P0-B prod proof SQL | Ops | Phase 05 COMPLETED, walks after graph phase | Pending |
 | 0.5 | Document deploy SHA in `DOCS/audits/baselines/continuity_p0_<date>.json` | Eng | Artifact committed | **Done** (with 0.2) |
 
@@ -369,6 +369,25 @@ Completed **2026-05-22** (GitHub Actions deploy on push to `main`):
 | Worker image gate | `backend/worker.Dockerfile` — same P0-A `walk_policy_packaging_ok` build step as API |
 
 **Next step (0.3):** recover or start pipeline run so phase 05 can execute on the new worker.
+
+#### Phase 0.3 completion (P0-C pipeline recovery)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Strategy | `new_run` — post-ingestion run with mirrored 02–04 receipts |
+| New pipeline run | `ce7df86d-b229-4467-ad28-1109ed119d34` (`status=running`) |
+| Prior failed run (unchanged) | `faa5469f-849b-4e19-bc26-e9ec001e926f` (`status=failed`) |
+| Lease | `dirty`, `fsm_state=TRAVERSAL`, `phase_cursor=phase_05_traversal`, `obligation_epoch=777` |
+| Phase 05–08 | `queued` (05 reset; no schema error in receipt) |
+| Code | `continuity_p0_recovery.py`, `continuity_p0_recover_pipeline.py`, admin `POST …/execution/continuity-p0-recover` |
+| Prod script | `python backend/scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only` |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_0_3_pipeline_recovery` |
+
+Execution slice enqueue uses prod **convergence sweeper** when `--db-only` (no local Redis); worker picks up dirty lease within ~2 minutes.
+
+**Next step (0.4):** prove phase 05 `COMPLETED` with walks after phase 04 timestamp (P0-B).
 
 ### Phase 1 — Propagation + downstream continuity (days 4–10)
 
@@ -418,6 +437,8 @@ Completed **2026-05-22** (GitHub Actions deploy on push to `main`):
 cd backend
 # After deploy (step 0.2):
 CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity_p0_deploy.py
+# After pipeline recovery (step 0.3):
+python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f  # after P1-G
 ```
@@ -559,6 +580,7 @@ python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b53
 | CORTEX-CONT-005 | Dual-lane lease + worker budgets | P2 |
 | CORTEX-CONT-006 | continuity_proof_panel.py + AA baselines | P1 |
 | CORTEX-CONT-007 | Celery promotion prod verification | P1 |
+| CORTEX-CONT-008 | P0-C pipeline recovery (`continuity_p0_recovery`) | P0 |
 
 ---
 

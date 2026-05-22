@@ -25,5 +25,66 @@
     "deploy_step_02_pass": true
   },
   "p0_a_schema_packaging_commit": "789b25fbcc360488975b9fabb0ae90960fca54c1",
-  "notes": "Step 0.2 complete when both ECS services run ECR tags equal deploy git SHA (includes bundled OCTS walk policy under traversal/schemas)."
+  "notes": "Step 0.2 complete when both ECS services run ECR tags equal deploy git SHA (includes bundled OCTS walk policy under traversal/schemas).",
+  "step_0_3_pipeline_recovery": {
+    "recovered": true,
+    "strategy": "new_run",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+    "pipeline_run_created": true,
+    "prior_failed_run_id": "faa5469f-849b-4e19-bc26-e9ec001e926f",
+    "mirrored_phases": [
+      "phase_02_canonical",
+      "phase_03_identity",
+      "phase_04_graph"
+    ],
+    "requeued_phases": [
+      "phase_05_traversal",
+      "phase_06_tcre",
+      "phase_07_retrieval",
+      "phase_08_synthesis"
+    ],
+    "resume_from_phase": "phase_05_traversal",
+    "pipeline_status": "running",
+    "execution": {
+      "dirty": {
+        "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+        "status": "dirty",
+        "fsm_state": "CANONICAL_DRAINING",
+        "obligation_epoch": 776,
+        "reason": "continuity_p0_step03"
+      },
+      "enqueue": {
+        "enqueued": false,
+        "reason": "deferred_to_convergence_sweeper",
+        "hint": "obligation_epoch_bumped; prod sweeper will run execution slice"
+      },
+      "execution_path_telemetry": {
+        "event": "cortex_execution_path",
+        "schema_version": 1,
+        "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+        "execution_path": "admin_bypass",
+        "trigger": "continuity_p0_step03",
+        "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+        "detail": {
+          "phase_cursor": "phase_05_traversal"
+        }
+      },
+      "lease_fsm_state": "TRAVERSAL",
+      "lease_status": "dirty"
+    },
+    "recovered_at": "2026-05-22T21:50:23.124036+00:00",
+    "recorded_at": "2026-05-22T21:50:23.150323+00:00",
+    "prod_verification": {
+      "active_pipeline_run_status": "running",
+      "lease_fsm_state": "TRAVERSAL",
+      "lease_phase_cursor": "phase_05_traversal",
+      "phase_05_status": "queued",
+      "prior_failed_run_status": "failed"
+    },
+    "verification": {
+      "step_03_pass": true,
+      "prior_failed_run_superseded": true
+    }
+  }
 }

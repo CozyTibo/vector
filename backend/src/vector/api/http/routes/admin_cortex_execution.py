@@ -15,6 +15,10 @@ from vector.domains.cortex.execution.admin_commands import (
     execution_rerun_v1,
     restart_execution_from_phase_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_recovery import (
+    RecoveryStrategyV1,
+    recover_continuity_p0_pipeline_v1,
+)
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 
 
@@ -109,6 +113,29 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
             return out
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    @er.post("/continuity-p0-recover")
+    def post_continuity_p0_recover(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        strategy: Annotated[RecoveryStrategyV1, Query()] = "new_run",
+        source_pipeline_run_id: Annotated[uuid.UUID | None, Query()] = None,
+    ) -> dict[str, Any]:
+        """P0-C: start post-ingestion run (mirror 02–04) or reopen failed run; enqueue phase 05."""
+        _assert_tenant(db, tenant_id)
+        out = recover_continuity_p0_pipeline_v1(
+            db,
+            tenant_id=tenant_id,
+            strategy=strategy,
+            source_pipeline_run_id=source_pipeline_run_id,
+        )
+        if not out.get("recovered"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=out,
+            )
+        db.commit()
+        return out
 
     @er.post("/rerun")
     def post_execution_rerun(
