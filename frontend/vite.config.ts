@@ -1,6 +1,16 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import type { IncomingMessage } from "node:http";
 import { defineConfig, loadEnv } from "vite";
+
+/** Let Vite serve the SPA for browser navigations; proxy only API fetches. */
+function apiProxyBypass(req: IncomingMessage): string | undefined {
+  const accept = req.headers.accept ?? "";
+  if (accept.includes("text/html")) {
+    return "/index.html";
+  }
+  return undefined;
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd() + "/..", "");
@@ -8,6 +18,12 @@ export default defineConfig(({ mode }) => {
     env.VITE_API_PROXY_TARGET?.trim() ||
     env.VITE_API_BASE_URL?.trim() ||
     "http://127.0.0.1:8000";
+
+  const apiProxy = {
+    target: apiProxyTarget,
+    changeOrigin: true,
+    bypass: apiProxyBypass,
+  };
 
   return {
     plugins: [react(), tailwindcss()],
@@ -25,12 +41,12 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       port: 5173,
       proxy: {
-        "/admin": { target: apiProxyTarget, changeOrigin: true },
-        "/auth": { target: apiProxyTarget, changeOrigin: true },
-        "/connectors": { target: apiProxyTarget, changeOrigin: true },
-        "/health": { target: apiProxyTarget, changeOrigin: true },
-        "/me": { target: apiProxyTarget, changeOrigin: true },
-        "/onboarding": { target: apiProxyTarget, changeOrigin: true },
+        "/admin": apiProxy,
+        "/auth": apiProxy,
+        "/connectors": apiProxy,
+        "/health": apiProxy,
+        "/me": apiProxy,
+        "/onboarding": apiProxy,
       },
     },
   };
