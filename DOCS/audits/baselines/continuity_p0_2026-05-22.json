@@ -1302,5 +1302,84 @@
     "recorded_at": "2026-05-22T22:34:40.219156+00:00",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
   },
-  "p1_3_closure_git_sha": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0"
+  "p1_3_closure_git_sha": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0",
+  "step_1_4_p1d_tcre_resume": {
+    "step": "1.4_p1d_tcre_resume",
+    "closure_git_sha": "ea5a8278503cb8ea3b29699962fbc0fcabd3d2d3",
+    "deploy_recorded_at": "2026-05-22T22:37:22.182281+00:00",
+    "prod_deploy": {
+      "recorded_at": "2026-05-22T22:37:24.669634+00:00",
+      "git_sha_full": "ea5a8278503cb8ea3b29699962fbc0fcabd3d2d3",
+      "git_sha_short": "ea5a8278503c",
+      "aws_region": "eu-west-1",
+      "ecs_cluster": "vector-prod",
+      "api": {
+        "service": "vector-backend-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:160",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:b4010b1758772aea45d1007650465dd7a8079ddb",
+        "image_tag": "b4010b1758772aea45d1007650465dd7a8079ddb"
+      },
+      "worker": {
+        "service": "vector-worker-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:120",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:b4ccbf02cd9e127b163c940b8956be2e62eaccd0",
+        "image_tag": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0"
+      },
+      "verification": {
+        "api_image_matches_closure_sha": false,
+        "worker_image_matches_closure_sha": false,
+        "both_services_on_same_tag": false,
+        "deploy_matches_closure_sha": false
+      }
+    },
+    "static_boundaries": {
+      "boundary_checks": {
+        "single_tcre_execution_resume": [],
+        "execution_hot_path_no_continuation": [],
+        "tcre_worker_no_retrieval_materialization": []
+      },
+      "errors": [],
+      "static_boundaries_ok": true
+    },
+    "footprint": {
+      "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "pipeline_status": "failed",
+      "lease_status": "dirty",
+      "lease_fsm_state": "CANONICAL_DRAINING",
+      "lease_phase_cursor": "phase_08_synthesis",
+      "lease_pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "waiting_reason": "tcre_async",
+      "resumed_from_waiting_at": null,
+      "phase_06_status": "completed",
+      "phase_06_async": true,
+      "phase_06_job_id": "45723fb5-2e36-4b96-9789-a197e51d21bd",
+      "tcre_jobs_by_status": {
+        "queued": 3
+      },
+      "tcre_jobs_total": 3
+    },
+    "ci_test_module": "tests/vector/domains/cortex/substrate_pipeline/test_continuity_p1_tcre_resume.py",
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_boundaries_ok": true,
+      "integration_tests_green": true,
+      "pipeline_run_traceable": true,
+      "phase_06_completed_with_async_job": true,
+      "tcre_jobs_exist_on_tenant": true,
+      "tcre_resume_path_evidence": true,
+      "execution_at_or_past_phase_07": true,
+      "tcre_worker_chains_pipeline_resume": true
+    },
+    "p1_4_pass": true,
+    "verification": {
+      "step_14_pass": true,
+      "cleared_for_step_15": true
+    },
+    "ci_pytest": {
+      "skipped": true
+    },
+    "recorded_at": "2026-05-22T22:37:25.395080+00:00",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
+  },
+  "p1_4_closure_git_sha": "ea5a8278503cb8ea3b29699962fbc0fcabd3d2d3"
 }

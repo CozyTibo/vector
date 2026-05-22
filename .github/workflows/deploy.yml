@@ -48,6 +48,15 @@ jobs:
           python -m pip install --quiet -r requirements.txt jsonschema
           PYTHONPATH=src python -m pytest -q tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py
 
+      - name: Verify P1-D TCRE resume boundaries (step 1.4)
+        run: |
+          cd backend
+          PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p1_tcre_resume.py \
+            tests/vector/domains/cortex/execution/test_single_tcre_execution_resume_boundary.py::test_verify_single_tcre_execution_resume_boundary \
+            tests/vector/domains/cortex/execution/test_single_tcre_execution_resume_boundary.py::test_tcre_resume_module_has_no_continuation_coupling \
+            tests/vector/domains/cortex/execution/test_tcre_worker_no_retrieval_materialization_boundary.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
