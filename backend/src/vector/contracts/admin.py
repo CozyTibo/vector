@@ -4626,6 +4626,7 @@ class AdminCortexPipelineOverviewPhasesResponse(BaseModel):
 
     surface_kind: str = "pipeline_overview_phases"
     tenant_id: uuid.UUID
+    execution: AdminCortexPipelineExecutionSnapshot | None = None
     continuity_status: AdminCortexContinuityStatus | None = None
     phases: list[AdminCortexPipelinePhaseOverview]
     attention: list[str] = Field(default_factory=list)

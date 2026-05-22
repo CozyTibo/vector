@@ -147,6 +147,7 @@ def build_pipeline_overview_phases_v1(
         return {
             "surface_kind": "pipeline_overview_phases",
             "tenant_id": str(tenant_id),
+            "execution": _build_execution_snapshot_v1(session, tenant_id=tenant_id),
             "continuity_status": continuity_status,
             "phases": phases,
             "attention": attention,

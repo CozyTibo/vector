@@ -10,7 +10,6 @@ import {
 } from "./cortex/OperationalPhaseStrip";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
 import {
-  usePipelineOverviewExecution,
   usePipelineOverviewIngestion,
   usePipelineOverviewPhases,
 } from "./cortex/usePipelineOverview";
@@ -20,15 +19,13 @@ import { StatusBadge } from "./ui/StatusBadge";
 export default function AdminCortexOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
 
-  const executionQ = usePipelineOverviewExecution();
   const phasesQ = usePipelineOverviewPhases();
   const ingestionQ = usePipelineOverviewIngestion();
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
-  const exec = executionQ.data?.execution;
-  const continuity =
-    executionQ.data?.continuity_status ?? phasesQ.data?.continuity_status ?? undefined;
+  const exec = phasesQ.data?.execution ?? null;
+  const continuity = phasesQ.data?.continuity_status ?? undefined;
   const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
   const attentionItems = phasesQ.data?.attention_items ?? [];
   const sched = ingestionQ.data?.scheduler;
@@ -47,7 +44,7 @@ export default function AdminCortexOverviewPage() {
     <div className="space-y-6">
       <ContinuityStatusCard
         status={continuity}
-        loading={executionQ.isPending && !executionQ.data}
+        loading={phasesQ.isPending && !phasesQ.data}
       />
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -56,19 +53,19 @@ export default function AdminCortexOverviewPage() {
             <h2 className="text-lg font-semibold text-stone-900">Pipeline continuity</h2>
             <p className="text-sm text-stone-600">
               Lease FSM is authoritative
-              {executionQ.isPending && !exec ? (
+              {phasesQ.isPending && !exec ? (
                 <span className="text-stone-400"> · loading…</span>
               ) : exec ? (
                 <>
                   {" "}
                   · FSM {exec.fsm_state ?? "—"} · cursor {exec.phase_cursor ?? "—"}
                 </>
-              ) : executionQ.isError && !exec ? (
-                <span className="text-red-700"> · execution slice unavailable</span>
+              ) : phasesQ.isError ? (
+                <span className="text-red-700"> · pipeline status unavailable</span>
               ) : null}
             </p>
           </div>
-          {executionQ.isPending && !exec ? (
+          {phasesQ.isPending && !exec ? (
             <div className="h-6 w-20 animate-pulse rounded bg-stone-200" aria-hidden />
           ) : exec?.block_reason_code ? (
             <StatusBadge tone="bad">{exec.block_reason_code}</StatusBadge>

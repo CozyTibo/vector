@@ -35,7 +35,7 @@ async function trySlice<T>(
     if (res.ok) {
       return (await res.json()) as T;
     }
-    if (res.status === 404 || res.status === 405 || res.status === 503) {
+    if (res.status === 404 || res.status === 405 || res.status === 500 || res.status === 503) {
       return null;
     }
     throw new Error(await readErrorDetail(res));
@@ -73,6 +73,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
     attention: string[];
     attention_items?: AttentionItem[];
     continuity_status?: ContinuityStatus | null;
+    execution?: PipelineOverview["execution"] | null;
   }>(tenantId, "/cortex/pipeline/overview/phases", 45_000);
   if (body) {
     return {
@@ -80,6 +81,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
       attention: body.attention,
       attention_items: body.attention_items ?? [],
       continuity_status: body.continuity_status ?? null,
+      execution: body.execution ?? null,
     };
   }
   const full = await fetchMonolithOverview(tenantId);
@@ -92,6 +94,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
     attention: full.attention,
     attention_items: extended.attention_items ?? [],
     continuity_status: extended.continuity_status ?? null,
+    execution: full.execution ?? null,
   };
 }
 

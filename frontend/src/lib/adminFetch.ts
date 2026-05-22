@@ -1,5 +1,5 @@
 import { adminBasicAuthorizationHeader, getAdminPassword } from "./adminCredentials";
-import { normalizeApiBase } from "./adminApiUrl";
+import { resolveAdminRequestUrl } from "./adminApiUrl";
 import { readErrorDetail } from "./canonicalApi";
 
 const ADMIN_FETCH_TIMEOUT_MS = 45_000;
@@ -19,7 +19,7 @@ export async function adminFetch(
   const timeoutMs = options?.timeoutMs ?? ADMIN_FETCH_TIMEOUT_MS;
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(`${normalizeApiBase()}${path}`, {
+    return await fetch(resolveAdminRequestUrl(path), {
       ...init,
       headers,
       signal: init?.signal ?? controller.signal,

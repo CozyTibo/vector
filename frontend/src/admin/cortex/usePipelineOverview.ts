@@ -34,6 +34,7 @@ export type PipelineOverviewPhases = {
   attention: string[];
   attention_items: AttentionItem[];
   continuity_status: ContinuityStatus | null;
+  execution: PipelineOverview["execution"] | null;
 };
 
 export type PipelineOverviewExecution = PipelineExecutionSlice & {
@@ -79,6 +80,7 @@ export function usePipelineOverviewPhases() {
         attention: data.attention,
         attention_items: data.attention_items,
         continuity_status: data.continuity_status ?? null,
+        execution: data.execution ?? null,
       };
     },
     enabled: Boolean(tenantId),
@@ -101,7 +103,6 @@ export function usePipelineOverviewIngestion() {
 
 /** Prefetch all overview slices in parallel (layout warm-up). */
 export function usePrefetchPipelineOverviewSlices() {
-  usePipelineOverviewExecution();
   usePipelineOverviewPhases();
   usePipelineOverviewIngestion();
 }

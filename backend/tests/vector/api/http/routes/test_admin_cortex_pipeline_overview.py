@@ -97,6 +97,7 @@ def test_pipeline_overview_slices_match_full(client: TestClient, db_session: Ses
     assert phases["attention"] == full["attention"]
     assert phases.get("attention_items") == full.get("attention_items")
     assert phases.get("continuity_status") == full.get("continuity_status")
+    assert phases.get("execution") == full.get("execution")
     assert ingestion["scheduler"] == full["scheduler"]
     assert ingestion["runnable_connectors"] == full["runnable_connectors"]
     assert ingestion["recent_ingestion_runs"] == full["recent_ingestion_runs"]

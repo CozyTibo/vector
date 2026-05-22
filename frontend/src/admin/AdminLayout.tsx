@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
-import { getApiBase, readErrorDetail } from "../lib/canonicalApi";
+import { resolveAdminRequestUrl } from "../lib/adminApiUrl";
+import { readErrorDetail } from "../lib/canonicalApi";
 import { getAdminPassword, setAdminPassword } from "../lib/adminCredentials";
 
 function adminNavLinkClass({ isActive }: { isActive: boolean }): string {
@@ -35,7 +36,6 @@ function AdminTopNav() {
 }
 
 export default function AdminLayout() {
-  const apiBase = getApiBase();
   const [authed, setAuthed] = useState(() => Boolean(getAdminPassword()));
 
   const [password, setPassword] = useState("");
@@ -47,7 +47,7 @@ export default function AdminLayout() {
     setError(null);
     setChecking(true);
     try {
-      const res = await fetch(`${apiBase}/admin/tenants`, {
+      const res = await fetch(resolveAdminRequestUrl("/admin/tenants"), {
         headers: {
           Authorization: `Basic ${btoa(`admin:${password}`)}`,
         },
