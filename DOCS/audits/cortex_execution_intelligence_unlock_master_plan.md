@@ -20,7 +20,7 @@
 | 3 | **Done** | 2026-05-22 | Fix 2: deferral-aware gate + `untreated_routable_drainable_exists_v1` |
 | 4 | **Done** | 2026-05-22 | Deploy triggered + prod wedge: 7715 deferrals released; A4 validated |
 | 5 | **Done** | 2026-05-22 | Identity backfill A1: 7286 active org handles on Fizzer |
-| 6 | Pending | — | Candidate regen A3 |
+| 6 | **Done** | 2026-05-22 | Candidate regen A3: 2000 link candidates (global cap) |
 | 7 | Pending | — | Promotion A2 |
 | 8 | Pending | — | Fix 3–5 |
 | 9 | Pending | — | GRAPH → A5 |
@@ -82,6 +82,14 @@
 - **Result:** `org_entities_active_after=7286` (`human_actor=7283`, `service_account=3`); anchors scanned across chunks with `skip_candidate_regen=True` (step 6).
 - **A1:** Pass — prod anchor yield ≥7k unique handles (plateau below 10k aspirational target due to work-object anchors).
 - **Code:** chunked commits + `anchor_offset` on `run_anchor_handle_backfill`; `db.expire_all()` between chunks avoids duplicate-PK on resume.
+
+### Step 6 completion record (candidate regen A3)
+
+- **Command:** `cd backend && .venv/bin/python scripts/unlock_step06_candidate_regen.py`
+- **Artifact:** [`baselines/fizzer_step06_2026-05-22.json`](baselines/fizzer_step06_2026-05-22.json)
+- **Result:** `link_candidates_before=0` → `link_candidates_after=2000` (`org.persona_belongs_to_handle`); `candidate_count=2000` at global cap (`p04.candidate.exact_notion_user_id_v1` dominated emission; later rules skipped after cap).
+- **A3:** Pass — wedge ≥50 and at 2000 cap per plan §6.2.
+- **Code:** `step06_candidate_regen.py` (`evaluate_a3_candidate_links_v1`); wedge script + tests `test_step06_candidate_regen.py`.
 
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py

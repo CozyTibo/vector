@@ -1,0 +1,810 @@
+{
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "step": 6,
+  "validated_at": "2026-05-22T15:08:05.518136+00:00",
+  "link_candidates_before": 0,
+  "regen": {
+    "candidate_batch_id": "5591f953-1521-4f19-b352-a06f7dcd0029",
+    "candidate_set_sha256": "2db531d41c61771e28ef12e751ff99a01e8896b116a307c255774a1d4baf6f2a",
+    "candidate_count": 2000,
+    "candidate_generation_schema_version": 1,
+    "anchor_evidence_input_sha256": "3b9ea16c72d36e2264a8fc7d26008609d57000e37438d55fe4f3b56e669f28f3",
+    "ambiguity_opened_email_slack_multiplicity": 0,
+    "ambiguity_opened_email_norm_slack_multiplicity": 0,
+    "ambiguity_opened_fixture_cohort": 0,
+    "candidate_generation_overflow_accounting": {
+      "schema_version": "p04.anchor_candidate_generation_accounting.v1",
+      "global_max_candidate_edges": 2000,
+      "rule_evaluation_order": [
+        "p04.candidate.exact_slack_user_id_v1",
+        "p04.candidate.exact_github_login_v1",
+        "p04.candidate.exact_linear_user_id_v1",
+        "p04.candidate.exact_notion_user_id_v1",
+        "p04.candidate.exact_email_localpart_domain_v1",
+        "p04.candidate.email_norm_continuity_evidence_v1",
+        "p04.candidate.continuity_fixture_cluster_key_v1",
+        "p04.candidate.fixture_declared_link_subject_v1",
+        "p04.candidate.fixture_declared_stable_account_key_v1"
+      ],
+      "anchor_count": 19961,
+      "per_rule": {
+        "p04.candidate.exact_slack_user_id_v1": {
+          "rule_id": "p04.candidate.exact_slack_user_id_v1",
+          "manifest_kind": "exact_provider_key",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 45,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        },
+        "p04.candidate.exact_github_login_v1": {
+          "rule_id": "p04.candidate.exact_github_login_v1",
+          "manifest_kind": "exact_provider_key",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 11,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        },
+        "p04.candidate.exact_linear_user_id_v1": {
+          "rule_id": "p04.candidate.exact_linear_user_id_v1",
+          "manifest_kind": "exact_linear_user_id",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 0,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        },
+        "p04.candidate.exact_notion_user_id_v1": {
+          "rule_id": "p04.candidate.exact_notion_user_id_v1",
+          "manifest_kind": "exact_notion_user_id",
+          "eligible_cross_entity_pairs_across_buckets": 32897,
+          "buckets_with_ge2_distinct_org_entity_rows": 2,
+          "edges_emitted": 2000,
+          "edges_suppressed_due_to_global_cap": 304448,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 273551
+        },
+        "p04.candidate.exact_email_localpart_domain_v1": {
+          "rule_id": "p04.candidate.exact_email_localpart_domain_v1",
+          "manifest_kind": "exact_email",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 0,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        },
+        "p04.candidate.email_norm_continuity_evidence_v1": {
+          "rule_id": "p04.candidate.email_norm_continuity_evidence_v1",
+          "manifest_kind": "email_norm_continuity_evidence",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 0,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        },
+        "p04.candidate.continuity_fixture_cluster_key_v1": {
+          "rule_id": "p04.candidate.continuity_fixture_cluster_key_v1",
+          "manifest_kind": "fixture_declared_cluster",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 0,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        },
+        "p04.candidate.fixture_declared_link_subject_v1": {
+          "rule_id": "p04.candidate.fixture_declared_link_subject_v1",
+          "manifest_kind": "fixture_declared_link_subject",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 0,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        },
+        "p04.candidate.fixture_declared_stable_account_key_v1": {
+          "rule_id": "p04.candidate.fixture_declared_stable_account_key_v1",
+          "manifest_kind": "fixture_declared_stable_account_key",
+          "eligible_cross_entity_pairs_across_buckets": 0,
+          "buckets_with_ge2_distinct_org_entity_rows": 0,
+          "edges_emitted": 0,
+          "edges_suppressed_due_to_global_cap": 0,
+          "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+        }
+      },
+      "rules_never_started_after_global_cap": [
+        "p04.candidate.exact_email_localpart_domain_v1",
+        "p04.candidate.email_norm_continuity_evidence_v1",
+        "p04.candidate.continuity_fixture_cluster_key_v1",
+        "p04.candidate.fixture_declared_link_subject_v1",
+        "p04.candidate.fixture_declared_stable_account_key_v1"
+      ],
+      "hit_global_candidate_edge_cap": true,
+      "first_rule_truncated_after_emission": "p04.candidate.exact_notion_user_id_v1",
+      "eligible_cross_entity_pairs_in_rules_never_started_after_cap": 1877415,
+      "deterministic_notes": [
+        "Candidate edge global cap reached: later rules in evaluation order may emit zero edges even when buckets exist \u2014 compare per_rule.edges_suppressed_due_to_global_cap and rules_never_started_after_global_cap."
+      ],
+      "edges_emitted_total": 2000
+    },
+    "continuity_pair_evidence_preview": {
+      "schema_version": "p04.continuity_pair_evidence_preview.v1",
+      "limit": 12,
+      "pair_families": [
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|00c386ab-2b24-5c03-adbc-33f1239db583",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "00c386ab-2b24-5c03-adbc-33f1239db583",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                2551341
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-19T10:37:12Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            2551341
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-19T10:37:12Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 1,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|00ca149b-781c-5243-b1d2-eeca67381de9",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "00ca149b-781c-5243-b1d2-eeca67381de9",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                2551355
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-19T10:37:13Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            2551355
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-19T10:37:13Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 1,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|011d7bb4-b709-5e00-84b5-37bb2c44fd03",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "011d7bb4-b709-5e00-84b5-37bb2c44fd03",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                1080753,
+                2551335
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-18T15:52:09Z",
+                "fetched_at_max_iso": "2026-05-19T10:37:11Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            1080753,
+            2551335
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-18T15:52:09Z",
+            "fetched_at_max_iso": "2026-05-19T10:37:11Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 2,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|01514567-54a2-55f5-9158-9c6c9c07b8ea",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "01514567-54a2-55f5-9158-9c6c9c07b8ea",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                4761032
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-22T00:36:59Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            4761032
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-22T00:36:59Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 2,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|0175ea64-22ed-5458-ab43-6525b6003e30",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "0175ea64-22ed-5458-ab43-6525b6003e30",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                4761191
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-22T00:37:06Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            4761191
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-22T00:37:06Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 2,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|01b9d965-c1f1-5679-8104-571cf98a58f9",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "01b9d965-c1f1-5679-8104-571cf98a58f9",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                4761052
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-22T00:37:00Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            4761052
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-22T00:37:00Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 2,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|025b3ecf-9285-56ab-8a96-708c1f931767",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "025b3ecf-9285-56ab-8a96-708c1f931767",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                2862224
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-19T14:37:47Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            2862224
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-19T14:37:47Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 1,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|02708049-e99d-5a14-8e1c-4c420e46c840",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "02708049-e99d-5a14-8e1c-4c420e46c840",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                2551371
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-19T10:37:14Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            2551371
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-19T10:37:14Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 1,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|0377dda2-e3dc-5b30-8bdb-dcfcd7f9e9f2",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "0377dda2-e3dc-5b30-8bdb-dcfcd7f9e9f2",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                977581,
+                2551335
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-18T14:32:20Z",
+                "fetched_at_max_iso": "2026-05-19T10:37:11Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            977581,
+            2551335
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-18T14:32:20Z",
+            "fetched_at_max_iso": "2026-05-19T10:37:11Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 2,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|0418a792-06b0-54b5-940e-ec8e46032a43",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "0418a792-06b0-54b5-940e-ec8e46032a43",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                977578,
+                2551335
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-18T14:32:20Z",
+                "fetched_at_max_iso": "2026-05-19T10:37:11Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            977578,
+            2551335
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-18T14:32:20Z",
+            "fetched_at_max_iso": "2026-05-19T10:37:11Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 2,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|04b79d52-44ce-53fd-8006-0fa632b680ef",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "04b79d52-44ce-53fd-8006-0fa632b680ef",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                4691187
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-21T11:12:13Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            4691187
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-21T11:12:13Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 2,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        },
+        {
+          "pair_key": "009afd75-bf1a-5458-8860-ce2e5abdab0a|04b7f295-1b6b-5294-907a-35eb45601ad5",
+          "source_entity_id": "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+          "target_entity_id": "04b7f295-1b6b-5294-907a-35eb45601ad5",
+          "distinct_rule_ids": [
+            "p04.candidate.exact_notion_user_id_v1"
+          ],
+          "rule_count": 1,
+          "by_rule_id": {
+            "p04.candidate.exact_notion_user_id_v1": {
+              "edge_count": 1,
+              "evidence_raw_record_ids": [
+                2551335,
+                2862197
+              ],
+              "by_connector": {
+                "notion": 2
+              },
+              "temporal": {
+                "evidence_raw_count": 2,
+                "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+                "fetched_at_max_iso": "2026-05-19T14:37:47Z"
+              }
+            }
+          },
+          "distinct_evidence_raw_record_ids": [
+            2551335,
+            2862197
+          ],
+          "by_connector": {
+            "notion": 2
+          },
+          "temporal": {
+            "evidence_raw_count": 2,
+            "fetched_at_min_iso": "2026-05-19T10:37:11Z",
+            "fetched_at_max_iso": "2026-05-19T14:37:47Z"
+          },
+          "manifest_kinds_distinct": [],
+          "distinct_resource_types": [
+            "notion.block"
+          ],
+          "recurrence_calendar_day_count": 1,
+          "deterministic_explain_lines": [
+            "Rule p04.candidate.exact_notion_user_id_v1 (unknown): 1 candidate edge(s)."
+          ]
+        }
+      ],
+      "pair_family_count_total": 2000
+    }
+  },
+  "overflow_accounting": {
+    "schema_version": "p04.anchor_candidate_generation_accounting.v1",
+    "global_max_candidate_edges": 2000,
+    "rule_evaluation_order": [
+      "p04.candidate.exact_slack_user_id_v1",
+      "p04.candidate.exact_github_login_v1",
+      "p04.candidate.exact_linear_user_id_v1",
+      "p04.candidate.exact_notion_user_id_v1",
+      "p04.candidate.exact_email_localpart_domain_v1",
+      "p04.candidate.email_norm_continuity_evidence_v1",
+      "p04.candidate.continuity_fixture_cluster_key_v1",
+      "p04.candidate.fixture_declared_link_subject_v1",
+      "p04.candidate.fixture_declared_stable_account_key_v1"
+    ],
+    "anchor_count": 19961,
+    "per_rule": {
+      "p04.candidate.exact_slack_user_id_v1": {
+        "rule_id": "p04.candidate.exact_slack_user_id_v1",
+        "manifest_kind": "exact_provider_key",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 45,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      },
+      "p04.candidate.exact_github_login_v1": {
+        "rule_id": "p04.candidate.exact_github_login_v1",
+        "manifest_kind": "exact_provider_key",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 11,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      },
+      "p04.candidate.exact_linear_user_id_v1": {
+        "rule_id": "p04.candidate.exact_linear_user_id_v1",
+        "manifest_kind": "exact_linear_user_id",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 0,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      },
+      "p04.candidate.exact_notion_user_id_v1": {
+        "rule_id": "p04.candidate.exact_notion_user_id_v1",
+        "manifest_kind": "exact_notion_user_id",
+        "eligible_cross_entity_pairs_across_buckets": 32897,
+        "buckets_with_ge2_distinct_org_entity_rows": 2,
+        "edges_emitted": 2000,
+        "edges_suppressed_due_to_global_cap": 304448,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 273551
+      },
+      "p04.candidate.exact_email_localpart_domain_v1": {
+        "rule_id": "p04.candidate.exact_email_localpart_domain_v1",
+        "manifest_kind": "exact_email",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 0,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      },
+      "p04.candidate.email_norm_continuity_evidence_v1": {
+        "rule_id": "p04.candidate.email_norm_continuity_evidence_v1",
+        "manifest_kind": "email_norm_continuity_evidence",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 0,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      },
+      "p04.candidate.continuity_fixture_cluster_key_v1": {
+        "rule_id": "p04.candidate.continuity_fixture_cluster_key_v1",
+        "manifest_kind": "fixture_declared_cluster",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 0,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      },
+      "p04.candidate.fixture_declared_link_subject_v1": {
+        "rule_id": "p04.candidate.fixture_declared_link_subject_v1",
+        "manifest_kind": "fixture_declared_link_subject",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 0,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      },
+      "p04.candidate.fixture_declared_stable_account_key_v1": {
+        "rule_id": "p04.candidate.fixture_declared_stable_account_key_v1",
+        "manifest_kind": "fixture_declared_stable_account_key",
+        "eligible_cross_entity_pairs_across_buckets": 0,
+        "buckets_with_ge2_distinct_org_entity_rows": 0,
+        "edges_emitted": 0,
+        "edges_suppressed_due_to_global_cap": 0,
+        "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0
+      }
+    },
+    "rules_never_started_after_global_cap": [
+      "p04.candidate.exact_email_localpart_domain_v1",
+      "p04.candidate.email_norm_continuity_evidence_v1",
+      "p04.candidate.continuity_fixture_cluster_key_v1",
+      "p04.candidate.fixture_declared_link_subject_v1",
+      "p04.candidate.fixture_declared_stable_account_key_v1"
+    ],
+    "hit_global_candidate_edge_cap": true,
+    "first_rule_truncated_after_emission": "p04.candidate.exact_notion_user_id_v1",
+    "eligible_cross_entity_pairs_in_rules_never_started_after_cap": 1877415,
+    "deterministic_notes": [
+      "Candidate edge global cap reached: later rules in evaluation order may emit zero edges even when buckets exist \u2014 compare per_rule.edges_suppressed_due_to_global_cap and rules_never_started_after_global_cap."
+    ],
+    "edges_emitted_total": 2000
+  },
+  "link_candidates_after": 2000,
+  "link_types": [
+    {
+      "link_type": "org.persona_belongs_to_handle",
+      "n": 2000
+    }
+  ],
+  "A3_pass": true,
+  "A3_detail": "link_candidates=2000 at_cap>=2000"
+}
