@@ -15,6 +15,9 @@ from vector.domains.cortex.execution.admin_commands import (
     execution_rerun_v1,
     restart_execution_from_phase_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_phase05_proof import (
+    evaluate_p0_b_phase05_proof_v1,
+)
 from vector.domains.cortex.substrate_pipeline.continuity_p0_recovery import (
     RecoveryStrategyV1,
     recover_continuity_p0_pipeline_v1,
@@ -113,6 +116,20 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
             return out
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    @er.get("/continuity-p0-phase05-proof")
+    def get_continuity_p0_phase05_proof(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        pipeline_run_id: Annotated[uuid.UUID | None, Query()] = None,
+    ) -> dict[str, Any]:
+        """P0-B: evaluate phase 05 completion + walk timestamp gates (CONT-INV-01/02)."""
+        _assert_tenant(db, tenant_id)
+        return evaluate_p0_b_phase05_proof_v1(
+            db,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+        )
 
     @er.post("/continuity-p0-recover")
     def post_continuity_p0_recover(

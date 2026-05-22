@@ -335,7 +335,7 @@ run_tenant_convergence_v1:
 | 0.1 | Implement P0-A schema packaging + CI smoke | Backend | CI + staging worker walk validate | **Done** (see §Phase 0.1 completion below) |
 | 0.2 | Deploy worker + API images | Ops | Prod deploy SHA recorded | **Done** (see §Phase 0.2 completion) |
 | 0.3 | P0-C new pipeline run or recovery | Ops | New run id, not `failed` | **Done** (see §Phase 0.3 completion) |
-| 0.4 | P0-B prod proof SQL | Ops | Phase 05 COMPLETED, walks after graph phase | Pending |
+| 0.4 | P0-B prod proof SQL | Ops | Phase 05 COMPLETED, walks after graph phase | **Done** (see §Phase 0.4 completion) |
 | 0.5 | Document deploy SHA in `DOCS/audits/baselines/continuity_p0_<date>.json` | Eng | Artifact committed | **Done** (with 0.2) |
 
 #### Phase 0.1 completion (P0-A + P0-D)
@@ -388,6 +388,24 @@ Executed **2026-05-22** on Fizzer prod:
 Execution slice enqueue uses prod **convergence sweeper** when `--db-only` (no local Redis); worker picks up dirty lease within ~2 minutes.
 
 **Next step (0.4):** prove phase 05 `COMPLETED` with walks after phase 04 timestamp (P0-B).
+
+#### Phase 0.4 completion (P0-B phase 05 autonomous proof)
+
+Executed **2026-05-22** on Fizzer prod (`c08ef32b-f89a-40f6-9566-e19b5329436f`):
+
+| Item | Value |
+|------|-------|
+| Pipeline run | `ce7df86d-b229-4467-ad28-1109ed119d34` (`status=running`) |
+| Phase 05 | `completed` at `2026-05-22T21:52:09Z` (receipt `COMPLETED_EMPTY`; slice had no new walks this run) |
+| Walks after phase 04 | 8 rows with `created_at > phase_04.completed_at` (newest `2026-05-22T21:36:24Z`) |
+| Lease | `waiting`, `fsm_state=AWAITING_TCRE`, `phase_cursor=phase_07_retrieval`, `last_error` null |
+| CONT-INV-01 | Phase 05 receipt on active run — no schema-path failure |
+| CONT-INV-02 | `lease.last_error` clear; no `octs-walk-policy-v1.schema.json` / DOCS path errors |
+| Code | `continuity_p0_phase05_proof.py`, `continuity_p0_phase05_proof.py` (script), admin `GET …/execution/continuity-p0-phase05-proof` |
+| Prod script | `python backend/scripts/continuity_p0_phase05_proof.py` (`--proof-only` to re-evaluate without slices) |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_0_4_phase05_proof` |
+
+**Phase 0 complete.** Next: Phase 1.1 (P3′ component scheduling).
 
 ### Phase 1 — Propagation + downstream continuity (days 4–10)
 
