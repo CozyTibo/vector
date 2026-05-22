@@ -143,6 +143,9 @@ def mark_tenant_waiting_v1(
     row.detail_json = detail
     row.updated_at = now
     session.flush()
+    from vector.domains.cortex.execution.dual_lane_lease import sync_dual_lane_fields_on_lease_v1
+
+    sync_dual_lane_fields_on_lease_v1(session, lease=row)
 
 
 def schedule_convergence_retry_v1(
@@ -200,6 +203,9 @@ def mark_tenant_stalled_v1(
     )
     row.updated_at = _now()
     session.flush()
+    from vector.domains.cortex.execution.dual_lane_lease import sync_dual_lane_fields_on_lease_v1
+
+    sync_dual_lane_fields_on_lease_v1(session, lease=row)
 
 
 def try_acquire_convergence_lease_v1(

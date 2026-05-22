@@ -63,7 +63,9 @@ jobs:
           PYTHONPATH=src python -m pytest -q \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p1_downstream.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p1_retrieval.py \
-            tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py
+            tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py \
+            tests/vector/domains/cortex/execution/test_dual_lane_lease.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p2_dual_lane.py
 
       - name: Build and push backend image
         env:

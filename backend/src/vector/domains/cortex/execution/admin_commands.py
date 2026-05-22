@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.execution.admin_rerun import admin_rerun_substrate_execution_v1
+from vector.domains.cortex.execution.dual_lane_lease import build_dual_lane_inspect_v1
 from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
 from vector.domains.cortex.execution.progression_status import build_substrate_progression_status_v1
 from vector.domains.cortex.execution.tenant_constants import FSM_BLOCKED, LEASE_STATUS_RUNNING
@@ -73,6 +74,7 @@ def build_execution_inspect_v1(
             .limit(lim)
         ).all()
     )
+    dual_lane = build_dual_lane_inspect_v1(session, tenant_id=tenant_id, lease=lease)
     return {
         "surface_kind": "execution_inspect",
         "tenant_id": str(tenant_id),
@@ -86,10 +88,13 @@ def build_execution_inspect_v1(
                 "pipeline_run_id": str(lease.pipeline_run_id) if lease.pipeline_run_id else None,
                 "block_reason_code": lease.block_reason_code,
                 "block_detail": lease.block_detail,
+                "canonical_lane": (dual_lane.get("canonical_lane") or {}).get("lane_status"),
+                "execution_lane": (dual_lane.get("execution_lane") or {}).get("lane_status"),
             }
             if lease is not None
             else None
         ),
+        "dual_lane": dual_lane,
         "progression": progression,
         "transitions": [
             {

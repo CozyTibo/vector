@@ -23,7 +23,12 @@ WORKER_OUTCOME_TIME_BUDGET: Final[str] = "time_budget_requeue"
 WORKER_OUTCOME_STALLED: Final[str] = "execution_stalled"
 
 
-def store_last_phase_receipt_on_lease_v1(lease: Any, *, phase_output: dict[str, Any]) -> None:
+def store_last_phase_receipt_on_lease_v1(
+    lease: Any,
+    *,
+    phase_output: dict[str, Any],
+    session: Any | None = None,
+) -> None:
     """Persist receipt pointers on lease detail_json for operator surfaces."""
     rec = read_phase_receipt_from_output(phase_output)
     detail = dict(lease.detail_json or {})
@@ -37,6 +42,10 @@ def store_last_phase_receipt_on_lease_v1(lease: Any, *, phase_output: dict[str, 
         detail["last_phase_receipt_hash"] = phase_output.get("receipt_hash")
         detail["last_phase_outcome"] = phase_output.get("outcome")
     lease.detail_json = detail
+    if session is not None:
+        from vector.domains.cortex.execution.dual_lane_lease import sync_dual_lane_fields_on_lease_v1
+
+        sync_dual_lane_fields_on_lease_v1(session, lease=lease)
 
 
 def phase_outcome_from_output_v1(output: dict[str, Any] | None) -> str | None:

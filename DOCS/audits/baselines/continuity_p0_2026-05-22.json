@@ -1608,5 +1608,33 @@
       "island_scope_id": "d7e41b3c763d38e9"
     },
     "trace_only": true
+  },
+  "step_2_1_p1f_dual_lane_lease": {
+    "validated_at": "2026-05-22T23:04:47.420290+00:00",
+    "closure_git_sha": "b127e699e1c0bbda889e3d1b1043dd0f9294a729",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p2_1_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "dual_lane_enabled": true,
+      "inspect_has_dual_lane_block": true,
+      "canonical_lane_present": true,
+      "execution_lane_present": true,
+      "canonical_lane_status_set": true,
+      "execution_lane_status_set": true,
+      "lease_summary_shows_both_lane_statuses": true,
+      "detail_json_persists_both_lanes": true,
+      "execution_lane_has_phase_cursor": true
+    },
+    "checks_advisory": {
+      "topology_decoupled_from_execution_cursor": true,
+      "execution_cursor_past_canonical": true
+    },
+    "snapshot_summary": {
+      "phase_cursor": "phase_08_synthesis",
+      "canonical_lane_status": "WAITING",
+      "execution_lane_status": "HEALTHY"
+    },
+    "trace_only": true
   }
 }

@@ -749,6 +749,14 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_RETRIEVAL_MIN_COMPONENT_ENTITIES",
         description="P1-C: minimum |V| in a connected component to scope retrieval materialization.",
     )
+    cortex_execution_dual_lane_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_EXECUTION_DUAL_LANE",
+        description=(
+            "P1-F: persist canonical_lane + execution_lane on lease detail_json; "
+            "set env to 0 for pre-P1-F serial stall semantics."
+        ),
+    )
     cortex_synthesis_forbidden_backoff_threshold: int = Field(
         default=3,
         ge=1,

@@ -28,6 +28,10 @@ from vector.domains.cortex.execution.execution_path_telemetry import (
     emit_execution_path_telemetry_v1,
 )
 from vector.domains.cortex.execution.fsm import apply_fsm_transition_v1, fsm_state_for_phase_cursor_v1
+from vector.domains.cortex.execution.dual_lane_lease import (
+    should_mark_execution_lane_stalled_v1,
+    sync_dual_lane_fields_on_lease_v1,
+)
 from vector.domains.cortex.execution.lease import (
     complete_convergence_lease_v1,
     mark_tenant_stalled_v1,
@@ -85,6 +89,21 @@ def _store_canonical_slice_outcome_on_lease(
     if isinstance(convergence_health, str) and convergence_health.strip():
         detail["convergence_health"] = convergence_health.strip()
     lease.detail_json = detail
+
+
+def _store_canonical_slice_outcome_on_lease_with_session(
+    session: Session,
+    lease: CortexTenantConvergenceLease,
+    *,
+    outcome: str,
+    convergence_health: str | None = None,
+) -> None:
+    _store_canonical_slice_outcome_on_lease(
+        lease,
+        outcome=outcome,
+        convergence_health=convergence_health,
+    )
+    sync_dual_lane_fields_on_lease_v1(session, lease=lease)
 
 
 def _resolve_start_phase(lease: CortexTenantConvergenceLease) -> str:
@@ -198,7 +217,7 @@ def run_tenant_convergence_v1(
                 )
                 raw_summary = out.get("canonical_summary")
                 summary: dict[str, Any] = raw_summary if isinstance(raw_summary, dict) else {}
-                store_last_phase_receipt_on_lease_v1(lease, phase_output=out)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=out, session=session)
                 if canonical_needs_more_work_v1(
                     session,
                     canonical_summary=summary,
@@ -222,7 +241,8 @@ def run_tenant_convergence_v1(
                         phase_cursor=PHASE_02_CANONICAL,
                         delay_seconds=delay,
                     )
-                    _store_canonical_slice_outcome_on_lease(
+                    _store_canonical_slice_outcome_on_lease_with_session(
+                        session,
                         lease,
                         outcome=outcome,
                         convergence_health=str(summary.get("convergence_health") or "") or None,
@@ -244,7 +264,8 @@ def run_tenant_convergence_v1(
                         "pipeline_run_id": str(pipeline_run_id),
                         "fsm_state": lease.fsm_state,
                     }
-                _store_canonical_slice_outcome_on_lease(
+                _store_canonical_slice_outcome_on_lease_with_session(
+                    session,
                     lease,
                     outcome=str(summary.get("canonical_outcome") or ""),
                     convergence_health=str(summary.get("convergence_health") or "") or None,
@@ -260,13 +281,13 @@ def run_tenant_convergence_v1(
                     bundle_id=bundle_id,
                     identity_substrate_trigger=identity_trigger,
                 )
-                store_last_phase_receipt_on_lease_v1(lease, phase_output=p03)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p03, session=session)
                 phase = PHASE_04_GRAPH
                 continue
 
             if phase == PHASE_04_GRAPH:
                 out = run_phase_04_graph_v1(session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id)
-                store_last_phase_receipt_on_lease_v1(lease, phase_output=out)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=out, session=session)
                 graph_hash = out.get("graph_projection_stable_hash_sha256")
                 phase = PHASE_05_TRAVERSAL
                 continue
@@ -278,13 +299,13 @@ def run_tenant_convergence_v1(
                     pipeline_run_id=pipeline_run_id,
                     graph_projection_stable_hash=graph_hash,
                 )
-                store_last_phase_receipt_on_lease_v1(lease, phase_output=p05)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p05, session=session)
                 phase = PHASE_06_TCRE
                 continue
 
             if phase == PHASE_06_TCRE:
                 p06 = run_phase_06_tcre_v1(session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id)
-                store_last_phase_receipt_on_lease_v1(lease, phase_output=p06)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p06, session=session)
                 mark_tenant_waiting_v1(
                     session,
                     tenant_id=tenant_id,
@@ -292,6 +313,7 @@ def run_tenant_convergence_v1(
                     phase_cursor=PHASE_07_RETRIEVAL,
                     waiting_reason="tcre_async",
                 )
+                sync_dual_lane_fields_on_lease_v1(session, lease=lease)
                 from vector.domains.cortex.execution.phase06_contract import (
                     assert_pipe085_chain_after_phase06_legal_v1,
                 )
@@ -319,7 +341,7 @@ def run_tenant_convergence_v1(
                     tenant_id=tenant_id,
                     pipeline_run_id=pipeline_run_id,
                 )
-                store_last_phase_receipt_on_lease_v1(lease, phase_output=out)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=out, session=session)
                 from vector.domains.cortex.execution.blocked import (
                     apply_post_phase07_retrieval_policy_v1,
                 )
@@ -354,7 +376,7 @@ def run_tenant_convergence_v1(
                     tenant_id=tenant_id,
                     pipeline_run_id=pipeline_run_id,
                 )
-                store_last_phase_receipt_on_lease_v1(lease, phase_output=p08)
+                store_last_phase_receipt_on_lease_v1(lease, phase_output=p08, session=session)
                 finalize_pipeline_if_complete_v1(session, pipeline_run_id=pipeline_run_id)
                 phase = ""
                 break
@@ -395,7 +417,16 @@ def run_tenant_convergence_v1(
             }
 
     except Exception as exc:  # noqa: BLE001
-        mark_tenant_stalled_v1(session, tenant_id=tenant_id, error=str(exc))
+        if should_mark_execution_lane_stalled_v1(lease):
+            mark_tenant_stalled_v1(session, tenant_id=tenant_id, error=str(exc))
+        else:
+            schedule_convergence_retry_v1(
+                session,
+                tenant_id=tenant_id,
+                phase_cursor=PHASE_02_CANONICAL,
+                last_error=str(exc)[:500],
+            )
+            sync_dual_lane_fields_on_lease_v1(session, lease=lease)
         session.commit()
         enqueue_tenant_convergence_v1(tenant_id, reason="stalled_retry")
         _LOGGER.exception(

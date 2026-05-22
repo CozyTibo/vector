@@ -557,10 +557,27 @@ Executed **2026-05-22** on Fizzer prod:
 
 | Step | Work | Done when |
 |------|------|-----------|
-| 2.1 | P1-F lease dual-lane fields | Admin/inspect shows both lanes |
+| 2.1 | P1-F lease dual-lane fields | Admin/inspect shows both lanes | **Done** (see §Phase 2.1 completion) |
 | 2.2 | `continuity_proof_panel.py` | Single command prints AA1–AA7 |
 | 2.3 | P2-A dual-lane worker (canonical + execution budgets) | Canonical progress while 05–08 runs |
 | 2.4 | Start 48h AA clock | T0 baseline JSON |
+
+#### Phase 2.1 completion (P1-F dual-lane lease fields)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Law | `detail_json.canonical_lane` + `detail_json.execution_lane`; `phase_cursor` = execution lane only |
+| Settings | `cortex_execution_dual_lane_enabled` (`CORTEX_EXECUTION_DUAL_LANE`, default on) |
+| Stall decouple | `mark_tenant_stalled_v1` only when `phase_cursor` ∈ phases 03–08; canonical exceptions → retry |
+| Admin inspect | `GET …/cortex/execution/state` → `dual_lane` block + lease summary lane statuses |
+| Fizzer prod | `canonical_lane=WAITING` (topology_wait), `execution_lane=WAITING` (tcre_async), cursor `phase_07_retrieval` |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_2_1_p1f_dual_lane_lease` |
+| Code | `dual_lane_lease.py`, `continuity_p2_dual_lane.py`, `admin_commands.py`, `run_tenant_execution.py` |
+| Prod script | `python backend/scripts/continuity_p2_phase21_dual_lane_proof.py --trace-only` |
+
+**Next step (2.2):** `continuity_proof_panel.py` — single command prints AA1–AA7.
 
 ### Phase 3 — Architecture hardening (weeks 3–6)
 
@@ -604,6 +621,10 @@ python scripts/continuity_p1_phase13_promotion_proof.py --wait-for-deploy 600
 python scripts/continuity_p1_phase14_tcre_proof.py --wait-for-deploy 600
 # P1-D/E downstream 06→07→08 proof (step 1.5):
 python scripts/continuity_p1_phase15_downstream_proof.py --wait-for-deploy 600
+# P1-C retrieval island materialization proof (step 1.6):
+python scripts/continuity_p1_phase16_retrieval_proof.py --trace-only
+# P1-F dual-lane lease inspect proof (step 2.1):
+python scripts/continuity_p2_phase21_dual_lane_proof.py --trace-only
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json
