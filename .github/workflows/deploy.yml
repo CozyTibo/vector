@@ -86,6 +86,13 @@ jobs:
           PYTHONPATH=src python -m pytest -q \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p2_aa_clock.py
 
+      - name: Verify P2-C execution island registry (step 3.1)
+        run: |
+          cd backend
+          PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/operational_runtime/test_execution_island_registry.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_island_registry.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

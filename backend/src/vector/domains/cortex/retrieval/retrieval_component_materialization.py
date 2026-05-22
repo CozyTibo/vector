@@ -363,6 +363,19 @@ def materialize_retrieval_index_for_largest_island_v1(
         walks_candidates=walks_in_island,
         org_link_candidates=links_in_island,
     )
+    try:
+        from vector.domains.cortex.operational_runtime.execution_island_registry import (
+            is_execution_island_registry_enabled_v1,
+            sync_execution_island_registry_v1,
+        )
+
+        if is_execution_island_registry_enabled_v1():
+            stats["island_registry_sync"] = sync_execution_island_registry_v1(
+                session,
+                tenant_id=tenant_id,
+            )
+    except Exception as exc:  # noqa: BLE001
+        stats["island_registry_sync"] = {"synced": False, "error": str(exc)[:500]}
     return stats
 
 

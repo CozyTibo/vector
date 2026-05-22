@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 
 from vector.domains.cortex.execution.admin_rerun import admin_rerun_substrate_execution_v1
 from vector.domains.cortex.execution.dual_lane_lease import build_dual_lane_inspect_v1
+from vector.domains.cortex.operational_runtime.execution_island_registry import (
+    build_island_registry_inspect_v1,
+)
 from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
 from vector.domains.cortex.execution.progression_status import build_substrate_progression_status_v1
 from vector.domains.cortex.execution.tenant_constants import FSM_BLOCKED, LEASE_STATUS_RUNNING
@@ -75,6 +78,11 @@ def build_execution_inspect_v1(
         ).all()
     )
     dual_lane = build_dual_lane_inspect_v1(session, tenant_id=tenant_id, lease=lease)
+    island_registry = build_island_registry_inspect_v1(
+        session,
+        tenant_id=tenant_id,
+        sync=False,
+    )
     return {
         "surface_kind": "execution_inspect",
         "tenant_id": str(tenant_id),
@@ -95,6 +103,7 @@ def build_execution_inspect_v1(
             else None
         ),
         "dual_lane": dual_lane,
+        "island_registry": island_registry,
         "progression": progression,
         "transitions": [
             {

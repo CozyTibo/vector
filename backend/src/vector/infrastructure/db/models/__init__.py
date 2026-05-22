@@ -43,6 +43,9 @@ from vector.infrastructure.db.models.cortex_canonical_materialization_deferral i
 from vector.infrastructure.db.models.cortex_execution_transition_log import (
     CortexExecutionTransitionLog,
 )
+from vector.infrastructure.db.models.cortex_execution_island_registry import (
+    CortexExecutionIslandRegistry,
+)
 from vector.infrastructure.db.models.cortex_tenant_convergence_lease import (
     CortexTenantConvergenceLease,
     CortexTenantExecution,
@@ -151,6 +154,7 @@ __all__ = [
     "CortexSubstratePipelineRun",
     "CortexCanonicalMaterializationDeferral",
     "CortexExecutionTransitionLog",
+    "CortexExecutionIslandRegistry",
     "CortexTenantConvergenceLease",
     "CortexTenantExecution",
     "CortexRetrievalIndexEntry",

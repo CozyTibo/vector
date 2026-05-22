@@ -619,16 +619,31 @@ Executed **2026-05-22** on Fizzer prod:
 | CI gate | `deploy.yml` → `test_continuity_p2_aa_clock.py` |
 | Prod script | `python backend/scripts/continuity_p2_phase24_aa_clock_proof.py --trace-only --wedge-free-ack` |
 
-**Phase 2 complete.** Next: **Phase 3 step 3.1** (P2-C island registry).
-
 ### Phase 3 — Architecture hardening (weeks 3–6)
 
-| Step | Work |
-|------|------|
-| 3.1 | P2-C island registry |
+| Step | Work | Done when |
+|------|------|-----------|
+| 3.1 | P2-C island registry | Registry persisted per eligible component | **Done** (see §Phase 3.1 completion) |
 | 3.2 | P2-B event triggers (hash-change walk schedule) |
 | 3.3 | P2-D per-island synthesis |
 | 3.4 | P2-E ingest caps + deferral release monitoring |
+
+#### Phase 3.1 completion (P2-C execution island registry)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Table | `cortex_execution_island_registry` — `island_scope_id`, `entity_ids`, `entity_count`, `authoritative_edge_count`, `last_walk_at`, `last_retrieval_epoch` |
+| Settings | `CORTEX_EXECUTION_ISLAND_REGISTRY` (default on); `CORTEX_EXECUTION_ISLAND_REGISTRY_MAX_ENTITY_IDS` |
+| Sync | `sync_execution_island_registry_v1` from eligible P3′ components; hook after P1-C retrieval materialization |
+| Admin inspect | `GET …/cortex/execution/state` → `island_registry` block |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_3_1_p2c_island_registry` |
+| Code | `execution_island_registry.py`, `continuity_p3_island_registry.py`, migration `20260522_0091` |
+| CI gate | `deploy.yml` → `test_continuity_p3_island_registry.py`, `test_execution_island_registry.py` |
+| Prod script | `python backend/scripts/continuity_p3_phase31_island_registry_proof.py --trace-only` |
+
+**Next step (3.2):** P2-B event triggers (hash-change walk schedule).
 
 ---
 
@@ -673,6 +688,8 @@ python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b53
 python scripts/continuity_p2_phase23_dual_lane_worker_proof.py --trace-only --proof-only
 # M3 forty-eight-hour AA hold clock T0 (step 2.4):
 python scripts/continuity_p2_phase24_aa_clock_proof.py --trace-only --wedge-free-ack
+# P2-C execution island registry (step 3.1):
+python scripts/continuity_p3_phase31_island_registry_proof.py --trace-only
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

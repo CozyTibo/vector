@@ -757,6 +757,21 @@ class Settings(BaseSettings):
             "set env to 0 for pre-P1-F serial stall semantics."
         ),
     )
+    cortex_execution_island_registry_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_EXECUTION_ISLAND_REGISTRY",
+        description=(
+            "P2-C: persist execution island registry rows per tenant "
+            "(component id, entity ids, edge count, last_walk_at, last_retrieval_epoch)."
+        ),
+    )
+    cortex_execution_island_registry_max_entity_ids: int = Field(
+        default=512,
+        ge=1,
+        le=50_000,
+        validation_alias="CORTEX_EXECUTION_ISLAND_REGISTRY_MAX_ENTITY_IDS",
+        description="P2-C: cap entity UUIDs stored per island row in registry JSON.",
+    )
     cortex_execution_canonical_lane_budget_seconds: int = Field(
         default=0,
         ge=0,
