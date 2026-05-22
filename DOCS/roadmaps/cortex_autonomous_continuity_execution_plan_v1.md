@@ -560,7 +560,7 @@ Executed **2026-05-22** on Fizzer prod:
 | 2.1 | P1-F lease dual-lane fields | Admin/inspect shows both lanes | **Done** (see §Phase 2.1 completion) |
 | 2.2 | `continuity_proof_panel.py` | Single command prints AA1–AA7 | **Done** (see §Phase 2.2 completion) |
 | 2.3 | P2-A dual-lane worker (canonical + execution budgets) | Canonical progress while 05–08 runs | **Done** (see §Phase 2.3 completion) |
-| 2.4 | Start 48h AA clock | T0 baseline JSON |
+| 2.4 | Start 48h AA clock | T0 baseline JSON | **Done** (see §Phase 2.4 completion) |
 
 #### Phase 2.1 completion (P1-F dual-lane lease fields)
 
@@ -605,7 +605,21 @@ Executed **2026-05-22** on Fizzer prod:
 | CI gate | `deploy.yml` → `test_dual_lane_worker.py`, `test_continuity_p2_dual_lane_worker.py` |
 | Prod script | `python backend/scripts/continuity_p2_phase23_dual_lane_worker_proof.py --trace-only --proof-only` (snapshot); `--canonical-only` / `--full-slice` for live slice drive |
 
-**Next step (2.4):** Start 48h AA clock (T0 baseline JSON).
+#### Phase 2.4 completion (M3 forty-eight-hour AA hold clock)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Clock | `clock_started_at` → `clock_deadline_at` (+48h); daily re-run `continuity_p2_phase24_aa_clock_proof.py` until elapsed |
+| T0 gate | AA1–AA7 all **PASS** at capture (`m3_autonomously_alive_at_t0: true`) |
+| T0 baseline | [`continuity_aa_clock_T0_2026-05-22.json`](../audits/baselines/continuity_aa_clock_T0_2026-05-22.json) |
+| Continuity baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_2_4_aa48_clock` (`p2_4_pass: true`) |
+| Code | `continuity_p2_aa_clock.py`, `continuity_p2_phase24_aa_clock_proof.py` |
+| CI gate | `deploy.yml` → `test_continuity_p2_aa_clock.py` |
+| Prod script | `python backend/scripts/continuity_p2_phase24_aa_clock_proof.py --trace-only --wedge-free-ack` |
+
+**Phase 2 complete.** Next: **Phase 3 step 3.1** (P2-C island registry).
 
 ### Phase 3 — Architecture hardening (weeks 3–6)
 
@@ -657,6 +671,8 @@ python scripts/continuity_p2_phase21_dual_lane_proof.py --trace-only
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --wedge-free-ack
 # P2-A dual-lane worker (step 2.3):
 python scripts/continuity_p2_phase23_dual_lane_worker_proof.py --trace-only --proof-only
+# M3 forty-eight-hour AA hold clock T0 (step 2.4):
+python scripts/continuity_p2_phase24_aa_clock_proof.py --trace-only --wedge-free-ack
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

@@ -1732,5 +1732,43 @@
     },
     "trace_only": true,
     "proof_only": true
+  },
+  "step_2_4_aa48_clock": {
+    "validated_at": "2026-05-22T23:55:33.841293+00:00",
+    "closure_git_sha": "73fa560fde70d4e8a48434132dda443c1602c34d",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p2_4_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "t0_baseline_schema_version": true,
+      "clock_started_at_recorded": true,
+      "clock_deadline_at_recorded": true,
+      "hold_hours_required_is_48": true,
+      "all_aa_gates_pass_at_t0": true,
+      "m3_autonomously_alive_at_t0": true,
+      "track_m3_signoff_pending": true,
+      "gate_verdicts_snapshot_complete": true,
+      "t0_gate_verdicts_all_pass": true
+    },
+    "checks_advisory": {
+      "aa_gates_pass_count": 7,
+      "hold_hours_elapsed_at_proof": 0.0,
+      "clock_deadline_at": "2026-05-24T23:55:28.204423+00:00"
+    },
+    "clock_started_at": "2026-05-22T23:55:28.204423+00:00",
+    "clock_deadline_at": "2026-05-24T23:55:28.204423+00:00",
+    "hold_hours_required": 48,
+    "m3_autonomously_alive_at_t0": true,
+    "gate_verdicts": {
+      "AA1": "PASS",
+      "AA2": "PASS",
+      "AA3": "PASS",
+      "AA4": "PASS",
+      "AA5": "PASS",
+      "AA6": "PASS",
+      "AA7": "PASS"
+    },
+    "t0_baseline_path": "DOCS/audits/baselines/continuity_aa_clock_T0_2026-05-22.json",
+    "trace_only": true
   }
 }

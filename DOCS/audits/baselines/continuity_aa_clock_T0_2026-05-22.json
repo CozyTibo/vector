@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "step": "2.4_aa48_clock",
+  "metric_tier": "M3",
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+  "closure_git_sha": "73fa560fde70d4e8a48434132dda443c1602c34d",
+  "clock_started_at": "2026-05-22T23:55:28.204423+00:00",
+  "clock_deadline_at": "2026-05-24T23:55:28.204423+00:00",
+  "hold_hours_required": 48,
+  "hold_hours_elapsed": 0.0,
+  "wedge_free_ack_at_t0": true,
+  "panel_step": "2.2_continuity_proof_panel",
+  "panel_evaluated_at": "2026-05-22T23:55:33.813126+00:00",
+  "gate_verdicts": {
+    "AA1": "PASS",
+    "AA2": "PASS",
+    "AA3": "PASS",
+    "AA4": "PASS",
+    "AA5": "PASS",
+    "AA6": "PASS",
+    "AA7": "PASS"
+  },
+  "panel_summary": {
+    "pass_count": 7,
+    "fail_count": 0,
+    "advisory_count": 0,
+    "total_gates": 7,
+    "m3_autonomously_alive": true,
+    "metric_tier": "M3"
+  },
+  "m3_autonomously_alive_at_t0": true,
+  "aa_gates_pass_count": 7,
+  "aa_gates_total": 7,
+  "track_m3_signoff_pending": true,
+  "track_m3_signoff_note": "Re-run continuity_p2_phase24_aa_clock_proof.py daily; M3 sign-off when AA1\u2013AA7 stay PASS for 48h without wedge scripts.",
+  "proof_panel": {
+    "surface_kind": "continuity_proof_panel",
+    "gate_order": [
+      "AA1",
+      "AA2",
+      "AA3",
+      "AA4",
+      "AA5",
+      "AA6",
+      "AA7"
+    ]
+  }
+}

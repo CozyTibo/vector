@@ -80,6 +80,12 @@ jobs:
             tests/vector/domains/cortex/execution/test_dual_lane_worker.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p2_dual_lane_worker.py
 
+      - name: Verify M3 forty-eight-hour AA clock (step 2.4)
+        run: |
+          cd backend
+          PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p2_aa_clock.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
