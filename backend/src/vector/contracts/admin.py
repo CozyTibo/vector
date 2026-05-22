@@ -4631,6 +4631,34 @@ class AdminCortexPipelinePhaseSummaryResponse(BaseModel):
     forward_progress: dict[str, Any] | None = None
     failure_count: int | None = None
     connector_rollups: list[dict[str, Any]] | None = None
+    # Identity phase (control-plane cards)
+    cards: dict[str, Any] | None = None
+    certification_warnings: list[str] = Field(default_factory=list)
+    freshness_label: str | None = None
+    computed_at: str | None = None
+    # Graph phase
+    graph_metrics: dict[str, Any] | None = None
+    traversal_substrate_state: str | None = None
+    node_count: int | None = None
+    edge_count: int | None = None
+    orphan_count: int | None = None
+    degraded_count: int | None = None
+    # Reconstruction phase
+    queue_depth: int | None = None
+    failed_jobs: int | None = None
+    job_status_counts: dict[str, int] | None = None
+    last_successful_job: dict[str, Any] | None = None
+    canonical_materialization_count: int | None = None
+    # Retrieval phase
+    indexed_count: int | None = None
+    coverage_percent: float | None = None
+    published_index_epoch: str | None = None
+    substrate_state: str | None = None
+    index_lag_epochs: int | None = None
+    # Synthesis phase
+    eligible_scopes: int | None = None
+    synthesized_scopes: int | None = None
+    health_strip: dict[str, Any] | None = None
 
 
 class AdminCortexPipelinePhaseExplorerResponse(BaseModel):

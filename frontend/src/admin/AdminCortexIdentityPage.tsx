@@ -38,7 +38,13 @@ function IdentitySummaryBody({ summary }: { summary: IdentitySummary }) {
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {CARD_LABELS.map(({ key, title }) => {
           const card = cards[key];
-          const val = card?.value ?? "—";
+          const raw = card?.value;
+          const val =
+            raw == null || raw === ""
+              ? "—"
+              : typeof raw === "number"
+                ? raw.toLocaleString()
+                : String(raw);
           return (
             <div key={key} className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
               <p className="text-xs uppercase text-stone-500">{title}</p>

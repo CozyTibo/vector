@@ -71,3 +71,7 @@ def test_identity_summary_includes_certification_warnings_key(
     body = res.json()
     assert "certification_warnings" in body
     assert isinstance(body["certification_warnings"], list)
+    cards = body.get("cards")
+    assert isinstance(cards, dict)
+    assert "org_handles" in cards
+    assert "value" in cards["org_handles"]
