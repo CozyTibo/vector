@@ -417,16 +417,22 @@ def _dependency_keys(raw: RawIngestionRecord) -> list[str]:
     return list(dict.fromkeys(deps))
 
 
-def build_replay_dependency_topology(
-    rows: list[RawIngestionRecord],
-    *,
-    temporal_key_by_id: dict[int, str],
-) -> dict[str, Any]:
+def build_node_key_index(rows: list[RawIngestionRecord]) -> dict[str, int]:
+    """Map topology node keys to raw_record_id (same keys as dependency parent refs)."""
     node_key_to_id: dict[str, int] = {}
     for row in rows:
         nk = _node_key(row)
         if nk:
             node_key_to_id[nk] = int(row.id)
+    return node_key_to_id
+
+
+def build_replay_dependency_topology(
+    rows: list[RawIngestionRecord],
+    *,
+    temporal_key_by_id: dict[int, str],
+) -> dict[str, Any]:
+    node_key_to_id = build_node_key_index(rows)
 
     edges: list[tuple[int, int]] = []
     orphans: list[dict[str, Any]] = []

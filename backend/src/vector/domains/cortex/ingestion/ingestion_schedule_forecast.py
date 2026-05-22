@@ -86,7 +86,7 @@ def _connector_rows_for_tenant(
         .order_by(TenantConnection.provider.asc())
     )
     conns = list(session.scalars(stmt).all())
-    by_provider: dict[str, Any] = {}
+    by_provider: dict[str, TenantConnection] = {}
     for tc in conns:
         cur = by_provider.get(tc.provider)
         if cur is None or (tc.status == "active" and cur.status != "active"):
@@ -94,14 +94,14 @@ def _connector_rows_for_tenant(
 
     rows: list[dict[str, Any]] = []
     for connector in sorted(SUPPORTED_CONNECTOR_IDS):
-        tc = by_provider.get(connector)
+        conn_row: TenantConnection | None = by_provider.get(connector)
         routed = should_route_ingestion_to_cortex(settings, connector, tenant_id)
         ck_at: str | None = None
-        if tc is not None:
+        if conn_row is not None:
             ck = session.scalar(
                 select(ConnectorSyncState).where(
                     ConnectorSyncState.tenant_id == tenant_id,
-                    ConnectorSyncState.connection_id == tc.id,
+                    ConnectorSyncState.connection_id == conn_row.id,
                     ConnectorSyncState.connector == connector,
                     ConnectorSyncState.scope_key == SCOPE_DEFAULT,
                 )
@@ -113,8 +113,8 @@ def _connector_rows_for_tenant(
         rows.append(
             {
                 "connector": connector,
-                "connection_id": tc.id if tc else None,
-                "connection_status": tc.status if tc else None,
+                "connection_id": conn_row.id if conn_row else None,
+                "connection_status": conn_row.status if conn_row else None,
                 "cortex_routed": routed,
                 "checkpoint_last_incremental_at": ck_at,
             }

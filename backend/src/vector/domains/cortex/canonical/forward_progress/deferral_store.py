@@ -28,6 +28,7 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
     PERMANENT_ORPHAN_DEFERRAL_RETRY_THRESHOLD,
 )
 from vector.domains.cortex.canonical.materialization_topology_engine import classify_orphan_missing_ref
+from vector.domains.cortex.canonical.replay_topology import build_node_key_index
 from vector.infrastructure.db.models.cortex_canonical_materialization_deferral import (
     CortexCanonicalMaterializationDeferral,
 )
@@ -243,6 +244,79 @@ def clear_deferral_for_raw_record(
             CortexCanonicalMaterializationDeferral.raw_record_id == int(raw_record_id),
         )
     )
+
+
+def raw_record_ids_releasable_for_missing_parent_refs(
+    *,
+    deferrals: list[tuple[int, str | None]],
+    node_key_index: dict[str, int],
+    materialized_raw_record_ids: set[int],
+) -> list[int]:
+    """Child deferral raw ids whose missing_parent_ref parent is materialized (pure helper)."""
+    releasable: list[int] = []
+    for child_raw_id, missing_ref in deferrals:
+        ref = str(missing_ref or "").strip()
+        if not ref:
+            continue
+        parent_raw_id = node_key_index.get(ref)
+        if parent_raw_id is not None and parent_raw_id in materialized_raw_record_ids:
+            releasable.append(int(child_raw_id))
+    return releasable
+
+
+def release_deferrals_when_missing_parent_ref_materialized_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+) -> int:
+    """Drop topology deferrals when the parent node key exists in raw and is materialized."""
+    deferral_rows = db.execute(
+        select(
+            CortexCanonicalMaterializationDeferral.raw_record_id,
+            CortexCanonicalMaterializationDeferral.missing_parent_ref,
+        ).where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.missing_parent_ref.is_not(None),
+            CortexCanonicalMaterializationDeferral.missing_parent_ref != "",
+        )
+    ).all()
+    if not deferral_rows:
+        return 0
+
+    raw_rows = list(
+        db.scalars(
+            select(RawIngestionRecord).where(RawIngestionRecord.tenant_id == tenant_id)
+        ).all()
+    )
+    node_key_index = build_node_key_index(raw_rows)
+    mat_ids = {
+        int(x)
+        for x in db.scalars(
+            select(CortexCanonicalTransformMaterialization.raw_record_id).where(
+                CortexCanonicalTransformMaterialization.tenant_id == tenant_id,
+                CortexCanonicalTransformMaterialization.bundle_id == bundle_id,
+            )
+        ).all()
+    }
+    deferrals = [(int(rid), ref) for rid, ref in deferral_rows]
+    to_release = raw_record_ids_releasable_for_missing_parent_refs(
+        deferrals=deferrals,
+        node_key_index=node_key_index,
+        materialized_raw_record_ids=mat_ids,
+    )
+    if not to_release:
+        return 0
+    res = db.execute(
+        delete(CortexCanonicalMaterializationDeferral).where(
+            CortexCanonicalMaterializationDeferral.tenant_id == tenant_id,
+            CortexCanonicalMaterializationDeferral.bundle_id == bundle_id,
+            CortexCanonicalMaterializationDeferral.raw_record_id.in_(to_release),
+        )
+    )
+    db.flush()
+    return int(getattr(res, "rowcount", 0) or 0)
 
 
 def release_deferrals_with_materialized_parents(

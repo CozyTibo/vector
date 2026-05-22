@@ -16,7 +16,7 @@
 | Step | Status | Completed | Notes |
 |------|--------|-----------|-------|
 | 1 | **Done** | 2026-05-21 | Prod baseline captured; artifact + validation module |
-| 2 | Pending | — | Fix 1 deferral release |
+| 2 | **Done** | 2026-05-22 | Fix 1: `release_deferrals_when_missing_parent_ref_materialized_v1` + drain hook + tests |
 | 3 | Pending | — | Fix 2 gate |
 | 4 | Pending | — | Deploy + A4 |
 | 5 | Pending | — | Identity backfill A1 |
@@ -50,6 +50,13 @@
 | primary_bundle_id | `bundle.phase03.step03.logical_keys.v1` |
 
 *Deferral topology mix shifted vs May forensic doc (now all classified permanent_orphan); step 2+ still required for routable release path and identity wedge.*
+
+### Step 2 completion record (Fix 1)
+
+- **Code:** `release_deferrals_when_missing_parent_ref_materialized_v1` in `deferral_store.py` — resolves `missing_parent_ref` via `build_node_key_index` (same as `replay_topology`).
+- **Wiring:** Called at drain start and after each productive batch in `drain_runtime.py` (alongside `release_deferrals_with_materialized_parents`).
+- **Tests:** `test_deferral_release_missing_parent_ref.py` (unit + integration); `build_node_key_index` in `replay_topology.py`.
+- **Deploy:** Step 4 (not part of step 2).
 
 ---
 
@@ -268,7 +275,7 @@ TRACK B — REPAIR (1–2 weeks): Autonomous execution substrate progression (L7
 | **Why** | 3,470+ rows cannot drain; `partial_progress` impossible; false `topology_wait` |
 | **Files** | `canonical/forward_progress/deferral_store.py`, `canonical/replay_topology.py` (`_node_key`), `canonical/forward_progress/drain_runtime.py` |
 | **Invariant violated** | “Deferrals clear when dependency satisfied” — only implemented for `parent_raw_record_id` |
-| **Proposed fix** | Add `release_deferrals_when_missing_parent_ref_materialized_v1()`: for each deferral with `missing_parent_ref`, resolve parent raw id via same key logic as `build_replay_dependency_topology` / `_node_key` on scoped raw set; delete deferral if parent has mat row for bundle. Call from `drain_forward_progress_backlog` before/after existing release. |
+| **Proposed fix** | **Shipped (step 2):** `release_deferrals_when_missing_parent_ref_materialized_v1()` + `build_node_key_index()`; wired in `drain_forward_progress_backlog` at slice start and after productive batches. |
 | **Expected result** | Next drain slice: `total_succeeded > 0`, deferral count drops by ~3k+, `canonical_outcome` → `partial_progress` |
 | **Risk** | Wrong key match → premature release → mat failure; mitigate with unit tests mirroring `replay_topology` keys |
 

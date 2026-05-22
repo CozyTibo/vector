@@ -18,6 +18,7 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
 )
 from vector.domains.cortex.canonical.forward_progress.deferral_store import (
     count_deferrals,
+    release_deferrals_when_missing_parent_ref_materialized_v1,
     release_deferrals_with_materialized_parents,
     summarize_deferral_pressure,
 )
@@ -119,6 +120,9 @@ def drain_forward_progress_backlog(
     raw_batch: dict[str, Any] = {}
     drain_candidate_raw_ids: list[int] = []
 
+    release_deferrals_when_missing_parent_ref_materialized_v1(
+        db, tenant_id=tenant_id, bundle_id=bundle_id
+    )
     release_deferrals_with_materialized_parents(db, tenant_id=tenant_id, bundle_id=bundle_id)
 
     while batches_run < max_batches:
@@ -219,6 +223,9 @@ def drain_forward_progress_backlog(
 
         if succeeded_n > 0:
             productive_batches += 1
+            release_deferrals_when_missing_parent_ref_materialized_v1(
+                db, tenant_id=tenant_id, bundle_id=bundle_id
+            )
             release_deferrals_with_materialized_parents(db, tenant_id=tenant_id, bundle_id=bundle_id)
 
         if not candidate_more_remain:

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from vector.domains.cortex.canonical.replay_topology import build_replay_dependency_topology
+from vector.domains.cortex.canonical.replay_topology import (
+    build_node_key_index,
+    build_replay_dependency_topology,
+)
 
 
 def _raw(
@@ -43,6 +46,18 @@ def test_replay_topology_parent_before_child_and_no_cycle() -> None:
     assert topo["ordered_raw_record_ids"] == [1, 2]
     assert topo["cycle_detected"] is False
     assert topo["orphan_refs"] == []
+
+
+def test_build_node_key_index_github_deployment() -> None:
+    rows = [
+        _raw(
+            1,
+            connector="github",
+            resource_type="github.deployment",
+            payload_body={"deployment": {"id": 999}},
+        ),
+    ]
+    assert build_node_key_index(rows) == {"github.deployment:999": 1}  # type: ignore[arg-type]
 
 
 def test_replay_topology_orphan_detection() -> None:

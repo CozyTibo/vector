@@ -20,7 +20,8 @@ _RAW_STATS_CACHE_LOCK = threading.Lock()
 _RAW_STATS_CACHE: dict[tuple[Any, ...], tuple[float, list[dict[str, Any]]]] = {}
 _RECENT_RUNS_CACHE_TTL_SECONDS = 8.0
 _RECENT_RUNS_CACHE_LOCK = threading.Lock()
-_RECENT_RUNS_CACHE: dict[tuple[str, int], tuple[float, list[dict[str, Any]]]] = {}
+_RecentRunsCacheKey = tuple[str, int, int, str | None]
+_RECENT_RUNS_CACHE: dict[_RecentRunsCacheKey, tuple[float, tuple[list[dict[str, Any]], int]]] = {}
 
 
 def invalidate_recent_ingestion_runs_cache_v1(tenant_id: uuid.UUID) -> None:
