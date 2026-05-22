@@ -1,0 +1,727 @@
+{
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "routable_pair_count": 48,
+  "tenant": [
+    {
+      "id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+      "company_name": "Fizzer",
+      "slug": "fizzer-com",
+      "status": "active"
+    }
+  ],
+  "lease": [
+    {
+      "status": "dirty",
+      "fsm_state": "CANONICAL_DRAINING",
+      "phase_cursor": "phase_02_canonical",
+      "obligation_epoch": 729,
+      "target_epoch": 729,
+      "block_reason_code": null,
+      "last_canonical_outcome": "partial_progress",
+      "convergence_health": "converging"
+    }
+  ],
+  "raw_total": 28219,
+  "mat_total": 20036,
+  "raw_minus_mat_admin_gap": 8183,
+  "bundles": [
+    {
+      "bundle_id": "bundle.phase03.step03.logical_keys.v1",
+      "mat_count": 20036
+    }
+  ],
+  "primary_bundle_id": "bundle.phase03.step03.logical_keys.v1",
+  "untreated_routable_estimate": 8181,
+  "untreated_raw_any_bundle": 8183,
+  "deferral_totals": [
+    {
+      "total": 8181,
+      "permanent_orphan": 8181,
+      "on_cooldown": 8181,
+      "retry_ready": 0
+    }
+  ],
+  "deferral_top": [
+    {
+      "resource_type": "github.pull_request_timeline_event",
+      "deferral_reason": "missing_pr",
+      "queue": "topology_orphan",
+      "n": 3052
+    },
+    {
+      "resource_type": "github.deployment_status",
+      "deferral_reason": "missing_deployment",
+      "queue": "topology_orphan",
+      "n": 1716
+    },
+    {
+      "resource_type": "notion.database_row",
+      "deferral_reason": "missing_page_parent",
+      "queue": "topology_orphan",
+      "n": 1138
+    },
+    {
+      "resource_type": "github.pull_request_review",
+      "deferral_reason": "missing_parent",
+      "queue": "topology_orphan",
+      "n": 1032
+    },
+    {
+      "resource_type": "slack.thread",
+      "deferral_reason": "dependency_not_materialized",
+      "queue": "topology_orphan",
+      "n": 955
+    },
+    {
+      "resource_type": "slack.file",
+      "deferral_reason": "dependency_not_materialized",
+      "queue": "topology_orphan",
+      "n": 183
+    },
+    {
+      "resource_type": "notion.block",
+      "deferral_reason": "missing_page_parent",
+      "queue": "topology_orphan",
+      "n": 105
+    }
+  ],
+  "topology_parent_gaps": [
+    {
+      "missing_parent_ref": "notion.database:6320c3e7-1777-4077-905b-20ca7886bb5f",
+      "resource_type": "notion.database_row",
+      "n": 677
+    },
+    {
+      "missing_parent_ref": "notion.database:fedeb237-5d7f-439f-87d1-388970662c44",
+      "resource_type": "notion.database_row",
+      "n": 300
+    },
+    {
+      "missing_parent_ref": "notion.database:47575abb-9736-4281-9028-806fb05d23f3",
+      "resource_type": "notion.database_row",
+      "n": 161
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1438998464",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 41
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1424028908",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 36
+    },
+    {
+      "missing_parent_ref": "github.pull_request:2797996812",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 31
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1105115199",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 29
+    },
+    {
+      "missing_parent_ref": "github.pull_request:974863734",
+      "resource_type": "github.pull_request_review",
+      "n": 27
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1072425643",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 22
+    },
+    {
+      "missing_parent_ref": "github.pull_request:316444209",
+      "resource_type": "github.pull_request_review",
+      "n": 22
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1510568585",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 21
+    },
+    {
+      "missing_parent_ref": "github.pull_request:2138861935",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 21
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1070208200",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 21
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1178571377",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 21
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1276616030",
+      "resource_type": "github.pull_request_review",
+      "n": 18
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1483081780",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 18
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1287572481",
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 17
+    },
+    {
+      "missing_parent_ref": "github.pull_request:207433918",
+      "resource_type": "github.pull_request_review",
+      "n": 16
+    },
+    {
+      "missing_parent_ref": "github.pull_request:600640788",
+      "resource_type": "github.pull_request_review",
+      "n": 15
+    },
+    {
+      "missing_parent_ref": "github.pull_request:1640458516",
+      "resource_type": "github.pull_request_review",
+      "n": 15
+    }
+  ],
+  "failure_cases": [],
+  "anchors": 19961,
+  "anchors_by_kind": [
+    {
+      "canonical_object_kind": "canonical_reference",
+      "n": 5863
+    },
+    {
+      "canonical_object_kind": "message",
+      "n": 5719
+    },
+    {
+      "canonical_object_kind": "timeline_mutation",
+      "n": 1933
+    },
+    {
+      "canonical_object_kind": "thread",
+      "n": 1837
+    },
+    {
+      "canonical_object_kind": "deployment",
+      "n": 1673
+    },
+    {
+      "canonical_object_kind": "page",
+      "n": 1239
+    },
+    {
+      "canonical_object_kind": "pull_request",
+      "n": 785
+    },
+    {
+      "canonical_object_kind": "document",
+      "n": 633
+    },
+    {
+      "canonical_object_kind": "person",
+      "n": 174
+    },
+    {
+      "canonical_object_kind": "conversation",
+      "n": 100
+    },
+    {
+      "canonical_object_kind": "repository",
+      "n": 5
+    }
+  ],
+  "org_entities_active": 0,
+  "auth_links": 0,
+  "candidates": 0,
+  "raw_by_type": [
+    {
+      "resource_type": "github.commit",
+      "n": 4324
+    },
+    {
+      "resource_type": "github.pull_request_timeline_event",
+      "n": 3433
+    },
+    {
+      "resource_type": "slack.message",
+      "n": 3321
+    },
+    {
+      "resource_type": "github.deployment_status",
+      "n": 3268
+    },
+    {
+      "resource_type": "slack.thread",
+      "n": 1806
+    },
+    {
+      "resource_type": "github.deployment",
+      "n": 1673
+    },
+    {
+      "resource_type": "github.pull_request_review",
+      "n": 1597
+    },
+    {
+      "resource_type": "github.pull_request_review_comment",
+      "n": 1567
+    },
+    {
+      "resource_type": "notion.block",
+      "n": 1351
+    },
+    {
+      "resource_type": "notion.database_row",
+      "n": 1138
+    },
+    {
+      "resource_type": "slack.reaction",
+      "n": 1027
+    },
+    {
+      "resource_type": "github.review_thread",
+      "n": 986
+    },
+    {
+      "resource_type": "github.pull_request",
+      "n": 785
+    },
+    {
+      "resource_type": "slack.file",
+      "n": 447
+    },
+    {
+      "resource_type": "notion.search_result",
+      "n": 395
+    },
+    {
+      "resource_type": "notion.page",
+      "n": 382
+    },
+    {
+      "resource_type": "github.issue_comment",
+      "n": 266
+    },
+    {
+      "resource_type": "slack.user",
+      "n": 208
+    },
+    {
+      "resource_type": "slack.conversation",
+      "n": 101
+    },
+    {
+      "resource_type": "github.tag",
+      "n": 100
+    },
+    {
+      "resource_type": "github.repository",
+      "n": 19
+    },
+    {
+      "resource_type": "github.branch",
+      "n": 17
+    },
+    {
+      "resource_type": "notion.database",
+      "n": 6
+    },
+    {
+      "resource_type": "notion.scope_ping",
+      "n": 1
+    },
+    {
+      "resource_type": "slack.api_error",
+      "n": 1
+    }
+  ],
+  "routable_breakdown": {
+    "raw_total": 28219,
+    "routable_raw": 28217,
+    "non_routable_raw": 2,
+    "routable_mat": 20036,
+    "routable_unmat": 8181
+  },
+  "slack_message_actor": [
+    {
+      "total": 3321,
+      "has_u_actor": 2498
+    }
+  ],
+  "github_pr_users": [
+    {
+      "total": 785,
+      "has_user_login": 785
+    }
+  ],
+  "notion_page_users": [
+    {
+      "total": 382,
+      "has_user_ref": 382
+    }
+  ],
+  "mat_without_anchor": 75,
+  "phase_runs": [
+    {
+      "phase_id": "phase_02_canonical",
+      "status": "completed",
+      "error_detail": null,
+      "output_json": {
+        "outcome": "COMPLETED",
+        "bundle_id": "bundle.phase03.step03.logical_keys.v1",
+        "input_epoch": "bundle.phase03.step03.logical_keys.v1",
+        "output_epoch": null,
+        "receipt_hash": "65ca07e90aae3a112617bd87bcdea9b9da67978e139d414698bfdaff493926dc",
+        "blocked_reason": null,
+        "processed_count": 1,
+        "canonical_outcome": "partial_progress",
+        "canonical_summary": {
+          "bundle_id": "bundle.phase03.step03.logical_keys.v1",
+          "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+          "batches_run": 1,
+          "duration_ms": 243,
+          "hit_batch_cap": false,
+          "hit_slice_cap": false,
+          "progress_made": true,
+          "topology_wait": false,
+          "selection_mode": "deterministic_fifo_v1",
+          "deferral_counts": {
+            "deferred_total": 8181,
+            "deferred_retry_ready": 0,
+            "deferred_permanent_orphan": 8181,
+            "deferred_waiting_cooldown": 8181
+          },
+          "failure_samples": [],
+          "pass_index_next": 0,
+          "scope_connector": null,
+          "total_attempted": 9,
+          "total_succeeded": 1,
+          "canonical_outcome": "partial_progress",
+          "pass_productivity": {},
+          "total_failed_rows": 0,
+          "convergence_health": "converging",
+          "productive_batches": 1,
+          "batch_limit_applied": 400,
+          "pass_topology_skips": {},
+          "scope_resource_type": null,
+          "candidate_more_remain": false,
+          "topology_only_batches": 0,
+          "canonical_receipt_hash": "ca790b4146b54225e49715986306ff2a21333109e6111b1ab697fd2b01bbc145",
+          "slice_budget_exhausted": false,
+          "total_topology_skipped": 8,
+          "blocked_pass_batch_ratio": 0.0,
+          "deferral_pressure_sample": [
+            {
+              "count": 3052,
+              "queue": "topology_orphan",
+              "resource_type": "github.pull_request_timeline_event",
+              "deferral_reason": "missing_pr"
+            },
+            {
+              "count": 1716,
+              "queue": "topology_orphan",
+              "resource_type": "github.deployment_status",
+              "deferral_reason": "missing_deployment"
+            },
+            {
+              "count": 1138,
+              "queue": "topology_orphan",
+              "resource_type": "notion.database_row",
+              "deferral_reason": "missing_page_parent"
+            },
+            {
+              "count": 1032,
+              "queue": "topology_orphan",
+              "resource_type": "github.pull_request_review",
+              "deferral_reason": "missing_parent"
+            },
+            {
+              "count": 955,
+              "queue": "topology_orphan",
+              "resource_type": "slack.thread",
+              "deferral_reason": "dependency_not_materialized"
+            },
+            {
+              "count": 183,
+              "queue": "topology_orphan",
+              "resource_type": "slack.file",
+              "deferral_reason": "dependency_not_materialized"
+            },
+            {
+              "count": 105,
+              "queue": "topology_orphan",
+              "resource_type": "notion.block",
+              "deferral_reason": "missing_page_parent"
+            }
+          ],
+          "forward_progress_metrics": {
+            "deferred_total": 8181,
+            "productive_batches": 1,
+            "deferred_retry_ready": 0,
+            "topology_only_batches": 0,
+            "blocked_pass_batch_ratio": 0.0,
+            "deferral_pressure_sample": [
+              {
+                "count": 3052,
+                "queue": "topology_orphan",
+                "resource_type": "github.pull_request_timeline_event",
+                "deferral_reason": "missing_pr"
+              },
+              {
+                "count": 1716,
+                "queue": "topology_orphan",
+                "resource_type": "github.deployment_status",
+                "deferral_reason": "missing_deployment"
+              },
+              {
+                "count": 1138,
+                "queue": "topology_orphan",
+                "resource_type": "notion.database_row",
+                "deferral_reason": "missing_page_parent"
+              },
+              {
+                "count": 1032,
+                "queue": "topology_orphan",
+                "resource_type": "github.pull_request_review",
+                "deferral_reason": "missing_parent"
+              },
+              {
+                "count": 955,
+                "queue": "topology_orphan",
+                "resource_type": "slack.thread",
+                "deferral_reason": "dependency_not_materialized"
+              },
+              {
+                "count": 183,
+                "queue": "topology_orphan",
+                "resource_type": "slack.file",
+                "deferral_reason": "dependency_not_materialized"
+              },
+              {
+                "count": 105,
+                "queue": "topology_orphan",
+                "resource_type": "notion.block",
+                "deferral_reason": "missing_page_parent"
+              }
+            ],
+            "deferred_permanent_orphan": 8181,
+            "deferred_waiting_cooldown": 8181,
+            "structural_orphan_pressure": 8181,
+            "topology_blockers_deferred": 8181,
+            "convergence_delta_succeeded": 1,
+            "untreated_routable_estimate": 8181,
+            "progress_density_rows_per_batch": 1.0,
+            "progress_velocity_rows_per_second": 4.1152
+          },
+          "failure_samples_truncated": false,
+          "total_processable_selected": 9,
+          "last_batch_forward_progress": {
+            "pass_key": null,
+            "selection_mode": "deterministic_fifo_v1",
+            "pass_index_next": 0
+          },
+          "untreated_routable_estimate": 8181,
+          "zero_progress_spin_detected": false,
+          "full_rotation_topology_stall": false,
+          "stub_resource_pairs_selected": [
+            "calls/calls.meeting",
+            "calls/calls.participant",
+            "calls/calls.recording",
+            "calls/calls.transcript",
+            "calls/calls.transcript_segment",
+            "github/github.check_run",
+            "github/github.workflow_run",
+            "github/github.deployment",
+            "github/github.deployment_status",
+            "github/github.branch",
+            "github/github.tag",
+            "github/github.check_suite",
+            "github/github.release",
+            "github/github.commit_comment",
+            "github/github.review_thread",
+            "github/github.commit",
+            "github/github.issue",
+            "github/github.issue_comment",
+            "github/github.issue_timeline_event",
+            "github/github.pull_request_timeline_event",
+            "github/github.pull_request",
+            "github/github.pull_request_review",
+            "github/github.pull_request_review_comment",
+            "github/github.repository",
+            "linear/linear.comment",
+            "linear/linear.cycle",
+            "linear/linear.initiative",
+            "linear/linear.issue",
+            "linear/linear.issue_label",
+            "linear/linear.issue_relation",
+            "linear/linear.project",
+            "linear/linear.issue_attachment",
+            "linear/linear.activity_history",
+            "linear/linear.project_update",
+            "linear/linear.comment_thread",
+            "linear/linear.viewer_ping",
+            "notion/notion.block",
+            "notion/notion.database",
+            "notion/notion.database_row",
+            "notion/notion.page",
+            "notion/notion.search_result",
+            "slack/slack.conversation",
+            "slack/slack.message",
+            "slack/slack.message_reply",
+            "slack/slack.thread",
+            "slack/slack.reaction",
+            "slack/slack.file",
+            "slack/slack.user"
+          ],
+          "forward_progress_schema_version": 2,
+          "progress_density_rows_per_batch": 1.0,
+          "total_topology_deferred_recorded": 8,
+          "transform_runtime_schema_version": 10,
+          "overall_throughput_rows_per_second": 4.115,
+          "batch_throughput_rows_per_second_samples": [
+            4.292
+          ]
+        },
+        "convergence_health": "converging",
+        "substrate_phase_receipt": {
+          "detail": {
+            "bundle_id": "bundle.phase03.step03.logical_keys.v1",
+            "deferral_counts": {
+              "deferred_total": 8181,
+              "deferred_retry_ready": 0,
+              "deferred_permanent_orphan": 8181,
+              "deferred_waiting_cooldown": 8181
+            },
+            "total_succeeded": 1,
+            "canonical_outcome": "partial_progress",
+            "total_failed_rows": 0
+          },
+          "outcome": "COMPLETED",
+          "phase_id": "phase_02_canonical",
+          "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+          "started_at": "2026-05-22T12:47:02.529758+00:00",
+          "input_epoch": "bundle.phase03.step03.logical_keys.v1",
+          "completed_at": "2026-05-22T12:47:03.074483+00:00",
+          "output_epoch": null,
+          "receipt_hash": "65ca07e90aae3a112617bd87bcdea9b9da67978e139d414698bfdaff493926dc",
+          "blocked_reason": null,
+          "schema_version": 1,
+          "pipeline_run_id": "faa5469f-849b-4e19-bc26-e9ec001e926f",
+          "processed_count": 1,
+          "deterministic_version": "substrate_receipt_v1"
+        }
+      },
+      "started_at": "2026-05-22 12:47:02.526629+00:00",
+      "completed_at": "2026-05-22 12:47:03.076413+00:00"
+    },
+    {
+      "phase_id": "phase_04_graph",
+      "status": "queued",
+      "error_detail": null,
+      "output_json": {},
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "phase_id": "phase_05_traversal",
+      "status": "queued",
+      "error_detail": null,
+      "output_json": {},
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "phase_id": "phase_03_identity",
+      "status": "queued",
+      "error_detail": null,
+      "output_json": {},
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "phase_id": "phase_07_retrieval",
+      "status": "queued",
+      "error_detail": null,
+      "output_json": {},
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "phase_id": "phase_08_synthesis",
+      "status": "queued",
+      "error_detail": null,
+      "output_json": {},
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "phase_id": "phase_06_tcre",
+      "status": "queued",
+      "error_detail": null,
+      "output_json": {},
+      "started_at": null,
+      "completed_at": null
+    }
+  ],
+  "primitives": 0,
+  "entity_by_kind": [],
+  "samples": {
+    "slack_message": [
+      {
+        "id": 4790067,
+        "external_id": "C92CP2A4A:1768896543.255009",
+        "msg_user": "UFGUGFB9V"
+      },
+      {
+        "id": 4790064,
+        "external_id": "C92CP2A4A:1768897144.315239",
+        "msg_user": "UFGUGFB9V"
+      },
+      {
+        "id": 4790063,
+        "external_id": "C92CP2A4A:1768905587.296479",
+        "msg_user": "UFGUGFB9V"
+      }
+    ],
+    "github_pr": [
+      {
+        "id": 1041616,
+        "external_id": "fizzer/admin#1",
+        "user_login": "C404"
+      },
+      {
+        "id": 1041596,
+        "external_id": "fizzer/admin#2",
+        "user_login": "cveneziani"
+      },
+      {
+        "id": 1041589,
+        "external_id": "fizzer/admin#7",
+        "user_login": "cveneziani"
+      }
+    ]
+  },
+  "alive_baseline": {
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "captured_at_note": "See baselines/*.json filename date",
+    "primary_bundle_id": "bundle.phase03.step03.logical_keys.v1",
+    "A1_org_entities_active": 0,
+    "A2_authoritative_links": 0,
+    "A3_candidate_links": 0,
+    "A4_last_canonical_outcome": "partial_progress",
+    "A4_fsm_state": "CANONICAL_DRAINING",
+    "A4_phase_cursor": "phase_02_canonical",
+    "raw_total": 28219,
+    "mat_total": 20036,
+    "raw_minus_mat_admin_gap": 8183,
+    "deferrals_total": 8181,
+    "deferrals_permanent_orphan": 8181,
+    "anchors": 19961,
+    "routable_unmat": 8181
+  }
+}
