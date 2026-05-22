@@ -559,7 +559,7 @@ Executed **2026-05-22** on Fizzer prod:
 |------|------|-----------|
 | 2.1 | P1-F lease dual-lane fields | Admin/inspect shows both lanes | **Done** (see §Phase 2.1 completion) |
 | 2.2 | `continuity_proof_panel.py` | Single command prints AA1–AA7 | **Done** (see §Phase 2.2 completion) |
-| 2.3 | P2-A dual-lane worker (canonical + execution budgets) | Canonical progress while 05–08 runs |
+| 2.3 | P2-A dual-lane worker (canonical + execution budgets) | Canonical progress while 05–08 runs | **Done** (see §Phase 2.3 completion) |
 | 2.4 | Start 48h AA clock | T0 baseline JSON |
 
 #### Phase 2.1 completion (P1-F dual-lane lease fields)
@@ -590,7 +590,22 @@ Executed **2026-05-22** on Fizzer prod:
 | Code | `continuity_proof_panel.py` (domain + script), `test_continuity_proof_panel.py` |
 | Prod script | `python backend/scripts/continuity_p2_phase22_proof_panel_proof.py --trace-only` |
 
-**Next step (2.3):** P2-A dual-lane worker (canonical + execution budgets).
+#### Phase 2.3 completion (P2-A dual-lane worker)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Worker | `run_dual_lane_convergence_v1` — canonical budget (A) then execution budget (B); `phase_cursor` preserved when cursor ∈ 05–08 during canonical slice |
+| Settings | `CORTEX_EXECUTION_DUAL_LANE`; `cortex_execution_canonical_lane_budget_seconds` / `cortex_execution_execution_lane_budget_seconds` (0 = auto-split of `CORTEX_CONVERGENCE_TIME_BUDGET_SECONDS`) |
+| Lease manifest | `detail_json.last_dual_lane_slice` — `canonical_lane_ran`, `execution_lane_ran`, budgets, `execution_phase_cursor_before` / `after` |
+| Fizzer prod | Schedule: `canonical_parallel_while_execution=true`, cursor `phase_08_synthesis`, budgets 180s / 360s; manifest shows both lanes ran with cursor preserved |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_2_3_p2a_dual_lane_worker` (`p2_3_pass: true`) |
+| Code | `dual_lane_worker.py`, `continuity_p2_dual_lane_worker.py`, `run_tenant_execution.py` |
+| CI gate | `deploy.yml` → `test_dual_lane_worker.py`, `test_continuity_p2_dual_lane_worker.py` |
+| Prod script | `python backend/scripts/continuity_p2_phase23_dual_lane_worker_proof.py --trace-only --proof-only` (snapshot); `--canonical-only` / `--full-slice` for live slice drive |
+
+**Next step (2.4):** Start 48h AA clock (T0 baseline JSON).
 
 ### Phase 3 — Architecture hardening (weeks 3–6)
 
@@ -640,6 +655,8 @@ python scripts/continuity_p1_phase16_retrieval_proof.py --trace-only
 python scripts/continuity_p2_phase21_dual_lane_proof.py --trace-only
 # P1-G AA1–AA7 continuity proof panel (step 2.2):
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --wedge-free-ack
+# P2-A dual-lane worker (step 2.3):
+python scripts/continuity_p2_phase23_dual_lane_worker_proof.py --trace-only --proof-only
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

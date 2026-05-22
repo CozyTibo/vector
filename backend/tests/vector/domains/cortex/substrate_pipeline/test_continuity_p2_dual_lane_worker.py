@@ -42,9 +42,13 @@ def test_p2_3_pass_when_canonical_ran_parallel() -> None:
         prod_deploy={"verification": {"deploy_matches_closure_sha": True}},
         snapshot=_snapshot(),
         slice_drive={
+            "acquired": True,
+            "canonical_only": True,
+            "cursor_before": "phase_07_retrieval",
+            "cursor_after": "phase_07_retrieval",
             "slice_result": {
                 "dual_lane": {"dual_lane_mode": True, "canonical_lane_ran": True},
-            }
+            },
         },
         deploy_recorded_at=datetime(2026, 5, 23, 0, 0, 0, tzinfo=UTC),
     )

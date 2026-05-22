@@ -45,6 +45,7 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_baseline import (
 )
 from vector.domains.cortex.substrate_pipeline.continuity_p2_dual_lane_worker import (
     DEFAULT_TENANT_ID,
+    drive_dual_lane_canonical_lane_proof_v1,
     drive_dual_lane_slice_v1,
     evaluate_p2_3_dual_lane_worker_proof_v1,
     snapshot_dual_lane_worker_v1,
@@ -76,6 +77,21 @@ def main() -> int:
     parser.add_argument("--wait-for-deploy", type=int, default=600)
     parser.add_argument("--trace-only", action="store_true")
     parser.add_argument("--proof-only", action="store_true", help="Snapshot only; no slice drive")
+    parser.add_argument(
+        "--canonical-only",
+        action="store_true",
+        help="Run canonical lane slice only (default prod proof path)",
+    )
+    parser.add_argument(
+        "--full-slice",
+        action="store_true",
+        help="Run full dual-lane convergence slice (slow on large tenants)",
+    )
+    parser.add_argument(
+        "--skip-canonical-execution",
+        action="store_true",
+        help="Persist dual-lane manifest without running phase 02 (schedule-only proof)",
+    )
     args = parser.parse_args()
 
     closure_sha = _git_sha(args.closure_sha or os.environ.get("CONTINUITY_DEPLOY_GIT_SHA"))
@@ -103,8 +119,19 @@ def main() -> int:
 
     if not args.proof_only:
         with SessionLocal() as session:
-            slice_drive = drive_dual_lane_slice_v1(session, tenant_id=tenant_id)
-            print("slice:", json.dumps(slice_drive.get("slice_result"), indent=2, default=str)[:4000])
+            if args.full_slice:
+                slice_drive = drive_dual_lane_slice_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    canonical_only=False,
+                )
+            else:
+                slice_drive = drive_dual_lane_canonical_lane_proof_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    skip_canonical_execution=args.skip_canonical_execution,
+                )
+            print("slice:", json.dumps(slice_drive, indent=2, default=str)[:4000])
 
     with SessionLocal() as session:
         snapshot = snapshot_dual_lane_worker_v1(session, tenant_id=tenant_id)

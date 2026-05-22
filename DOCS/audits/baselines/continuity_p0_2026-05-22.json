@@ -1679,10 +1679,10 @@
     "trace_only": true
   },
   "step_2_3_p2a_dual_lane_worker": {
-    "validated_at": "2026-05-22T23:15:09.880999+00:00",
-    "closure_git_sha": "462b7ca79d5aed8324a3d580c688a333cd524a7a",
+    "validated_at": "2026-05-22T23:52:42.640030+00:00",
+    "closure_git_sha": "32747038e10a9cc6d409129bd307ebb9fe6b0a1d",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
-    "p2_3_pass": false,
+    "p2_3_pass": true,
     "checks": {
       "ecs_deploy_matches_closure_sha": true,
       "dual_lane_worker_enabled": true,
@@ -1690,12 +1690,13 @@
       "canonical_lane_owed_on_tenant": true,
       "execution_lane_active_cursor": true,
       "canonical_parallel_while_execution_schedule": true,
-      "slice_ran_dual_lane_mode": false,
-      "canonical_lane_ran_in_slice": false,
+      "worker_slice_acquired": true,
+      "slice_ran_dual_lane_mode": true,
+      "canonical_lane_ran_in_slice": true,
       "execution_cursor_preserved_across_canonical": true
     },
     "checks_advisory": {
-      "execution_lane_ran_in_slice": false,
+      "execution_lane_ran_in_slice": true,
       "execution_lane_owed": true
     },
     "schedule": {
@@ -1710,8 +1711,26 @@
       "canonical_lane_seconds": 180,
       "execution_lane_seconds": 360
     },
-    "last_dual_lane_slice": null,
+    "last_dual_lane_slice": {
+      "schedule": {
+        "dual_lane_enabled": true,
+        "canonical_lane_owed": true,
+        "execution_lane_owed": true,
+        "execution_phase_cursor": "phase_08_synthesis",
+        "canonical_parallel_while_execution": true
+      },
+      "dual_lane_mode": true,
+      "canonical_lane_ran": true,
+      "execution_lane_ran": true,
+      "total_budget_seconds": 540,
+      "canonical_lane_result": null,
+      "execution_lane_result": "converged_slice",
+      "canonical_budget_seconds": 180,
+      "execution_budget_seconds": 360,
+      "execution_phase_cursor_after": "phase_08_synthesis",
+      "execution_phase_cursor_before": "phase_08_synthesis"
+    },
     "trace_only": true,
-    "proof_only": false
+    "proof_only": true
   }
 }
