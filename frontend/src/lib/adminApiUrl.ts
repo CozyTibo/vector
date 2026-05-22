@@ -3,13 +3,14 @@ import { getApiBase } from "./canonicalApi";
 const TENANT_UUID =
   "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
-const TENANT_SCOPED_BASE_RE = new RegExp(
-  `/admin/tenants/${TENANT_UUID}(?:/overview)?$`,
+/** Misconfigured ``VITE_API_BASE_URL`` may embed a tenant (and optional ``/overview`` or ``/cortex``). */
+const TENANT_SCOPED_SUFFIX_RE = new RegExp(
+  `/admin/tenants/${TENANT_UUID}(?:/(?:overview|cortex(?:/overview)?))?$`,
   "i",
 );
 
 const TENANT_SCOPED_EXTRACT_RE = new RegExp(
-  `/admin/tenants/(${TENANT_UUID})(?:/overview)?$`,
+  `/admin/tenants/(${TENANT_UUID})(?:/(?:overview|cortex(?:/overview)?))?$`,
   "i",
 );
 
@@ -18,11 +19,26 @@ const LEGACY_TENANT_OVERVIEW_RE = new RegExp(
   "i",
 );
 
+const LEGACY_CORTEX_OVERVIEW_RE = new RegExp(
+  `^/admin/tenants/${TENANT_UUID}/cortex/overview`,
+  "i",
+);
+
 const TENANT_IN_PATH_RE = new RegExp(`^/admin/tenants/(${TENANT_UUID})`, "i");
+
+function rewriteCortexOverviewPath(path: string): string {
+  if (path === "/cortex/overview" || path.startsWith("/cortex/overview/")) {
+    return path.replace("/cortex/overview", "/cortex/pipeline/overview");
+  }
+  if (LEGACY_CORTEX_OVERVIEW_RE.test(path)) {
+    return path.replace("/cortex/overview", "/cortex/pipeline/overview");
+  }
+  return path;
+}
 
 /** API origin only — strips accidental per-tenant suffixes from VITE_API_BASE_URL. */
 export function normalizeApiBase(): string {
-  return getApiBase().replace(/\/$/, "").replace(TENANT_SCOPED_BASE_RE, "");
+  return getApiBase().replace(/\/$/, "").replace(TENANT_SCOPED_SUFFIX_RE, "");
 }
 
 /** Tenant id embedded in a misconfigured ``VITE_API_BASE_URL`` (per-tenant base). */
@@ -38,10 +54,11 @@ function _tenantIdFromPath(path: string): string | null {
 
 /**
  * Resolve a final admin URL path (no origin). Fixes legacy ``/overview`` when the build
- * baked in a per-tenant API base (``…/admin/tenants/{id}`` + ``/overview``).
+ * baked in a per-tenant API base (``…/admin/tenants/{id}`` or ``…/cortex`` + ``/overview``).
  */
 export function resolveAdminRequestPath(path: string, tenantIdHint?: string): string {
   let p = path.startsWith("/") ? path : `/${path}`;
+  p = rewriteCortexOverviewPath(p);
   const tid = tenantIdHint ?? _tenantIdFromPath(p) ?? tenantIdFromApiBase();
 
   if (tid && (p === "/overview" || LEGACY_TENANT_OVERVIEW_RE.test(p))) {
@@ -59,6 +76,7 @@ export function resolveAdminRequestPath(path: string, tenantIdHint?: string): st
  */
 export function adminApiPath(tenantId: string, path: string): string {
   let p = path.startsWith("/") ? path : `/${path}`;
+  p = rewriteCortexOverviewPath(p);
 
   if (LEGACY_TENANT_OVERVIEW_RE.test(p)) {
     return `/admin/tenants/${tenantId}/cortex/pipeline/overview`;

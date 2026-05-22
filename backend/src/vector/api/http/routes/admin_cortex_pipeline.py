@@ -38,7 +38,17 @@ from vector.settings import Settings
 
 
 def register_legacy_pipeline_overview_alias(router: APIRouter) -> None:
-    """Misconfigured frontends called ``…/tenants/{id}/overview`` (no cortex/pipeline)."""
+    """Misconfigured frontends called legacy overview paths (no ``cortex/pipeline`` segment)."""
+
+    def _legacy_overview(
+        tenant_id: uuid.UUID,
+        db: Session,
+        settings: Settings,
+    ) -> AdminCortexPipelineOverviewResponse:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        raw = build_pipeline_overview_v1(db, settings, tenant_id=tenant_id)
+        return AdminCortexPipelineOverviewResponse.model_validate(raw)
 
     @router.get(
         "/tenants/{tenant_id}/overview",
@@ -50,10 +60,19 @@ def register_legacy_pipeline_overview_alias(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexPipelineOverviewResponse:
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
-        raw = build_pipeline_overview_v1(db, settings, tenant_id=tenant_id)
-        return AdminCortexPipelineOverviewResponse.model_validate(raw)
+        return _legacy_overview(tenant_id, db, settings)
+
+    @router.get(
+        "/tenants/{tenant_id}/cortex/overview",
+        response_model=AdminCortexPipelineOverviewResponse,
+        include_in_schema=False,
+    )
+    def get_legacy_cortex_overview(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelineOverviewResponse:
+        return _legacy_overview(tenant_id, db, settings)
 
 
 def register_cortex_pipeline_routes(router: APIRouter) -> None:

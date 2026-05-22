@@ -80,6 +80,17 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
     assert canonical["backlog_count"] is None or isinstance(canonical["backlog_count"], int)
 
 
+def test_legacy_cortex_overview_alias(client: TestClient, db_session: Session) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    legacy = client.get(f"/admin/tenants/{tid}/cortex/overview")
+    canonical = client.get(f"/admin/tenants/{tid}/cortex/pipeline/overview")
+    assert legacy.status_code == 200
+    assert canonical.status_code == 200
+    assert legacy.json()["surface_kind"] == "pipeline_overview"
+    assert legacy.json()["phases"] == canonical.json()["phases"]
+
+
 def test_pipeline_overview_slices_match_full(client: TestClient, db_session: Session) -> None:
     tid = _tenant(db_session)
     db_session.commit()
