@@ -148,6 +148,11 @@ def test_graph_projection_includes_density_score_and_propagation_manifest(
             },
         },
     )
+    monkeypatch.setattr(
+        "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."
+        "list_eligible_traversal_components_v1",
+        lambda *_a, **_k: [],
+    )
     out = project_graph_completeness_v1(session, tenant_id=tid)
     assert out["substrate_state"] == "degraded"
     assert out["metrics"]["graph_density_score"] == 12

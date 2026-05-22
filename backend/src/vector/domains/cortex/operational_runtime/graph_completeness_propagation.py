@@ -65,6 +65,8 @@ def derive_graph_completeness_substrate_state_v1(
     fake_green_blocked: bool,
     orphan_disconnected_count: int,
     orphan_identity_unresolved_count: int,
+    islands_eligible_count: int = 0,
+    traversal_propagation_mode: str = "global",
 ) -> str:
     """Derive graph stage ``substrate_state`` with traversal-blocking orphan law."""
     if entity_count == 0:
@@ -79,7 +81,13 @@ def derive_graph_completeness_substrate_state_v1(
         return "degraded"
     if graph_maturity_stage == GRAPH_MATURITY_STAGE_G0_V1:
         return "degraded"
-    if orphan_disconnected_count > 0 and linked_entities > 0:
+    if (
+        orphan_disconnected_count > 0
+        and linked_entities > 0
+        and not (
+            traversal_propagation_mode == "component" and islands_eligible_count > 0
+        )
+    ):
         return "degraded"
     if orphan_identity_unresolved_count > 0:
         return "degraded"
@@ -119,7 +127,9 @@ def build_graph_completeness_propagation_manifest_v1(
     fake_green_evaluation: dict[str, Any],
     orphan_classification: dict[str, Any],
     traversal_propagation_blocked: bool,
+    traversal_propagation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    prop = dict(traversal_propagation or {})
     return {
         "law_version": GRAPH_PROPAGATION_LAW_VERSION_V1,
         "gate_id": GP085_GRAPH_PROP01_GATE_ID_V1,
@@ -128,6 +138,12 @@ def build_graph_completeness_propagation_manifest_v1(
         "orphan_entity_count": int(orphan_classification.get("orphan_entity_count") or 0),
         "counts_by_orphan_class": dict(orphan_classification.get("counts_by_class") or {}),
         "traversal_propagation_blocked": traversal_propagation_blocked,
+        "traversal_propagation_mode": prop.get(
+            "traversal_propagation_mode", "global"
+        ),
+        "islands_eligible_count": int(prop.get("islands_eligible_count") or 0),
+        "global_degraded": substrate_state == "degraded",
+        "traversal_propagation_block_reason": prop.get("traversal_propagation_block_reason"),
         "downstream_stages": list(GRAPH_PROPAGATION_DOWNSTREAM_STAGES_V1),
         "ret_skip_when_disconnected": RET_SKIP_GRAPH_DISCONNECTED_V1,
     }
@@ -173,6 +189,22 @@ def propagate_graph_completeness_stage_v1(
     orphan_disconnected = int(counts_by_class.get(ORPHAN_CLASS_DISCONNECTED_COMPONENT_V1, 0))
     orphan_identity_unresolved = int(counts_by_class.get(ORPHAN_CLASS_IDENTITY_UNRESOLVED_V1, 0))
 
+    from vector.domains.cortex.operational_runtime.substrate_traversal_scheduling import (
+        evaluate_traversal_propagation_v1,
+    )
+
+    propagation_law = evaluate_traversal_propagation_v1(
+        session,
+        tenant_id=tenant_id,
+        linked_entity_count=linked_entities,
+        entity_count=entity_count,
+        orphan_disconnected_count=orphan_disconnected,
+        orphan_identity_unresolved_count=orphan_identity_unresolved,
+    )
+    traversal_blocked = bool(propagation_law["traversal_propagation_blocked"])
+    islands_eligible = int(propagation_law.get("islands_eligible_count") or 0)
+    propagation_mode = str(propagation_law.get("traversal_propagation_mode") or "global")
+
     fake_green = evaluate_graph_density_fake_green_v1(
         graph_orphan_artifact_count=orphan_count,
         pending_link_candidates=pending_candidates,
@@ -191,18 +223,14 @@ def propagate_graph_completeness_stage_v1(
         fake_green_blocked=bool(fake_green["fake_green_blocked"]),
         orphan_disconnected_count=orphan_disconnected,
         orphan_identity_unresolved_count=orphan_identity_unresolved,
+        islands_eligible_count=islands_eligible,
+        traversal_propagation_mode=propagation_mode,
     )
 
     omission_classes = build_graph_stage_omission_classes_v1(
         orphan_count=orphan_count,
         pending_candidates=pending_candidates,
         orphan_classification_counts=counts_by_class,
-    )
-
-    traversal_blocked = (
-        orphan_disconnected > 0
-        or orphan_identity_unresolved > 0
-        or (orphan_count > 0 and linked_entities == 0)
     )
 
     degraded_count = orphan_disconnected + orphan_identity_unresolved
@@ -216,6 +244,7 @@ def propagate_graph_completeness_stage_v1(
         fake_green_evaluation=fake_green,
         orphan_classification=orphan_classification,
         traversal_propagation_blocked=traversal_blocked,
+        traversal_propagation=propagation_law,
     )
 
     drift_warnings: list[str] = []

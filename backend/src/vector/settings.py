@@ -607,6 +607,21 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_ORPHAN_STITCHING_AUTO_SCHEDULE_PROMOTION",
         description="G-P085-ORPHAN-01: schedule graph density promotion when orphans await promotion.",
     )
+    cortex_traversal_component_schedule_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_TRAVERSAL_COMPONENT_SCHEDULE",
+        description=(
+            "P3′ (P1-A): component-scoped traversal propagation when true; "
+            "set env to 0 to restore global orphan-disconnect block law."
+        ),
+    )
+    cortex_traversal_min_component_entities: int = Field(
+        default=2,
+        ge=1,
+        le=10_000,
+        validation_alias="CORTEX_TRAVERSAL_MIN_COMPONENT_ENTITIES",
+        description="P3′: minimum |V| in an authoritative connected component to schedule walks.",
+    )
     cortex_traversal_max_walks_per_pass: int = Field(
         default=32,
         ge=1,
@@ -1241,6 +1256,15 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS",
         description="Soft per-run GitHub deep-ingestion budget before checkpoint-and-resume.",
     )
+
+    @field_validator("cortex_traversal_component_schedule_enabled", mode="before")
+    @classmethod
+    def _parse_traversal_component_schedule_enabled(cls, value: object) -> bool:
+        if isinstance(value, str):
+            return value.strip().lower() not in ("0", "false", "no", "off")
+        if value is None:
+            return True
+        return bool(value)
 
     @field_validator("github_app_private_key", mode="before")
     @classmethod

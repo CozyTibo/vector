@@ -305,5 +305,76 @@
     },
     "recorded_at": "2026-05-22T22:00:44.325584+00:00"
   },
-  "phase_0_signed_off": true
+  "phase_0_signed_off": true,
+  "step_1_1_p3_component_scheduling": {
+    "step": "1.1_p3_prime_component_scheduling",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "recorded_at": "2026-05-22T22:04:03.903129+00:00",
+    "schedule_evaluation": {
+      "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+      "gate_id": "G-P085-WALK-01",
+      "should_schedule": true,
+      "schedule_reason": "after_phase_05_eligible",
+      "trigger": "after_phase_05",
+      "graph_maturity_stage": "G0",
+      "graph_density_score": 7,
+      "entity_count": 7286,
+      "linked_entity_count": 216,
+      "walk_queue_depth": 0,
+      "traversal_propagation_blocked": false,
+      "traversal_propagation_mode": "component",
+      "islands_eligible_count": 2,
+      "min_component_entities": 2,
+      "largest_eligible_island_size": 214,
+      "traversal_propagation_block_reason": "component_islands_eligible",
+      "orphan_disconnected_count": 7033,
+      "eligible_component_scope_ids": [
+        "182fdd36be823c97",
+        "b87caf33b42e2307"
+      ]
+    },
+    "graph_propagation_manifest": {
+      "law_version": "cesp.graph_completeness_propagation.v1",
+      "gate_id": "G-P085-GRAPH-PROP-01",
+      "substrate_state": "degraded",
+      "fake_green_evaluation": {
+        "fake_green_blocked": true,
+        "would_block_healthy_substrate_state": true,
+        "pending_candidate_threshold": 10,
+        "graph_orphan_artifact_count": 7070,
+        "pending_link_candidates": 3600
+      },
+      "orphan_entity_count": 7070,
+      "counts_by_orphan_class": {
+        "orphan_awaiting_promotion": 37,
+        "orphan_identity_unresolved": 0,
+        "orphan_disconnected_component": 7033,
+        "orphan_intentionally_excluded": 0
+      },
+      "traversal_propagation_blocked": false,
+      "traversal_propagation_mode": "component",
+      "islands_eligible_count": 2,
+      "global_degraded": true,
+      "traversal_propagation_block_reason": "component_islands_eligible",
+      "downstream_stages": [
+        "traversal",
+        "tcre",
+        "retrieval"
+      ],
+      "ret_skip_when_disconnected": "RET-SKIP-GRAPH-DISCONNECTED"
+    },
+    "checks": {
+      "traversal_propagation_mode_component": true,
+      "islands_eligible_gte_1": true,
+      "traversal_propagation_not_blocked": true,
+      "should_schedule_after_phase_05": true,
+      "manifest_islands_eligible_gte_1": true,
+      "cont_inv_03_partial": true
+    },
+    "p1_1_pass": true,
+    "verification": {
+      "step_11_pass": true,
+      "cleared_for_step_12_deploy": true
+    }
+  }
 }

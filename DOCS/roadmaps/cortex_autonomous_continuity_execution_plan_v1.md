@@ -441,8 +441,25 @@ Executed **2026-05-22** on Fizzer prod:
 
 | Step | Work | Done when |
 |------|------|-----------|
-| 1.1 | Implement P3′ component scheduling (P1-A) + unit tests | `evaluate_traversal_schedule` eligible with Fizzer islands |
+| 1.1 | Implement P3′ component scheduling (P1-A) + unit tests | `evaluate_traversal_schedule` eligible with Fizzer islands | **Done** (see §Phase 1.1 completion) |
 | 1.2 | Deploy P3′ | New walks without manual step 9 |
+
+#### Phase 1.1 completion (P3′ component-scoped propagation)
+
+Implemented **2026-05-22** (P1-A / CONT-INV-03 partial):
+
+| Item | Value |
+|------|-------|
+| Law | P3′ replaces global orphan-disconnect block when `CORTEX_TRAVERSAL_COMPONENT_SCHEDULE` ≠ 0 |
+| Settings | `cortex_traversal_component_schedule_enabled`, `cortex_traversal_min_component_entities` (default 2) |
+| Scheduling | `evaluate_traversal_propagation_v1`, `list_eligible_traversal_components_v1` in `substrate_traversal_scheduling.py` |
+| Propagation manifest | `traversal_propagation_mode`, `islands_eligible_count`, `global_degraded` in `graph_completeness_propagation.py` |
+| Fizzer prod | `islands_eligible_count=2`, `traversal_propagation_blocked=false`, `should_schedule=true` |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_1_p3_component_scheduling` |
+| Tests | `test_p3_component_traversal_propagation.py` + updated phase085 scheduling/propagation tests |
+| Prod script | `python backend/scripts/continuity_p1_component_scheduling_proof.py` |
+
+**Next step (1.2):** deploy image with P3′ and verify autonomous walks without manual step 9 wedge.
 | 1.3 | P1-B verify promotion Celery + raise caps | `pending_candidates` trending down |
 | 1.4 | P1-D TCRE integration test in CI | Test green |
 | 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 |
@@ -489,6 +506,8 @@ CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity
 python scripts/continuity_p0_phase0_closure.py --wait-for-deploy 600
 # Phase 0 sign-off (step 0.6 — P0 invariants + P0-D + baseline consolidation):
 python scripts/continuity_p0_phase0_signoff.py
+# P3′ component scheduling proof (step 1.1):
+python scripts/continuity_p1_component_scheduling_proof.py
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

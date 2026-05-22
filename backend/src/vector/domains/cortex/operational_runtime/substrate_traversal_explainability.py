@@ -35,7 +35,7 @@ from vector.domains.cortex.operational_runtime.substrate_traversal_retry import 
 )
 from vector.domains.cortex.operational_runtime.substrate_traversal_scheduling import (
     GP085_WALK01_GATE_ID_V1,
-    _is_traversal_propagation_blocked_v1,
+    evaluate_traversal_propagation_v1,
     evaluate_traversal_schedule_v1,
     get_traversal_queue_saturation_threshold_v1,
 )
@@ -275,11 +275,14 @@ def build_upstream_graph_omissions_for_traversal_v1(
     manifest = dict(metrics.get("graph_completeness_propagation") or {})
 
     blocked = bool(manifest.get("traversal_propagation_blocked"))
-    if not blocked:
+    islands_eligible = int(manifest.get("islands_eligible_count") or 0)
+    if manifest.get("traversal_propagation_mode") is None:
         orphan_cls = classify_tenant_graph_orphans_v1(session, tenant_id=tenant_id, sample_limit=0)
         counts = dict(orphan_cls.get("counts_by_class") or {})
         dm = compute_graph_density_metrics_v1(session, tenant_id=tenant_id)["metrics"]
-        blocked = _is_traversal_propagation_blocked_v1(
+        prop = evaluate_traversal_propagation_v1(
+            session,
+            tenant_id=tenant_id,
             linked_entity_count=int(dm.get("linked_entity_count") or 0),
             entity_count=int(dm.get("entity_count") or 0),
             orphan_disconnected_count=int(counts.get(ORPHAN_CLASS_DISCONNECTED_COMPONENT_V1, 0)),
@@ -287,9 +290,13 @@ def build_upstream_graph_omissions_for_traversal_v1(
                 counts.get(ORPHAN_CLASS_IDENTITY_UNRESOLVED_V1, 0)
             ),
         )
+        blocked = bool(prop["traversal_propagation_blocked"])
+        islands_eligible = int(prop.get("islands_eligible_count") or 0)
 
     return {
         "traversal_propagation_blocked": blocked,
+        "islands_eligible_count": islands_eligible,
+        "traversal_propagation_mode": manifest.get("traversal_propagation_mode"),
         "omission_classes": omission_classes,
         "graph_substrate_state": graph_stage.get("substrate_state"),
         "graph_maturity_stage": metrics.get("graph_maturity_stage"),

@@ -72,6 +72,11 @@ def test_evaluate_schedule_after_phase_05_g1(
         lambda *_a, **_k: {"counts_by_class": {}},
     )
     monkeypatch.setattr(
+        "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."
+        "list_eligible_traversal_components_v1",
+        lambda *_a, **_k: [frozenset({uuid.uuid4(), uuid.uuid4()})],
+    )
+    monkeypatch.setattr(
         "vector.domains.cortex.traversal.runtime.durable_walk_store.resolve_octs_walk_store_v1",
         lambda *_a, **_k: MagicMock(walk_queue_depth_for_tenant=lambda _t: 0),
     )
@@ -86,17 +91,18 @@ def test_evaluate_schedule_after_phase_05_g1(
 def test_rank_frontiers_from_components(monkeypatch: pytest.MonkeyPatch) -> None:
     session = MagicMock()
     tid = uuid.uuid4()
-    e1, e2, e3 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    e1, e2, e3, e4 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     monkeypatch.setattr(
         "vector.domains.cortex.operational_runtime.graph_density.compute_graph_density_metrics_v1",
         lambda *_a, **_k: {
             "graph_maturity_stage": GRAPH_MATURITY_STAGE_G1_V1,
-            "metrics": {METRIC_GRAPH_DENSITY_SCORE_V1: 50, "entity_count": 3},
+            "metrics": {METRIC_GRAPH_DENSITY_SCORE_V1: 50, "entity_count": 4},
         },
     )
     monkeypatch.setattr(
-        "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling.list_graph_connected_components_v1",
-        lambda *_a, **_k: [frozenset({e1, e2}), frozenset({e3})],
+        "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."
+        "list_eligible_traversal_components_v1",
+        lambda *_a, **_k: [frozenset({e1, e2}), frozenset({e3, e4})],
     )
     starts, meta = rank_walk_frontiers_by_density_v1(session, tenant_id=tid, limit=2)
     assert len(starts) == 2
@@ -105,6 +111,7 @@ def test_rank_frontiers_from_components(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_schedule_octs_walks_runs_inline(monkeypatch: pytest.MonkeyPatch) -> None:
     tid = uuid.uuid4()
+    session = MagicMock()
 
     monkeypatch.setattr(
         "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."
@@ -116,7 +123,7 @@ def test_schedule_octs_walks_runs_inline(monkeypatch: pytest.MonkeyPatch) -> Non
         "evaluate_traversal_schedule_v1",
         lambda *_a, **_k: {"should_schedule": True, "schedule_reason": "test"},
     )
-    out = schedule_octs_walks_for_tenant_v1(tenant_id=tid, force=True)
+    out = schedule_octs_walks_for_tenant_v1(tenant_id=tid, force=True, session=session)
     assert out["scheduled"] is True
     assert out["path"] == "inline_execution_slice"
     assert "pass" in out

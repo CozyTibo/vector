@@ -5,6 +5,7 @@ Normative: ``DOCS/cortex/operational-runtime/phase-085-traversal-completion-doct
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import uuid
 from typing import Any, Final
@@ -50,6 +51,9 @@ TRAVERSAL_SCHEDULE_TRIGGER_MANUAL_V1: Final[str] = "manual"
 
 WAITING_ON_TRAVERSAL_COMPLETION_V1: Final[str] = "TRAVERSAL_COMPLETION"
 
+TRAVERSAL_PROPAGATION_MODE_GLOBAL_V1: Final[str] = "global"
+TRAVERSAL_PROPAGATION_MODE_COMPONENT_V1: Final[str] = "component"
+
 _GRAPH_MATURITY_SCHEDULE_ELIGIBLE_V1: Final[frozenset[str]] = frozenset(
     {
         GRAPH_MATURITY_STAGE_G1_V1,
@@ -93,7 +97,116 @@ def get_traversal_queue_saturation_threshold_v1() -> int:
         return 64
 
 
-def _is_traversal_propagation_blocked_v1(
+def is_component_traversal_schedule_enabled_v1() -> bool:
+    try:
+        from vector.settings import get_settings
+
+        return bool(get_settings().cortex_traversal_component_schedule_enabled)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def get_traversal_min_component_entities_v1() -> int:
+    try:
+        from vector.settings import get_settings
+
+        return max(1, int(get_settings().cortex_traversal_min_component_entities))
+    except Exception:  # noqa: BLE001
+        return 2
+
+
+def component_has_authoritative_edge_v1(component: frozenset[uuid.UUID]) -> bool:
+    """Authoritative components from ``list_graph_connected_components_v1`` always include an edge when |V|≥2."""
+    return len(component) >= 2
+
+
+def stable_component_scope_id_v1(component: frozenset[uuid.UUID]) -> str:
+    parts = sorted(str(e) for e in component)
+    digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+    return digest[:16]
+
+
+def list_eligible_traversal_components_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    min_entities: int | None = None,
+) -> list[frozenset[uuid.UUID]]:
+    """P3′: connected components with |V| ≥ min and at least one authoritative edge (|V|≥2)."""
+    floor = min_entities if min_entities is not None else get_traversal_min_component_entities_v1()
+    components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
+    return [
+        comp
+        for comp in components
+        if len(comp) >= floor and component_has_authoritative_edge_v1(comp)
+    ]
+
+
+def evaluate_traversal_propagation_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    linked_entity_count: int,
+    entity_count: int,
+    orphan_disconnected_count: int,
+    orphan_identity_unresolved_count: int,
+) -> dict[str, Any]:
+    """Evaluate P3 global vs P3′ component traversal propagation law."""
+    component_mode = is_component_traversal_schedule_enabled_v1()
+    min_entities = get_traversal_min_component_entities_v1()
+    eligible: list[frozenset[uuid.UUID]] = []
+    if component_mode and entity_count > 0:
+        eligible = list_eligible_traversal_components_v1(
+            session,
+            tenant_id=tenant_id,
+            min_entities=min_entities,
+        )
+
+    islands_eligible = len(eligible)
+    mode = (
+        TRAVERSAL_PROPAGATION_MODE_COMPONENT_V1
+        if component_mode
+        else TRAVERSAL_PROPAGATION_MODE_GLOBAL_V1
+    )
+
+    if orphan_identity_unresolved_count > 0:
+        blocked = True
+        block_reason = "orphan_identity_unresolved"
+    elif entity_count > 0 and linked_entity_count == 0:
+        blocked = True
+        block_reason = "no_linked_entities"
+    elif component_mode:
+        blocked = islands_eligible == 0
+        block_reason = (
+            "no_eligible_islands" if blocked else "component_islands_eligible"
+        )
+    else:
+        blocked = _is_traversal_propagation_blocked_global_v1(
+            linked_entity_count=linked_entity_count,
+            entity_count=entity_count,
+            orphan_disconnected_count=orphan_disconnected_count,
+            orphan_identity_unresolved_count=orphan_identity_unresolved_count,
+        )
+        block_reason = "global_orphan_disconnected" if blocked else "global_propagation_open"
+
+    largest = max((len(c) for c in eligible), default=0)
+    return {
+        "traversal_propagation_mode": mode,
+        "islands_eligible_count": islands_eligible,
+        "min_component_entities": min_entities,
+        "largest_eligible_island_size": largest,
+        "traversal_propagation_blocked": blocked,
+        "traversal_propagation_block_reason": block_reason,
+        "orphan_disconnected_count": orphan_disconnected_count,
+        "linked_entity_count": linked_entity_count,
+        "entity_count": entity_count,
+        "eligible_component_scope_ids": [
+            stable_component_scope_id_v1(c) for c in eligible[:32]
+        ],
+    }
+
+
+def _is_traversal_propagation_blocked_global_v1(
     *,
     linked_entity_count: int,
     entity_count: int,
@@ -109,6 +222,22 @@ def _is_traversal_propagation_blocked_v1(
     return False
 
 
+def _is_traversal_propagation_blocked_v1(
+    *,
+    linked_entity_count: int,
+    entity_count: int,
+    orphan_disconnected_count: int,
+    orphan_identity_unresolved_count: int,
+) -> bool:
+    """Global P3 law only (tests + legacy callers without session)."""
+    return _is_traversal_propagation_blocked_global_v1(
+        linked_entity_count=linked_entity_count,
+        entity_count=entity_count,
+        orphan_disconnected_count=orphan_disconnected_count,
+        orphan_identity_unresolved_count=orphan_identity_unresolved_count,
+    )
+
+
 def rank_walk_frontiers_by_density_v1(
     session: Session,
     *,
@@ -119,7 +248,10 @@ def rank_walk_frontiers_by_density_v1(
     density = compute_graph_density_metrics_v1(session, tenant_id=tenant_id)
     dm = dict(density["metrics"])
     tenant_density_score = int(dm.get(METRIC_GRAPH_DENSITY_SCORE_V1) or 0)
-    components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
+    if is_component_traversal_schedule_enabled_v1():
+        components = list_eligible_traversal_components_v1(session, tenant_id=tenant_id)
+    else:
+        components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
 
     ranked: list[tuple[int, int, str]] = []
     if components:
@@ -180,12 +312,15 @@ def evaluate_traversal_schedule_v1(
     disconnected = int(counts.get(ORPHAN_CLASS_DISCONNECTED_COMPONENT_V1, 0))
     identity_unresolved = int(counts.get(ORPHAN_CLASS_IDENTITY_UNRESOLVED_V1, 0))
 
-    blocked = _is_traversal_propagation_blocked_v1(
+    propagation = evaluate_traversal_propagation_v1(
+        session,
+        tenant_id=tenant_id,
         linked_entity_count=linked,
         entity_count=entity_count,
         orphan_disconnected_count=disconnected,
         orphan_identity_unresolved_count=identity_unresolved,
     )
+    blocked = bool(propagation["traversal_propagation_blocked"])
 
     store = resolve_octs_walk_store_v1(session)
     queue_depth = int(store.walk_queue_depth_for_tenant(tenant_id))
@@ -219,6 +354,7 @@ def evaluate_traversal_schedule_v1(
         "linked_entity_count": linked,
         "walk_queue_depth": queue_depth,
         "traversal_propagation_blocked": blocked,
+        **propagation,
     }
 
 
