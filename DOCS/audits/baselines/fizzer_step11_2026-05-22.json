@@ -1,0 +1,98 @@
+{
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "step": 11,
+  "validated_at": "2026-05-22T15:25:27.477837+00:00",
+  "track_a_panel_hold_hours": 48,
+  "metrics": {
+    "org_entities_active": 7286,
+    "authoritative_links_active": 200,
+    "link_candidates": 2000,
+    "raw_total": 28221,
+    "mat_total": 20038,
+    "raw_minus_mat_admin_gap": 8183,
+    "lease": {
+      "fsm_state": "CANONICAL_DRAINING",
+      "phase_cursor": "phase_02_canonical",
+      "last_canonical_outcome": "topology_wait",
+      "convergence_health": "structurally_incomplete"
+    },
+    "walks": {
+      "completed_walks": 16,
+      "walks_with_authoritative_hop": 8
+    },
+    "retrieval": {
+      "entries_materialized": 216,
+      "accepted_rows": 216,
+      "published_index_epoch": "epoch-a36e4f6244fb",
+      "report_id": "908c7eef-fff4-41d9-a95c-eb564f31ed98",
+      "report_created_at": "2026-05-22T15:22:41.619695+00:00",
+      "skip_code_counts": {},
+      "skip_reasons_normalized": []
+    },
+    "step04_wedge_reference": {
+      "deferrals_before": 8181,
+      "deferrals_after": 466,
+      "released_missing_parent_ref": 7715,
+      "total_succeeded": 2
+    }
+  },
+  "panel": {
+    "panel_schema_version": 1,
+    "panel_captured_at": "2026-05-22T15:25:27.477837+00:00",
+    "criteria": {
+      "A1": {
+        "pass": true,
+        "detail": "org_entities_active=7286 prod_anchor_yield (>=7000)",
+        "metric": "org_entities_active",
+        "value": 7286
+      },
+      "A2": {
+        "pass": true,
+        "detail": "authoritative_links_active=200 at_pass_cap>=200",
+        "metric": "authoritative_links_active",
+        "value": 200
+      },
+      "A3": {
+        "pass": true,
+        "detail": "link_candidates=2000 at_cap>=2000",
+        "metric": "link_candidates",
+        "value": 2000
+      },
+      "A4": {
+        "pass": true,
+        "detail": "total_succeeded=2",
+        "metric": "canonical_execution_motion",
+        "value": "topology_wait"
+      },
+      "A5": {
+        "pass": true,
+        "detail": "completed_walks=16:authoritative_hop_walks=8",
+        "metric": "octs_walks_with_authoritative_hop",
+        "value": 8
+      },
+      "A6": {
+        "pass": true,
+        "detail": "entries_materialized=216:accepted_rows=216",
+        "metric": "evidence_recovery_entries",
+        "value": 216,
+        "graph_disconnect_dominated": false
+      }
+    },
+    "alive_criteria_pass_count": 6,
+    "alive_criteria_total": 6,
+    "anti_fake_pass": true,
+    "anti_fake_detail": "alive_criteria_pass_count=6 (not chasing raw_minus_mat=8183)",
+    "track_a_panel_all_green_at_capture": true,
+    "track_a_panel_hold_hours_required": 48,
+    "track_a_panel_hold_started_at": "2026-05-22T15:25:27.477837+00:00",
+    "track_a_signoff_pending": true,
+    "track_a_signoff_note": "Re-run unlock_step11_alive_panel.py daily; Track A sign-off when panel stays green for 48h without manual backfill wedges.",
+    "step11_pass": true,
+    "step11_detail": "panel_green_at_T0:alive=6/6",
+    "ret_skip_code_counts": {},
+    "RET_SKIP_GRAPH_DISCONNECTED_present": false
+  },
+  "step11_pass": true,
+  "step11_detail": "panel_green_at_T0:alive=6/6",
+  "track_a_signoff_pending": true
+}

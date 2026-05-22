@@ -25,7 +25,7 @@
 | 8 | **Done** | 2026-05-22 | Fix 3–5: phase-03 promotion hook + backfill regen + admin APIs |
 | 9 | **Done** | 2026-05-22 | GRAPH/OCTS wedge A5: 16 completed walks, 8 with authoritative hops |
 | 10 | **Done** | 2026-05-22 | RETRIEVAL wedge A6: 216 index entries published |
-| 11 | Pending | — | 48h alive panel (Track A) |
+| 11 | **Done** | 2026-05-22 | 48h alive panel T0 green (Track A clock started) |
 | 12 | Pending | — | Fix 6–7 + soak + synthesis L6 (Track B + P3) |
 
 ### Step 1 completion record
@@ -125,6 +125,14 @@
 - **A6:** Pass — evidence recovery attempt with materialized entries, not graph-disconnect dominated.
 - **Code:** `step10_retrieval.py` (`evaluate_a6_evidence_recovery_v1`); wedge script + tests `test_step10_retrieval.py`.
 - **Note:** `completed_tcre_jobs=0`; walk + org-link bindings sufficient for wedge. Execution restart (Celery) optional and failed locally without affecting materialization pass.
+
+### Step 11 completion record (§9.1 alive panel — Track A T0)
+
+- **Command:** `cd backend && .venv/bin/python scripts/unlock_step11_alive_panel.py`
+- **Artifact:** [`baselines/fizzer_step11_2026-05-22.json`](baselines/fizzer_step11_2026-05-22.json)
+- **Panel T0 (all green):** A1=7286 handles, A2=200 auth links, A3=2000 candidates, A4=step04 motion evidence, A5=16 walks / 8 with authoritative hops, A6=216 retrieval entries (no `RET-SKIP-GRAPH-DISCONNECTED` dominance).
+- **48h hold:** Clock started at `2026-05-22T15:25:27Z`; re-run panel script daily until 48h elapses for Track A sign-off (§11).
+- **Code:** `step11_alive_panel.py` (`build_alive_panel_evaluation_v1`); `unlock_step11_alive_panel.py`; tests `test_step11_alive_panel.py`.
 
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py
