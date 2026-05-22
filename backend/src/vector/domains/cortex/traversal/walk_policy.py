@@ -45,18 +45,27 @@ class WalkPolicyInvariantError(ValueError):
     """Raised when ``walk_policy`` violates WP / FS-WP-* / sync caps."""
 
 
+_OCT_WALK_POLICY_SCHEMA_FILENAME_V1: Final[str] = "octs-walk-policy-v1.schema.json"
+_BUNDLED_SCHEMA_DIR_V1: Final[Path] = Path(__file__).resolve().parent / "schemas"
+_DOCS_SCHEMA_REL_V1: Final[Path] = (
+    Path("DOCS")
+    / "cortex"
+    / "05-traversal"
+    / "schemas"
+    / _OCT_WALK_POLICY_SCHEMA_FILENAME_V1
+)
+
+
+def bundled_oct_walk_policy_v1_schema_path() -> Path:
+    """Packaged schema shipped in worker/API images (``src/.../traversal/schemas``)."""
+    return _BUNDLED_SCHEMA_DIR_V1 / _OCT_WALK_POLICY_SCHEMA_FILENAME_V1
+
+
 def _repo_root_with_oct_schemas() -> Path:
+    """Monorepo root for golden fixtures (dev/CI only; not required in production images)."""
     start = Path(__file__).resolve()
     for root in [start, *start.parents]:
-        marker = (
-            root
-            / "DOCS"
-            / "cortex"
-            / "05-traversal"
-            / "schemas"
-            / "octs-walk-policy-v1.schema.json"
-        )
-        if marker.is_file():
+        if (root / _DOCS_SCHEMA_REL_V1).is_file():
             return root
     msg = (
         "Could not locate DOCS/cortex/05-traversal/schemas/octs-walk-policy-v1.schema.json "
@@ -66,8 +75,20 @@ def _repo_root_with_oct_schemas() -> Path:
 
 
 def oct_walk_policy_v1_schema_path() -> Path:
-    root = _repo_root_with_oct_schemas()
-    return root / "DOCS" / "cortex" / "05-traversal" / "schemas" / "octs-walk-policy-v1.schema.json"
+    """Resolve OCTS walk policy JSON Schema (bundled first, monorepo DOCS fallback)."""
+    bundled = bundled_oct_walk_policy_v1_schema_path()
+    if bundled.is_file():
+        return bundled
+    start = Path(__file__).resolve()
+    for root in [start, *start.parents]:
+        docs_path = root / _DOCS_SCHEMA_REL_V1
+        if docs_path.is_file():
+            return docs_path
+    msg = (
+        f"Could not locate {_OCT_WALK_POLICY_SCHEMA_FILENAME_V1}: "
+        f"expected bundled path {bundled} or monorepo {_DOCS_SCHEMA_REL_V1}"
+    )
+    raise RuntimeError(msg)
 
 
 def octs_walk_policy_fixture_dir() -> Path:

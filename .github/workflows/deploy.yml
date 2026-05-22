@@ -42,6 +42,12 @@ jobs:
       - name: Set image tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
 
+      - name: Verify OCTS walk policy packaging (P0-A)
+        run: |
+          cd backend
+          python -m pip install --quiet -r requirements.txt jsonschema
+          PYTHONPATH=src python -m pytest -q tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

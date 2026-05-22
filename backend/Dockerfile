@@ -17,6 +17,10 @@ COPY src ./src
 COPY mock_connectors ./mock_connectors
 
 ENV PYTHONPATH=/app/src
+
+# P0-A (CONT-INV-02): phase 05 validates SUBSTRATE_WALK_POLICY_V1 at runtime; schema is bundled under
+# vector/domains/cortex/traversal/schemas/ (also copied via src/). Fail the image build if missing.
+RUN python -c "from vector.domains.cortex.substrate_pipeline.substrate_traversal_execution import SUBSTRATE_WALK_POLICY_V1; from vector.domains.cortex.traversal.walk_policy import bundled_oct_walk_policy_v1_schema_path, validate_walk_policy_for_request_v1; assert bundled_oct_walk_policy_v1_schema_path().is_file(); validate_walk_policy_for_request_v1(SUBSTRATE_WALK_POLICY_V1, walk_execution_strategy='ONLINE_OBSERVED', exploration_mode=False, enforce_sync_caps=False); print('walk_policy_packaging_ok')"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
