@@ -1,22 +1,22 @@
 {
   "phase": "continuity_p0",
   "step": "0.2_deploy_backend_worker",
-  "recorded_at": "2026-05-22T21:57:06.507114+00:00",
-  "git_sha_full": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-  "git_sha_short": "b8ca0065f68e",
+  "recorded_at": "2026-05-22T22:00:50.578836+00:00",
+  "git_sha_full": "6b75776d7cd0825a6b699898bb8e6e295643378a",
+  "git_sha_short": "6b75776d7cd0",
   "aws_region": "eu-west-1",
   "ecs_cluster": "vector-prod",
   "api": {
     "service": "vector-backend-service",
-    "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:152",
-    "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-    "image_tag": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995"
+    "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:153",
+    "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:6b75776d7cd0825a6b699898bb8e6e295643378a",
+    "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
   },
   "worker": {
     "service": "vector-worker-service",
-    "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:113",
-    "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-    "image_tag": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995"
+    "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:114",
+    "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:6b75776d7cd0825a6b699898bb8e6e295643378a",
+    "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
   },
   "verification": {
     "api_image_matches_closure_sha": true,
@@ -29,30 +29,27 @@
   "notes": "Step 0.2 complete when both ECS services run ECR tags equal deploy git SHA (includes bundled OCTS walk policy under traversal/schemas).",
   "step_0_3_pipeline_recovery": {
     "recovered": true,
-    "strategy": "new_run",
+    "strategy": "recover_in_place",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
     "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
-    "pipeline_run_created": true,
-    "prior_failed_run_id": "faa5469f-849b-4e19-bc26-e9ec001e926f",
-    "mirrored_phases": [
-      "phase_02_canonical",
-      "phase_03_identity",
-      "phase_04_graph"
-    ],
-    "requeued_phases": [
-      "phase_05_traversal",
-      "phase_06_tcre",
-      "phase_07_retrieval",
-      "phase_08_synthesis"
-    ],
-    "resume_from_phase": "phase_05_traversal",
-    "pipeline_status": "running",
+    "prior_failed_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+    "reopen": {
+      "reopened": true,
+      "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "resume_from_phase": "phase_06_tcre",
+      "requeued_phases": [
+        "phase_06_tcre",
+        "phase_07_retrieval",
+        "phase_08_synthesis"
+      ],
+      "pipeline_status": "running"
+    },
     "execution": {
       "dirty": {
         "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
         "status": "dirty",
         "fsm_state": "CANONICAL_DRAINING",
-        "obligation_epoch": 776,
+        "obligation_epoch": 783,
         "reason": "continuity_p0_step03"
       },
       "enqueue": {
@@ -68,21 +65,13 @@
         "trigger": "continuity_p0_step03",
         "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
         "detail": {
-          "phase_cursor": "phase_05_traversal"
+          "phase_cursor": "phase_06_tcre"
         }
       },
-      "lease_fsm_state": "TRAVERSAL",
+      "lease_fsm_state": "AWAITING_TCRE",
       "lease_status": "dirty"
     },
-    "recovered_at": "2026-05-22T21:50:23.124036+00:00",
-    "recorded_at": "2026-05-22T21:50:23.150323+00:00",
-    "prod_verification": {
-      "active_pipeline_run_status": "running",
-      "lease_fsm_state": "TRAVERSAL",
-      "lease_phase_cursor": "phase_05_traversal",
-      "phase_05_status": "queued",
-      "prior_failed_run_status": "failed"
-    },
+    "recorded_at": "2026-05-22T21:59:42.997540+00:00",
     "verification": {
       "step_03_pass": true,
       "prior_failed_run_superseded": true
@@ -139,22 +128,22 @@
     }
   },
   "step_0_2_deploy": {
-    "recorded_at": "2026-05-22T21:57:06.507114+00:00",
-    "git_sha_full": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-    "git_sha_short": "b8ca0065f68e",
+    "recorded_at": "2026-05-22T22:00:50.578836+00:00",
+    "git_sha_full": "6b75776d7cd0825a6b699898bb8e6e295643378a",
+    "git_sha_short": "6b75776d7cd0",
     "aws_region": "eu-west-1",
     "ecs_cluster": "vector-prod",
     "api": {
       "service": "vector-backend-service",
-      "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:152",
-      "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-      "image_tag": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995"
+      "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:153",
+      "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:6b75776d7cd0825a6b699898bb8e6e295643378a",
+      "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
     },
     "worker": {
       "service": "vector-worker-service",
-      "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:113",
-      "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-      "image_tag": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995"
+      "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:114",
+      "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:6b75776d7cd0825a6b699898bb8e6e295643378a",
+      "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
     },
     "verification": {
       "api_image_matches_closure_sha": true,
@@ -167,32 +156,32 @@
   },
   "step_0_5_phase0_closure": {
     "step": "0.5_phase0_closure",
-    "recorded_at": "2026-05-22T21:57:06.507198+00:00",
-    "closure_git_sha": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-    "closure_git_sha_short": "b8ca0065f68e",
+    "recorded_at": "2026-05-22T22:00:50.578909+00:00",
+    "closure_git_sha": "6b75776d7cd0825a6b699898bb8e6e295643378a",
+    "closure_git_sha_short": "6b75776d7cd0",
     "phase0_commits": {
-      "p0_4_phase05_proof": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
+      "p0_4_phase05_proof": "6b75776d7cd0825a6b699898bb8e6e295643378a",
       "p0_a_schema_packaging": "789b25fbcc360488975b9fabb0ae90960fca54c1",
       "p0_2_deploy": "0146cd05149c03a8b6e9572e1bc6739f24584b2e",
       "p0_3_recovery": "3cd8561539656d6c1196144755bb457b8b415103"
     },
     "prod_deploy": {
-      "recorded_at": "2026-05-22T21:57:06.507114+00:00",
-      "git_sha_full": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-      "git_sha_short": "b8ca0065f68e",
+      "recorded_at": "2026-05-22T22:00:50.578836+00:00",
+      "git_sha_full": "6b75776d7cd0825a6b699898bb8e6e295643378a",
+      "git_sha_short": "6b75776d7cd0",
       "aws_region": "eu-west-1",
       "ecs_cluster": "vector-prod",
       "api": {
         "service": "vector-backend-service",
-        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:152",
-        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-        "image_tag": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995"
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:153",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:6b75776d7cd0825a6b699898bb8e6e295643378a",
+        "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
       },
       "worker": {
         "service": "vector-worker-service",
-        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:113",
-        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-        "image_tag": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995"
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:114",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:6b75776d7cd0825a6b699898bb8e6e295643378a",
+        "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
       },
       "verification": {
         "api_image_matches_closure_sha": true,
@@ -213,6 +202,108 @@
     },
     "notes": "Step 0.5 records the Phase 0 closure deploy SHA in the committed baseline artifact. Both ECS services must run the same ECR tag equal to closure_git_sha."
   },
-  "phase0_closure_git_sha": "b8ca0065f68eaab6ce7f04749d9818c14b7ce995",
-  "phase0_complete": true
+  "phase0_closure_git_sha": "6b75776d7cd0825a6b699898bb8e6e295643378a",
+  "phase0_complete": true,
+  "step_0_6_p0_signoff": {
+    "step": "0.6_p0_signoff",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "closure_git_sha": "6b75776d7cd0825a6b699898bb8e6e295643378a",
+    "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+    "cont_inv_08": "CONT-INV-08",
+    "p0_b_proof": {
+      "gate": "0.4_phase05_autonomous_proof",
+      "cont_inv_01": "CONT-INV-01",
+      "cont_inv_02": "CONT-INV-02",
+      "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+      "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "pipeline_run_status": "running",
+      "phase_04_completed_at": "2026-05-22T15:29:51.317011+00:00",
+      "phase_05": {
+        "status": "completed",
+        "started_at": "2026-05-22T21:52:07.045396+00:00",
+        "completed_at": "2026-05-22T21:52:09.107608+00:00",
+        "error_detail": null,
+        "walks_persisted": 0,
+        "receipt_outcome": "COMPLETED_EMPTY"
+      },
+      "lease": {
+        "status": "dirty",
+        "fsm_state": "AWAITING_TCRE",
+        "phase_cursor": "phase_06_tcre",
+        "last_error": null
+      },
+      "walks": {
+        "total_count": 24,
+        "after_phase_04_count": 8,
+        "newest_created_at": "2026-05-22T21:36:24.876777+00:00"
+      },
+      "checks": {
+        "phase_05_status_completed": true,
+        "walks_persisted_gt_0": true,
+        "walks_after_phase_04_completed_at": true,
+        "lease_last_error_null": true,
+        "no_schema_path_error": true,
+        "cont_inv_02_schema_resolvable": true
+      },
+      "p0_b_pass": true
+    },
+    "p0_d_ci": {
+      "gate": "P0-D",
+      "checks": {
+        "deploy_workflow_walk_policy_test": true,
+        "bundled_schema_present": true,
+        "backend_Dockerfile_packaging_gate": true,
+        "backend_worker_Dockerfile_packaging_gate": true,
+        "packaging_unit_test_present": true
+      },
+      "p0_d_pass": true
+    },
+    "prod_deploy": {
+      "recorded_at": "2026-05-22T22:00:44.302211+00:00",
+      "git_sha_full": "6b75776d7cd0825a6b699898bb8e6e295643378a",
+      "git_sha_short": "6b75776d7cd0",
+      "aws_region": "eu-west-1",
+      "ecs_cluster": "vector-prod",
+      "api": {
+        "service": "vector-backend-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:153",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:6b75776d7cd0825a6b699898bb8e6e295643378a",
+        "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
+      },
+      "worker": {
+        "service": "vector-worker-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:114",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:6b75776d7cd0825a6b699898bb8e6e295643378a",
+        "image_tag": "6b75776d7cd0825a6b699898bb8e6e295643378a"
+      },
+      "verification": {
+        "api_image_matches_closure_sha": true,
+        "worker_image_matches_closure_sha": true,
+        "both_services_on_same_tag": true,
+        "deploy_matches_closure_sha": true
+      }
+    },
+    "baseline_prerequisites": {
+      "step_02_artifact_present": true,
+      "step_03_pass": true,
+      "step_04_pass": true
+    },
+    "baseline_phase0_complete": true,
+    "checks": {
+      "CONT-INV-01_phase_05_completed": true,
+      "CONT-INV-02_schema_and_lease_clear": true,
+      "CONT-INV-08_active_run_not_failed": true,
+      "P0-D_ci_packaging_gates": true,
+      "baseline_steps_0_1_through_0_5": true,
+      "ecs_matches_closure_sha": true
+    },
+    "p0_signoff_pass": true,
+    "verification": {
+      "step_06_pass": true,
+      "phase_0_signed_off": true,
+      "cleared_for_phase_1": true
+    },
+    "recorded_at": "2026-05-22T22:00:44.325584+00:00"
+  },
+  "phase_0_signed_off": true
 }

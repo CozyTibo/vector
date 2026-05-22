@@ -337,6 +337,7 @@ run_tenant_convergence_v1:
 | 0.3 | P0-C new pipeline run or recovery | Ops | New run id, not `failed` | **Done** (see §Phase 0.3 completion) |
 | 0.4 | P0-B prod proof SQL | Ops | Phase 05 COMPLETED, walks after graph phase | **Done** (see §Phase 0.4 completion) |
 | 0.5 | Document deploy SHA in `DOCS/audits/baselines/continuity_p0_<date>.json` | Eng | Artifact committed | **Done** (see §Phase 0.5 completion) |
+| 0.6 | P0 sign-off gate (CONT-INV-01/02/08 + P0-D) | Eng | `step_0_6_p0_signoff` pass in baseline | **Done** (see §Phase 0.6 completion) |
 
 #### Phase 0.1 completion (P0-A + P0-D)
 
@@ -419,7 +420,22 @@ Executed **2026-05-22** after steps 0.1–0.4:
 | Code | `continuity_p0_baseline.py`, `continuity_p0_phase0_closure.py`; `record_continuity_p0_deploy.py` merge-safe |
 | Prod script | `python backend/scripts/continuity_p0_phase0_closure.py --wait-for-deploy 600` |
 
-**Phase 0 complete.** Next: Phase 1.1 (P3′ component scheduling).
+#### Phase 0.6 completion (P0 sign-off gate)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Gate | CONT-INV-01, CONT-INV-02, CONT-INV-08 + P0-D CI packaging |
+| Pipeline run | `ce7df86d-b229-4467-ad28-1109ed119d34` (`status=running` after in-place recovery from `phase_06_tcre`) |
+| Closure SHA | `6b75776d7cd0825a6b699898bb8e6e295643378a` (API + worker aligned) |
+| P0-D | `deploy.yml` walk-policy test + Dockerfile/worker gates + bundled schema |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_0_6_p0_signoff`, `phase_0_signed_off: true` |
+| Code | `continuity_p0_signoff.py`, `continuity_p0_phase0_signoff.py`, admin `GET …/execution/continuity-p0-signoff` |
+| Prod script | `python backend/scripts/continuity_p0_phase0_signoff.py` |
+| Recovery (CONT-INV-08) | `continuity_p0_recover_pipeline.py --strategy recover_in_place --resume-from-phase phase_06_tcre` |
+
+**Phase 0 signed off.** Next: Phase 1.1 (P3′ component scheduling).
 
 ### Phase 1 — Propagation + downstream continuity (days 4–10)
 
@@ -471,6 +487,8 @@ cd backend
 CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity_p0_deploy.py
 # Phase 0 closure (step 0.5 — merges baseline, verifies ECS + prerequisites):
 python scripts/continuity_p0_phase0_closure.py --wait-for-deploy 600
+# Phase 0 sign-off (step 0.6 — P0 invariants + P0-D + baseline consolidation):
+python scripts/continuity_p0_phase0_signoff.py
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

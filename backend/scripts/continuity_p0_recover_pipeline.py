@@ -73,6 +73,11 @@ def main() -> int:
         help="new_run: post_ingestion run + mirror 02-04; recover_in_place: reset failed run",
     )
     parser.add_argument("--source-run", default="", help="optional failed pipeline run uuid")
+    parser.add_argument(
+        "--resume-from-phase",
+        default="phase_05_traversal",
+        help="for recover_in_place: requeue from this phase (e.g. phase_06_tcre after 05 completed)",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--db-only",
@@ -113,6 +118,7 @@ def main() -> int:
             tenant_id=tenant_id,
             strategy=strategy,
             source_pipeline_run_id=source_run,
+            resume_from_phase=args.resume_from_phase,
             enqueue_celery=not args.db_only,
         )
         session.commit()
@@ -122,12 +128,13 @@ def main() -> int:
             return 1
 
         baseline = _load_baseline()
+        run_status = (out.get("reopen") or {}).get("pipeline_status") or out.get("pipeline_status")
         baseline["step_0_3_pipeline_recovery"] = {
+            **(baseline.get("step_0_3_pipeline_recovery") or {}),
             **out,
             "recorded_at": datetime.now(UTC).isoformat(),
             "verification": {
-                "step_03_pass": out.get("pipeline_status") == "running"
-                and out.get("pipeline_run_id") is not None,
+                "step_03_pass": run_status == "running" and out.get("pipeline_run_id") is not None,
                 "prior_failed_run_superseded": bool(out.get("prior_failed_run_id")),
             },
         }

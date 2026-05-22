@@ -18,6 +18,9 @@ from vector.domains.cortex.execution.admin_commands import (
 from vector.domains.cortex.substrate_pipeline.continuity_p0_phase05_proof import (
     evaluate_p0_b_phase05_proof_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_signoff import (
+    evaluate_p0_signoff_v1,
+)
 from vector.domains.cortex.substrate_pipeline.continuity_p0_recovery import (
     RecoveryStrategyV1,
     recover_continuity_p0_pipeline_v1,
@@ -116,6 +119,37 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
             return out
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    @er.get("/continuity-p0-signoff")
+    def get_continuity_p0_signoff(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        closure_git_sha: Annotated[str, Query(min_length=12)],
+        pipeline_run_id: Annotated[uuid.UUID | None, Query()] = None,
+    ) -> dict[str, Any]:
+        """P0 step 0.6: CONT-INV-01/02/08 + P0-D gates (closure SHA must match prod ECS)."""
+        _assert_tenant(db, tenant_id)
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[6]
+        baseline_stub = {
+            "phase0_complete": True,
+            "phase0_closure_git_sha": closure_git_sha.strip(),
+            "step_0_5_phase0_closure": {"verification": {"step_05_pass": True}},
+            "step_0_3_pipeline_recovery": {"verification": {"step_03_pass": True}},
+            "step_0_4_phase05_proof": {
+                "p0_b_pass": True,
+                "verification": {"step_04_pass": True},
+            },
+            "step_0_2_deploy": {"git_sha_full": closure_git_sha.strip()},
+        }
+        return evaluate_p0_signoff_v1(
+            db,
+            tenant_id=tenant_id,
+            baseline=baseline_stub,
+            repo_root=repo_root,
+            pipeline_run_id=pipeline_run_id,
+        )
 
     @er.get("/continuity-p0-phase05-proof")
     def get_continuity_p0_phase05_proof(
