@@ -1,0 +1,42 @@
+{
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "step": 5,
+  "validated_at": "2026-05-22T15:05:44+00:00",
+  "anchor_limit": 20000,
+  "chunk_size": 2000,
+  "dry_run": false,
+  "org_entities_active_before": 0,
+  "notes": "Full anchor scan (~19961); unique active handles plateau at 7286 (non-primitive anchors skipped).",
+  "chunks": [
+    {
+      "offset": 15000,
+      "anchors_scanned": 2500,
+      "entities_upserted": 1169,
+      "run_id": "2b692f07-490f-481e-a54f-4814b382112d"
+    },
+    {
+      "offset": 17500,
+      "anchors_scanned": 2461,
+      "entities_upserted": 1297,
+      "run_id": "4330b9cc-0074-452d-8ff4-04ba644488e5"
+    }
+  ],
+  "backfill": {
+    "anchors_scanned": 4961,
+    "entities_upserted": 2466,
+    "chunk_count": 2
+  },
+  "org_entities_active_after": 7286,
+  "entity_by_kind": [
+    {
+      "entity_kind": "human_actor",
+      "n": 7283
+    },
+    {
+      "entity_kind": "service_account",
+      "n": 3
+    }
+  ],
+  "A1_pass": true,
+  "A1_detail": "org_entities_active=7286>=100"
+}

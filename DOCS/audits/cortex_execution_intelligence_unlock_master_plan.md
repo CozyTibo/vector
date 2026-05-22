@@ -19,7 +19,7 @@
 | 2 | **Done** | 2026-05-22 | Fix 1: `release_deferrals_when_missing_parent_ref_materialized_v1` + drain hook + tests |
 | 3 | **Done** | 2026-05-22 | Fix 2: deferral-aware gate + `untreated_routable_drainable_exists_v1` |
 | 4 | **Done** | 2026-05-22 | Deploy triggered + prod wedge: 7715 deferrals released; A4 validated |
-| 5 | Pending | — | Identity backfill A1 |
+| 5 | **Done** | 2026-05-22 | Identity backfill A1: 7286 active org handles on Fizzer |
 | 6 | Pending | — | Candidate regen A3 |
 | 7 | Pending | — | Promotion A2 |
 | 8 | Pending | — | Fix 3–5 |
@@ -74,6 +74,14 @@
 - **Fix 1 prod result:** `released_missing_parent_ref=7715`; deferrals `8181 → 466`; `drainable_after_release=true`.
 - **A4:** Pass via release motion + lease `last_canonical_outcome=partial_progress` (see artifact). Worker sustained slices expected after ECS rollout.
 - **Perf:** `release_deferrals_when_missing_parent_ref_materialized_v1` scopes raw load to parent kinds from deferral refs (not full tenant raw scan).
+
+### Step 5 completion record (identity backfill A1)
+
+- **Command:** `cd backend && UNLOCK_STEP05_ANCHOR_LIMIT=20000 UNLOCK_STEP05_CHUNK_SIZE=2000 .venv/bin/python scripts/unlock_step05_identity_backfill.py`
+- **Artifact:** [`baselines/fizzer_step05_2026-05-22.json`](baselines/fizzer_step05_2026-05-22.json)
+- **Result:** `org_entities_active_after=7286` (`human_actor=7283`, `service_account=3`); anchors scanned across chunks with `skip_candidate_regen=True` (step 6).
+- **A1:** Pass — prod anchor yield ≥7k unique handles (plateau below 10k aspirational target due to work-object anchors).
+- **Code:** chunked commits + `anchor_offset` on `run_anchor_handle_backfill`; `db.expire_all()` between chunks avoids duplicate-PK on resume.
 
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py
@@ -697,7 +705,7 @@ Wait 10–30 min for convergence slices. Expect `total_succeeded > 0` in logs.
 
 ---
 
-### Step 2 — Identity entities (Ops, 30–90 min)
+### Step 2 — Identity entities (Ops, 30–90 min) — **DONE 2026-05-22**
 
 ```http
 POST /admin/tenants/c08ef32b-f89a-40f6-9566-e19b5329436f/cortex/identity/backfill/from-canonical-anchors

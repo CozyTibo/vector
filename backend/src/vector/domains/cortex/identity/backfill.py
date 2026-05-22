@@ -90,14 +90,20 @@ def compute_anchor_backfill_set_sha256(anchors: list[CortexCanonicalIdentityAnch
 
 
 def list_identity_anchors_for_backfill(
-    db: Session, *, tenant_id: uuid.UUID, limit: int
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    limit: int,
+    offset: int = 0,
 ) -> list[CortexCanonicalIdentityAnchor]:
     lim = max(1, min(int(limit), 50_000))
+    off = max(0, int(offset))
     return list(
         db.scalars(
             select(CortexCanonicalIdentityAnchor)
             .where(CortexCanonicalIdentityAnchor.tenant_id == tenant_id)
             .order_by(nullslast(CortexCanonicalIdentityAnchor.updated_at.desc()))
+            .offset(off)
             .limit(lim)
         ).all()
     )
@@ -109,10 +115,13 @@ def run_anchor_handle_backfill(
     tenant_id: uuid.UUID,
     dry_run: bool = False,
     anchor_limit: int = 5_000,
+    anchor_offset: int = 0,
     skip_candidate_regen: bool = False,
 ) -> dict[str, Any]:
     """Upsert org entities from anchors; never writes authoritative org links (P04-20)."""
-    anchors = list_identity_anchors_for_backfill(db, tenant_id=tenant_id, limit=anchor_limit)
+    anchors = list_identity_anchors_for_backfill(
+        db, tenant_id=tenant_id, limit=anchor_limit, offset=anchor_offset
+    )
     set_sha = compute_anchor_backfill_set_sha256(anchors)
     legacy_lane_org_entities_tombstoned = 0
     anchors_skipped_work_object_no_primitive = 0
