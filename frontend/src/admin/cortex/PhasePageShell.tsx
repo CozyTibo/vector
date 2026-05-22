@@ -5,7 +5,7 @@ import { adminJson } from "../../lib/adminFetch";
 import { StatusBadge } from "../ui/StatusBadge";
 import { CortexPageSkeleton } from "./CortexPageSkeleton";
 import type { OperatorPhase, PhaseStatus, PipelineOverview } from "./pipelineTypes";
-import { usePipelineOverview } from "./usePipelineOverview";
+import { usePipelineOverviewPhases } from "./usePipelineOverview";
 
 export type PhaseSummaryPayload = {
   phase: string;
@@ -41,8 +41,11 @@ function resolvePhaseTab(tabParam: string | null, hasRunsTab: boolean): PhaseTab
   return "summary";
 }
 
-function phaseRowFromOverview(overview: PipelineOverview | undefined, phase: OperatorPhase) {
-  return overview?.phases.find((p) => p.phase === phase);
+function phaseRowFromPhases(
+  phases: PipelineOverview["phases"] | undefined,
+  phase: OperatorPhase,
+) {
+  return phases?.find((p) => p.phase === phase);
 }
 
 export function PhasePageShell({
@@ -71,8 +74,8 @@ export function PhasePageShell({
   };
   const overviewPath = `/admin/tenants/${tenantId}/cortex/overview`;
 
-  const overviewQ = usePipelineOverview();
-  const headerRow = phaseRowFromOverview(overviewQ.data, phase);
+  const phasesQ = usePipelineOverviewPhases();
+  const headerRow = phaseRowFromPhases(phasesQ.data?.phases, phase);
 
   const summaryQ = useQuery({
     queryKey: ["admin-cortex-phase-summary", tenantId, phase],
@@ -95,8 +98,8 @@ export function PhasePageShell({
   });
 
   const headerStatus = headerRow?.status ?? summaryQ.data?.status;
-  const headerPending = overviewQ.isPending && !headerRow;
-  const headerError = overviewQ.isError && !headerRow;
+  const headerPending = phasesQ.isPending && !headerRow;
+  const headerError = phasesQ.isError && !headerRow;
 
   const s = summaryQ.data;
   const summaryLoading = tab === "summary" && summaryQ.isFetching && !summaryQ.isFetched;
@@ -110,7 +113,7 @@ export function PhasePageShell({
         {headerPending ? (
           <p className="mt-3 text-sm text-stone-500">Loading phase status…</p>
         ) : headerError ? (
-          <p className="mt-3 text-sm text-red-700">{(overviewQ.error as Error).message}</p>
+          <p className="mt-3 text-sm text-red-700">{(phasesQ.error as Error).message}</p>
         ) : headerStatus ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
             <StatusBadge tone={statusTone(headerStatus)}>

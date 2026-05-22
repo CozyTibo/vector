@@ -4571,6 +4571,34 @@ class AdminCortexPipelineNextScheduledIngestion(BaseModel):
     connectors_eligible_now: list[str] = Field(default_factory=list)
 
 
+class AdminCortexPipelineOverviewExecutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "pipeline_overview_execution"
+    tenant_id: uuid.UUID
+    execution: AdminCortexPipelineExecutionSnapshot
+
+
+class AdminCortexPipelineOverviewPhasesResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "pipeline_overview_phases"
+    tenant_id: uuid.UUID
+    phases: list[AdminCortexPipelinePhaseOverview]
+    attention: list[str] = Field(default_factory=list)
+
+
+class AdminCortexPipelineOverviewIngestionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "pipeline_overview_ingestion"
+    tenant_id: uuid.UUID
+    scheduler: AdminCortexGlobalScheduler | None = None
+    runnable_connectors: list[str] = Field(default_factory=list)
+    recent_ingestion_runs: list[AdminCortexPipelineRecentIngestionRunItem] = Field(default_factory=list)
+    next_scheduled_ingestion: AdminCortexPipelineNextScheduledIngestion | None = None
+
+
 class AdminCortexPipelineOverviewResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

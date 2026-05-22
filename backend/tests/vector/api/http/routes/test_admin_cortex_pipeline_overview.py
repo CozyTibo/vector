@@ -70,3 +70,23 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
     }
     canonical = next(p for p in body["phases"] if p["phase"] == "canonical")
     assert canonical["backlog_count"] is None or isinstance(canonical["backlog_count"], int)
+
+
+def test_pipeline_overview_slices_match_full(client: TestClient, db_session: Session) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    full = client.get(f"/admin/tenants/{tid}/cortex/pipeline/overview").json()
+    execution = client.get(f"/admin/tenants/{tid}/cortex/pipeline/overview/execution").json()
+    phases = client.get(f"/admin/tenants/{tid}/cortex/pipeline/overview/phases").json()
+    ingestion = client.get(f"/admin/tenants/{tid}/cortex/pipeline/overview/ingestion").json()
+
+    assert execution["surface_kind"] == "pipeline_overview_execution"
+    assert phases["surface_kind"] == "pipeline_overview_phases"
+    assert ingestion["surface_kind"] == "pipeline_overview_ingestion"
+    assert execution["execution"] == full["execution"]
+    assert phases["phases"] == full["phases"]
+    assert phases["attention"] == full["attention"]
+    assert ingestion["scheduler"] == full["scheduler"]
+    assert ingestion["runnable_connectors"] == full["runnable_connectors"]
+    assert ingestion["recent_ingestion_runs"] == full["recent_ingestion_runs"]
+    assert ingestion["next_scheduled_ingestion"] == full["next_scheduled_ingestion"]

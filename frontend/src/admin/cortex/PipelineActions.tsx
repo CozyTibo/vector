@@ -9,6 +9,7 @@ import {
   CORTEX_MANUAL_SYNC_CONFIRM_PHRASE,
 } from "../adminConstants";
 import { StatusBadge } from "../ui/StatusBadge";
+import { pipelineOverviewSliceQueryKeys } from "./usePipelineOverview";
 import { START_PHASE_OPTIONS } from "./pipelineTypes";
 
 type Props = {
@@ -24,6 +25,9 @@ export function PipelineActions({ runnableConnectors }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const invalidate = () => {
+    for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
+      void qc.invalidateQueries({ queryKey: key });
+    }
     void qc.invalidateQueries({ queryKey: ["admin-cortex-pipeline-overview", tenantId] });
     void qc.invalidateQueries({ queryKey: ["admin-cortex-phase-summary", tenantId] });
     void qc.invalidateQueries({ queryKey: ["admin-cortex-ingestion", tenantId] });

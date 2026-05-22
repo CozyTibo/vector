@@ -14,6 +14,7 @@ _OVERVIEW_CACHE_TTL_SECONDS = 30.0
 _OVERVIEW_STALE_SERVE_SECONDS = 120.0
 _OVERVIEW_CACHE_LOCK = threading.Lock()
 _OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_SLICE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
@@ -21,6 +22,8 @@ def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
     key = str(tenant_id)
     with _OVERVIEW_CACHE_LOCK:
         _OVERVIEW_CACHE.pop(key, None)
+        for suffix in ("execution", "phases", "ingestion"):
+            _SLICE_CACHE.pop(f"{key}:{suffix}", None)
 
 from sqlalchemy.orm import Session
 
@@ -256,6 +259,94 @@ def _phase_from_completeness_blockers(
     return blockers[:8]
 
 
+def _cached_slice_v1(
+    *,
+    cache_key: str,
+    build: Any,
+) -> dict[str, Any]:
+    now = time.monotonic()
+    stale_payload: dict[str, Any] | None = None
+    with _OVERVIEW_CACHE_LOCK:
+        cached = _SLICE_CACHE.get(cache_key)
+        if cached is not None:
+            ts, payload = cached
+            if now - ts <= _OVERVIEW_CACHE_TTL_SECONDS:
+                return copy.deepcopy(payload)
+            if now - ts <= _OVERVIEW_STALE_SERVE_SECONDS:
+                stale_payload = copy.deepcopy(payload)
+    try:
+        out = build()
+    except Exception:
+        if stale_payload is not None:
+            _LOGGER.warning(
+                "serving stale cortex pipeline overview slice key=%s",
+                cache_key,
+                exc_info=True,
+            )
+            return stale_payload
+        raise
+    with _OVERVIEW_CACHE_LOCK:
+        _SLICE_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(out))
+    return out
+
+
+def build_pipeline_overview_execution_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Fast execution lease snapshot for progressive admin load."""
+    cache_key = f"{tenant_id}:execution"
+
+    def _build() -> dict[str, Any]:
+        return {
+            "surface_kind": "pipeline_overview_execution",
+            "tenant_id": str(tenant_id),
+            "execution": _build_execution_snapshot_v1(session, tenant_id=tenant_id),
+        }
+
+    return _cached_slice_v1(cache_key=cache_key, build=_build)
+
+
+def build_pipeline_overview_phases_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Phase strip + attention (completeness projections)."""
+    cache_key = f"{tenant_id}:phases"
+
+    def _build() -> dict[str, Any]:
+        phases, attention = _build_phases_and_attention_v1(session, tenant_id=tenant_id)
+        return {
+            "surface_kind": "pipeline_overview_phases",
+            "tenant_id": str(tenant_id),
+            "phases": phases,
+            "attention": attention,
+        }
+
+    return _cached_slice_v1(cache_key=cache_key, build=_build)
+
+
+def build_pipeline_overview_ingestion_v1(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Ingestion panel: scheduler, connectors, recent runs, next beat."""
+    cache_key = f"{tenant_id}:ingestion"
+
+    def _build() -> dict[str, Any]:
+        return {
+            "surface_kind": "pipeline_overview_ingestion",
+            "tenant_id": str(tenant_id),
+            **_build_ingestion_panel_v1(session, settings, tenant_id=tenant_id),
+        }
+
+    return _cached_slice_v1(cache_key=cache_key, build=_build)
+
+
 def build_pipeline_overview_v1(
     session: Session,
     settings: Settings,
@@ -292,20 +383,38 @@ def build_pipeline_overview_v1(
     return out
 
 
-def _build_pipeline_overview_v1_uncached(
+def _build_execution_snapshot_v1(
     session: Session,
-    settings: Settings,
     *,
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
     inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=5)
     lease = inspect.get("lease")
+    if not isinstance(lease, dict):
+        return {
+            "fsm_state": None,
+            "phase_cursor": None,
+            "lease_status": None,
+            "block_reason_code": None,
+        }
+    return {
+        "fsm_state": lease.get("fsm_state"),
+        "phase_cursor": lease.get("phase_cursor"),
+        "lease_status": lease.get("status"),
+        "block_reason_code": lease.get("block_reason_code"),
+    }
+
+
+def _build_phases_and_attention_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=5)
+    lease = inspect.get("lease")
     progression = inspect.get("progression") or {}
     mirror_status: dict[str, str] = dict(progression.get("phase_status") or {})
 
-    ingestion_admin = build_cortex_ingestion_admin_overview(
-        session, settings, tenant_id, lite=True
-    )
     ing_env = project_ingestion_completeness_v1(session, tenant_id=tenant_id)
     can_env = project_canonical_completeness_v1(session, tenant_id=tenant_id, admin_fast=True)
     id_env = project_identity_completeness_v1(session, tenant_id=tenant_id)
@@ -389,14 +498,18 @@ def _build_pipeline_overview_v1_uncached(
         if isinstance(code, str) and code.strip():
             exec_block = code.strip()
     attention = build_attention_lines(phases, execution_block_reason=exec_block)
+    return phases, attention
 
-    execution = {
-        "fsm_state": lease.get("fsm_state") if isinstance(lease, dict) else None,
-        "phase_cursor": lease.get("phase_cursor") if isinstance(lease, dict) else None,
-        "lease_status": lease.get("status") if isinstance(lease, dict) else None,
-        "block_reason_code": lease.get("block_reason_code") if isinstance(lease, dict) else None,
-    }
 
+def _build_ingestion_panel_v1(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    ingestion_admin = build_cortex_ingestion_admin_overview(
+        session, settings, tenant_id, lite=True
+    )
     runnable = [
         row["connector"]
         for row in ingestion_admin.get("connectors") or []
@@ -427,8 +540,28 @@ def _build_pipeline_overview_v1_uncached(
         settings,
         tenant_id=tenant_id,
         scheduler=global_scheduler if isinstance(global_scheduler, dict) else None,
-        connector_rows=ingestion_admin.get("connectors") if isinstance(ingestion_admin.get("connectors"), list) else None,
+        connector_rows=ingestion_admin.get("connectors")
+        if isinstance(ingestion_admin.get("connectors"), list)
+        else None,
     )
+
+    return {
+        "scheduler": global_scheduler,
+        "runnable_connectors": runnable,
+        "recent_ingestion_runs": recent_ingestion_runs,
+        "next_scheduled_ingestion": next_scheduled,
+    }
+
+
+def _build_pipeline_overview_v1_uncached(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    execution = _build_execution_snapshot_v1(session, tenant_id=tenant_id)
+    phases, attention = _build_phases_and_attention_v1(session, tenant_id=tenant_id)
+    ingestion_panel = _build_ingestion_panel_v1(session, settings, tenant_id=tenant_id)
 
     return {
         "surface_kind": "pipeline_overview",
@@ -436,8 +569,5 @@ def _build_pipeline_overview_v1_uncached(
         "execution": execution,
         "phases": phases,
         "attention": attention,
-        "scheduler": global_scheduler,
-        "runnable_connectors": runnable,
-        "recent_ingestion_runs": recent_ingestion_runs,
-        "next_scheduled_ingestion": next_scheduled,
+        **ingestion_panel,
     }
