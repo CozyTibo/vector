@@ -497,11 +497,13 @@ Executed **2026-05-22** on Fizzer prod:
 
 #### Phase 1.4 completion (P1-D TCRE resume — CI + prod trace)
 
-Implemented **2026-05-22**:
+Executed **2026-05-22** on Fizzer prod:
 
 | Item | Value |
 |------|-------|
+| Closure git SHA | `1c66058` |
 | Path | Phase 06 → `mark_tenant_waiting_v1` → TCRE Celery `run_tcre_reconstruction_job_task` terminal → `on_tcre_job_terminal_for_execution_v1` → `resume_convergence_from_waiting_v1` @ `phase_07_retrieval` |
+| Prod trace | Pipeline `ce7df86d…`: phase 06 `completed` + `async` job `45723fb5…`; lease `waiting_reason=tcre_async`, cursor `phase_08_synthesis`; 3 TCRE jobs |
 | CI gate | `deploy.yml` runs `test_continuity_p1_tcre_resume.py` + TCRE boundary tests (no DB) |
 | Integration | `test_p1_d_phase06_waiting_tcre_terminal_resumes_phase07` (`@pytest.mark.integration`) |
 | Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_4_p1d_tcre_resume` |

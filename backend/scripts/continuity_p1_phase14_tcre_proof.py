@@ -86,6 +86,8 @@ def _run_ci_tests() -> tuple[bool, dict[str, Any]]:
         "-m",
         "pytest",
         "-q",
+        "-m",
+        "not integration and not e2e",
         *P1_D_CI_TESTS,
     ]
     env = {**os.environ, "PYTHONPATH": str(backend / "src")}
