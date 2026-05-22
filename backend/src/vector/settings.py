@@ -757,6 +757,26 @@ class Settings(BaseSettings):
             "set env to 0 for pre-P1-F serial stall semantics."
         ),
     )
+    cortex_execution_canonical_lane_budget_seconds: int = Field(
+        default=0,
+        ge=0,
+        le=3600,
+        validation_alias="CORTEX_EXECUTION_CANONICAL_LANE_BUDGET_SECONDS",
+        description=(
+            "P2-A: wall-time budget for canonical lane (phase 02) per slice; "
+            "0 = auto-split from CORTEX_CONVERGENCE_TIME_BUDGET_SECONDS."
+        ),
+    )
+    cortex_execution_execution_lane_budget_seconds: int = Field(
+        default=0,
+        ge=0,
+        le=3600,
+        validation_alias="CORTEX_EXECUTION_EXECUTION_LANE_BUDGET_SECONDS",
+        description=(
+            "P2-A: wall-time budget for execution lane (phases 03–08) per slice; "
+            "0 = remainder after canonical budget."
+        ),
+    )
     cortex_synthesis_forbidden_backoff_threshold: int = Field(
         default=3,
         ge=1,

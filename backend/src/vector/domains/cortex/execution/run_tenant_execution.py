@@ -29,9 +29,11 @@ from vector.domains.cortex.execution.execution_path_telemetry import (
 )
 from vector.domains.cortex.execution.fsm import apply_fsm_transition_v1, fsm_state_for_phase_cursor_v1
 from vector.domains.cortex.execution.dual_lane_lease import (
+    is_execution_dual_lane_enabled_v1,
     should_mark_execution_lane_stalled_v1,
     sync_dual_lane_fields_on_lease_v1,
 )
+from vector.domains.cortex.execution.dual_lane_worker import run_dual_lane_convergence_v1
 from vector.domains.cortex.execution.lease import (
     complete_convergence_lease_v1,
     mark_tenant_stalled_v1,
@@ -189,6 +191,19 @@ def run_tenant_convergence_v1(
                 "outcome": "no_transformable_bundle",
                 "fsm_state": lease.fsm_state,
             }
+
+        if is_execution_dual_lane_enabled_v1():
+            return run_dual_lane_convergence_v1(
+                session,
+                tenant_id=tenant_id,
+                lease=lease,
+                pipeline_run_id=pipeline_run_id,
+                bundle_id=bundle_id,
+                cfg=cfg,
+                started=started,
+                reason=reason,
+                celery_task_id=celery_task_id,
+            )
 
         phase = _resolve_start_phase(lease)
         requeue = False
