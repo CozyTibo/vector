@@ -285,9 +285,20 @@ def release_deferrals_when_missing_parent_ref_materialized_v1(
     if not deferral_rows:
         return 0
 
+    parent_kinds = {
+        str(ref).split(":", 1)[0]
+        for _rid, ref in deferral_rows
+        if ref and ":" in str(ref)
+    }
+    if not parent_kinds:
+        return 0
+    # Node keys use resource_type strings (e.g. github.pull_request) — scope raw load.
     raw_rows = list(
         db.scalars(
-            select(RawIngestionRecord).where(RawIngestionRecord.tenant_id == tenant_id)
+            select(RawIngestionRecord).where(
+                RawIngestionRecord.tenant_id == tenant_id,
+                RawIngestionRecord.resource_type.in_(sorted(parent_kinds)),
+            )
         ).all()
     )
     node_key_index = build_node_key_index(raw_rows)

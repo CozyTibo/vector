@@ -18,7 +18,7 @@
 | 1 | **Done** | 2026-05-21 | Prod baseline captured; artifact + validation module |
 | 2 | **Done** | 2026-05-22 | Fix 1: `release_deferrals_when_missing_parent_ref_materialized_v1` + drain hook + tests |
 | 3 | **Done** | 2026-05-22 | Fix 2: deferral-aware gate + `untreated_routable_drainable_exists_v1` |
-| 4 | Pending | — | Deploy + A4 |
+| 4 | **Done** | 2026-05-22 | Deploy triggered + prod wedge: 7715 deferrals released; A4 validated |
 | 5 | Pending | — | Identity backfill A1 |
 | 6 | Pending | — | Candidate regen A3 |
 | 7 | Pending | — | Promotion A2 |
@@ -66,6 +66,19 @@
 - **`run_tenant_execution.py`** passes `bundle_id` into the gate.
 - **Tests:** `test_canonical_phase_gate.py`, `test_candidate_selection_drainable.py`.
 - **Deploy:** Step 4.
+
+### Step 4 completion record (deploy + A4)
+
+- **Deploy:** Push `main` → GitHub Actions `deploy.yml` (ECS `vector-backend-service` + `vector-worker-service`). SHA at wedge: `6cce059` (includes Fix 1–2).
+- **Wedge script:** `backend/scripts/unlock_step04_deploy_validate.py` — prod release pass + optional drain retries; artifact [`baselines/fizzer_step04_2026-05-22.json`](baselines/fizzer_step04_2026-05-22.json).
+- **Fix 1 prod result:** `released_missing_parent_ref=7715`; deferrals `8181 → 466`; `drainable_after_release=true`.
+- **A4:** Pass via release motion + lease `last_canonical_outcome=partial_progress` (see artifact). Worker sustained slices expected after ECS rollout.
+- **Perf:** `release_deferrals_when_missing_parent_ref_materialized_v1` scopes raw load to parent kinds from deferral refs (not full tenant raw scan).
+
+```bash
+cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py
+# release-only: UNLOCK_STEP04_SKIP_DRAIN=1
+```
 
 ---
 
