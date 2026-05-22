@@ -222,6 +222,30 @@ jobs:
             --force-new-deployment \
             --region "$AWS_REGION"
 
+      - name: Wait for API and worker ECS rollouts
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" "$ECS_WORKER_SERVICE" \
+            --region "$AWS_REGION"
+
+      - name: Verify prod image tags match deploy SHA
+        run: |
+          set -euo pipefail
+          api_img=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
+          worker_img=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_WORKER_SERVICE" \
+            --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
+          api_tag=$(aws ecs describe-task-definition --task-definition "$api_img" --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
+          worker_tag=$(aws ecs describe-task-definition --task-definition "$worker_img" --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
+          echo "API image tag: $api_tag"
+          echo "Worker image tag: $worker_tag"
+          echo "Expected: $IMAGE_TAG"
+          test "$api_tag" = "$IMAGE_TAG"
+          test "$worker_tag" = "$IMAGE_TAG"
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
