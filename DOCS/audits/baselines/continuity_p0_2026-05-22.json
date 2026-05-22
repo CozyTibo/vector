@@ -376,5 +376,802 @@
       "step_11_pass": true,
       "cleared_for_step_12_deploy": true
     }
-  }
+  },
+  "step_1_2_p3_deploy": {
+    "step": "1.2_p3_prime_deploy",
+    "closure_git_sha": "80aea87620d0c81bbe648bcf9e9981a989cc11a7",
+    "deploy_recorded_at": "2026-05-22T22:06:08.614808+00:00",
+    "prod_deploy": {
+      "recorded_at": "2026-05-22T22:08:19.274580+00:00",
+      "git_sha_full": "80aea87620d0c81bbe648bcf9e9981a989cc11a7",
+      "git_sha_short": "80aea87620d0",
+      "aws_region": "eu-west-1",
+      "ecs_cluster": "vector-prod",
+      "api": {
+        "service": "vector-backend-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:155",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:80aea87620d0c81bbe648bcf9e9981a989cc11a7",
+        "image_tag": "80aea87620d0c81bbe648bcf9e9981a989cc11a7"
+      },
+      "worker": {
+        "service": "vector-worker-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:116",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:80aea87620d0c81bbe648bcf9e9981a989cc11a7",
+        "image_tag": "80aea87620d0c81bbe648bcf9e9981a989cc11a7"
+      },
+      "verification": {
+        "api_image_matches_closure_sha": true,
+        "worker_image_matches_closure_sha": true,
+        "both_services_on_same_tag": true,
+        "deploy_matches_closure_sha": true
+      }
+    },
+    "schedule_pass": {
+      "evaluation": {
+        "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+        "gate_id": "G-P085-WALK-01",
+        "should_schedule": true,
+        "schedule_reason": "after_phase_05_eligible",
+        "trigger": "after_phase_05",
+        "graph_maturity_stage": "G0",
+        "graph_density_score": 7,
+        "entity_count": 7286,
+        "linked_entity_count": 216,
+        "walk_queue_depth": 0,
+        "traversal_propagation_blocked": false,
+        "traversal_propagation_mode": "component",
+        "islands_eligible_count": 2,
+        "min_component_entities": 2,
+        "largest_eligible_island_size": 214,
+        "traversal_propagation_block_reason": "component_islands_eligible",
+        "orphan_disconnected_count": 7033,
+        "eligible_component_scope_ids": [
+          "182fdd36be823c97",
+          "b87caf33b42e2307"
+        ]
+      },
+      "schedule": {
+        "scheduled": true,
+        "path": "inline_execution_slice",
+        "trigger": "after_phase_05",
+        "evaluation": {
+          "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+          "gate_id": "G-P085-WALK-01",
+          "should_schedule": true,
+          "schedule_reason": "after_phase_05_eligible",
+          "trigger": "after_phase_05",
+          "graph_maturity_stage": "G0",
+          "graph_density_score": 7,
+          "entity_count": 7286,
+          "linked_entity_count": 216,
+          "walk_queue_depth": 0,
+          "traversal_propagation_blocked": false,
+          "traversal_propagation_mode": "component",
+          "islands_eligible_count": 2,
+          "min_component_entities": 2,
+          "largest_eligible_island_size": 214,
+          "traversal_propagation_block_reason": "component_islands_eligible",
+          "orphan_disconnected_count": 7033,
+          "eligible_component_scope_ids": [
+            "182fdd36be823c97",
+            "b87caf33b42e2307"
+          ]
+        },
+        "pass": {
+          "gate_id": "G-P085-WALK-01",
+          "trigger": "after_phase_05",
+          "scheduled": true,
+          "max_walks_per_pass": 32,
+          "frontier_meta": {
+            "graph_maturity_stage": "G0",
+            "graph_density_score": 7,
+            "connected_component_count": 2,
+            "frontier_candidates": 2,
+            "selected_start_count": 2
+          },
+          "selected_start_node_ids": [
+            "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+            "311086af-4721-5203-ab45-ff6136193761"
+          ],
+          "materialization": {
+            "ok": true,
+            "walks_persisted": 2,
+            "walk_ids": [
+              "5872ded0-9ddc-430f-807e-e971bb4c9e72",
+              "175b774a-f123-48d3-81d8-00fcf2eeae71"
+            ],
+            "primary_octs_walk_id": "5872ded0-9ddc-430f-807e-e971bb4c9e72",
+            "skipped_idempotent": 0,
+            "graph_projection_stable_hash_sha256": "7ff17d96e80b421454b491cac4a3fd53283584a7e9661c42db886b8004df219a"
+          },
+          "traversal_explainability_panel": {
+            "gate_id": "G-P085-WALK-04",
+            "related_gate_ids": [
+              "G-P085-WALK-01",
+              "G-P085-WALK-03"
+            ],
+            "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+            "computed_at_utc": "2026-05-22T22:08:33.728107+00:00",
+            "metrics": {
+              "walks_completed_rate": 1.0,
+              "walks_pending_gauge": 0,
+              "traversal_density_score": 1.0
+            },
+            "traversal_density_detail": {
+              "completed_walks_with_payload": 26,
+              "eligible_graph_frontiers": 2,
+              "formula": "completed_walks_with_payload / eligible_graph_frontiers"
+            },
+            "operational_alive": false,
+            "operational_alive_threshold": 0.5,
+            "graph_maturity_stage": "G0",
+            "why_walks_pending": [
+              {
+                "code": "no_pending_walks",
+                "detail": "Traversal queue is empty."
+              }
+            ],
+            "upstream_graph_omissions": {
+              "traversal_propagation_blocked": false,
+              "islands_eligible_count": 2,
+              "traversal_propagation_mode": "component",
+              "omission_classes": {
+                "orphan_artifacts": 7070,
+                "orphan_awaiting_promotion": 37,
+                "orphan_disconnected_component": 7033,
+                "pending_link_candidates": 3600
+              },
+              "graph_substrate_state": "degraded",
+              "graph_maturity_stage": "G0",
+              "ret_skip_when_disconnected": "RET-SKIP-GRAPH-DISCONNECTED"
+            },
+            "stall_evaluation": {
+              "gate_id": "G-P085-WALK-03",
+              "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+              "pending_walks": 0,
+              "last_walk_completed_at": "2026-05-22T22:08:19.914919+00:00",
+              "stalled": false,
+              "reason": "no_pending_walks",
+              "stall_threshold_seconds": 1800,
+              "seconds_since_last_completion": 8.491388
+            },
+            "schedule_evaluation": {
+              "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+              "gate_id": "G-P085-WALK-01",
+              "should_schedule": false,
+              "schedule_reason": "graph_below_g1_or_empty",
+              "trigger": null,
+              "graph_maturity_stage": "G0",
+              "graph_density_score": 7,
+              "entity_count": 7286,
+              "linked_entity_count": 216,
+              "walk_queue_depth": 0,
+              "traversal_propagation_blocked": false,
+              "traversal_propagation_mode": "component",
+              "islands_eligible_count": 2,
+              "min_component_entities": 2,
+              "largest_eligible_island_size": 214,
+              "traversal_propagation_block_reason": "component_islands_eligible",
+              "orphan_disconnected_count": 7033,
+              "eligible_component_scope_ids": [
+                "182fdd36be823c97",
+                "b87caf33b42e2307"
+              ]
+            },
+            "per_walk_explanations": [
+              {
+                "early_termination": {
+                  "walk_id": "0cef764c-3fa9-43b5-959f-f61afcc333c3",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "0cef764c-3fa9-43b5-959f-f61afcc333c3",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "be38d43a6bf279b22d012c226b590ec7",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "16245674-c561-4928-a11f-ab8ad7f272f6",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "16245674-c561-4928-a11f-ab8ad7f272f6",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "25b165c1236d3940195782482ccf7da8",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "175b774a-f123-48d3-81d8-00fcf2eeae71",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 1,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 1 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "175b774a-f123-48d3-81d8-00fcf2eeae71",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "9c8c963bdf521a6e0afa755d009115c5",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "1b3b460a-56e7-4ef8-a4ce-e9ac728f7b35",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 25,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 25 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "1b3b460a-56e7-4ef8-a4ce-e9ac728f7b35",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "ab902def107a31b77cf5d842a331d028",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "1d23053f-136b-46bb-9876-5d47ca9b0ad9",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 23,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 23 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "1d23053f-136b-46bb-9876-5d47ca9b0ad9",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "e05ac7c26037f7f93c01bf44417b718d",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "3772ed48-c1b7-4ccc-884a-540290b2490a",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "3772ed48-c1b7-4ccc-884a-540290b2490a",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "70f211b91c7a7fc8f966c4ba0468f1d3",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "3f4daab9-8c57-4f4a-91b6-ba8fa1d2b63b",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "3f4daab9-8c57-4f4a-91b6-ba8fa1d2b63b",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "ea5a8770c4ca8495ecdd6b616c5135ae",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "5872ded0-9ddc-430f-807e-e971bb4c9e72",
+                  "status": "completed",
+                  "termination_reason": "budget_exhausted",
+                  "hops_emitted": 95,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=budget_exhausted after 95 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "5872ded0-9ddc-430f-807e-e971bb4c9e72",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "budget_exhausted"
+                  ],
+                  "replay_identity": "17de265ee3b0bd0a565ebd37ad7c0bd1",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "58c703e2-f068-47f7-a5c7-f0a6ec5aa9c1",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "58c703e2-f068-47f7-a5c7-f0a6ec5aa9c1",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "5978b9338c72d58ddbd503aeed0437a8",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "6dc5f52f-fa5e-4708-a15c-3a44af522fd9",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "6dc5f52f-fa5e-4708-a15c-3a44af522fd9",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "e996b18f6715f6cd9d2d8664877c7d6c",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "75ed6ce3-0529-4672-b79e-2ee7eaf12e22",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "75ed6ce3-0529-4672-b79e-2ee7eaf12e22",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "e8ee19819b6c42c17b5c0cb9569bccf8",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "7fc1c0b9-940d-409d-b951-c24cfc35070e",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "7fc1c0b9-940d-409d-b951-c24cfc35070e",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "834178468e9ce39970a484788643e4b2",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "800427af-527b-4aca-9f13-6c36d46775dc",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 26,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 26 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "800427af-527b-4aca-9f13-6c36d46775dc",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "9d7ebdfa7796d843186ae1e61a410cb0",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "9191bb08-879c-4240-9d5d-de1f809da272",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "9191bb08-879c-4240-9d5d-de1f809da272",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "deb7e6c5929715bd20b0b5a668c6adab",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "a3f9bfb4-fa98-4796-909b-5dea5058e86f",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "a3f9bfb4-fa98-4796-909b-5dea5058e86f",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "766a438700f0744d28c503fa9a6d4c95",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "aaf89fd7-c811-499d-a1b5-32c49a3b7b3e",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "aaf89fd7-c811-499d-a1b5-32c49a3b7b3e",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "f2647c884daada06ea5d331b8590ab26",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "b55e5cb7-7d51-47e4-8d2f-9eeaf3a95d9a",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 33,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 33 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "b55e5cb7-7d51-47e4-8d2f-9eeaf3a95d9a",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "905b66946dc0a5ce699d68aacc862c30",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "d3ce4722-4aa3-43e8-8bf6-81268f26f8bd",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "d3ce4722-4aa3-43e8-8bf6-81268f26f8bd",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "890b1d1095f9a97614e0dda0d4e96dd9",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "d501b7e3-7cc2-448c-9c2b-b818e52ddf2c",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "d501b7e3-7cc2-448c-9c2b-b818e52ddf2c",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "736cd36dcf540412c858ba224f87b1b1",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "d77673c0-00c7-45fb-91df-bffb6d3db10a",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "d77673c0-00c7-45fb-91df-bffb6d3db10a",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "da5966c24c9c85859e7ec2c1a9e79715",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "e1a3a67d-af2d-4828-99b3-33915d32bbc0",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "e1a3a67d-af2d-4828-99b3-33915d32bbc0",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "cdc648392f7adfebd31325881dc1ab87",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "eab3ec7a-5407-4fc8-8646-ea97cd81cb67",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 46,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 46 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "eab3ec7a-5407-4fc8-8646-ea97cd81cb67",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "67b772076bd78165ba31738f51143595",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "eec99c6d-de4e-4678-a107-2ff7fbc369bf",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 53,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 53 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "eec99c6d-de4e-4678-a107-2ff7fbc369bf",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "5c7867f4e223062617910bd30ab75100",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "ef14f6a9-9707-44af-9f50-b002ab976495",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 23,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 23 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "ef14f6a9-9707-44af-9f50-b002ab976495",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "8339cedac52f1ec06fa3648dfe137191",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "f7525842-d1d0-438f-a94c-48c460e29bf0",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 0,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": "frontier_collapse",
+                  "cesp_reason_code": "empty_frontier_zero_hops",
+                  "summary": "Walk ended with termination_reason=empty_frontier after 0 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "f7525842-d1d0-438f-a94c-48c460e29bf0",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "ac355cdecf962ba69c638a76c2c01d4a",
+                  "parent_walk_id": null
+                }
+              },
+              {
+                "early_termination": {
+                  "walk_id": "fe92b964-a4bd-4fb2-829b-70188912d392",
+                  "status": "completed",
+                  "termination_reason": "empty_frontier",
+                  "hops_emitted": 26,
+                  "terminated_early": true,
+                  "early_termination_reason_known": true,
+                  "cesp_failure_class": null,
+                  "cesp_reason_code": null,
+                  "summary": "Walk ended with termination_reason=empty_frontier after 26 hop(s)."
+                },
+                "replay_posture": {
+                  "walk_id": "fe92b964-a4bd-4fb2-829b-70188912d392",
+                  "replay_legality_posture": "degraded",
+                  "degradation_classes": [
+                    "empty_frontier"
+                  ],
+                  "replay_identity": "41d02faabfb0724f623da1190cae7e6b",
+                  "parent_walk_id": null
+                }
+              }
+            ]
+          },
+          "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34"
+        }
+      },
+      "persisted_new": 2,
+      "scheduled": true,
+      "path": "inline_execution_slice",
+      "trigger": "after_phase_05"
+    },
+    "walks_before": {
+      "total_count": 24,
+      "newest_created_at": "2026-05-22T21:36:24.876777+00:00",
+      "oldest_created_at": "2026-05-22T15:19:28.925592+00:00"
+    },
+    "walks_after": {
+      "total_count": 26,
+      "newest_created_at": "2026-05-22T22:08:19.914919+00:00",
+      "oldest_created_at": "2026-05-22T15:19:28.925592+00:00"
+    },
+    "walks_persisted_new_in_pass": 2,
+    "walks_created_after_deploy_delta": 2,
+    "checks": {
+      "ecs_deploy_matches_p3_prime_sha": true,
+      "api_tag_contains_p3_prime_commit": true,
+      "worker_tag_contains_p3_prime_commit": true,
+      "p3_prime_schedule_should_schedule": true,
+      "p3_prime_not_propagation_blocked": true,
+      "autonomous_schedule_pass_ran": true,
+      "autonomous_walks_persisted_or_new_rows": true,
+      "newest_walk_after_deploy_window": true,
+      "not_wedge_only_timeline": true,
+      "no_manual_step09_script_required": true
+    },
+    "p1_2_pass": true,
+    "verification": {
+      "step_12_pass": true,
+      "cleared_for_step_13": true
+    },
+    "recorded_at": "2026-05-22T22:08:33.865119+00:00",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
+  },
+  "p1_2_closure_git_sha": "80aea87620d0c81bbe648bcf9e9981a989cc11a7"
 }

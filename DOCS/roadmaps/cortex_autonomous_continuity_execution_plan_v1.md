@@ -442,7 +442,11 @@ Executed **2026-05-22** on Fizzer prod:
 | Step | Work | Done when |
 |------|------|-----------|
 | 1.1 | Implement P3′ component scheduling (P1-A) + unit tests | `evaluate_traversal_schedule` eligible with Fizzer islands | **Done** (see §Phase 1.1 completion) |
-| 1.2 | Deploy P3′ | New walks without manual step 9 |
+| 1.2 | Deploy P3′ | New walks without manual step 9 | **Done** (see §Phase 1.2 completion) |
+| 1.3 | P1-B verify promotion Celery + raise caps | `pending_candidates` trending down |
+| 1.4 | P1-D TCRE integration test in CI | Test green |
+| 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 |
+| 1.6 | P1-C retrieval per island (minimal: largest island only) | AA4 partial |
 
 #### Phase 1.1 completion (P3′ component-scoped propagation)
 
@@ -459,11 +463,23 @@ Implemented **2026-05-22** (P1-A / CONT-INV-03 partial):
 | Tests | `test_p3_component_traversal_propagation.py` + updated phase085 scheduling/propagation tests |
 | Prod script | `python backend/scripts/continuity_p1_component_scheduling_proof.py` |
 
-**Next step (1.2):** deploy image with P3′ and verify autonomous walks without manual step 9 wedge.
-| 1.3 | P1-B verify promotion Celery + raise caps | `pending_candidates` trending down |
-| 1.4 | P1-D TCRE integration test in CI | Test green |
-| 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 |
-| 1.6 | P1-C retrieval per island (minimal: largest island only) | AA4 partial |
+**Next step (1.3):** P1-B — verify promotion Celery and raise caps so `pending_candidates` trends down.
+
+#### Phase 1.2 completion (P3′ deploy + autonomous walks)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Closure git SHA | `80aea87620d0c81bbe648bcf9e9981a989cc11a7` (P3′ from step 1.1) |
+| API ECS image | `vector-backend:80aea87620d0…` (task def `:155`) |
+| Worker ECS image | `vector-worker:80aea87620d0…` (task def `:116`) |
+| Schedule pass | `schedule_octs_walks_for_tenant_v1` / `after_phase_05`, `path=inline_execution_slice` |
+| Autonomous walks | `walks_persisted=2` (`5872ded0…`, `175b774a…`); no `unlock_step09_graph_octs_walk.py` |
+| Walk delta | 24 → 26 rows; newest `2026-05-22T22:08:19Z` (after deploy window) |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_2_p3_deploy`, `p1_2_closure_git_sha` |
+| Code | `continuity_p1_p3_deploy.py`, `test_continuity_p1_p3_deploy.py` |
+| Prod script | `python backend/scripts/continuity_p1_phase12_deploy_proof.py --wait-for-deploy 600` |
 
 ### Phase 2 — Decouple + proof panel (days 11–18)
 
@@ -508,6 +524,8 @@ python scripts/continuity_p0_phase0_closure.py --wait-for-deploy 600
 python scripts/continuity_p0_phase0_signoff.py
 # P3′ component scheduling proof (step 1.1):
 python scripts/continuity_p1_component_scheduling_proof.py
+# P3′ deploy + autonomous walk proof (step 1.2):
+python scripts/continuity_p1_phase12_deploy_proof.py --wait-for-deploy 600
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json
