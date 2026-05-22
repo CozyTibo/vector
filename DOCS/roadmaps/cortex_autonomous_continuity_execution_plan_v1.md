@@ -483,13 +483,14 @@ Executed **2026-05-22** on Fizzer prod:
 
 #### Phase 1.3 completion (P1-B promotion worker + caps)
 
-Implemented **2026-05-22** on Fizzer prod:
+Executed **2026-05-22** on Fizzer prod:
 
 | Item | Value |
 |------|-------|
+| Closure git SHA | `04993e9` (promotion cap default 400) |
 | Worker path (M9) | Inline `schedule_graph_density_promotion_after_identity_substrate_v1` after phase 03; legacy `app.tasks.cortex_graph_density_promotion` absent |
 | Cap raised | `cortex_graph_density_promotion_max_per_pass` default **400** (`CORTEX_GRAPH_DENSITY_PROMOTION_MAX_PER_PASS`) |
-| Drain proof | Multi-pass `schedule_graph_density_pass_v1` (`backlog_threshold`, `force=True`); `pending_link_candidates` decreased |
+| Drain proof | 3 passes × 400 promoted; `pending_link_candidates` **3600 → 2400**; auth edges **400 → 1600** |
 | Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_3_p1b_promotion`, `p1_3_closure_git_sha` |
 | Code | `continuity_p1_promotion.py`, `test_continuity_p1_promotion.py` |
 | Prod script | `python backend/scripts/continuity_p1_phase13_promotion_proof.py --wait-for-deploy 600` |

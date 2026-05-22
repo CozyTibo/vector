@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import subprocess
@@ -63,6 +64,9 @@ def _git_sha(expected: str | None) -> str:
     if expected:
         return expected.strip()
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True).strip()
+
+
+print = functools.partial(print, flush=True)  # noqa: A001
 
 
 def main() -> int:

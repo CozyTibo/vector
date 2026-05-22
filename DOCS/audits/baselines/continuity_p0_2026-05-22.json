@@ -1173,5 +1173,134 @@
     "recorded_at": "2026-05-22T22:08:33.865119+00:00",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
   },
-  "p1_2_closure_git_sha": "80aea87620d0c81bbe648bcf9e9981a989cc11a7"
+  "p1_2_closure_git_sha": "80aea87620d0c81bbe648bcf9e9981a989cc11a7",
+  "step_1_3_p1b_promotion": {
+    "step": "1.3_p1b_promotion_worker",
+    "closure_git_sha": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0",
+    "deploy_recorded_at": "2026-05-22T22:32:56.396679+00:00",
+    "prod_deploy": {
+      "recorded_at": "2026-05-22T22:32:59.028660+00:00",
+      "git_sha_full": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0",
+      "git_sha_short": "b4ccbf02cd9e",
+      "aws_region": "eu-west-1",
+      "ecs_cluster": "vector-prod",
+      "api": {
+        "service": "vector-backend-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:159",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:b4ccbf02cd9e127b163c940b8956be2e62eaccd0",
+        "image_tag": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0"
+      },
+      "worker": {
+        "service": "vector-worker-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:120",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:b4ccbf02cd9e127b163c940b8956be2e62eaccd0",
+        "image_tag": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0"
+      },
+      "verification": {
+        "api_image_matches_closure_sha": true,
+        "worker_image_matches_closure_sha": true,
+        "both_services_on_same_tag": true,
+        "deploy_matches_closure_sha": true
+      }
+    },
+    "worker_path": {
+      "m9_promotion_errors": [],
+      "phase03_promotion_errors": [],
+      "legacy_celery_task_name": "vector.cortex.operational_runtime.graph_density_promotion_pass",
+      "worker_hook": "schedule_graph_density_promotion_after_identity_substrate_v1",
+      "pass_entrypoint": "schedule_graph_density_pass_v1",
+      "m9_promotion_path_ok": true
+    },
+    "drain_result": {
+      "max_per_pass": 400,
+      "passes_executed": 3,
+      "passes": [
+        {
+          "pass_index": 0,
+          "scheduled": true,
+          "promoted_count": 400,
+          "pending_before": 3600,
+          "pending_after": 3200,
+          "unpromoted_remaining": 3200,
+          "schedule_reason": "backlog_threshold"
+        },
+        {
+          "pass_index": 1,
+          "scheduled": true,
+          "promoted_count": 400,
+          "pending_before": 3200,
+          "pending_after": 2800,
+          "unpromoted_remaining": 2800,
+          "schedule_reason": "backlog_threshold"
+        },
+        {
+          "pass_index": 2,
+          "scheduled": true,
+          "promoted_count": 400,
+          "pending_before": 2800,
+          "pending_after": 2400,
+          "unpromoted_remaining": 2400,
+          "schedule_reason": "backlog_threshold"
+        }
+      ],
+      "metrics_before": {
+        "pending_link_candidates": 3600,
+        "unpromoted_link_candidates": 3600,
+        "graph_maturity_stage": "G0",
+        "graph_promoted_edge_count": 400,
+        "graph_candidate_count": 4000,
+        "fake_green_evaluation": {
+          "fake_green_blocked": true,
+          "would_block_healthy_substrate_state": false,
+          "pending_candidate_threshold": 10,
+          "graph_orphan_artifact_count": 7070,
+          "pending_link_candidates": 3600
+        },
+        "max_per_pass_configured": 400,
+        "pending_candidate_threshold": 10
+      },
+      "metrics_after": {
+        "pending_link_candidates": 2400,
+        "unpromoted_link_candidates": 2400,
+        "graph_maturity_stage": "G0",
+        "graph_promoted_edge_count": 1600,
+        "graph_candidate_count": 4000,
+        "fake_green_evaluation": {
+          "fake_green_blocked": true,
+          "would_block_healthy_substrate_state": false,
+          "pending_candidate_threshold": 10,
+          "graph_orphan_artifact_count": 7027,
+          "pending_link_candidates": 2400
+        },
+        "max_per_pass_configured": 400,
+        "pending_candidate_threshold": 10
+      },
+      "total_promoted": 1200,
+      "pending_delta": 1200
+    },
+    "pending_before": 3600,
+    "pending_after": 2400,
+    "pending_delta": 1200,
+    "pending_candidate_threshold": 10,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "m9_legacy_promotion_celery_absent": true,
+      "phase03_worker_promotion_hook_wired": true,
+      "promotion_max_per_pass_at_least_p1b_floor": true,
+      "promotion_passes_executed": true,
+      "total_promoted_gt_zero": true,
+      "pending_link_candidates_decreased": true,
+      "pending_delta_positive": true,
+      "pending_trending_down": true,
+      "not_blocked_at_theta_only": true
+    },
+    "p1_3_pass": true,
+    "verification": {
+      "step_13_pass": true,
+      "cleared_for_step_14": true
+    },
+    "recorded_at": "2026-05-22T22:34:40.219156+00:00",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
+  },
+  "p1_3_closure_git_sha": "b4ccbf02cd9e127b163c940b8956be2e62eaccd0"
 }
