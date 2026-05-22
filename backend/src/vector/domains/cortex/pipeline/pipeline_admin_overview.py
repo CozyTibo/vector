@@ -32,6 +32,7 @@ from vector.domains.cortex.ingestion.admin_recent_raw import list_recent_ingesti
 from vector.domains.cortex.ingestion.ingestion_schedule_forecast import (
     estimate_tenant_next_scheduled_ingestion_v1,
 )
+from vector.domains.cortex.execution.admin_commands import build_execution_inspect_v1
 from vector.domains.cortex.pipeline.continuity_overview_v1 import (
     build_continuity_overview_bundle_v1,
 )
