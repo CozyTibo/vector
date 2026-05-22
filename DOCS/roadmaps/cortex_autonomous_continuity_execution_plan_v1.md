@@ -443,7 +443,7 @@ Executed **2026-05-22** on Fizzer prod:
 |------|------|-----------|
 | 1.1 | Implement P3′ component scheduling (P1-A) + unit tests | `evaluate_traversal_schedule` eligible with Fizzer islands | **Done** (see §Phase 1.1 completion) |
 | 1.2 | Deploy P3′ | New walks without manual step 9 | **Done** (see §Phase 1.2 completion) |
-| 1.3 | P1-B verify promotion Celery + raise caps | `pending_candidates` trending down |
+| 1.3 | P1-B verify promotion Celery + raise caps | `pending_candidates` trending down | **Done** (see §Phase 1.3 completion) |
 | 1.4 | P1-D TCRE integration test in CI | Test green |
 | 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 |
 | 1.6 | P1-C retrieval per island (minimal: largest island only) | AA4 partial |
@@ -463,7 +463,7 @@ Implemented **2026-05-22** (P1-A / CONT-INV-03 partial):
 | Tests | `test_p3_component_traversal_propagation.py` + updated phase085 scheduling/propagation tests |
 | Prod script | `python backend/scripts/continuity_p1_component_scheduling_proof.py` |
 
-**Next step (1.3):** P1-B — verify promotion Celery and raise caps so `pending_candidates` trends down.
+**Next step (1.4):** P1-D — TCRE integration test in CI and prod resume path proof.
 
 #### Phase 1.2 completion (P3′ deploy + autonomous walks)
 
@@ -480,6 +480,19 @@ Executed **2026-05-22** on Fizzer prod:
 | Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_2_p3_deploy`, `p1_2_closure_git_sha` |
 | Code | `continuity_p1_p3_deploy.py`, `test_continuity_p1_p3_deploy.py` |
 | Prod script | `python backend/scripts/continuity_p1_phase12_deploy_proof.py --wait-for-deploy 600` |
+
+#### Phase 1.3 completion (P1-B promotion worker + caps)
+
+Implemented **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Worker path (M9) | Inline `schedule_graph_density_promotion_after_identity_substrate_v1` after phase 03; legacy `app.tasks.cortex_graph_density_promotion` absent |
+| Cap raised | `cortex_graph_density_promotion_max_per_pass` default **400** (`CORTEX_GRAPH_DENSITY_PROMOTION_MAX_PER_PASS`) |
+| Drain proof | Multi-pass `schedule_graph_density_pass_v1` (`backlog_threshold`, `force=True`); `pending_link_candidates` decreased |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_3_p1b_promotion`, `p1_3_closure_git_sha` |
+| Code | `continuity_p1_promotion.py`, `test_continuity_p1_promotion.py` |
+| Prod script | `python backend/scripts/continuity_p1_phase13_promotion_proof.py --wait-for-deploy 600` |
 
 ### Phase 2 — Decouple + proof panel (days 11–18)
 
@@ -526,6 +539,8 @@ python scripts/continuity_p0_phase0_signoff.py
 python scripts/continuity_p1_component_scheduling_proof.py
 # P3′ deploy + autonomous walk proof (step 1.2):
 python scripts/continuity_p1_phase12_deploy_proof.py --wait-for-deploy 600
+# P1-B promotion worker + pending drain proof (step 1.3):
+python scripts/continuity_p1_phase13_promotion_proof.py --wait-for-deploy 600
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

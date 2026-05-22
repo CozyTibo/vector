@@ -561,7 +561,7 @@ class Settings(BaseSettings):
         ),
     )
     cortex_graph_density_promotion_max_per_pass: int = Field(
-        default=200,
+        default=400,
         ge=1,
         le=500,
         validation_alias="CORTEX_GRAPH_DENSITY_PROMOTION_MAX_PER_PASS",
