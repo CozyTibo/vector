@@ -73,6 +73,7 @@ export type CoveragePayload = {
     awaiting_ingestion_support_pair_count?: number;
   };
   rows: CoverageRow[];
+  connector_rollups?: ConnectorRollup[];
   phase03_exit_audit?: Array<Record<string, unknown>>;
 };
 

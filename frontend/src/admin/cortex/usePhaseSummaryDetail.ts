@@ -5,6 +5,8 @@ import { adminFetch, adminJson } from "../../lib/adminFetch";
 import { readErrorDetail } from "../../lib/canonicalApi";
 import type { OperatorPhase } from "./pipelineTypes";
 
+const DETAIL_TIMEOUT_MS = 20_000;
+
 export const phaseSummaryDetailQueryKey = (tenantId: string, phase: OperatorPhase) =>
   ["admin-cortex-phase-summary-detail", tenantId, phase] as const;
 
@@ -25,8 +27,8 @@ const CORE_SUMMARY_KEYS = new Set([
   "blockers",
 ]);
 
-function detailPath(tenantId: string, phase: OperatorPhase, suffix: "summary-detail" | "summary/detail") {
-  return `/admin/tenants/${tenantId}/cortex/pipeline/phases/${phase}/${suffix}`;
+function detailPath(tenantId: string, phase: OperatorPhase) {
+  return `/admin/tenants/${tenantId}/cortex/pipeline/phases/${phase}/summary-detail`;
 }
 
 function stripCoreFields(full: Record<string, unknown>): Record<string, unknown> {
@@ -43,24 +45,19 @@ async function fetchPhaseSummaryDetail(
   tenantId: string,
   phase: OperatorPhase,
 ): Promise<PhaseSummaryDetail> {
-  const candidates: Array<"summary-detail" | "summary/detail"> = [
-    "summary-detail",
-    "summary/detail",
-  ];
-
-  for (const suffix of candidates) {
-    const path = detailPath(tenantId, phase, suffix);
-    const res = await adminFetch(path);
-    if (res.ok) {
-      return (await res.json()) as PhaseSummaryDetail;
-    }
-    if (res.status !== 404) {
-      throw new Error(await readErrorDetail(res));
-    }
+  const path = detailPath(tenantId, phase);
+  const res = await adminFetch(path, undefined, { timeoutMs: DETAIL_TIMEOUT_MS });
+  if (res.ok) {
+    return (await res.json()) as PhaseSummaryDetail;
+  }
+  if (res.status !== 404) {
+    throw new Error(await readErrorDetail(res));
   }
 
   const full = await adminJson<Record<string, unknown>>(
     `/admin/tenants/${tenantId}/cortex/pipeline/phases/${phase}/summary`,
+    undefined,
+    { timeoutMs: DETAIL_TIMEOUT_MS },
   );
   return {
     surface_kind: "phase_summary_detail",
@@ -83,5 +80,6 @@ export function usePhaseSummaryDetail(phase: OperatorPhase, enabled: boolean) {
     enabled: Boolean(tenantId) && enabled,
     staleTime: 45_000,
     gcTime: 5 * 60_000,
+    retry: 1,
   });
 }

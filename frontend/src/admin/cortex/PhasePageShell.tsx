@@ -29,6 +29,8 @@ type Props = {
   phase: OperatorPhase;
   title: string;
   description: string;
+  /** When true, summary tab renders immediately and children fetch their own data. */
+  summaryLoadsOwnData?: boolean;
   summaryContent: (summary: PhaseSummaryPayload & Record<string, unknown>) => React.ReactNode;
   explorerContent: React.ReactNode;
   runsContent?: React.ReactNode;
@@ -65,6 +67,7 @@ export function PhasePageShell({
   phase,
   title,
   description,
+  summaryLoadsOwnData = false,
   summaryContent,
   explorerContent,
   runsContent,
@@ -89,7 +92,7 @@ export function PhasePageShell({
 
   const phasesQ = usePipelineOverviewPhases();
   const headerRow = phaseRowFromPhases(phasesQ.data?.phases, phase);
-  const detailQ = usePhaseSummaryDetail(phase, tab === "summary");
+  const detailQ = usePhaseSummaryDetail(phase, tab === "summary" && !summaryLoadsOwnData);
 
   const core = headerRow ? coreFromPhaseRow(phase, headerRow) : null;
   const detail = detailQ.data;
@@ -206,8 +209,14 @@ export function PhasePageShell({
               </ul>
             </section>
           ) : null}
-          {detailLoading ? <SectionSkeleton variant="cards" /> : null}
-          {merged && !detailLoading ? summaryContent(merged) : null}
+          {summaryLoadsOwnData ? (
+            summaryContent({ ...(core ?? { phase, status: "waiting", processed_count: null, backlog_count: null, last_success_at: null, blockers: [] }) })
+          ) : (
+            <>
+              {detailLoading ? <SectionSkeleton variant="cards" /> : null}
+              {merged && !detailLoading ? summaryContent(merged) : null}
+            </>
+          )}
         </div>
       ) : (
         explorerContent

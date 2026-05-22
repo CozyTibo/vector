@@ -9,9 +9,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.canonical.canonical_control_plane import build_canonical_control_plane
-from vector.domains.cortex.canonical.forward_progress.operator_snapshot import (
-    build_canonical_forward_progress_snapshot,
+from vector.domains.cortex.canonical.canonical_phase_admin_lite import (
+    build_canonical_phase_summary_metrics_v1,
 )
 from vector.domains.cortex.canonical.transform_runtime import (
     list_recent_materializations,
@@ -131,17 +130,7 @@ def _build_phase_summary_extra_v1(
         }
 
     if key == "canonical":
-        cp = build_canonical_control_plane(session, tenant_id)
-        forward = build_canonical_forward_progress_snapshot(session, tenant_id=tenant_id)
-        h = cp.get("health_overview") or {}
-        insp = (cp.get("inspectors") or {}).get("coverage_inspector") or {}
-        rollups = insp.get("coverage_connector_rollups") if isinstance(insp, dict) else []
-        return {
-            "health": h,
-            "forward_progress": forward,
-            "failure_count": int(h.get("active_canonical_failure_count") or 0),
-            "connector_rollups": rollups if isinstance(rollups, list) else [],
-        }
+        return build_canonical_phase_summary_metrics_v1(session, tenant_id=tenant_id)
 
     if key == "identity":
         cp = build_identity_control_plane(session, tenant_id=tenant_id)
