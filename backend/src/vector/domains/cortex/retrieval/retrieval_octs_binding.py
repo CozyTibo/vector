@@ -379,6 +379,7 @@ def materialize_retrieval_index_from_walk_v1(
     replay_identity: str,
     index_epoch: str,
     auto_publish: bool = True,
+    omission_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Materialize index row for a completed durable walk."""
     if str(record.status) != "completed":
@@ -410,7 +411,7 @@ def materialize_retrieval_index_from_walk_v1(
             "walk_result_hash": binding["walk_result_hash"],
             "traversal_epoch": binding["traversal_epoch"],
         },
-        omission_summary={},
+        omission_summary=dict(omission_summary or {}),
         auto_publish=auto_publish,
     )
     return {"retrieval_index_entry": row, "binding": binding, "walk_ref": walk_ref}

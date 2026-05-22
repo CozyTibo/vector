@@ -367,6 +367,19 @@ def materialize_retrieval_index_for_pipeline_v1(
     max_tcre_jobs: int = 25,
 ) -> dict[str, Any]:
     """Incremental retrieval materialization after pipeline TCRE completes (idempotent)."""
+    from vector.domains.cortex.retrieval.retrieval_component_materialization import (
+        is_retrieval_component_scope_enabled_v1,
+        materialize_retrieval_index_for_largest_island_v1,
+    )
+
+    if is_retrieval_component_scope_enabled_v1():
+        return materialize_retrieval_index_for_largest_island_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            max_tcre_jobs=max_tcre_jobs,
+        )
+
     from vector.domains.cortex.retrieval.retrieval_graph_binding import (
         RetrievalGraphBindingError,
         materialize_retrieval_index_from_graph_ref_v1,

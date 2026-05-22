@@ -1548,5 +1548,65 @@
     "recorded_at": "2026-05-22T22:51:46.806185+00:00",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
   },
-  "p1_5_closure_git_sha": "f04eda87bd705250e32c0179fd5e23085a97c066"
+  "p1_5_closure_git_sha": "f04eda87bd705250e32c0179fd5e23085a97c066",
+  "step_1_6_p1c_retrieval_island": {
+    "validated_at": "2026-05-22T22:59:45.687450+00:00",
+    "closure_git_sha": "06f943e0a743426c87f296ad36241398679c8893",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+    "p1_6_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "component_scope_enabled": true,
+      "retrieval_propagation_mode_component": true,
+      "largest_island_selected": true,
+      "islands_eligible_count_gt_zero": true,
+      "island_entity_count_ge_min": true,
+      "outside_island_scope_documented": true,
+      "island_scope_id_present": true,
+      "retrieval_index_epoch_published": true,
+      "entries_materialized_in_island_pass_gt_zero": true,
+      "aa4_partial_retrieval_footprint": true
+    },
+    "checks_advisory": {
+      "aa4_multi_hour_spread": false,
+      "aa4_total_entries_ge_10": true
+    },
+    "island_scope_id": "d7e41b3c763d38e9",
+    "materialization_summary": {
+      "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+      "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "index_epoch": "epoch-1335eb195190",
+      "entries_materialized": 1599,
+      "skip_reasons": [],
+      "tcre_candidates": 2,
+      "walks_candidates": 0,
+      "org_link_candidates": 1599,
+      "retrieval_propagation_mode": "component",
+      "island_scope_id": "d7e41b3c763d38e9",
+      "island_entity_count": 257,
+      "outside_island_scope_entity_count": 7029,
+      "islands_eligible_count": 2,
+      "largest_island_selected": true,
+      "largest_island_entity_count": 257,
+      "eligible_component_scope_ids": [
+        "d7e41b3c763d38e9",
+        "b87caf33b42e2307"
+      ],
+      "build_state": "PUBLISHED",
+      "entry_count": 1599,
+      "output_index_hash": "95ff669a4a122567a1ed34f1b8a97166b2f7de4c4db2fc2a5c696eff7570cdb5",
+      "ok": true,
+      "retrieval_card_classification": "progressing"
+    },
+    "aa4_footprint": {
+      "total_entries": 1100,
+      "distinct_created_hours": 1,
+      "entries_by_hour": {
+        "2026-05-22T22:00:00+00:00": 1100
+      },
+      "island_scope_id": "d7e41b3c763d38e9"
+    },
+    "trace_only": true
+  }
 }

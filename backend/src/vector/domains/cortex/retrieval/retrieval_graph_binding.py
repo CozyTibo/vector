@@ -442,6 +442,7 @@ def materialize_retrieval_index_from_graph_ref_v1(
     index_epoch: str,
     execution_partition: str = "authoritative",
     auto_publish: bool = True,
+    omission_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Materialize one index row for org entity or link addressing."""
     lookup_map = build_graph_handoff_lookup_map_v1(
@@ -470,6 +471,7 @@ def materialize_retrieval_index_from_graph_ref_v1(
         chronology_legality_class="strict",
         causal_legality_class="verified",
         artifact_ref={ref_kind: ref_value},
+        omission_summary=dict(omission_summary or {}),
         auto_publish=auto_publish,
     )
     return {"retrieval_index_entry": row, "lookup_map": lookup_map, "handoff_entry": entry}

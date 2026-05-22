@@ -445,8 +445,8 @@ Executed **2026-05-22** on Fizzer prod:
 | 1.2 | Deploy P3′ | New walks without manual step 9 | **Done** (see §Phase 1.2 completion) |
 | 1.3 | P1-B verify promotion Celery + raise caps | `pending_candidates` trending down | **Done** (see §Phase 1.3 completion) |
 | 1.4 | P1-D TCRE integration test in CI | Test green | **Done** (see §Phase 1.4 completion) |
-| 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 | **Done** (see §Phase 1.5 completion) | **Done** (see §Phase 1.5 completion) |
-| 1.6 | P1-C retrieval per island (minimal: largest island only) | AA4 partial |
+| 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 | **Done** (see §Phase 1.5 completion) |
+| 1.6 | P1-C retrieval per island (minimal: largest island only) | AA4 partial | **Done** (see §Phase 1.6 completion) |
 
 #### Phase 1.1 completion (P3′ component-scoped propagation)
 
@@ -463,7 +463,23 @@ Implemented **2026-05-22** (P1-A / CONT-INV-03 partial):
 | Tests | `test_p3_component_traversal_propagation.py` + updated phase085 scheduling/propagation tests |
 | Prod script | `python backend/scripts/continuity_p1_component_scheduling_proof.py` |
 
-**Next step (1.6):** P1-C — component-scoped retrieval materialization (largest island only).
+**Next step:** Phase 2 — synthesis / retrieval starvation unlock (see Phase 2 table).
+
+#### Phase 1.6 completion (P1-C retrieval per largest island)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Law | P1-C scopes `materialize_retrieval_index_for_pipeline_v1` to largest eligible island when `CORTEX_RETRIEVAL_COMPONENT_SCOPE` ≠ 0 |
+| Settings | `cortex_retrieval_component_scope_enabled`, `cortex_retrieval_min_component_entities` (default 2) |
+| Materialization | `retrieval_propagation_mode=component`, `island_scope_id=d7e41b3c763d38e9`, `entries_materialized=1599`, epoch `PUBLISHED` |
+| Island | 257 entities; 2 eligible islands; `outside_island_scope_entity_count=7029` |
+| AA4 partial | 1100 island-scoped `retrieval_entries` in 1 UTC hour bucket (advisory: multi-hour spread pending) |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_6_p1c_retrieval_island` |
+| Code | `retrieval_component_materialization.py`, `continuity_p1_retrieval.py`, binding `omission_summary` passthrough |
+| Tests | `test_continuity_p1_retrieval.py`, `test_p1c_retrieval_component_materialization.py` |
+| Prod script | `python backend/scripts/continuity_p1_phase16_retrieval_proof.py --trace-only` |
 
 #### Phase 1.5 completion (P1-D/E downstream chain — prod)
 

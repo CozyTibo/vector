@@ -734,6 +734,21 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_RETRIEVAL_INDEX_STALE_SECONDS",
         description="G-P085-RET-02: degrade retrieval when published index age exceeds threshold (T_index_stale).",
     )
+    cortex_retrieval_component_scope_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_RETRIEVAL_COMPONENT_SCOPE",
+        description=(
+            "P1-C: materialize retrieval index from largest eligible island only when true; "
+            "set env to 0 for global (pre-P1-C) materialization law."
+        ),
+    )
+    cortex_retrieval_min_component_entities: int = Field(
+        default=2,
+        ge=1,
+        le=10_000,
+        validation_alias="CORTEX_RETRIEVAL_MIN_COMPONENT_ENTITIES",
+        description="P1-C: minimum |V| in a connected component to scope retrieval materialization.",
+    )
     cortex_synthesis_forbidden_backoff_threshold: int = Field(
         default=3,
         ge=1,
