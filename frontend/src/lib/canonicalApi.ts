@@ -2,7 +2,14 @@ import { mergeProductSessionAuth } from "./sessionToken";
 
 export function getApiBase(): string {
   const raw = import.meta.env.VITE_API_BASE_URL;
+  // Empty in dev → same-origin requests; Vite proxies API paths to the backend (no CORS).
+  if (typeof raw === "string" && raw.trim() === "" && import.meta.env.DEV) {
+    return "";
+  }
   if (typeof raw !== "string" || !raw.trim()) {
+    if (import.meta.env.DEV) {
+      return "";
+    }
     return "http://localhost:8000";
   }
   return raw.replace(/\/$/, "");

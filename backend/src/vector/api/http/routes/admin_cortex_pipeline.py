@@ -40,13 +40,16 @@ from vector.settings import Settings
 def register_legacy_pipeline_overview_alias(router: APIRouter) -> None:
     """Misconfigured frontends called legacy overview paths (no ``cortex/pipeline`` segment)."""
 
+    def _assert_tenant(db: Session, tenant_id: uuid.UUID) -> None:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+
     def _legacy_overview(
         tenant_id: uuid.UUID,
         db: Session,
         settings: Settings,
     ) -> AdminCortexPipelineOverviewResponse:
-        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        _assert_tenant(db, tenant_id)
         raw = build_pipeline_overview_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewResponse.model_validate(raw)
 
@@ -62,17 +65,51 @@ def register_legacy_pipeline_overview_alias(router: APIRouter) -> None:
     ) -> AdminCortexPipelineOverviewResponse:
         return _legacy_overview(tenant_id, db, settings)
 
-    @router.get(
-        "/tenants/{tenant_id}/cortex/overview",
-        response_model=AdminCortexPipelineOverviewResponse,
+    legacy = APIRouter(
+        prefix="/tenants/{tenant_id}/cortex/overview",
+        tags=["cortex-pipeline"],
         include_in_schema=False,
     )
+
+    @legacy.get("", response_model=AdminCortexPipelineOverviewResponse)
     def get_legacy_cortex_overview(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexPipelineOverviewResponse:
         return _legacy_overview(tenant_id, db, settings)
+
+    @legacy.get("/execution", response_model=AdminCortexPipelineOverviewExecutionResponse)
+    def get_legacy_cortex_overview_execution(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelineOverviewExecutionResponse:
+        _assert_tenant(db, tenant_id)
+        raw = build_pipeline_overview_execution_v1(db, settings, tenant_id=tenant_id)
+        return AdminCortexPipelineOverviewExecutionResponse.model_validate(raw)
+
+    @legacy.get("/phases", response_model=AdminCortexPipelineOverviewPhasesResponse)
+    def get_legacy_cortex_overview_phases(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelineOverviewPhasesResponse:
+        _assert_tenant(db, tenant_id)
+        raw = build_pipeline_overview_phases_v1(db, settings, tenant_id=tenant_id)
+        return AdminCortexPipelineOverviewPhasesResponse.model_validate(raw)
+
+    @legacy.get("/ingestion", response_model=AdminCortexPipelineOverviewIngestionResponse)
+    def get_legacy_cortex_overview_ingestion(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelineOverviewIngestionResponse:
+        _assert_tenant(db, tenant_id)
+        raw = build_pipeline_overview_ingestion_v1(db, settings, tenant_id=tenant_id)
+        return AdminCortexPipelineOverviewIngestionResponse.model_validate(raw)
+
+    router.include_router(legacy)
 
 
 def register_cortex_pipeline_routes(router: APIRouter) -> None:

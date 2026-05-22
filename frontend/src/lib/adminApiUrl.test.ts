@@ -28,7 +28,7 @@ describe("adminApiUrl", () => {
     );
   });
 
-  it("strips per-tenant cortex suffix from misconfigured API base", () => {
+  it("strips deep tenant paths from misconfigured API base", () => {
     vi.spyOn(canonicalApi, "getApiBase").mockReturnValue(
       `https://api.myvector.co/admin/tenants/${TID}/cortex`,
     );
@@ -41,6 +41,18 @@ describe("adminApiUrl", () => {
       resolveAdminRequestUrl(adminApiPath(TID, "/cortex/pipeline/overview/phases")),
     ).toBe(
       `https://api.myvector.co/admin/tenants/${TID}/cortex/pipeline/overview/phases`,
+    );
+  });
+
+  it("maps overview slice suffixes when API base ends in cortex overview", () => {
+    vi.spyOn(canonicalApi, "getApiBase").mockReturnValue(
+      `http://localhost:8080/admin/tenants/${TID}/cortex/overview`,
+    );
+    expect(resolveAdminRequestUrl("/phases")).toBe(
+      `http://localhost:8080/admin/tenants/${TID}/cortex/pipeline/overview/phases`,
+    );
+    expect(resolveAdminRequestUrl("/ingestion")).toBe(
+      `http://localhost:8080/admin/tenants/${TID}/cortex/pipeline/overview/ingestion`,
     );
   });
 });
