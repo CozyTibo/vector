@@ -266,7 +266,7 @@ def reduce_degradation_propagation_edges_v1(
             "underlying_coordination_edge_ids": sorted([f"mat:{a}", f"mat:{b}"]),
             "derivation_rule_id": "p06.runtime03.chronology_degraded_propagation.v1",
             "causal_legality_class": "causal_replay_degraded",
-            "parent_artifact_ids": [f"mat:{a}", f"mat:{b}"],
+            "parent_artifact_ids": sorted([f"mat:{a}", f"mat:{b}"]),
             "evidence_lineage": [
                 {"hop_kind": "canonical_materialization", "artifact_id": a},
                 {"hop_kind": "canonical_materialization", "artifact_id": b},

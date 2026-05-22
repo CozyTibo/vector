@@ -445,7 +445,7 @@ Executed **2026-05-22** on Fizzer prod:
 | 1.2 | Deploy P3′ | New walks without manual step 9 | **Done** (see §Phase 1.2 completion) |
 | 1.3 | P1-B verify promotion Celery + raise caps | `pending_candidates` trending down | **Done** (see §Phase 1.3 completion) |
 | 1.4 | P1-D TCRE integration test in CI | Test green | **Done** (see §Phase 1.4 completion) |
-| 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 |
+| 1.5 | P1-D/E prod: 06 waiting → resume → 07 → 08 | Phase receipts + TCRE count > 0 | **Done** (see §Phase 1.5 completion) | **Done** (see §Phase 1.5 completion) |
 | 1.6 | P1-C retrieval per island (minimal: largest island only) | AA4 partial |
 
 #### Phase 1.1 completion (P3′ component-scoped propagation)
@@ -463,7 +463,21 @@ Implemented **2026-05-22** (P1-A / CONT-INV-03 partial):
 | Tests | `test_p3_component_traversal_propagation.py` + updated phase085 scheduling/propagation tests |
 | Prod script | `python backend/scripts/continuity_p1_component_scheduling_proof.py` |
 
-**Next step (1.5):** P1-D/E prod — phase 06 waiting → resume → 07 → 08 with receipts and TCRE count > 0.
+**Next step (1.6):** P1-C — component-scoped retrieval materialization (largest island only).
+
+#### Phase 1.5 completion (P1-D/E downstream chain — prod)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Pipeline run | `ce7df86d-b229-4467-ad28-1109ed119d34` |
+| TCRE | 3 jobs completed inline (`parent_artifact_ids` sort fix); resume via `resume_convergence_from_waiting_v1` |
+| Phase 06/07 | `completed` with execution receipts |
+| Phase 08 | Executed with receipt (`failed` — all scoped synthesis jobs errored; see `checks_advisory`) |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_5_p1de_downstream` |
+| Code | `continuity_p1_downstream.py`, `edge_expansion_runtime.py` (TCRE edge sort), `test_continuity_p1_downstream.py` |
+| Prod script | `python backend/scripts/continuity_p1_phase15_downstream_proof.py --wait-for-deploy 600` |
 
 #### Phase 1.2 completion (P3′ deploy + autonomous walks)
 
@@ -509,6 +523,19 @@ Executed **2026-05-22** on Fizzer prod:
 | Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_4_p1d_tcre_resume` |
 | Code | `continuity_p1_tcre.py`, `test_continuity_p1_tcre_resume.py` |
 | Prod script | `python backend/scripts/continuity_p1_phase14_tcre_proof.py --wait-for-deploy 600` |
+
+#### Phase 1.5 completion (P1-D/E downstream chain — prod)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Pipeline run | `ce7df86d-b229-4467-ad28-1109ed119d34` |
+| Chain | TCRE queued jobs drained inline → `on_tcre_job_completed` resume → `run_tenant_convergence_v1` slices for phase 07 + 08 |
+| Done when | Phase **06/07** `completed` + **08** execution receipt; `tcre_jobs_completed` > 0 (08 synthesis jobs on Fizzer: advisory `checks_advisory`) |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_1_5_p1de_downstream` |
+| Code | `continuity_p1_downstream.py`, `test_continuity_p1_downstream.py` |
+| Prod script | `python backend/scripts/continuity_p1_phase15_downstream_proof.py --wait-for-deploy 600` |
 
 ### Phase 2 — Decouple + proof panel (days 11–18)
 
@@ -559,6 +586,8 @@ python scripts/continuity_p1_phase12_deploy_proof.py --wait-for-deploy 600
 python scripts/continuity_p1_phase13_promotion_proof.py --wait-for-deploy 600
 # P1-D TCRE resume CI boundaries + prod trace (step 1.4):
 python scripts/continuity_p1_phase14_tcre_proof.py --wait-for-deploy 600
+# P1-D/E downstream 06→07→08 proof (step 1.5):
+python scripts/continuity_p1_phase15_downstream_proof.py --wait-for-deploy 600
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

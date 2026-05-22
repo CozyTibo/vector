@@ -1306,9 +1306,9 @@
   "step_1_4_p1d_tcre_resume": {
     "step": "1.4_p1d_tcre_resume",
     "closure_git_sha": "1c66058a1607e433238db7cfbaec0f3b0305c9b9",
-    "deploy_recorded_at": "2026-05-22T22:41:31.516701+00:00",
+    "deploy_recorded_at": "2026-05-22T22:41:38.074582+00:00",
     "prod_deploy": {
-      "recorded_at": "2026-05-22T22:41:33.667566+00:00",
+      "recorded_at": "2026-05-22T22:41:42.449646+00:00",
       "git_sha_full": "1c66058a1607e433238db7cfbaec0f3b0305c9b9",
       "git_sha_short": "1c66058a1607",
       "aws_region": "eu-west-1",
@@ -1376,10 +1376,177 @@
       "cleared_for_step_15": true
     },
     "ci_pytest": {
-      "skipped": true
+      "returncode": 0,
+      "stdout_tail": "..........                                                               [100%]\n10 passed, 1 deselected in 0.09s\n",
+      "stderr_tail": ""
     },
-    "recorded_at": "2026-05-22T22:41:34.373967+00:00",
+    "recorded_at": "2026-05-22T22:41:43.246466+00:00",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
   },
-  "p1_4_closure_git_sha": "1c66058a1607e433238db7cfbaec0f3b0305c9b9"
+  "p1_4_closure_git_sha": "1c66058a1607e433238db7cfbaec0f3b0305c9b9",
+  "step_1_5_p1de_downstream": {
+    "step": "1.5_p1de_downstream_chain",
+    "closure_git_sha": "f04eda87bd705250e32c0179fd5e23085a97c066",
+    "deploy_recorded_at": "2026-05-22T22:50:30.145854+00:00",
+    "prod_deploy": {
+      "recorded_at": "2026-05-22T22:50:32.470076+00:00",
+      "git_sha_full": "f04eda87bd705250e32c0179fd5e23085a97c066",
+      "git_sha_short": "f04eda87bd70",
+      "aws_region": "eu-west-1",
+      "ecs_cluster": "vector-prod",
+      "api": {
+        "service": "vector-backend-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:163",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:f04eda87bd705250e32c0179fd5e23085a97c066",
+        "image_tag": "f04eda87bd705250e32c0179fd5e23085a97c066"
+      },
+      "worker": {
+        "service": "vector-worker-service",
+        "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:124",
+        "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:f04eda87bd705250e32c0179fd5e23085a97c066",
+        "image_tag": "f04eda87bd705250e32c0179fd5e23085a97c066"
+      },
+      "verification": {
+        "api_image_matches_closure_sha": true,
+        "worker_image_matches_closure_sha": true,
+        "both_services_on_same_tag": true,
+        "deploy_matches_closure_sha": true
+      }
+    },
+    "phase_receipts": {
+      "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "pipeline_status": "failed",
+      "phases": {
+        "phase_06_tcre": {
+          "phase_id": "phase_06_tcre",
+          "status": "completed",
+          "started_at": "2026-05-22T22:01:22.053096+00:00",
+          "completed_at": "2026-05-22T22:01:22.253118+00:00",
+          "error_detail": null,
+          "receipt_digest": "ced4043c30a76f8caf52ecf7ba6f879b1a54a06239ce31288aa7d7ac8e18f089",
+          "output_summary": {
+            "job_id": "45723fb5-2e36-4b96-9789-a197e51d21bd",
+            "status": "queued",
+            "async": true
+          }
+        },
+        "phase_07_retrieval": {
+          "phase_id": "phase_07_retrieval",
+          "status": "completed",
+          "started_at": "2026-05-22T22:50:33.824858+00:00",
+          "completed_at": "2026-05-22T22:51:05.974231+00:00",
+          "error_detail": null,
+          "receipt_digest": "ace827f31b8fed8c2852f6d2a3e65cd14979a6f60f62b40a1e5f70e567bebace",
+          "output_summary": {
+            "index_epoch": "epoch-8b226c263bd4",
+            "published_index_epoch": "epoch-8b226c263bd4",
+            "build_state": "PUBLISHED",
+            "entry_count": 577,
+            "entries_materialized": 577
+          }
+        },
+        "phase_08_synthesis": {
+          "phase_id": "phase_08_synthesis",
+          "status": "failed",
+          "started_at": "2026-05-22T22:51:33.290693+00:00",
+          "completed_at": "2026-05-22T22:51:45.975958+00:00",
+          "error_detail": "synthesis_pipeline_all_jobs_failed",
+          "receipt_digest": "16035d3c3b23e6b946c7d5a079d47618228ee1800acd33b8b31e28674192d888",
+          "output_summary": {
+            "synthesis_publication_epoch": null,
+            "artifact_digests": [],
+            "synthesis_job_ids": [],
+            "retrieval_epoch_pinned": "epoch-8b226c263bd4",
+            "jobs_completed": 0,
+            "sd_rollup": {
+              "SD-PIPELINE-GAP": 8
+            }
+          }
+        }
+      },
+      "tcre_jobs_by_status": {
+        "completed": 2
+      },
+      "tcre_jobs_total": 2,
+      "tcre_jobs_completed": 2
+    },
+    "tcre_footprint": {
+      "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "pipeline_status": "failed",
+      "lease_status": "idle",
+      "lease_fsm_state": "IDLE",
+      "lease_phase_cursor": "phase_08_synthesis",
+      "lease_pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+      "waiting_reason": "tcre_async",
+      "resumed_from_waiting_at": "2026-05-22T22:45:02.227089+00:00",
+      "phase_06_status": "completed",
+      "phase_06_async": true,
+      "phase_06_job_id": "45723fb5-2e36-4b96-9789-a197e51d21bd",
+      "tcre_jobs_by_status": {
+        "completed": 2,
+        "queued": 1
+      },
+      "tcre_jobs_total": 3
+    },
+    "chain_drive": {
+      "prepare": {
+        "prepared": true,
+        "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+        "pipeline_status": "running",
+        "reopen": {
+          "reopened": true,
+          "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+          "resume_from_phase": "phase_07_retrieval",
+          "requeued_phases": [
+            "phase_07_retrieval",
+            "phase_08_synthesis"
+          ],
+          "pipeline_status": "running"
+        },
+        "execution_phase_cursor": "phase_07_retrieval",
+        "lease_status": "dirty",
+        "lease_fsm_state": "CANONICAL_DRAINING"
+      },
+      "tcre_drain": {
+        "jobs_processed": 0,
+        "jobs": []
+      },
+      "execution_slices": {
+        "slices_executed": 1,
+        "slices": [
+          {
+            "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+            "acquired": true,
+            "outcome": "converged_slice",
+            "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+            "lease_status": "idle",
+            "fsm_state": "IDLE"
+          }
+        ],
+        "enqueue_skipped": true
+      }
+    },
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "phase_06_completed_with_receipt": true,
+      "phase_06_async_tcre_enqueued": true,
+      "tcre_jobs_completed_gt_zero": true,
+      "phase_07_completed_with_receipt": true,
+      "phase_08_executed_with_receipt": true,
+      "downstream_chain_receipts_06_07_08": true,
+      "tcre_wait_or_resume_evidence": true
+    },
+    "checks_advisory": {
+      "phase_08_completed_with_receipt": false,
+      "phase_08_synthesis_jobs_completed_gt_zero": false
+    },
+    "p1_5_pass": true,
+    "verification": {
+      "step_15_pass": true,
+      "cleared_for_step_16": true
+    },
+    "recorded_at": "2026-05-22T22:51:46.806185+00:00",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f"
+  },
+  "p1_5_closure_git_sha": "f04eda87bd705250e32c0179fd5e23085a97c066"
 }
