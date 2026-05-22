@@ -1,8 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
-import { adminJson } from "../../lib/adminFetch";
 import type { PipelineOverview } from "./pipelineTypes";
+import {
+  fetchPipelineExecutionSlice,
+  fetchPipelineIngestionSlice,
+  fetchPipelinePhasesSlice,
+  invalidateMonolithOverviewCache,
+} from "./fetchPipelineOverviewSlice";
 
 export const pipelineOverviewQueryKey = (tenantId: string) =>
   ["admin-cortex-pipeline-overview", tenantId] as const;
@@ -39,18 +44,14 @@ export type PipelineOverviewIngestion = {
 const sliceQueryOpts = {
   staleTime: 60_000,
   gcTime: 5 * 60_000,
+  retry: 1,
 } as const;
 
 export function usePipelineOverviewExecution() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   return useQuery({
     queryKey: pipelineOverviewExecutionQueryKey(tenantId),
-    queryFn: async () => {
-      const res = await adminJson<{ execution: PipelineOverview["execution"] }>(
-        `/admin/tenants/${tenantId}/cortex/pipeline/overview/execution`,
-      );
-      return res.execution;
-    },
+    queryFn: () => fetchPipelineExecutionSlice(tenantId),
     enabled: Boolean(tenantId),
     ...sliceQueryOpts,
   });
@@ -60,10 +61,10 @@ export function usePipelineOverviewPhases() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   return useQuery({
     queryKey: pipelineOverviewPhasesQueryKey(tenantId),
-    queryFn: () =>
-      adminJson<PipelineOverviewPhases>(
-        `/admin/tenants/${tenantId}/cortex/pipeline/overview/phases`,
-      ),
+    queryFn: async () => {
+      const data = await fetchPipelinePhasesSlice(tenantId);
+      return { tenant_id: tenantId, ...data };
+    },
     enabled: Boolean(tenantId),
     ...sliceQueryOpts,
   });
@@ -73,10 +74,10 @@ export function usePipelineOverviewIngestion() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   return useQuery({
     queryKey: pipelineOverviewIngestionQueryKey(tenantId),
-    queryFn: () =>
-      adminJson<PipelineOverviewIngestion>(
-        `/admin/tenants/${tenantId}/cortex/pipeline/overview/ingestion`,
-      ),
+    queryFn: async () => {
+      const data = await fetchPipelineIngestionSlice(tenantId);
+      return { tenant_id: tenantId, ...data };
+    },
     enabled: Boolean(tenantId),
     ...sliceQueryOpts,
   });
@@ -89,15 +90,8 @@ export function usePrefetchPipelineOverviewSlices() {
   usePipelineOverviewIngestion();
 }
 
-/** Legacy monolithic overview — prefer slice hooks for the overview page. */
-export function usePipelineOverview() {
-  const { tenantId = "" } = useParams<{ tenantId: string }>();
-  return useQuery({
-    queryKey: pipelineOverviewQueryKey(tenantId),
-    queryFn: () =>
-      adminJson<PipelineOverview>(`/admin/tenants/${tenantId}/cortex/pipeline/overview`),
-    enabled: Boolean(tenantId),
-    staleTime: 60_000,
-    gcTime: 5 * 60_000,
-  });
+/** Invalidate slice caches after pipeline mutations. */
+export function invalidatePipelineOverviewCaches(tenantId: string) {
+  invalidateMonolithOverviewCache();
+  return pipelineOverviewSliceQueryKeys(tenantId);
 }

@@ -3,7 +3,10 @@ import { useParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
 import { phaseSummaryDetailQueryKey } from "./usePhaseSummaryDetail";
-import { pipelineOverviewSliceQueryKeys } from "./usePipelineOverview";
+import {
+  invalidatePipelineOverviewCaches,
+  pipelineOverviewSliceQueryKeys,
+} from "./usePipelineOverview";
 import type { OperatorPhase } from "./pipelineTypes";
 
 const PHASE_TO_START: Partial<Record<OperatorPhase, string>> = {
@@ -33,6 +36,7 @@ export function PhaseRerunCta({ phase, label, description }: Props) {
       });
     },
     onSuccess: () => {
+      invalidatePipelineOverviewCaches(tenantId);
       for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
         void qc.invalidateQueries({ queryKey: key });
       }

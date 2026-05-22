@@ -9,7 +9,10 @@ import { IngestionRunsTab } from "./cortex/IngestionRunsTab";
 import { PhaseExplorer } from "./cortex/PhaseExplorer";
 import { PhasePageShell, type PhaseSummaryPayload } from "./cortex/PhasePageShell";
 import { phaseSummaryDetailQueryKey } from "./cortex/usePhaseSummaryDetail";
-import { pipelineOverviewSliceQueryKeys } from "./cortex/usePipelineOverview";
+import {
+  invalidatePipelineOverviewCaches,
+  pipelineOverviewSliceQueryKeys,
+} from "./cortex/usePipelineOverview";
 import { CortexOverview, formatRelativeAge, titleConnector } from "./cortexAdminTypes";
 import AdminFeedbackBanner from "./ui/AdminFeedbackBanner";
 import { StatusBadge } from "./ui/StatusBadge";
@@ -50,6 +53,7 @@ function ConnectorsSummary({ connectors }: { connectors: CortexOverview["connect
         await qc.refetchQueries({
           queryKey: phaseSummaryDetailQueryKey(tenantId, "ingestion"),
         });
+        invalidatePipelineOverviewCaches(tenantId);
         for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
           void qc.invalidateQueries({ queryKey: key });
         }

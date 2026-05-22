@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
 import { adminFetch, adminJson } from "../../lib/adminFetch";
+import { adminApiPath } from "../../lib/adminApiUrl";
 import { readErrorDetail } from "../../lib/canonicalApi";
 import type { OperatorPhase } from "./pipelineTypes";
 
@@ -28,7 +29,7 @@ const CORE_SUMMARY_KEYS = new Set([
 ]);
 
 function detailPath(tenantId: string, phase: OperatorPhase) {
-  return `/admin/tenants/${tenantId}/cortex/pipeline/phases/${phase}/summary-detail`;
+  return adminApiPath(tenantId, `/cortex/pipeline/phases/${phase}/summary-detail`);
 }
 
 function stripCoreFields(full: Record<string, unknown>): Record<string, unknown> {
@@ -55,7 +56,7 @@ async function fetchPhaseSummaryDetail(
   }
 
   const full = await adminJson<Record<string, unknown>>(
-    `/admin/tenants/${tenantId}/cortex/pipeline/phases/${phase}/summary`,
+    adminApiPath(tenantId, `/cortex/pipeline/phases/${phase}/summary`),
     undefined,
     { timeoutMs: DETAIL_TIMEOUT_MS },
   );

@@ -10,7 +10,10 @@ import {
 } from "../adminConstants";
 import { StatusBadge } from "../ui/StatusBadge";
 import { phaseSummaryDetailQueryKey } from "./usePhaseSummaryDetail";
-import { pipelineOverviewSliceQueryKeys } from "./usePipelineOverview";
+import {
+  invalidatePipelineOverviewCaches,
+  pipelineOverviewSliceQueryKeys,
+} from "./usePipelineOverview";
 import { START_PHASE_OPTIONS, type OperatorPhase } from "./pipelineTypes";
 
 type Props = {
@@ -26,6 +29,7 @@ export function PipelineActions({ runnableConnectors }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const invalidate = () => {
+    invalidatePipelineOverviewCaches(tenantId);
     for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
       void qc.invalidateQueries({ queryKey: key });
     }

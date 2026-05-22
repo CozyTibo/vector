@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
+import { adminApiPath } from "../../lib/adminApiUrl";
 import { formatRelativeAge, titleConnector } from "../cortexAdminTypes";
 import type { ConnectorRollup } from "../canonical/coverageMatrixTypes";
 import type { CoveragePayload } from "../canonical/coverageMatrixTypes";
@@ -28,7 +29,7 @@ export function CanonicalSummaryPanels() {
     queryKey: ["admin-cortex-canonical-coverage-rollups", tenantId],
     queryFn: () =>
       adminJson<CoveragePayload>(
-        `/admin/tenants/${tenantId}/cortex/canonical/coverage-matrix`,
+        adminApiPath(tenantId, "/cortex/canonical/coverage-matrix"),
         undefined,
         { timeoutMs: 45_000 },
       ),
