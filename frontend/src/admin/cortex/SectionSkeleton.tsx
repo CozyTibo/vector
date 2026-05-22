@@ -1,4 +1,4 @@
-type Variant = "strip" | "attention" | "actions" | "table" | "footer";
+type Variant = "strip" | "attention" | "actions" | "table" | "footer" | "cards";
 
 export function SectionSkeleton({ variant }: { variant: Variant }) {
   const pulse = "animate-pulse rounded bg-stone-200";
@@ -19,6 +19,19 @@ export function SectionSkeleton({ variant }: { variant: Variant }) {
   if (variant === "actions") {
     return (
       <div className={`h-28 w-full ${pulse}`} aria-busy="true" aria-label="Loading pipeline actions" />
+    );
+  }
+  if (variant === "cards") {
+    return (
+      <div
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        aria-busy="true"
+        aria-label="Loading phase metrics"
+      >
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className={`h-20 ${pulse}`} />
+        ))}
+      </div>
     );
   }
   if (variant === "table") {

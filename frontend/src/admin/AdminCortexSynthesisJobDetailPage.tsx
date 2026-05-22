@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
+import { SectionSkeleton } from "./cortex/SectionSkeleton";
 
 type DebuggerPayload = {
   job_detail: { status: string; synthesis_workload_class: string };
@@ -27,7 +28,11 @@ export default function AdminCortexSynthesisJobDetailPage() {
       <Link className="text-sm text-indigo-700 underline" to={base}>
         ← Synthesis
       </Link>
-      {isLoading ? <p className="text-sm text-stone-500">Loading…</p> : null}
+      {isLoading && !data ? (
+        <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
+          <SectionSkeleton variant="cards" />
+        </section>
+      ) : null}
       {isError ? <p className="text-sm text-red-700">{(error as Error).message}</p> : null}
       {data ? (
         <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">

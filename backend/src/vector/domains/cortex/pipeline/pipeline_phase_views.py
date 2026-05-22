@@ -32,7 +32,7 @@ from vector.domains.cortex.identity.org_entities import list_org_entities, org_e
 from vector.domains.cortex.identity.link_explorer import list_org_link_explorer_rows
 from vector.domains.cortex.ingestion.admin_overview import build_cortex_ingestion_admin_overview
 from vector.domains.cortex.ingestion.admin_recent_raw import list_raw_records_for_connector
-from vector.domains.cortex.pipeline.pipeline_admin_overview import build_pipeline_overview_v1
+from vector.domains.cortex.pipeline.pipeline_admin_overview import build_pipeline_overview_phases_v1
 from vector.domains.cortex.reasoning.runtime import (
     build_reasoning_runtime_health_v1,
     list_reconstruction_jobs_v1,
@@ -81,25 +81,129 @@ def _assert_phase(phase: str) -> str:
     return key
 
 
-def _summary_envelope(
-    overview: dict[str, Any],
+def _phase_row_from_phases_payload(phases_payload: dict[str, Any], phase: str) -> dict[str, Any]:
+    phase_row = next((p for p in phases_payload["phases"] if p["phase"] == phase), None)
+    if phase_row is None:
+        raise ValueError("phase_not_in_overview")
+    return phase_row
+
+
+def _summary_envelope_from_phase_row(
+    phases_payload: dict[str, Any],
     phase: str,
     *,
     extra: dict[str, Any],
 ) -> dict[str, Any]:
-    phase_row = next((p for p in overview["phases"] if p["phase"] == phase), None)
-    if phase_row is None:
-        raise ValueError("phase_not_in_overview")
+    phase_row = _phase_row_from_phases_payload(phases_payload, phase)
     return {
         "surface_kind": "phase_summary",
         "phase": phase,
-        "tenant_id": overview["tenant_id"],
+        "tenant_id": phases_payload["tenant_id"],
         "status": phase_row["status"],
         "processed_count": phase_row.get("processed_count"),
         "backlog_count": phase_row.get("backlog_count"),
         "last_success_at": phase_row.get("last_success_at"),
         "blockers": phase_row.get("blockers") or [],
         **extra,
+    }
+
+
+def _build_phase_summary_extra_v1(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    phase: str,
+) -> dict[str, Any]:
+    key = _assert_phase(phase)
+
+    if key == "ingestion":
+        ing = build_cortex_ingestion_admin_overview(session, settings, tenant_id)
+        return {
+            "connectors": ing.get("connectors") or [],
+            "checkpoints": [
+                {
+                    "connector": row["connector"],
+                    "checkpoint_last_incremental_at": row.get("checkpoint_last_incremental_at"),
+                }
+                for row in ing.get("connectors") or []
+            ],
+        }
+
+    if key == "canonical":
+        cp = build_canonical_control_plane(session, tenant_id)
+        forward = build_canonical_forward_progress_snapshot(session, tenant_id=tenant_id)
+        h = cp.get("health_overview") or {}
+        insp = (cp.get("inspectors") or {}).get("coverage_inspector") or {}
+        rollups = insp.get("coverage_connector_rollups") if isinstance(insp, dict) else []
+        return {
+            "health": h,
+            "forward_progress": forward,
+            "failure_count": int(h.get("active_canonical_failure_count") or 0),
+            "connector_rollups": rollups if isinstance(rollups, list) else [],
+        }
+
+    if key == "identity":
+        cp = build_identity_control_plane(session, tenant_id=tenant_id)
+        cards = cp.get("cards") or {}
+        certification_warnings: list[str] = []
+        open_amb = int((cards.get("ambiguous_identities") or {}).get("value") or 0)
+        pending = int((cards.get("pending_merges") or {}).get("value") or 0)
+        bundle_gaps = int((cards.get("bundle_equivalence_gaps") or {}).get("value") or 0)
+        if open_amb > 0:
+            certification_warnings.append(f"{open_amb} unresolved org ambiguity record(s)")
+        if pending > 0:
+            certification_warnings.append(f"{pending} merge proposal(s) awaiting decision")
+        if bundle_gaps > 0:
+            certification_warnings.append(f"{bundle_gaps} bundle equivalence gap(s)")
+        if count_open_org_ambiguity_records(session, tenant_id=tenant_id) > open_amb:
+            certification_warnings.append("Additional open ambiguity cases in registry")
+        return {
+            "cards": cards,
+            "certification_warnings": certification_warnings,
+            "freshness_label": cp.get("freshness_label"),
+            "computed_at": cp.get("computed_at"),
+        }
+
+    if key == "graph":
+        graph_env = project_graph_completeness_v1(session, tenant_id=tenant_id)
+        trav_env = project_traversal_completeness_v1(session, tenant_id=tenant_id)
+        metrics = dict(graph_env.get("metrics") or {})
+        return {
+            "graph_metrics": metrics,
+            "traversal_substrate_state": trav_env.get("substrate_state"),
+            "node_count": int(metrics.get("entity_count") or graph_env.get("total_objects") or 0),
+            "edge_count": int(metrics.get("authoritative_link_count") or 0),
+            "orphan_count": int(metrics.get("orphan_node_count") or graph_env.get("unresolved_count") or 0),
+            "degraded_count": int(graph_env.get("degraded_count") or 0),
+        }
+
+    if key == "reconstruction":
+        health = build_reasoning_runtime_health_v1(session, tenant_id=tenant_id)
+        return {
+            "queue_depth": int(health.get("queue_depth_proxy") or 0),
+            "failed_jobs": int(health.get("failed_job_count") or 0),
+            "job_status_counts": dict(health.get("job_status_counts") or {}),
+            "last_successful_job": health.get("last_successful_job"),
+            "canonical_materialization_count": health.get("canonical_materialization_count"),
+        }
+
+    if key == "retrieval":
+        coverage = build_retrieval_coverage_catalog_v1(session, tenant_id=tenant_id)
+        return {
+            "indexed_count": coverage.get("indexed_count"),
+            "coverage_percent": coverage.get("coverage_percent"),
+            "published_index_epoch": coverage.get("published_index_epoch"),
+            "substrate_state": coverage.get("substrate_state"),
+            "index_lag_epochs": coverage.get("index_lag_epochs"),
+        }
+
+    syn_overview = build_synthesis_overview_catalog_v1(session, tenant_id=tenant_id)
+    return {
+        "eligible_scopes": syn_overview.get("eligible_scopes"),
+        "synthesized_scopes": syn_overview.get("synthesized_scopes"),
+        "coverage_percent": syn_overview.get("coverage_percent"),
+        "health_strip": syn_overview.get("health_strip"),
     }
 
 
@@ -126,6 +230,26 @@ def _explorer_envelope(
     }
 
 
+def build_phase_summary_detail_v1(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+    phase: str,
+) -> dict[str, Any]:
+    """Phase-specific summary payload without recomputing the full pipeline overview."""
+    key = _assert_phase(phase)
+    extra = _build_phase_summary_extra_v1(
+        session, settings, tenant_id=tenant_id, phase=key
+    )
+    return {
+        "surface_kind": "phase_summary_detail",
+        "phase": key,
+        "tenant_id": str(tenant_id),
+        **extra,
+    }
+
+
 def build_phase_summary_v1(
     session: Session,
     settings: Settings,
@@ -134,124 +258,11 @@ def build_phase_summary_v1(
     phase: str,
 ) -> dict[str, Any]:
     key = _assert_phase(phase)
-    overview = build_pipeline_overview_v1(session, settings, tenant_id=tenant_id)
-
-    if key == "ingestion":
-        ing = build_cortex_ingestion_admin_overview(session, settings, tenant_id)
-        return _summary_envelope(
-            overview,
-            key,
-            extra={
-                "connectors": ing.get("connectors") or [],
-                "checkpoints": [
-                    {
-                        "connector": row["connector"],
-                        "checkpoint_last_incremental_at": row.get("checkpoint_last_incremental_at"),
-                    }
-                    for row in ing.get("connectors") or []
-                ],
-            },
-        )
-
-    if key == "canonical":
-        cp = build_canonical_control_plane(session, tenant_id)
-        forward = build_canonical_forward_progress_snapshot(session, tenant_id=tenant_id)
-        h = cp.get("health_overview") or {}
-        insp = (cp.get("inspectors") or {}).get("coverage_inspector") or {}
-        rollups = insp.get("coverage_connector_rollups") if isinstance(insp, dict) else []
-        return _summary_envelope(
-            overview,
-            key,
-            extra={
-                "health": h,
-                "forward_progress": forward,
-                "failure_count": int(h.get("active_canonical_failure_count") or 0),
-                "connector_rollups": rollups if isinstance(rollups, list) else [],
-            },
-        )
-
-    if key == "identity":
-        cp = build_identity_control_plane(session, tenant_id=tenant_id)
-        cards = cp.get("cards") or {}
-        certification_warnings: list[str] = []
-        open_amb = int((cards.get("ambiguous_identities") or {}).get("value") or 0)
-        pending = int((cards.get("pending_merges") or {}).get("value") or 0)
-        bundle_gaps = int((cards.get("bundle_equivalence_gaps") or {}).get("value") or 0)
-        if open_amb > 0:
-            certification_warnings.append(f"{open_amb} unresolved org ambiguity record(s)")
-        if pending > 0:
-            certification_warnings.append(f"{pending} merge proposal(s) awaiting decision")
-        if bundle_gaps > 0:
-            certification_warnings.append(f"{bundle_gaps} bundle equivalence gap(s)")
-        if count_open_org_ambiguity_records(session, tenant_id=tenant_id) > open_amb:
-            certification_warnings.append("Additional open ambiguity cases in registry")
-        return _summary_envelope(
-            overview,
-            key,
-            extra={
-                "cards": cards,
-                "certification_warnings": certification_warnings,
-                "freshness_label": cp.get("freshness_label"),
-                "computed_at": cp.get("computed_at"),
-            },
-        )
-
-    if key == "graph":
-        graph_env = project_graph_completeness_v1(session, tenant_id=tenant_id)
-        trav_env = project_traversal_completeness_v1(session, tenant_id=tenant_id)
-        metrics = dict(graph_env.get("metrics") or {})
-        return _summary_envelope(
-            overview,
-            key,
-            extra={
-                "graph_metrics": metrics,
-                "traversal_substrate_state": trav_env.get("substrate_state"),
-                "node_count": int(metrics.get("entity_count") or graph_env.get("total_objects") or 0),
-                "edge_count": int(metrics.get("authoritative_link_count") or 0),
-                "orphan_count": int(metrics.get("orphan_node_count") or graph_env.get("unresolved_count") or 0),
-                "degraded_count": int(graph_env.get("degraded_count") or 0),
-            },
-        )
-
-    if key == "reconstruction":
-        health = build_reasoning_runtime_health_v1(session, tenant_id=tenant_id)
-        return _summary_envelope(
-            overview,
-            key,
-            extra={
-                "queue_depth": int(health.get("queue_depth_proxy") or 0),
-                "failed_jobs": int(health.get("failed_job_count") or 0),
-                "job_status_counts": dict(health.get("job_status_counts") or {}),
-                "last_successful_job": health.get("last_successful_job"),
-                "canonical_materialization_count": health.get("canonical_materialization_count"),
-            },
-        )
-
-    if key == "retrieval":
-        coverage = build_retrieval_coverage_catalog_v1(session, tenant_id=tenant_id)
-        return _summary_envelope(
-            overview,
-            key,
-            extra={
-                "indexed_count": coverage.get("indexed_count"),
-                "coverage_percent": coverage.get("coverage_percent"),
-                "published_index_epoch": coverage.get("published_index_epoch"),
-                "substrate_state": coverage.get("substrate_state"),
-                "index_lag_epochs": coverage.get("index_lag_epochs"),
-            },
-        )
-
-    syn_overview = build_synthesis_overview_catalog_v1(session, tenant_id=tenant_id)
-    return _summary_envelope(
-        overview,
-        key,
-        extra={
-            "eligible_scopes": syn_overview.get("eligible_scopes"),
-            "synthesized_scopes": syn_overview.get("synthesized_scopes"),
-            "coverage_percent": syn_overview.get("coverage_percent"),
-            "health_strip": syn_overview.get("health_strip"),
-        },
+    phases_payload = build_pipeline_overview_phases_v1(session, tenant_id=tenant_id)
+    extra = _build_phase_summary_extra_v1(
+        session, settings, tenant_id=tenant_id, phase=key
     )
+    return _summary_envelope_from_phase_row(phases_payload, key, extra=extra)
 
 
 def build_phase_explorer_v1(

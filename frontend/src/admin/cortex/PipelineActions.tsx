@@ -9,8 +9,9 @@ import {
   CORTEX_MANUAL_SYNC_CONFIRM_PHRASE,
 } from "../adminConstants";
 import { StatusBadge } from "../ui/StatusBadge";
+import { phaseSummaryDetailQueryKey } from "./usePhaseSummaryDetail";
 import { pipelineOverviewSliceQueryKeys } from "./usePipelineOverview";
-import { START_PHASE_OPTIONS } from "./pipelineTypes";
+import { START_PHASE_OPTIONS, type OperatorPhase } from "./pipelineTypes";
 
 type Props = {
   runnableConnectors: string[];
@@ -30,6 +31,18 @@ export function PipelineActions({ runnableConnectors }: Props) {
     }
     void qc.invalidateQueries({ queryKey: ["admin-cortex-pipeline-overview", tenantId] });
     void qc.invalidateQueries({ queryKey: ["admin-cortex-phase-summary", tenantId] });
+    const phases: OperatorPhase[] = [
+      "ingestion",
+      "canonical",
+      "identity",
+      "graph",
+      "reconstruction",
+      "retrieval",
+      "synthesis",
+    ];
+    for (const p of phases) {
+      void qc.invalidateQueries({ queryKey: phaseSummaryDetailQueryKey(tenantId, p) });
+    }
     void qc.invalidateQueries({ queryKey: ["admin-cortex-ingestion", tenantId] });
   };
 

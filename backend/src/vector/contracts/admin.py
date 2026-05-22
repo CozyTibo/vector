@@ -4642,6 +4642,16 @@ class AdminCortexPipelineRunResponse(BaseModel):
     hint: str | None = None
 
 
+class AdminCortexPipelinePhaseSummaryDetailResponse(BaseModel):
+    """Phase-specific summary fields (metrics, connectors, cards) without core status."""
+
+    model_config = ConfigDict(extra="allow", from_attributes=False)
+
+    surface_kind: str = "phase_summary_detail"
+    phase: str
+    tenant_id: uuid.UUID
+
+
 class AdminCortexPipelinePhaseSummaryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

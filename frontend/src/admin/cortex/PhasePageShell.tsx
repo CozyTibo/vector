@@ -1,10 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { adminJson } from "../../lib/adminFetch";
 import { StatusBadge } from "../ui/StatusBadge";
-import { CortexPageSkeleton } from "./CortexPageSkeleton";
 import type { OperatorPhase, PhaseStatus, PipelineOverview } from "./pipelineTypes";
+import { SectionSkeleton } from "./SectionSkeleton";
+import { usePhaseSummaryDetail } from "./usePhaseSummaryDetail";
 import { usePipelineOverviewPhases } from "./usePipelineOverview";
 
 export type PhaseSummaryPayload = {
@@ -30,7 +29,7 @@ type Props = {
   phase: OperatorPhase;
   title: string;
   description: string;
-  summaryContent: (summary: PhaseSummaryPayload) => React.ReactNode;
+  summaryContent: (summary: PhaseSummaryPayload & Record<string, unknown>) => React.ReactNode;
   explorerContent: React.ReactNode;
   runsContent?: React.ReactNode;
 };
@@ -46,6 +45,20 @@ function phaseRowFromPhases(
   phase: OperatorPhase,
 ) {
   return phases?.find((p) => p.phase === phase);
+}
+
+function coreFromPhaseRow(
+  phase: OperatorPhase,
+  row: PipelineOverview["phases"][number],
+): PhaseSummaryPayload {
+  return {
+    phase,
+    status: row.status,
+    processed_count: row.processed_count ?? null,
+    backlog_count: row.backlog_count ?? null,
+    last_success_at: row.last_success_at ?? null,
+    blockers: row.blockers ?? [],
+  };
 }
 
 export function PhasePageShell({
@@ -76,33 +89,27 @@ export function PhasePageShell({
 
   const phasesQ = usePipelineOverviewPhases();
   const headerRow = phaseRowFromPhases(phasesQ.data?.phases, phase);
+  const detailQ = usePhaseSummaryDetail(phase, tab === "summary");
 
-  const summaryQ = useQuery({
-    queryKey: ["admin-cortex-phase-summary", tenantId, phase],
-    queryFn: () =>
-      adminJson<PhaseSummaryPayload & Record<string, unknown>>(
-        `/admin/tenants/${tenantId}/cortex/pipeline/phases/${phase}/summary`,
-      ),
-    enabled: Boolean(tenantId) && tab === "summary",
-    staleTime: 45_000,
-    placeholderData: headerRow
-      ? {
-          phase,
-          status: headerRow.status,
-          processed_count: headerRow.processed_count ?? null,
-          backlog_count: headerRow.backlog_count ?? null,
-          last_success_at: headerRow.last_success_at ?? null,
-          blockers: headerRow.blockers ?? [],
-        }
-      : undefined,
-  });
+  const core = headerRow ? coreFromPhaseRow(phase, headerRow) : null;
+  const detail = detailQ.data;
+  const merged =
+    core && detail
+      ? ({
+          ...core,
+          ...Object.fromEntries(
+            Object.entries(detail).filter(
+              ([k]) => !["surface_kind", "phase", "tenant_id"].includes(k),
+            ),
+          ),
+        } as PhaseSummaryPayload & Record<string, unknown>)
+      : core;
 
-  const headerStatus = headerRow?.status ?? summaryQ.data?.status;
+  const headerStatus = headerRow?.status;
   const headerPending = phasesQ.isPending && !headerRow;
   const headerError = phasesQ.isError && !headerRow;
-
-  const s = summaryQ.data;
-  const summaryLoading = tab === "summary" && summaryQ.isFetching && !summaryQ.isFetched;
+  const detailLoading = tab === "summary" && detailQ.isPending && !detailQ.data;
+  const blockers = core?.blockers ?? [];
 
   return (
     <div className="space-y-5">
@@ -111,7 +118,7 @@ export function PhasePageShell({
         <h1 className="mt-1 text-xl font-semibold text-stone-900">{title}</h1>
         <p className="mt-1 text-sm text-stone-600">{description}</p>
         {headerPending ? (
-          <p className="mt-3 text-sm text-stone-500">Loading phase status…</p>
+          <div className="mt-4 h-6 w-48 animate-pulse rounded bg-stone-200" aria-hidden />
         ) : headerError ? (
           <p className="mt-3 text-sm text-red-700">{(phasesQ.error as Error).message}</p>
         ) : headerStatus ? (
@@ -119,21 +126,19 @@ export function PhasePageShell({
             <StatusBadge tone={statusTone(headerStatus)}>
               {headerRow?.status_label ?? headerStatus}
             </StatusBadge>
-            {(headerRow?.processed_count ?? s?.processed_count) != null ? (
+            {headerRow?.processed_count != null ? (
               <span className="text-stone-600">
-                Processed {(headerRow?.processed_count ?? s?.processed_count)!.toLocaleString()}
+                Processed {headerRow.processed_count.toLocaleString()}
               </span>
             ) : null}
-            {(headerRow?.backlog_count ?? s?.backlog_count) != null &&
-            (headerRow?.backlog_count ?? s?.backlog_count)! > 0 ? (
+            {headerRow?.backlog_count != null && headerRow.backlog_count > 0 ? (
               <span className="text-amber-800">
-                Backlog {(headerRow?.backlog_count ?? s?.backlog_count)!.toLocaleString()}
+                Backlog {headerRow.backlog_count.toLocaleString()}
               </span>
             ) : null}
-            {(headerRow?.last_success_at ?? s?.last_success_at) ? (
+            {headerRow?.last_success_at ? (
               <span className="text-stone-500">
-                Last success{" "}
-                {new Date(headerRow?.last_success_at ?? s?.last_success_at!).toLocaleString()}
+                Last success {new Date(headerRow.last_success_at).toLocaleString()}
               </span>
             ) : null}
             <Link className="font-medium text-indigo-700 underline" to={overviewPath}>
@@ -188,26 +193,21 @@ export function PhasePageShell({
         runsContent
       ) : tab === "summary" ? (
         <div className="space-y-4">
-          {summaryQ.isError ? (
-            <p className="text-sm text-red-700">{(summaryQ.error as Error).message}</p>
+          {detailQ.isError ? (
+            <p className="text-sm text-red-700">{(detailQ.error as Error).message}</p>
           ) : null}
-          {summaryLoading ? (
-            <CortexPageSkeleton label="Loading phase details…" />
-          ) : (
-            <>
-              {s && s.blockers.length > 0 ? (
-                <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                  <h2 className="text-sm font-semibold text-amber-950">Blockers</h2>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
-                    {s.blockers.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-              {s ? summaryContent(s) : null}
-            </>
-          )}
+          {blockers.length > 0 ? (
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <h2 className="text-sm font-semibold text-amber-950">Blockers</h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+                {blockers.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {detailLoading ? <SectionSkeleton variant="cards" /> : null}
+          {merged && !detailLoading ? summaryContent(merged) : null}
         </div>
       ) : (
         explorerContent

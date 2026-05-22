@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { adminJson } from "../../lib/adminFetch";
 import type { CortexRecentRuns } from "../cortexAdminTypes";
 import { apiRunToTableRow, IngestionRunsTable } from "./IngestionRunsTable";
+import { SectionSkeleton } from "./SectionSkeleton";
 
 const PAGE_SIZE = 50;
 
@@ -91,8 +92,10 @@ export function IngestionRunsTab() {
         </label>
       </div>
 
-      {runsQ.isPending ? (
-        <p className="mt-4 text-sm text-stone-500">Loading runs…</p>
+      {runsQ.isPending && !data ? (
+        <div className="mt-4">
+          <SectionSkeleton variant="table" />
+        </div>
       ) : runsQ.isError ? (
         <p className="mt-4 text-sm text-red-700">{(runsQ.error as Error).message}</p>
       ) : (

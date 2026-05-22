@@ -77,6 +77,7 @@ export type PipelineOverview = {
     paused_via_redis: boolean;
     beat_interval_seconds: number;
     min_gap_seconds: number;
+    operator_mode_label?: string;
   };
   runnable_connectors: string[];
   recent_ingestion_runs: PipelineRecentIngestionRun[];

@@ -75,3 +75,23 @@ def test_identity_summary_includes_certification_warnings_key(
     assert isinstance(cards, dict)
     assert "org_handles" in cards
     assert "value" in cards["org_handles"]
+
+
+@pytest.mark.parametrize("phase", ["identity", "graph", "ingestion"])
+def test_phase_summary_detail_matches_summary_extras(
+    client: TestClient,
+    db_session: Session,
+    phase: str,
+) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    full = client.get(f"/admin/tenants/{tid}/cortex/pipeline/phases/{phase}/summary").json()
+    detail = client.get(
+        f"/admin/tenants/{tid}/cortex/pipeline/phases/{phase}/summary/detail"
+    ).json()
+    assert detail["surface_kind"] == "phase_summary_detail"
+    assert detail["phase"] == phase
+    for key, value in detail.items():
+        if key in ("surface_kind", "phase", "tenant_id"):
+            continue
+        assert full.get(key) == value

@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
+import { phaseSummaryDetailQueryKey } from "./usePhaseSummaryDetail";
+import { pipelineOverviewSliceQueryKeys } from "./usePipelineOverview";
 import type { OperatorPhase } from "./pipelineTypes";
 
 const PHASE_TO_START: Partial<Record<OperatorPhase, string>> = {
@@ -31,6 +33,10 @@ export function PhaseRerunCta({ phase, label, description }: Props) {
       });
     },
     onSuccess: () => {
+      for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
+        void qc.invalidateQueries({ queryKey: key });
+      }
+      void qc.invalidateQueries({ queryKey: phaseSummaryDetailQueryKey(tenantId, phase) });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-phase-summary", tenantId, phase] });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-pipeline-overview", tenantId] });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-phase-explorer", tenantId, phase] });

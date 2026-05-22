@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
 import type { OperatorPhase } from "./pipelineTypes";
+import { SectionSkeleton } from "./SectionSkeleton";
 
 export type PhaseExplorerPayload = {
   columns: string[];
@@ -62,7 +63,11 @@ export function PhaseExplorer({ phase, connector, resourceType, searchQuery }: P
   return (
     <section className="space-y-3 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <h2 className="text-base font-semibold text-stone-900">Explorer</h2>
-      {explorerQ.isPending ? <p className="text-sm text-stone-500">Loading rows…</p> : null}
+      {explorerQ.isPending && !data ? (
+        <div className="mt-3">
+          <SectionSkeleton variant="table" />
+        </div>
+      ) : null}
       {explorerQ.isError ? (
         <p className="text-sm text-red-700">{(explorerQ.error as Error).message}</p>
       ) : null}

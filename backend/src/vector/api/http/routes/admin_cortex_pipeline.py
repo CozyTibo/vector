@@ -15,6 +15,7 @@ from vector.contracts.admin import (
     AdminCortexPipelineOverviewPhasesResponse,
     AdminCortexPipelineOverviewResponse,
     AdminCortexPipelinePhaseExplorerResponse,
+    AdminCortexPipelinePhaseSummaryDetailResponse,
     AdminCortexPipelinePhaseSummaryResponse,
     AdminCortexPipelineRunRequest,
     AdminCortexPipelineRunResponse,
@@ -29,6 +30,7 @@ from vector.domains.cortex.pipeline.pipeline_admin_overview import (
 from vector.domains.cortex.pipeline.pipeline_admin_run import pipeline_run_v1
 from vector.domains.cortex.pipeline.pipeline_phase_views import (
     build_phase_explorer_v1,
+    build_phase_summary_detail_v1,
     build_phase_summary_v1,
 )
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
@@ -121,6 +123,23 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         try:
             raw = build_phase_summary_v1(db, settings, tenant_id=tenant_id, phase=phase)
             return AdminCortexPipelinePhaseSummaryResponse.model_validate(raw)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    @pr.get(
+        "/phases/{phase}/summary/detail",
+        response_model=AdminCortexPipelinePhaseSummaryDetailResponse,
+    )
+    def get_phase_summary_detail(
+        tenant_id: uuid.UUID,
+        phase: str,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelinePhaseSummaryDetailResponse:
+        _assert_tenant(db, tenant_id)
+        try:
+            raw = build_phase_summary_detail_v1(db, settings, tenant_id=tenant_id, phase=phase)
+            return AdminCortexPipelinePhaseSummaryDetailResponse.model_validate(raw)
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

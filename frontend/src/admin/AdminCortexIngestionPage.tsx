@@ -8,6 +8,8 @@ import { CORTEX_MANUAL_SYNC_CONFIRM_PHRASE } from "./adminConstants";
 import { IngestionRunsTab } from "./cortex/IngestionRunsTab";
 import { PhaseExplorer } from "./cortex/PhaseExplorer";
 import { PhasePageShell, type PhaseSummaryPayload } from "./cortex/PhasePageShell";
+import { phaseSummaryDetailQueryKey } from "./cortex/usePhaseSummaryDetail";
+import { pipelineOverviewSliceQueryKeys } from "./cortex/usePipelineOverview";
 import { CortexOverview, formatRelativeAge, titleConnector } from "./cortexAdminTypes";
 import AdminFeedbackBanner from "./ui/AdminFeedbackBanner";
 import { StatusBadge } from "./ui/StatusBadge";
@@ -45,11 +47,16 @@ function ConnectorsSummary({ connectors }: { connectors: CortexOverview["connect
         message: `${label} sync queued on ${data.queue ?? "cortex_live"} (${data.sync_mode ?? "incremental"}). Waiting for the worker to finish…`,
       });
       const poll = async (attempt: number) => {
-        await qc.refetchQueries({ queryKey: ["admin-cortex-phase-summary", tenantId, "ingestion"] });
+        await qc.refetchQueries({
+          queryKey: phaseSummaryDetailQueryKey(tenantId, "ingestion"),
+        });
+        for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
+          void qc.invalidateQueries({ queryKey: key });
+        }
         void qc.invalidateQueries({ queryKey: ["admin-cortex-pipeline-overview", tenantId] });
         const summary = qc.getQueryData<
           PhaseSummaryPayload & { connectors?: CortexOverview["connectors"] }
-        >(["admin-cortex-phase-summary", tenantId, "ingestion"]);
+        >(phaseSummaryDetailQueryKey(tenantId, "ingestion"));
         const row = summary?.connectors?.find((c) => c.connector === data.connector);
         const latest = row?.latest_run;
         const runIsFresh =
