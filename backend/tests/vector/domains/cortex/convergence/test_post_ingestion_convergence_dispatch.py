@@ -17,20 +17,15 @@ def test_post_ingestion_uses_convergence_path() -> None:
             "cortex_post_ingestion_substrate_refresh_enabled": True,
         },
     )()
-    with (
-        patch(
-            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_tenant_dirty_v1",
-            return_value={"obligation_epoch": 1, "status": "dirty"},
-        ) as mark_dirty,
-        patch(
-            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.session_scope",
-        ) as scope,
-        patch(
-            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.enqueue_tenant_convergence_v1",
-            return_value={"enqueued": True, "celery_task_id": "t1"},
-        ) as enqueue,
-    ):
-        mock_session = scope.return_value.__enter__.return_value
+    with patch(
+        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_dirty_and_enqueue_convergence_v1",
+        return_value={
+            "scheduled": True,
+            "path": "convergence_lease",
+            "execution_path": "convergence",
+            "execution_path_telemetry": {"event": "cortex_execution_path"},
+        },
+    ) as dispatch:
         out = schedule_post_ingestion_substrate_refresh(
             tenant_id=tenant_id,
             settings=cfg,
@@ -40,5 +35,4 @@ def test_post_ingestion_uses_convergence_path() -> None:
     assert out["path"] == "convergence_lease"
     assert out["execution_path"] == "convergence"
     assert out["execution_path_telemetry"]["event"] == "cortex_execution_path"
-    mark_dirty.assert_called_once()
-    enqueue.assert_called_once()
+    dispatch.assert_called_once()

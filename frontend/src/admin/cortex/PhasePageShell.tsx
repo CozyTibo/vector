@@ -3,7 +3,9 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
 import { StatusBadge } from "../ui/StatusBadge";
-import type { OperatorPhase, PhaseStatus } from "./pipelineTypes";
+import { CortexPageSkeleton } from "./CortexPageSkeleton";
+import type { OperatorPhase, PhaseStatus, PipelineOverview } from "./pipelineTypes";
+import { usePipelineOverview } from "./usePipelineOverview";
 
 export type PhaseSummaryPayload = {
   phase: string;
@@ -39,6 +41,10 @@ function resolvePhaseTab(tabParam: string | null, hasRunsTab: boolean): PhaseTab
   return "summary";
 }
 
+function phaseRowFromOverview(overview: PipelineOverview | undefined, phase: OperatorPhase) {
+  return overview?.phases.find((p) => p.phase === phase);
+}
+
 export function PhasePageShell({
   phase,
   title,
@@ -65,16 +71,35 @@ export function PhasePageShell({
   };
   const overviewPath = `/admin/tenants/${tenantId}/cortex/overview`;
 
+  const overviewQ = usePipelineOverview();
+  const headerRow = phaseRowFromOverview(overviewQ.data, phase);
+
   const summaryQ = useQuery({
     queryKey: ["admin-cortex-phase-summary", tenantId, phase],
     queryFn: () =>
       adminJson<PhaseSummaryPayload & Record<string, unknown>>(
         `/admin/tenants/${tenantId}/cortex/pipeline/phases/${phase}/summary`,
       ),
-    enabled: Boolean(tenantId),
+    enabled: Boolean(tenantId) && tab === "summary",
+    staleTime: 45_000,
+    placeholderData: headerRow
+      ? {
+          phase,
+          status: headerRow.status,
+          processed_count: headerRow.processed_count ?? null,
+          backlog_count: headerRow.backlog_count ?? null,
+          last_success_at: headerRow.last_success_at ?? null,
+          blockers: headerRow.blockers ?? [],
+        }
+      : undefined,
   });
 
+  const headerStatus = headerRow?.status ?? summaryQ.data?.status;
+  const headerPending = overviewQ.isPending && !headerRow;
+  const headerError = overviewQ.isError && !headerRow;
+
   const s = summaryQ.data;
+  const summaryLoading = tab === "summary" && summaryQ.isFetching && !summaryQ.isFetched;
 
   return (
     <div className="space-y-5">
@@ -82,21 +107,31 @@ export function PhasePageShell({
         <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Pipeline phase</p>
         <h1 className="mt-1 text-xl font-semibold text-stone-900">{title}</h1>
         <p className="mt-1 text-sm text-stone-600">{description}</p>
-        {summaryQ.isPending ? (
-          <p className="mt-3 text-sm text-stone-500">Loading phase summary…</p>
-        ) : summaryQ.isError ? (
-          <p className="mt-3 text-sm text-red-700">{(summaryQ.error as Error).message}</p>
-        ) : s ? (
+        {headerPending ? (
+          <p className="mt-3 text-sm text-stone-500">Loading phase status…</p>
+        ) : headerError ? (
+          <p className="mt-3 text-sm text-red-700">{(overviewQ.error as Error).message}</p>
+        ) : headerStatus ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-            <StatusBadge tone={statusTone(s.status)}>{s.status}</StatusBadge>
-            {s.processed_count != null ? (
-              <span className="text-stone-600">Processed {s.processed_count.toLocaleString()}</span>
+            <StatusBadge tone={statusTone(headerStatus)}>
+              {headerRow?.status_label ?? headerStatus}
+            </StatusBadge>
+            {(headerRow?.processed_count ?? s?.processed_count) != null ? (
+              <span className="text-stone-600">
+                Processed {(headerRow?.processed_count ?? s?.processed_count)!.toLocaleString()}
+              </span>
             ) : null}
-            {s.backlog_count != null && s.backlog_count > 0 ? (
-              <span className="text-amber-800">Backlog {s.backlog_count.toLocaleString()}</span>
+            {(headerRow?.backlog_count ?? s?.backlog_count) != null &&
+            (headerRow?.backlog_count ?? s?.backlog_count)! > 0 ? (
+              <span className="text-amber-800">
+                Backlog {(headerRow?.backlog_count ?? s?.backlog_count)!.toLocaleString()}
+              </span>
             ) : null}
-            {s.last_success_at ? (
-              <span className="text-stone-500">Last success {new Date(s.last_success_at).toLocaleString()}</span>
+            {(headerRow?.last_success_at ?? s?.last_success_at) ? (
+              <span className="text-stone-500">
+                Last success{" "}
+                {new Date(headerRow?.last_success_at ?? s?.last_success_at!).toLocaleString()}
+              </span>
             ) : null}
             <Link className="font-medium text-indigo-700 underline" to={overviewPath}>
               Pipeline overview
@@ -150,17 +185,26 @@ export function PhasePageShell({
         runsContent
       ) : tab === "summary" ? (
         <div className="space-y-4">
-          {s && s.blockers.length > 0 ? (
-            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-amber-950">Blockers</h2>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
-                {s.blockers.map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
-              </ul>
-            </section>
+          {summaryQ.isError ? (
+            <p className="text-sm text-red-700">{(summaryQ.error as Error).message}</p>
           ) : null}
-          {s ? summaryContent(s) : null}
+          {summaryLoading ? (
+            <CortexPageSkeleton label="Loading phase details…" />
+          ) : (
+            <>
+              {s && s.blockers.length > 0 ? (
+                <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                  <h2 className="text-sm font-semibold text-amber-950">Blockers</h2>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+                    {s.blockers.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+              {s ? summaryContent(s) : null}
+            </>
+          )}
         </div>
       ) : (
         explorerContent

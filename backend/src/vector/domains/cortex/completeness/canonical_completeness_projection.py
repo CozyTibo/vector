@@ -28,6 +28,7 @@ def project_canonical_completeness_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
+    admin_fast: bool = False,
 ) -> dict[str, Any]:
     raw_total = int(
         session.scalar(
@@ -67,7 +68,7 @@ def project_canonical_completeness_v1(
     untreated_routable_estimate = 0
     drainable_routable_estimate = 0
     deferral_counts: dict[str, int] = {}
-    if bundle_id:
+    if bundle_id and not admin_fast:
         untreated_routable_estimate = list_untreated_routable_count_estimate(
             session, tenant_id=tenant_id, bundle_id=bundle_id
         )
@@ -80,6 +81,8 @@ def project_canonical_completeness_v1(
             omission_classes["canonical_deferrals_active"] = deferred_total
         if drainable_routable_estimate:
             omission_classes["canonical_drainable_backlog"] = drainable_routable_estimate
+    elif admin_fast and unmaterialized:
+        omission_classes["canonical_backlog_admin_fast_estimate"] = unmaterialized
 
     degraded = len(failures)
     substrate_state = "critical" if raw_total > 0 and mat_total == 0 else (

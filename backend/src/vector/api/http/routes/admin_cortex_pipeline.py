@@ -16,6 +16,7 @@ from vector.contracts.admin import (
     AdminCortexPipelineRunRequest,
     AdminCortexPipelineRunResponse,
 )
+from vector.domains.cortex.ingestion.admin_overview import invalidate_cortex_ingestion_admin_caches_v1
 from vector.domains.cortex.pipeline.pipeline_admin_overview import build_pipeline_overview_v1
 from vector.domains.cortex.pipeline.pipeline_admin_run import pipeline_run_v1
 from vector.domains.cortex.pipeline.pipeline_phase_views import (
@@ -62,6 +63,7 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
                 confirmation=body.confirmation,
             )
             db.commit()
+            invalidate_cortex_ingestion_admin_caches_v1(tenant_id)
             return AdminCortexPipelineRunResponse.model_validate(raw)
         except ValueError as exc:
             detail = str(exc)

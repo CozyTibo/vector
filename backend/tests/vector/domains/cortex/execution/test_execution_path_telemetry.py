@@ -78,18 +78,12 @@ def test_post_ingestion_convergence_dispatch_includes_execution_path() -> None:
             "cortex_post_ingestion_substrate_refresh_enabled": True,
         },
     )()
-    with (
-        patch(
-            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_tenant_dirty_v1",
-            return_value={"obligation_epoch": 1, "status": "dirty"},
-        ),
-        patch(
-            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.session_scope",
-        ),
-        patch(
-            "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.enqueue_tenant_convergence_v1",
-            return_value={"enqueued": True, "celery_task_id": "t1"},
-        ),
+    with patch(
+        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_dirty_and_enqueue_convergence_v1",
+        return_value={
+            "execution_path": EXECUTION_PATH_CONVERGENCE,
+            "execution_path_telemetry": {"execution_path": EXECUTION_PATH_CONVERGENCE},
+        },
     ):
         out = schedule_post_ingestion_substrate_refresh(
             tenant_id=tenant_id,

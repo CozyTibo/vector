@@ -2,8 +2,25 @@
 
 from __future__ import annotations
 
+import copy
+import logging
+import threading
+import time
 import uuid
 from typing import Any, Literal
+
+_LOGGER = logging.getLogger("app")
+_OVERVIEW_CACHE_TTL_SECONDS = 30.0
+_OVERVIEW_STALE_SERVE_SECONDS = 120.0
+_OVERVIEW_CACHE_LOCK = threading.Lock()
+_OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
+    """Drop cached pipeline overview so operator actions refresh immediately."""
+    key = str(tenant_id)
+    with _OVERVIEW_CACHE_LOCK:
+        _OVERVIEW_CACHE.pop(key, None)
 
 from sqlalchemy.orm import Session
 
@@ -245,14 +262,52 @@ def build_pipeline_overview_v1(
     *,
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
-    inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=20)
+    """Cached operator pipeline overview (fast path for admin UI)."""
+    cache_key = str(tenant_id)
+    now = time.monotonic()
+    stale_payload: dict[str, Any] | None = None
+    with _OVERVIEW_CACHE_LOCK:
+        cached = _OVERVIEW_CACHE.get(cache_key)
+        if cached is not None:
+            ts, payload = cached
+            if now - ts <= _OVERVIEW_CACHE_TTL_SECONDS:
+                return copy.deepcopy(payload)
+            if now - ts <= _OVERVIEW_STALE_SERVE_SECONDS:
+                stale_payload = copy.deepcopy(payload)
+
+    try:
+        out = _build_pipeline_overview_v1_uncached(session, settings, tenant_id=tenant_id)
+    except Exception:
+        if stale_payload is not None:
+            _LOGGER.warning(
+                "serving stale cortex pipeline overview tenant_id=%s",
+                tenant_id,
+                exc_info=True,
+            )
+            return stale_payload
+        raise
+
+    with _OVERVIEW_CACHE_LOCK:
+        _OVERVIEW_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(out))
+    return out
+
+
+def _build_pipeline_overview_v1_uncached(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=5)
     lease = inspect.get("lease")
     progression = inspect.get("progression") or {}
     mirror_status: dict[str, str] = dict(progression.get("phase_status") or {})
 
-    ingestion_admin = build_cortex_ingestion_admin_overview(session, settings, tenant_id)
+    ingestion_admin = build_cortex_ingestion_admin_overview(
+        session, settings, tenant_id, lite=True
+    )
     ing_env = project_ingestion_completeness_v1(session, tenant_id=tenant_id)
-    can_env = project_canonical_completeness_v1(session, tenant_id=tenant_id)
+    can_env = project_canonical_completeness_v1(session, tenant_id=tenant_id, admin_fast=True)
     id_env = project_identity_completeness_v1(session, tenant_id=tenant_id)
     graph_env = project_graph_completeness_v1(session, tenant_id=tenant_id)
     trav_env = project_traversal_completeness_v1(session, tenant_id=tenant_id)

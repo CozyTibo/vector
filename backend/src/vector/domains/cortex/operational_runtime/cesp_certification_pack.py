@@ -597,7 +597,7 @@ def _watchdog_in_celery_beat_v1() -> tuple[bool, list[str]]:
     if convergence_runtime_authoritative_v1():
         if CELERY_CONVERGENCE_SWEEP_BEAT_KEY_V1 not in text:
             return False, ["convergence_sweep_not_in_beat"]
-        if "mark_tenant_dirty_v1" not in text:
+        if "mark_dirty_and_enqueue_convergence_v1" not in text:
             # ingest path lives in post_ingestion_refresh_dispatch, not celery_app
             dispatch_path = (
                 _backend_root_v1()
@@ -611,7 +611,7 @@ def _watchdog_in_celery_beat_v1() -> tuple[bool, list[str]]:
             if not dispatch_path.is_file():
                 return False, ["post_ingestion_dispatch_missing"]
             dispatch_text = dispatch_path.read_text(encoding="utf-8")
-            if "mark_tenant_dirty_v1" not in dispatch_text:
+            if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_text:
                 return False, ["convergence_dirty_mark_missing"]
         return True, []
 

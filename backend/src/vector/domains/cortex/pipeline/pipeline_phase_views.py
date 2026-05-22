@@ -10,7 +10,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canonical.canonical_control_plane import build_canonical_control_plane
-from vector.domains.cortex.canonical.failure_remediation_runtime import sync_canonical_failure_cases
 from vector.domains.cortex.canonical.forward_progress.operator_snapshot import (
     build_canonical_forward_progress_snapshot,
 )
@@ -156,7 +155,6 @@ def build_phase_summary_v1(
 
     if key == "canonical":
         cp = build_canonical_control_plane(session, tenant_id)
-        failures = sync_canonical_failure_cases(session, tenant_id)
         forward = build_canonical_forward_progress_snapshot(session, tenant_id=tenant_id)
         h = cp.get("health_overview") or {}
         insp = (cp.get("inspectors") or {}).get("coverage_inspector") or {}
@@ -167,7 +165,7 @@ def build_phase_summary_v1(
             extra={
                 "health": h,
                 "forward_progress": forward,
-                "failure_count": int(failures.get("active_failure_count") or 0),
+                "failure_count": int(h.get("active_canonical_failure_count") or 0),
                 "connector_rollups": rollups if isinstance(rollups, list) else [],
             },
         )

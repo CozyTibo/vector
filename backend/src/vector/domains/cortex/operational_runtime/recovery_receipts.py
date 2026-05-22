@@ -381,7 +381,7 @@ def verify_gp085_rec01_static() -> dict[str, Any]:
 
     from vector.domains.cortex.substrate_pipeline import stalled_pipeline_recovery as rec_mod
 
-    rec_src = inspect.getsource(rec_mod.recover_stalled_pipeline_v1)
+    rec_src = inspect.getsource(rec_mod._recover_stalled_pipeline_impl_v1)
     if (
         "persist_stalled_recovery_receipt_v1" not in rec_src
         and "_finish_stalled_recovery_v1" not in rec_src

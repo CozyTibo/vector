@@ -1,5 +1,7 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 
+import { usePipelineOverview } from "./cortex/usePipelineOverview";
+
 const CORTEX_SECTIONS: Array<{ key: string; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "ingestion", label: "Ingestion" },
@@ -23,6 +25,7 @@ function tabCls(isActive: boolean): string {
 
 export default function AdminTenantCortexLayout() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
+  usePipelineOverview();
   return (
     <div className="space-y-5">
       <header className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">

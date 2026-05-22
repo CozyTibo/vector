@@ -78,10 +78,8 @@ def verify_schedule_substrate_pipeline_uses_convergence_v1() -> list[str]:
     src = inspect.getsource(orch.schedule_substrate_pipeline_v1)
     if "run_cortex_substrate_pipeline_coordinator_task" in src:
         errors.append("schedule_substrate_pipeline_enqueues_legacy_coordinator")
-    if "enqueue_tenant_convergence_v1" not in src:
+    if "mark_dirty_and_enqueue_convergence_v1" not in src:
         errors.append("schedule_substrate_pipeline_missing_convergence_enqueue")
-    if "mark_tenant_dirty_v1" not in src:
-        errors.append("schedule_substrate_pipeline_missing_dirty_mark")
     return errors
 
 
@@ -601,7 +599,7 @@ def verify_single_tcre_execution_resume_boundary_v1() -> list[str]:
 
     from vector.domains.cortex.substrate_pipeline import stalled_pipeline_recovery as rec_mod
 
-    rec_src = inspect.getsource(rec_mod.recover_stalled_pipeline_v1)
+    rec_src = inspect.getsource(rec_mod._recover_stalled_pipeline_impl_v1)
     if "resume_pipeline_after_tcre_completion_v1" in rec_src:
         errors.append("stalled_recovery_still_calls_continuation_resume")
     if "on_tcre_job_terminal_for_execution_v1" not in rec_src:

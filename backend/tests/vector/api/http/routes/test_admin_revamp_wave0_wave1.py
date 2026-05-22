@@ -4,13 +4,32 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+_ADMIN_REVAMP_PLAN = Path("DOCS") / "cortex" / "10-admin" / "ADMIN_REVAMP_PLAN.md"
+
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[6]
+    start = Path(__file__).resolve()
+    for root in [start, *start.parents]:
+        if (root / _ADMIN_REVAMP_PLAN).is_file():
+            return root
+    for root in (Path("/app"), Path("/")):
+        if (root / _ADMIN_REVAMP_PLAN).is_file():
+            return root
+    pytest.fail("repo root not found (DOCS/cortex/10-admin/ADMIN_REVAMP_PLAN.md)")
 
 
 def _frontend_admin() -> Path:
-    return _repo_root() / "frontend" / "src" / "admin"
+    start = Path(__file__).resolve()
+    for root in [start, *start.parents]:
+        admin = root / "frontend" / "src" / "admin"
+        if admin.is_dir():
+            return admin
+    for admin in (Path("/frontend/src/admin"), Path("/app/frontend/src/admin")):
+        if admin.is_dir():
+            return admin
+    pytest.fail("frontend admin sources not found (mount ./frontend for docker pytest)")
 
 
 def test_wave0_plan_signoff_document_present() -> None:
@@ -23,9 +42,11 @@ def test_wave0_plan_signoff_document_present() -> None:
 
 def test_wave1_overview_no_flush_rerun_in_frontend() -> None:
     overview = (_frontend_admin() / "AdminCortexOverviewPage.tsx").read_text(encoding="utf-8")
+    hook = (_frontend_admin() / "cortex/usePipelineOverview.ts").read_text(encoding="utf-8")
     assert "flush-rerun-to-identity" not in overview
     assert "Replay all connectors" not in overview
-    assert "pipeline/overview" in overview
+    assert "usePipelineOverview" in overview
+    assert "/cortex/pipeline/overview" in hook
     assert "PipelineActions" in overview
 
 

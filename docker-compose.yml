@@ -90,6 +90,8 @@ services:
       - ./.env:/app/.env:ro
       # Normative Cortex docs (Phase 04 doc-contract tests read under DOCS/cortex/04-identity).
       - ./DOCS:/app/DOCS:ro
+      # Admin revamp static gates read frontend operator surfaces.
+      - ./frontend:/app/frontend:ro
       - ./backend/src:/app/src
       - ./backend/tests:/app/tests
       - ./backend/mock_connectors:/app/mock_connectors

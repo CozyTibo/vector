@@ -37,14 +37,18 @@ _OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 def invalidate_cortex_ingestion_admin_caches_v1(tenant_id: uuid.UUID) -> None:
     """Drop cached ingestion admin payloads so manual sync UI refreshes immediately."""
-    key = str(tenant_id)
     with _OVERVIEW_CACHE_LOCK:
-        _OVERVIEW_CACHE.pop(key, None)
+        _OVERVIEW_CACHE.pop(str(tenant_id), None)
+        _OVERVIEW_CACHE.pop(f"{tenant_id}:lite", None)
     from vector.domains.cortex.ingestion.admin_recent_raw import (
         invalidate_recent_ingestion_runs_cache_v1,
     )
+    from vector.domains.cortex.pipeline.pipeline_admin_overview import (
+        invalidate_pipeline_overview_cache_v1,
+    )
 
     invalidate_recent_ingestion_runs_cache_v1(tenant_id)
+    invalidate_pipeline_overview_cache_v1(tenant_id)
 
 
 def _operator_scheduler_label(
@@ -317,9 +321,11 @@ def build_cortex_ingestion_admin_overview(
     session: Session,
     settings: Settings,
     tenant_id: uuid.UUID,
+    *,
+    lite: bool = False,
 ) -> dict[str, Any]:
     """Assemble visibility payload for :class:`AdminCortexIngestionOverviewResponse`."""
-    cache_key = str(tenant_id)
+    cache_key = f"{tenant_id}:lite" if lite else str(tenant_id)
     now = time.monotonic()
     stale_payload: dict[str, Any] | None = None
     with _OVERVIEW_CACHE_LOCK:
@@ -337,6 +343,7 @@ def build_cortex_ingestion_admin_overview(
             settings,
             tenant_id,
             cache_key=cache_key,
+            lite=lite,
         )
     except Exception:
         if stale_payload is not None:
@@ -355,6 +362,7 @@ def _build_cortex_ingestion_admin_overview_uncached(
     tenant_id: uuid.UUID,
     *,
     cache_key: str,
+    lite: bool = False,
 ) -> dict[str, Any]:
     tenant = session.get(Tenant, tenant_id)
     if tenant is None:
@@ -469,8 +477,26 @@ def _build_cortex_ingestion_admin_overview_uncached(
             paused_redis=paused_redis,
         ),
     }
-    worker_telemetry = _collect_worker_telemetry(settings)
-    duplicate_prevention = _collect_duplicate_prevention_metric(session, tenant_id)
+    if lite:
+        worker_telemetry = {
+            "status": "deferred",
+            "worker_count": 0,
+            "live_queue_workers": 0,
+            "replay_queue_workers": 0,
+            "worker_names": [],
+            "detail": "Worker telemetry omitted on pipeline overview (see ingestion tab).",
+        }
+        duplicate_prevention = {
+            "status": "deferred",
+            "ratio_percent": None,
+            "live_rows_examined": 0,
+            "duplicate_groups": 0,
+            "duplicate_rows_excess": 0,
+            "detail": "Duplicate scan omitted on pipeline overview (see ingestion tab).",
+        }
+    else:
+        worker_telemetry = _collect_worker_telemetry(settings)
+        duplicate_prevention = _collect_duplicate_prevention_metric(session, tenant_id)
 
     out = {
         "tenant_id": tenant_id,

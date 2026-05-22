@@ -245,6 +245,11 @@ def list_cesp_package_forward_product_import_violations_v1() -> list[str]:
     )
 
 
+def _is_allowed_identity_cesp_hook_import_v1(rel: str) -> bool:
+    """Phase-03 inline promotion hook (step 8) may call graph_density from identity only."""
+    return "continuity_rebuild.py" in rel and "graph_density_promotion" in rel
+
+
 def list_upstream_packages_importing_cesp_violations_v1() -> list[str]:
     """Phases 02–08 MUST NOT import CESP except allowlisted extension surfaces."""
     cortex_root = Path(__file__).resolve().parents[1]
@@ -257,6 +262,8 @@ def list_upstream_packages_importing_cesp_violations_v1() -> list[str]:
             pkg_dir,
             forbidden_module_prefixes=("vector.domains.cortex.operational_runtime",),
         ):
+            if pkg_name == "identity" and _is_allowed_identity_cesp_hook_import_v1(rel):
+                continue
             violations.append(f"{pkg_name}/{rel}")
     return violations
 

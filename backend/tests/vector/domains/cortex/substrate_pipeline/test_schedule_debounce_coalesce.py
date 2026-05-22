@@ -37,13 +37,20 @@ def test_schedule_substrate_pipeline_enqueues_convergence_not_coordinator(
         "vector.domains.cortex.substrate_pipeline.orchestrator.session_scope",
         _fake_scope,
     )
+    def _dispatch(*, tenant_id: object, reason: str, **kwargs: object) -> dict[str, object]:
+        dirty_calls.append(reason)
+        enqueue_calls.append(reason)
+        return {
+            "scheduled": True,
+            "path": "convergence_lease",
+            "obligation_epoch": 1,
+            "enqueued": True,
+            "celery_task_id": "conv-1",
+        }
+
     monkeypatch.setattr(
-        "vector.domains.cortex.execution.lease.mark_tenant_dirty_v1",
-        _mark_dirty,
-    )
-    monkeypatch.setattr(
-        "vector.domains.cortex.execution.enqueue.enqueue_tenant_convergence_v1",
-        _enqueue,
+        "vector.domains.cortex.execution.convergence_dispatch.mark_dirty_and_enqueue_convergence_v1",
+        _dispatch,
     )
     monkeypatch.setattr(
         "vector.domains.cortex.canonical.transform_runtime."

@@ -139,14 +139,8 @@ def enqueue_next_pipeline_phase_v1(
     identity_substrate_trigger: str = "substrate_pipeline",
     allow_legacy_orchestrator_chain: bool = False,
 ) -> dict[str, Any]:
-    """Admin/recovery-only: enqueue execution slice at ``phase_id`` (frozen by default)."""
-    del bundle_id, batch_limit, graph_projection_stable_hash, identity_substrate_trigger
-    if not allow_legacy_orchestrator_chain:
-        cfg = get_settings()
-        if not cfg.cortex_allow_legacy_enqueue_next_pipeline_phase:
-            raise RuntimeError(
-                "enqueue_next_pipeline_phase_v1 is frozen; use enqueue_execution_slice_at_phase_v1"
-            )
+    """Admin/recovery-only: enqueue execution slice at ``phase_id`` (M6 redirect, no phase Celery chain)."""
+    del bundle_id, batch_limit, graph_projection_stable_hash, identity_substrate_trigger, allow_legacy_orchestrator_chain
     from vector.domains.cortex.execution.enqueue import enqueue_execution_slice_at_phase_v1
 
     return enqueue_execution_slice_at_phase_v1(

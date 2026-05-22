@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
-import { adminJson } from "../lib/adminFetch";
+import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
 import { PipelineActions } from "./cortex/PipelineActions";
+import { usePipelineOverview } from "./cortex/usePipelineOverview";
 import { RecentIngestionRuns } from "./cortex/RecentIngestionRuns";
 import { PipelineStrip } from "./cortex/PipelineStrip";
 import type { PhaseOverview, PipelineOverview } from "./cortex/pipelineTypes";
@@ -37,14 +37,10 @@ function phasesForStrip(overview: PipelineOverview): PhaseOverview[] {
 export default function AdminCortexOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
 
-  const overviewQ = useQuery({
-    queryKey: ["admin-cortex-pipeline-overview", tenantId],
-    queryFn: () => adminJson<PipelineOverview>(`/admin/tenants/${tenantId}/cortex/pipeline/overview`),
-    enabled: Boolean(tenantId),
-  });
+  const overviewQ = usePipelineOverview();
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
-  if (overviewQ.isPending) return <p className="text-sm text-stone-600">Loading pipeline overview…</p>;
+  if (overviewQ.isPending) return <CortexPageSkeleton label="Loading pipeline overview…" />;
   if (overviewQ.isError) return <p className="text-sm text-red-700">{(overviewQ.error as Error).message}</p>;
 
   const overview = overviewQ.data;
