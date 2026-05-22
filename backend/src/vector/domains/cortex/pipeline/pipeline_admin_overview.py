@@ -143,6 +143,15 @@ def _merge_status(a: PhaseStatus, b: PhaseStatus) -> PhaseStatus:
     return a if rank[a] >= rank[b] else b
 
 
+def _canonical_operator_backlog_count(envelope: dict[str, Any]) -> int | None:
+    """Prefer drainable routable backlog over raw−mat admin gap (Fix 7)."""
+    metrics = envelope.get("metrics")
+    if isinstance(metrics, dict) and "drainable_routable_estimate" in metrics:
+        return int(metrics.get("drainable_routable_estimate") or 0)
+    backlog = envelope.get("unresolved_count")
+    return int(backlog) if backlog is not None else None
+
+
 def _envelope_blockers(envelope: dict[str, Any]) -> list[str]:
     out: list[str] = []
     for w in envelope.get("drift_warnings") or []:
@@ -186,9 +195,12 @@ def _phase_from_completeness(
 
     blockers = _phase_from_completeness_blockers(envelope, lease, active_op, operator_phase)
     processed = envelope.get("processed_count")
-    backlog = envelope.get("unresolved_count")
-    if backlog is None:
-        backlog = envelope.get("omitted_count")
+    if operator_phase == "canonical":
+        backlog = _canonical_operator_backlog_count(envelope)
+    else:
+        backlog = envelope.get("unresolved_count")
+        if backlog is None:
+            backlog = envelope.get("omitted_count")
     processed_n = int(processed) if processed is not None else None
     backlog_n = int(backlog) if backlog is not None else None
     issues = humanize_phase_issues(

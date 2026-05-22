@@ -1,0 +1,256 @@
+{
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "step": 12,
+  "validated_at": "2026-05-22T15:34:18.180079+00:00",
+  "canonical_completeness_metrics": {
+    "raw_count": 28221,
+    "canonicalized_count": 20038,
+    "raw_minus_mat_admin_gap": 8183,
+    "untreated_routable_estimate": 8181,
+    "drainable_routable_estimate": 7715,
+    "deferral_counts": {
+      "deferred_total": 8181,
+      "deferred_waiting_cooldown": 466,
+      "deferred_retry_ready": 7715,
+      "deferred_permanent_orphan": 466
+    },
+    "operator_kpi_primary": "drainable_routable_estimate",
+    "unsupported_count": 0,
+    "parse_failed_count": 0,
+    "schema_drift_count": 0,
+    "conversion_percent": 71.0
+  },
+  "forward_progress": {
+    "bundle_id": "bundle.phase03.step03.logical_keys.v1",
+    "metrics": {
+      "untreated_routable_estimate": 8181,
+      "deferred_total": 8181,
+      "deferred_waiting_cooldown": 466,
+      "deferred_retry_ready": 7715,
+      "deferred_permanent_orphan": 466,
+      "convergence_delta_succeeded": 0,
+      "progress_velocity_rows_per_second": 0.0,
+      "progress_density_rows_per_batch": 0.0,
+      "productive_batches": 0,
+      "topology_only_batches": 0,
+      "blocked_pass_batch_ratio": 0.0,
+      "topology_blockers_deferred": 8181,
+      "structural_orphan_pressure": 466,
+      "deferral_pressure_sample": [
+        {
+          "resource_type": "github.pull_request_timeline_event",
+          "deferral_reason": "missing_pr",
+          "queue": "topology_orphan",
+          "count": 3052
+        },
+        {
+          "resource_type": "github.deployment_status",
+          "deferral_reason": "missing_deployment",
+          "queue": "topology_orphan",
+          "count": 1716
+        },
+        {
+          "resource_type": "notion.database_row",
+          "deferral_reason": "missing_page_parent",
+          "queue": "topology_orphan",
+          "count": 1138
+        },
+        {
+          "resource_type": "github.pull_request_review",
+          "deferral_reason": "missing_parent",
+          "queue": "topology_orphan",
+          "count": 1032
+        },
+        {
+          "resource_type": "slack.thread",
+          "deferral_reason": "dependency_not_materialized",
+          "queue": "topology_orphan",
+          "count": 955
+        },
+        {
+          "resource_type": "slack.file",
+          "deferral_reason": "dependency_not_materialized",
+          "queue": "topology_orphan",
+          "count": 183
+        },
+        {
+          "resource_type": "notion.block",
+          "deferral_reason": "missing_page_parent",
+          "queue": "topology_orphan",
+          "count": 105
+        }
+      ],
+      "topology_parent_gaps_sample": [
+        {
+          "missing_parent_ref": "notion.database:6320c3e7-1777-4077-905b-20ca7886bb5f",
+          "parent_kind": "notion.database",
+          "child_resource_type": "notion.database_row",
+          "count": 677,
+          "likely_cause": "ingest: Notion database parent missing"
+        },
+        {
+          "missing_parent_ref": "notion.database:fedeb237-5d7f-439f-87d1-388970662c44",
+          "parent_kind": "notion.database",
+          "child_resource_type": "notion.database_row",
+          "count": 300,
+          "likely_cause": "ingest: Notion database parent missing"
+        },
+        {
+          "missing_parent_ref": "notion.database:47575abb-9736-4281-9028-806fb05d23f3",
+          "parent_kind": "notion.database",
+          "child_resource_type": "notion.database_row",
+          "count": 161,
+          "likely_cause": "ingest: Notion database parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:1438998464",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_timeline_event",
+          "count": 41,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:1424028908",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_timeline_event",
+          "count": 36,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:2797996812",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_timeline_event",
+          "count": 31,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:1105115199",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_timeline_event",
+          "count": 29,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:974863734",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_review",
+          "count": 27,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:1072425643",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_timeline_event",
+          "count": 22,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:316444209",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_review",
+          "count": 22,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:1178571377",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_timeline_event",
+          "count": 21,
+          "likely_cause": "ingest: pull request parent missing"
+        },
+        {
+          "missing_parent_ref": "github.pull_request:1070208200",
+          "parent_kind": "github.pull_request",
+          "child_resource_type": "github.pull_request_timeline_event",
+          "count": 21,
+          "likely_cause": "ingest: pull request parent missing"
+        }
+      ]
+    },
+    "lease": {
+      "status": "stalled",
+      "obligation_epoch": 735,
+      "target_epoch": 735,
+      "phase_cursor": "phase_05_traversal",
+      "next_attempt_at": "2026-05-22T15:37:27.042862+00:00",
+      "last_canonical_outcome": "topology_wait",
+      "convergence_health": "structurally_incomplete"
+    }
+  },
+  "lease": {
+    "fsm_state": "STALLED",
+    "phase_cursor": "phase_05_traversal",
+    "last_canonical_outcome": "topology_wait"
+  },
+  "pipeline_overview_canonical": {
+    "backlog_count": 7715,
+    "status": "degraded"
+  },
+  "pipeline_run_id": "faa5469f-849b-4e19-bc26-e9ec001e926f",
+  "published_index_epoch": "epoch-a36e4f6244fb",
+  "synthesis_materialization": {},
+  "synthesis_job": {
+    "job_id": "7bd0192d-8b54-48ec-bb3e-a74fa42d696b",
+    "status": "completed",
+    "synthesis_legality_class": "synthesis_replay_safe",
+    "receipt_digest": "27783792e1c17189e7ba4fef9fd5802a39a1fa0fd582a214f7ca7893b63cd612"
+  },
+  "evaluation": {
+    "step": 12,
+    "fix6_pass": true,
+    "fix6_detail": "github_caps_documented_for_ops_raise",
+    "fix6_caps": {
+      "cortex_github_prs_max_pages_per_repo": {
+        "value": 5,
+        "recommended_min": 10,
+        "ceiling": 200,
+        "meets_recommended": false
+      },
+      "cortex_github_pr_fetch_max_repos": {
+        "value": 8,
+        "recommended_min": 16,
+        "ceiling": 200,
+        "meets_recommended": false
+      },
+      "cortex_github_repo_time_budget_seconds": {
+        "value": 25,
+        "recommended_min": 120,
+        "ceiling": 600,
+        "meets_recommended": false
+      }
+    },
+    "fix7_pass": true,
+    "fix7_detail": "admin_metric_truth_wired",
+    "p2_soak": {
+      "track_b_soak_hours_required": 24,
+      "track_b_soak_started_at": "2026-05-22T15:34:18.180079+00:00",
+      "track_b_signoff_pending": true,
+      "track_b_soak_indicators": {
+        "phase_cursor_past_phase_02": true,
+        "canonical_motion_outcome": true,
+        "drainable_routable_zero": false,
+        "untreated_routable_estimate": 8181,
+        "drainable_routable_estimate": 7715
+      },
+      "p2_soak_t0_captured": true,
+      "p2_soak_detail": "soak_clock_started:motion=topology_wait:drainable=7715"
+    },
+    "l6_pass": true,
+    "l6_detail": "l6_lawful_partial_intelligence",
+    "l6_checks": {
+      "phase_08_completed_or_materialized": true,
+      "phase_08_output_non_empty": true,
+      "legality_not_forbidden": true,
+      "omission_classes_present": true,
+      "evidence_trace_present": true,
+      "candidate_not_authoritative": true
+    },
+    "level_6_met": true,
+    "step12_pass": true,
+    "step12_detail": "fix6_7_l6_wedge_complete",
+    "track_b_signoff_note": "Re-run unlock_step12_track_b_p3.py daily; Track B sign-off after 24h autonomous soak."
+  },
+  "step12_pass": true,
+  "step12_detail": "fix6_7_l6_wedge_complete",
+  "level_6_met": true
+}

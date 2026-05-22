@@ -9,6 +9,13 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.canonical.forward_progress.candidate_selection import (
+    list_untreated_routable_count_estimate,
+)
+from vector.domains.cortex.canonical.forward_progress.deferral_store import count_deferrals
+from vector.domains.cortex.canonical.transform_runtime import (
+    resolve_default_bundle_id_for_stub_transform,
+)
 from vector.domains.cortex.completeness._completeness_common import build_stage_envelope_v1, pct
 from vector.infrastructure.db.models.cortex_canonical_failure_case import CortexCanonicalFailureCase
 from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
@@ -56,6 +63,24 @@ def project_canonical_completeness_v1(
     if unmaterialized and "reconstruction_skipped_by_policy" not in omission_classes:
         omission_classes["canonical_backlog_unmaterialized"] = unmaterialized
 
+    bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
+    untreated_routable_estimate = 0
+    drainable_routable_estimate = 0
+    deferral_counts: dict[str, int] = {}
+    if bundle_id:
+        untreated_routable_estimate = list_untreated_routable_count_estimate(
+            session, tenant_id=tenant_id, bundle_id=bundle_id
+        )
+        drainable_routable_estimate = list_untreated_routable_count_estimate(
+            session, tenant_id=tenant_id, bundle_id=bundle_id, drainable_only=True
+        )
+        deferral_counts = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
+        deferred_total = int(deferral_counts.get("deferred_total") or 0)
+        if deferred_total:
+            omission_classes["canonical_deferrals_active"] = deferred_total
+        if drainable_routable_estimate:
+            omission_classes["canonical_drainable_backlog"] = drainable_routable_estimate
+
     degraded = len(failures)
     substrate_state = "critical" if raw_total > 0 and mat_total == 0 else (
         "degraded" if failures or unmaterialized > raw_total * 0.05 else "healthy"
@@ -79,6 +104,11 @@ def project_canonical_completeness_v1(
         metrics={
             "raw_count": raw_total,
             "canonicalized_count": mat_total,
+            "raw_minus_mat_admin_gap": unmaterialized,
+            "untreated_routable_estimate": untreated_routable_estimate,
+            "drainable_routable_estimate": drainable_routable_estimate,
+            "deferral_counts": deferral_counts,
+            "operator_kpi_primary": "drainable_routable_estimate",
             "unsupported_count": unsupported,
             "parse_failed_count": parse_failed,
             "schema_drift_count": schema_drift,

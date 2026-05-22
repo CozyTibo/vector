@@ -26,7 +26,7 @@
 | 9 | **Done** | 2026-05-22 | GRAPH/OCTS wedge A5: 16 completed walks, 8 with authoritative hops |
 | 10 | **Done** | 2026-05-22 | RETRIEVAL wedge A6: 216 index entries published |
 | 11 | **Done** | 2026-05-22 | 48h alive panel T0 green (Track A clock started) |
-| 12 | Pending | — | Fix 6–7 + soak + synthesis L6 (Track B + P3) |
+| 12 | **Done** | 2026-05-22 | Fix 6–7 + Track B soak T0 + Level 6 synthesis legality wedge |
 
 ### Step 1 completion record
 
@@ -134,6 +134,16 @@
 - **48h hold:** Clock started at `2026-05-22T15:25:27Z`; re-run panel script daily until 48h elapses for Track A sign-off (§11).
 - **Code:** `step11_alive_panel.py` (`build_alive_panel_evaluation_v1`); `unlock_step11_alive_panel.py`; tests `test_step11_alive_panel.py`.
 
+### Step 12 completion record (Fix 6–7, Track B soak, Level 6 / P3)
+
+- **Command:** `cd backend && .venv/bin/python scripts/unlock_step12_track_b_p3.py`
+- **Artifact:** [`baselines/fizzer_step12_2026-05-22.json`](baselines/fizzer_step12_2026-05-22.json)
+- **Fix 6:** GitHub ingest caps snapshotted (`CORTEX_GITHUB_*`); ops should raise to recommended mins (pages≥10, repos≥16, budget≥120s) for true orphan closure.
+- **Fix 7:** `project_canonical_completeness_v1` exposes `untreated_routable_estimate`, `drainable_routable_estimate`, `deferral_counts`; pipeline overview canonical `backlog_count` uses drainable (not raw−mat).
+- **Track B soak T0:** 24h clock started; `phase_cursor=phase_05_traversal`, `drainable=7715` (operator chases drainable, not 8183 admin gap).
+- **Level 6:** Completed `degradation_brief` synthesis job `synthesis_replay_safe` with receipt + `SD-SCOPE-EMPTY` omission rows (lawful partial intelligence §5.4).
+- **Code:** `step12_track_b_p3.py`; `unlock_step12_track_b_p3.py`; tests `test_step12_track_b_p3.py`.
+
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py
 # release-only: UNLOCK_STEP04_SKIP_DRAIN=1
@@ -177,7 +187,7 @@ Use this ladder for prioritization. **P0/P1 unlock targets Level 4–6**, not Le
 | **3** | Authoritative graph continuity | Promoted meaning links; exportable org execution graph | **Not met** (0 authoritative links) |
 | **4** | Successful OCTS execution continuity | Completed walk visiting ≥1 authoritative link | **Not met** |
 | **5** | Retrieval evidence binding | Evidence recovery attempt not dominated by graph/walk RET-SKIP | **Not met** |
-| **6** | Lawful partial intelligence | Synthesis/narrative legal under §11; omission classes propagated | **Not met** |
+| **6** | Lawful partial intelligence | Synthesis/narrative legal under §11; omission classes propagated | **Met (wedge)** — step 12 receipt + SD omissions |
 | **7** | Stable execution intelligence | Repeatable Level 4–6 without manual wedge | **Not met** |
 | **8** | Agent-consumable execution cognition layer | Agents use substrate APIs, not raw connector chaos (§14) | **Not met** |
 
