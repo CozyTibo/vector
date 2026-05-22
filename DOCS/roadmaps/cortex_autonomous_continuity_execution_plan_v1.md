@@ -336,7 +336,7 @@ run_tenant_convergence_v1:
 | 0.2 | Deploy worker + API images | Ops | Prod deploy SHA recorded | **Done** (see §Phase 0.2 completion) |
 | 0.3 | P0-C new pipeline run or recovery | Ops | New run id, not `failed` | **Done** (see §Phase 0.3 completion) |
 | 0.4 | P0-B prod proof SQL | Ops | Phase 05 COMPLETED, walks after graph phase | **Done** (see §Phase 0.4 completion) |
-| 0.5 | Document deploy SHA in `DOCS/audits/baselines/continuity_p0_<date>.json` | Eng | Artifact committed | **Done** (with 0.2) |
+| 0.5 | Document deploy SHA in `DOCS/audits/baselines/continuity_p0_<date>.json` | Eng | Artifact committed | **Done** (see §Phase 0.5 completion) |
 
 #### Phase 0.1 completion (P0-A + P0-D)
 
@@ -405,6 +405,20 @@ Executed **2026-05-22** on Fizzer prod (`c08ef32b-f89a-40f6-9566-e19b5329436f`):
 | Prod script | `python backend/scripts/continuity_p0_phase05_proof.py` (`--proof-only` to re-evaluate without slices) |
 | Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_0_4_phase05_proof` |
 
+#### Phase 0.5 completion (baseline closure artifact)
+
+Executed **2026-05-22** after steps 0.1–0.4:
+
+| Item | Value |
+|------|-------|
+| Closure git SHA | `b8ca0065f68eaab6ce7f04749d9818c14b7ce995` |
+| API ECS image | `vector-backend:b8ca0065f68eaab6ce7f04749d9818c14b7ce995` (task def `:152`) |
+| Worker ECS image | `vector-worker:b8ca0065f68eaab6ce7f04749d9818c14b7ce995` (task def `:113`) |
+| Prerequisites | `step_02_artifact_present`, `step_03_pass`, `step_04_pass` all true |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_0_5_phase0_closure`, `phase0_closure_git_sha`, `phase0_complete: true` |
+| Code | `continuity_p0_baseline.py`, `continuity_p0_phase0_closure.py`; `record_continuity_p0_deploy.py` merge-safe |
+| Prod script | `python backend/scripts/continuity_p0_phase0_closure.py --wait-for-deploy 600` |
+
 **Phase 0 complete.** Next: Phase 1.1 (P3′ component scheduling).
 
 ### Phase 1 — Propagation + downstream continuity (days 4–10)
@@ -455,6 +469,8 @@ Executed **2026-05-22** on Fizzer prod (`c08ef32b-f89a-40f6-9566-e19b5329436f`):
 cd backend
 # After deploy (step 0.2):
 CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity_p0_deploy.py
+# Phase 0 closure (step 0.5 — merges baseline, verifies ECS + prerequisites):
+python scripts/continuity_p0_phase0_closure.py --wait-for-deploy 600
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json
