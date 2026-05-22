@@ -23,7 +23,7 @@
 | 6 | **Done** | 2026-05-22 | Candidate regen A3: 2000 link candidates (global cap) |
 | 7 | **Done** | 2026-05-22 | Promotion A2: 200 authoritative links (pass cap) |
 | 8 | **Done** | 2026-05-22 | Fix 3–5: phase-03 promotion hook + backfill regen + admin APIs |
-| 9 | Pending | — | GRAPH → A5 |
+| 9 | **Done** | 2026-05-22 | GRAPH/OCTS wedge A5: 16 completed walks, 8 with authoritative hops |
 | 10 | Pending | — | RETRIEVAL → A6 |
 | 11 | Pending | — | 48h alive panel (Track A) |
 | 12 | Pending | — | Fix 6–7 + soak + synthesis L6 (Track B + P3) |
@@ -107,6 +107,15 @@
 - **Fix 4:** `POST …/identity/backfill/from-canonical-anchors` accepts `include_candidate_regen` (default true) → `run_identity_handles_and_candidates_refresh`.
 - **Fix 5:** `POST …/operational-runtime/graph-density-promotion/run`; `POST …/identity/replay-jobs/run` + `/enqueue` restored; removed from `admin_bypass_guard` forbidden list.
 - **Tests:** `test_step08_fixes_shipped.py`; updated phase03 boundary, step10/11, m8 admin route tests.
+
+### Step 9 completion record (GRAPH / OCTS execution continuity A5)
+
+- **Command:** `cd backend && .venv/bin/python scripts/unlock_step09_graph_octs_walk.py`
+- **Artifact:** [`baselines/fizzer_step09_2026-05-22.json`](baselines/fizzer_step09_2026-05-22.json)
+- **Result:** Projection `7286` nodes / `200` authoritative edges; `run_substrate_traversal_materialization_v1` with starts on authoritative link endpoints (`walks_persisted=8` new); `completed_walks=16`, `walks_with_authoritative_hop=8` (e.g. 25 hops on one walk).
+- **A5:** Pass — ≥1 completed walk visiting ≥1 authoritative link per plan §6.2.
+- **Code:** `step09_octs_walk.py` (`pick_start_node_ids_on_authoritative_edges_v1`, `evaluate_a5_octs_execution_continuity_v1`); wedge script + tests `test_step09_octs_walk.py`.
+- **Note:** First pass used default entity starts (0-hop walks); wedge selects authoritative-incident starts for real traversal.
 
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py

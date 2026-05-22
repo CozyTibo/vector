@@ -1,0 +1,128 @@
+{
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "step": 9,
+  "validated_at": "2026-05-22T15:20:01.651694+00:00",
+  "max_starts": 8,
+  "authoritative_links_active": 200,
+  "projection": {
+    "node_count": 7286,
+    "edge_count": 200,
+    "authoritative_edge_count": 200
+  },
+  "walks_before": {
+    "walk_records_total": 8,
+    "completed_walks": 8,
+    "walks_with_authoritative_hop": 0,
+    "walk_samples": [
+      {
+        "walk_id": "16245674-c561-4928-a11f-ab8ad7f272f6",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      },
+      {
+        "walk_id": "3f4daab9-8c57-4f4a-91b6-ba8fa1d2b63b",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      },
+      {
+        "walk_id": "58c703e2-f068-47f7-a5c7-f0a6ec5aa9c1",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      },
+      {
+        "walk_id": "6dc5f52f-fa5e-4708-a15c-3a44af522fd9",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      },
+      {
+        "walk_id": "9191bb08-879c-4240-9d5d-de1f809da272",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      }
+    ]
+  },
+  "execution_restart": {
+    "restarted": false,
+    "error": "(psycopg.OperationalError) failed to resolve host 'postgres': [Errno 8] nodename nor servname provided, or not known\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+  },
+  "selected_start_node_ids": [
+    "009afd75-bf1a-5458-8860-ce2e5abdab0a",
+    "00c386ab-2b24-5c03-adbc-33f1239db583",
+    "00ca149b-781c-5243-b1d2-eeca67381de9",
+    "011d7bb4-b709-5e00-84b5-37bb2c44fd03",
+    "01514567-54a2-55f5-9158-9c6c9c07b8ea",
+    "0175ea64-22ed-5458-ab43-6525b6003e30",
+    "01b9d965-c1f1-5679-8104-571cf98a58f9",
+    "025b3ecf-9285-56ab-8a96-708c1f931767"
+  ],
+  "traversal_materialization": {
+    "ok": true,
+    "walks_persisted": 8,
+    "walk_ids": [
+      "eab3ec7a-5407-4fc8-8646-ea97cd81cb67",
+      "800427af-527b-4aca-9f13-6c36d46775dc",
+      "eec99c6d-de4e-4678-a107-2ff7fbc369bf",
+      "1d23053f-136b-46bb-9876-5d47ca9b0ad9",
+      "b55e5cb7-7d51-47e4-8d2f-9eeaf3a95d9a",
+      "ef14f6a9-9707-44af-9f50-b002ab976495",
+      "1b3b460a-56e7-4ef8-a4ce-e9ac728f7b35",
+      "fe92b964-a4bd-4fb2-829b-70188912d392"
+    ],
+    "primary_octs_walk_id": "eab3ec7a-5407-4fc8-8646-ea97cd81cb67",
+    "skipped_idempotent": 0,
+    "graph_projection_stable_hash_sha256": "1f36297fece82755a140cf5c2b1f6bf06d0a713b0ed51e00267a29947ff7efa0"
+  },
+  "walks_after": {
+    "walk_records_total": 16,
+    "completed_walks": 16,
+    "walks_with_authoritative_hop": 8,
+    "walk_samples": [
+      {
+        "walk_id": "16245674-c561-4928-a11f-ab8ad7f272f6",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      },
+      {
+        "walk_id": "1b3b460a-56e7-4ef8-a4ce-e9ac728f7b35",
+        "authoritative_hops": 25,
+        "hops_emitted": 25,
+        "path_fingerprints": 25
+      },
+      {
+        "walk_id": "1d23053f-136b-46bb-9876-5d47ca9b0ad9",
+        "authoritative_hops": 23,
+        "hops_emitted": 23,
+        "path_fingerprints": 23
+      },
+      {
+        "walk_id": "3f4daab9-8c57-4f4a-91b6-ba8fa1d2b63b",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      },
+      {
+        "walk_id": "58c703e2-f068-47f7-a5c7-f0a6ec5aa9c1",
+        "authoritative_hops": 0,
+        "hops_emitted": 0,
+        "path_fingerprints": 0
+      }
+    ]
+  },
+  "phase_05_recent": [
+    {
+      "phase_id": "phase_05_traversal",
+      "status": "queued",
+      "walks_persisted": null,
+      "primary_octs_walk_id": null,
+      "started_at": null
+    }
+  ],
+  "A5_pass": true,
+  "A5_detail": "completed_walks=16:authoritative_hop_walks=8:walks_persisted=8"
+}
