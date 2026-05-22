@@ -53,6 +53,49 @@ def _deterministic_raw_order_columns() -> tuple[Any, ...]:
     )
 
 
+def _routable_type_or_clause(pairs: list[tuple[str, str]]) -> Any:
+    return or_(
+        *[
+            and_(RawIngestionRecord.connector == p[0], RawIngestionRecord.resource_type == p[1])
+            for p in pairs
+        ]
+    )
+
+
+def _active_deferral_exists_clauses(
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    now: datetime,
+) -> tuple[Any, Any]:
+    """Match ``list_forward_progress_candidate_ids`` deferral exclusion (correlated)."""
+    deferral_tbl = CortexCanonicalMaterializationDeferral
+    cooldown_deferral_block = (
+        select(deferral_tbl.raw_record_id)
+        .where(
+            deferral_tbl.tenant_id == tenant_id,
+            deferral_tbl.bundle_id == bundle_id,
+            deferral_tbl.raw_record_id == RawIngestionRecord.id,
+            deferral_tbl.retry_ready_at > now,
+            deferral_tbl.detail_json["permanent_orphan"].astext.is_distinct_from("true"),
+        )
+        .correlate(RawIngestionRecord)
+        .exists()
+    )
+    permanent_deferral_block = (
+        select(deferral_tbl.raw_record_id)
+        .where(
+            deferral_tbl.tenant_id == tenant_id,
+            deferral_tbl.bundle_id == bundle_id,
+            deferral_tbl.raw_record_id == RawIngestionRecord.id,
+            deferral_tbl.detail_json["permanent_orphan"].astext == "true",
+        )
+        .correlate(RawIngestionRecord)
+        .exists()
+    )
+    return cooldown_deferral_block, permanent_deferral_block
+
+
 def list_forward_progress_candidate_ids(
     db: Session,
     *,
@@ -87,35 +130,11 @@ def list_forward_progress_candidate_ids(
     if not pairs:
         return [], False, meta
 
-    type_or = or_(
-        *[
-            and_(RawIngestionRecord.connector == p[0], RawIngestionRecord.resource_type == p[1])
-            for p in pairs
-        ]
-    )
-    deferral_tbl = CortexCanonicalMaterializationDeferral
-    cooldown_deferral_block = (
-        select(deferral_tbl.raw_record_id)
-        .where(
-            deferral_tbl.tenant_id == tenant_id,
-            deferral_tbl.bundle_id == bundle_id,
-            deferral_tbl.raw_record_id == RawIngestionRecord.id,
-            deferral_tbl.retry_ready_at > now,
-            deferral_tbl.detail_json["permanent_orphan"].astext.is_distinct_from("true"),
-        )
-        .correlate(RawIngestionRecord)
-        .exists()
-    )
-    permanent_deferral_block = (
-        select(deferral_tbl.raw_record_id)
-        .where(
-            deferral_tbl.tenant_id == tenant_id,
-            deferral_tbl.bundle_id == bundle_id,
-            deferral_tbl.raw_record_id == RawIngestionRecord.id,
-            deferral_tbl.detail_json["permanent_orphan"].astext == "true",
-        )
-        .correlate(RawIngestionRecord)
-        .exists()
+    type_or = _routable_type_or_clause(pairs)
+    cooldown_deferral_block, permanent_deferral_block = _active_deferral_exists_clauses(
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        now=now,
     )
 
     stmt = (
@@ -144,21 +163,22 @@ def list_forward_progress_candidate_ids(
     return rows[:lim], more_remain, meta
 
 
-def list_untreated_routable_count_estimate(
+def untreated_routable_drainable_exists_v1(
     db: Session,
     *,
     tenant_id: uuid.UUID,
     bundle_id: str,
-) -> int:
-    """Count routable raw rows missing materialization for this tenant+bundle."""
+) -> bool:
+    """True when ≥1 routable unmat row is eligible for drain (not deferral-blocked)."""
     pairs = stub_routing_pairs(connector=None, resource_type=None)
     if not pairs:
-        return 0
-    type_or = or_(
-        *[
-            and_(RawIngestionRecord.connector == p[0], RawIngestionRecord.resource_type == p[1])
-            for p in pairs
-        ]
+        return False
+    now = _now_utc()
+    type_or = _routable_type_or_clause(pairs)
+    cooldown_deferral_block, permanent_deferral_block = _active_deferral_exists_clauses(
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        now=now,
     )
     stmt = (
         select(RawIngestionRecord.id)
@@ -174,6 +194,49 @@ def list_untreated_routable_count_estimate(
             RawIngestionRecord.tenant_id == tenant_id,
             type_or,
             CortexCanonicalTransformMaterialization.id.is_(None),
+            ~cooldown_deferral_block,
+            ~permanent_deferral_block,
         )
+        .limit(1)
+    )
+    return db.execute(stmt).first() is not None
+
+
+def list_untreated_routable_count_estimate(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+    drainable_only: bool = False,
+) -> int:
+    """Count routable raw rows missing materialization for this tenant+bundle."""
+    pairs = stub_routing_pairs(connector=None, resource_type=None)
+    if not pairs:
+        return 0
+    type_or = _routable_type_or_clause(pairs)
+    filters: list[Any] = [
+        RawIngestionRecord.tenant_id == tenant_id,
+        type_or,
+        CortexCanonicalTransformMaterialization.id.is_(None),
+    ]
+    if drainable_only:
+        now = _now_utc()
+        cooldown_deferral_block, permanent_deferral_block = _active_deferral_exists_clauses(
+            tenant_id=tenant_id,
+            bundle_id=bundle_id,
+            now=now,
+        )
+        filters.extend([~cooldown_deferral_block, ~permanent_deferral_block])
+    stmt = (
+        select(RawIngestionRecord.id)
+        .outerjoin(
+            CortexCanonicalTransformMaterialization,
+            and_(
+                CortexCanonicalTransformMaterialization.raw_record_id == RawIngestionRecord.id,
+                CortexCanonicalTransformMaterialization.tenant_id == tenant_id,
+                CortexCanonicalTransformMaterialization.bundle_id == bundle_id,
+            ),
+        )
+        .where(*filters)
     )
     return len(db.scalars(stmt).all())

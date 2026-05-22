@@ -8,10 +8,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.canonical.forward_progress.candidate_selection import (
+    untreated_routable_drainable_exists_v1,
+)
 from vector.domains.cortex.canonical.forward_progress.constants import (
     CANONICAL_OUTCOME_PARTIAL_PROGRESS,
     CANONICAL_OUTCOME_TOPOLOGY_WAIT,
 )
+from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_02_CANONICAL,
     PHASE_STATUS_FAILED,
@@ -43,26 +47,69 @@ def untreated_raw_exists_v1(session: Session, *, tenant_id: uuid.UUID) -> bool:
     return session.execute(stmt).first() is not None
 
 
+def _resolve_gate_bundle_id(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str | None,
+    canonical_summary: dict[str, Any],
+) -> str | None:
+    bid = (bundle_id or "").strip() or None
+    if bid:
+        return bid
+    summary_bid = canonical_summary.get("bundle_id")
+    if isinstance(summary_bid, str) and summary_bid.strip():
+        return summary_bid.strip()
+    return resolve_default_bundle_id_for_stub_transform(session, tenant_id)
+
+
+def canonical_identity_may_proceed_despite_topology_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+) -> bool:
+    """True when canonical drain has no eligible rows left (deferral-aware)."""
+    return not untreated_routable_drainable_exists_v1(
+        session, tenant_id=tenant_id, bundle_id=bundle_id
+    )
+
+
 def canonical_needs_more_work_v1(
     session: Session,
     *,
     canonical_summary: dict[str, Any],
     tenant_id: uuid.UUID,
+    bundle_id: str | None = None,
 ) -> bool:
     """Mirror convergence worker: canonical slice not done — do not advance to identity."""
     if bool(canonical_summary.get("skipped")):
         return False
+
+    bid = _resolve_gate_bundle_id(
+        session, tenant_id=tenant_id, bundle_id=bundle_id, canonical_summary=canonical_summary
+    )
+    if bid is None:
+        return untreated_raw_exists_v1(session, tenant_id=tenant_id)
+
+    drainable_exists = untreated_routable_drainable_exists_v1(
+        session, tenant_id=tenant_id, bundle_id=bid
+    )
+
     outcome = str(canonical_summary.get("canonical_outcome") or "")
     if outcome in (CANONICAL_OUTCOME_TOPOLOGY_WAIT, CANONICAL_OUTCOME_PARTIAL_PROGRESS):
-        return True
+        if bool(canonical_summary.get("candidate_more_remain")):
+            return True
+        return drainable_exists
+
     if bool(canonical_summary.get("progress_made")):
         if bool(canonical_summary.get("slice_budget_exhausted")) or bool(
             canonical_summary.get("candidate_more_remain")
         ):
-            return True
+            return drainable_exists
     if bool(canonical_summary.get("hit_slice_cap")) and bool(canonical_summary.get("progress_made")):
-        return True
-    return untreated_raw_exists_v1(session, tenant_id=tenant_id)
+        return drainable_exists
+    return drainable_exists
 
 
 def _canonical_summary_from_phase_output(phase_output: dict[str, Any]) -> dict[str, Any]:
@@ -76,10 +123,17 @@ def canonical_may_advance_to_identity_v1(
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID,
     phase_output: dict[str, Any],
+    bundle_id: str | None = None,
 ) -> tuple[bool, str | None]:
     """Whether phase 03 may run after phase 02 (substrate determinism contract)."""
     summary = _canonical_summary_from_phase_output(phase_output)
     total_succeeded = int(summary.get("total_succeeded") or 0)
+    gate_bundle = _resolve_gate_bundle_id(
+        session,
+        tenant_id=tenant_id,
+        bundle_id=bundle_id or (phase_output.get("bundle_id") if isinstance(phase_output.get("bundle_id"), str) else None),
+        canonical_summary=summary,
+    )
 
     phase_run = get_phase_run_v1(
         session,
@@ -88,11 +142,23 @@ def canonical_may_advance_to_identity_v1(
     )
     if phase_run is not None:
         if phase_run.status == PHASE_STATUS_WAITING and total_succeeded == 0:
+            if (
+                gate_bundle is not None
+                and canonical_identity_may_proceed_despite_topology_v1(
+                    session, tenant_id=tenant_id, bundle_id=gate_bundle
+                )
+            ):
+                return True, None
             return False, "canonical_topology_wait_zero_progress"
         if phase_run.status == PHASE_STATUS_FAILED and total_succeeded == 0:
             return False, "canonical_materialization_failed_zero_progress"
 
-    if canonical_needs_more_work_v1(session, canonical_summary=summary, tenant_id=tenant_id):
+    if canonical_needs_more_work_v1(
+        session,
+        canonical_summary=summary,
+        tenant_id=tenant_id,
+        bundle_id=gate_bundle,
+    ):
         outcome = str(summary.get("canonical_outcome") or "incomplete")
         return False, f"canonical_incomplete:{outcome}"
 

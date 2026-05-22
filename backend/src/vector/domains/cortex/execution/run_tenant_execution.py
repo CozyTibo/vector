@@ -199,7 +199,12 @@ def run_tenant_convergence_v1(
                 raw_summary = out.get("canonical_summary")
                 summary: dict[str, Any] = raw_summary if isinstance(raw_summary, dict) else {}
                 store_last_phase_receipt_on_lease_v1(lease, phase_output=out)
-                if canonical_needs_more_work_v1(session, canonical_summary=summary, tenant_id=tenant_id):
+                if canonical_needs_more_work_v1(
+                    session,
+                    canonical_summary=summary,
+                    tenant_id=tenant_id,
+                    bundle_id=bundle_id,
+                ):
                     outcome = str(summary.get("canonical_outcome") or "")
                     progress_made = bool(summary.get("progress_made"))
                     if progress_made or outcome == CANONICAL_OUTCOME_PARTIAL_PROGRESS:

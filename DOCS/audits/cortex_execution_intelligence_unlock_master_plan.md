@@ -17,7 +17,7 @@
 |------|--------|-----------|-------|
 | 1 | **Done** | 2026-05-21 | Prod baseline captured; artifact + validation module |
 | 2 | **Done** | 2026-05-22 | Fix 1: `release_deferrals_when_missing_parent_ref_materialized_v1` + drain hook + tests |
-| 3 | Pending | — | Fix 2 gate |
+| 3 | **Done** | 2026-05-22 | Fix 2: deferral-aware gate + `untreated_routable_drainable_exists_v1` |
 | 4 | Pending | — | Deploy + A4 |
 | 5 | Pending | — | Identity backfill A1 |
 | 6 | Pending | — | Candidate regen A3 |
@@ -57,6 +57,15 @@
 - **Wiring:** Called at drain start and after each productive batch in `drain_runtime.py` (alongside `release_deferrals_with_materialized_parents`).
 - **Tests:** `test_deferral_release_missing_parent_ref.py` (unit + integration); `build_node_key_index` in `replay_topology.py`.
 - **Deploy:** Step 4 (not part of step 2).
+
+### Step 3 completion record (Fix 2)
+
+- **`untreated_routable_drainable_exists_v1`** in `candidate_selection.py` — same deferral exclusion as drain FIFO selection.
+- **`canonical_needs_more_work_v1`** uses drainable check (not raw−mat); `topology_wait` / `partial_progress` only block when drainable rows remain.
+- **`canonical_may_advance_to_identity_v1`** allows phase 03 when topology-wait + zero progress but no drainable backlog.
+- **`run_tenant_execution.py`** passes `bundle_id` into the gate.
+- **Tests:** `test_canonical_phase_gate.py`, `test_candidate_selection_drainable.py`.
+- **Deploy:** Step 4.
 
 ---
 
@@ -289,7 +298,7 @@ TRACK B — REPAIR (1–2 weeks): Autonomous execution substrate progression (L7
 | **Why** | 7,047 unmat includes permanent orphans + deferral-blocked; worker never advances |
 | **Files** | `substrate_pipeline/canonical_phase_gate.py`, `canonical/forward_progress/candidate_selection.py` (reuse exclusion logic), `execution/run_tenant_execution.py` |
 | **Invariant violated** | “Do not advance identity while canonical work remains” — interpreted as **any** unmat raw |
-| **Proposed fix** | Add `untreated_routable_drainable_exists_v1()` = routable unmat **not** in active deferral (same predicates as candidate selection). Gate phase 03 on **not** `canonical_needs_more_work` **or** new `canonical_identity_may_proceed_despite_topology_v1` when `untreated_routable_drainable_exists` is false but entities path allowed. Minimum: replace `untreated_raw_exists_v1` tail in gate with drainable check. |
+| **Proposed fix** | **Shipped (step 3):** `untreated_routable_drainable_exists_v1()` + `canonical_identity_may_proceed_despite_topology_v1()`; gate tail and topology-wait branches deferral-aware; worker passes `bundle_id`. |
 | **Expected result** | Worker runs phase 03 while topology gap remains; identity substrate progresses |
 | **Risk** | Identity on “incomplete” canonical — acceptable per wedge doctrine; document in receipt |
 
