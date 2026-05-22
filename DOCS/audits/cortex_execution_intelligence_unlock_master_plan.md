@@ -24,7 +24,7 @@
 | 7 | **Done** | 2026-05-22 | Promotion A2: 200 authoritative links (pass cap) |
 | 8 | **Done** | 2026-05-22 | Fix 3–5: phase-03 promotion hook + backfill regen + admin APIs |
 | 9 | **Done** | 2026-05-22 | GRAPH/OCTS wedge A5: 16 completed walks, 8 with authoritative hops |
-| 10 | Pending | — | RETRIEVAL → A6 |
+| 10 | **Done** | 2026-05-22 | RETRIEVAL wedge A6: 216 index entries published |
 | 11 | Pending | — | 48h alive panel (Track A) |
 | 12 | Pending | — | Fix 6–7 + soak + synthesis L6 (Track B + P3) |
 
@@ -116,6 +116,15 @@
 - **A5:** Pass — ≥1 completed walk visiting ≥1 authoritative link per plan §6.2.
 - **Code:** `step09_octs_walk.py` (`pick_start_node_ids_on_authoritative_edges_v1`, `evaluate_a5_octs_execution_continuity_v1`); wedge script + tests `test_step09_octs_walk.py`.
 - **Note:** First pass used default entity starts (0-hop walks); wedge selects authoritative-incident starts for real traversal.
+
+### Step 10 completion record (RETRIEVAL / evidence recovery A6)
+
+- **Command:** `cd backend && .venv/bin/python scripts/unlock_step10_retrieval.py`
+- **Artifact:** [`baselines/fizzer_step10_2026-05-22.json`](baselines/fizzer_step10_2026-05-22.json)
+- **Result:** `materialize_retrieval_index_for_pipeline_v1` on pipeline `faa5469f-…`; `entries_materialized=216`, `entry_count=216`, `build_state=PUBLISHED`; `walks_candidates=16`, `org_link_candidates=200`; `skip_reasons=[]` (no `RET-SKIP-GRAPH-DISCONNECTED` dominance).
+- **A6:** Pass — evidence recovery attempt with materialized entries, not graph-disconnect dominated.
+- **Code:** `step10_retrieval.py` (`evaluate_a6_evidence_recovery_v1`); wedge script + tests `test_step10_retrieval.py`.
+- **Note:** `completed_tcre_jobs=0`; walk + org-link bindings sufficient for wedge. Execution restart (Celery) optional and failed locally without affecting materialization pass.
 
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py

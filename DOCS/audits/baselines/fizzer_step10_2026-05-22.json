@@ -1,0 +1,56 @@
+{
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "step": 10,
+  "validated_at": "2026-05-22T15:22:39.957256+00:00",
+  "completed_walks": 16,
+  "completed_tcre_jobs": 0,
+  "published_index_epoch_before": null,
+  "materialization_report_before": null,
+  "execution_restart": {
+    "restarted": false,
+    "error": "(psycopg.OperationalError) failed to resolve host 'postgres': [Errno 8] nodename nor servname provided, or not known\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+  },
+  "pipeline_run_id": "faa5469f-849b-4e19-bc26-e9ec001e926f",
+  "retrieval_materialization": {
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "pipeline_run_id": "faa5469f-849b-4e19-bc26-e9ec001e926f",
+    "index_epoch": "epoch-a36e4f6244fb",
+    "entries_materialized": 216,
+    "skip_reasons": [],
+    "tcre_candidates": 0,
+    "walks_candidates": 16,
+    "org_link_candidates": 200,
+    "build_state": "PUBLISHED",
+    "entry_count": 216,
+    "output_index_hash": "5d371b42cdcc70a6ca423931e995f43f60adfac43e210a12bd28602c4c837fb7",
+    "ok": true,
+    "retrieval_card_classification": "progressing"
+  },
+  "ret_skip_code_counts": {},
+  "ret_skip_codes_normalized": [],
+  "graph_disconnect_dominated": false,
+  "A6_pass": true,
+  "A6_detail": "entries_materialized=216:accepted_rows=216",
+  "published_index_epoch_after": "epoch-a36e4f6244fb",
+  "materialization_report_after": {
+    "id": "908c7eef-fff4-41d9-a95c-eb564f31ed98",
+    "accepted_rows": 216,
+    "skipped_rows": 0,
+    "tcre_candidates": 0,
+    "walks_candidates": 16,
+    "org_link_candidates": 200,
+    "skip_reasons": [],
+    "retrieval_epoch": "epoch-a36e4f6244fb",
+    "created_at": "2026-05-22T15:22:41.619695+00:00"
+  },
+  "phase_07_recent": [
+    {
+      "status": "queued",
+      "entries_materialized": null,
+      "entry_count": null,
+      "retrieval_outcome": null,
+      "build_state": null,
+      "started_at": null
+    }
+  ]
+}
