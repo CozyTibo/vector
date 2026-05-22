@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canonical.forward_progress.pass_fairness import resolve_fair_pass_cursor
@@ -228,7 +228,8 @@ def list_untreated_routable_count_estimate(
         )
         filters.extend([~cooldown_deferral_block, ~permanent_deferral_block])
     stmt = (
-        select(RawIngestionRecord.id)
+        select(func.count())
+        .select_from(RawIngestionRecord)
         .outerjoin(
             CortexCanonicalTransformMaterialization,
             and_(
@@ -239,4 +240,4 @@ def list_untreated_routable_count_estimate(
         )
         .where(*filters)
     )
-    return len(db.scalars(stmt).all())
+    return int(db.scalar(stmt) or 0)

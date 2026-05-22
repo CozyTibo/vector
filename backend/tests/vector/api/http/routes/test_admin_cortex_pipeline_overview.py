@@ -68,3 +68,5 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
         "eligible_now",
         "waiting_cooldown",
     }
+    canonical = next(p for p in body["phases"] if p["phase"] == "canonical")
+    assert canonical["backlog_count"] is None or isinstance(canonical["backlog_count"], int)
