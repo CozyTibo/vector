@@ -1,0 +1,11 @@
+{
+  "step": 8,
+  "fix3_pass": true,
+  "fix3_detail": "phase03_graph_density_promotion_hook",
+  "fix4_pass": true,
+  "fix4_detail": "backfill_include_candidate_regen",
+  "fix5_pass": true,
+  "fix5_detail": "admin_promotion_and_replay_routes",
+  "step8_pass": true,
+  "validated_at": "2026-05-22T15:16:45.359295+00:00"
+}

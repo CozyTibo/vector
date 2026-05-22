@@ -391,6 +391,15 @@ def execute_lawful_edge_promotion_replay_job_v1(
     )
 
 
+def public_graph_density_promotion_run_payload_v1(schedule_out: dict[str, Any]) -> dict[str, Any]:
+    """Flatten inline promotion pass output for admin HTTP (G-P085-PROMO-01)."""
+    if schedule_out.get("scheduled") and isinstance(schedule_out.get("pass"), dict):
+        pass_out = dict(schedule_out["pass"])
+        pass_out["schedule_meta"] = {k: v for k, v in schedule_out.items() if k != "pass"}
+        return pass_out
+    return schedule_out
+
+
 def schedule_graph_density_pass_v1(
     *,
     tenant_id: uuid.UUID,

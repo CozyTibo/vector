@@ -99,6 +99,36 @@ def build_identity_substrate_projection_receipt_v1(
     }
 
 
+def schedule_graph_density_promotion_after_identity_substrate_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    substrate: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Bounded lawful promotion after phase-03 identity substrate (not phase-04 sidecar)."""
+    backfill_only = {
+        k: v
+        for k, v in substrate.items()
+        if k not in ("candidate_regeneration", "identity_continuity_substrate_pipeline")
+    }
+    entities_upserted = int(backfill_only.get("entities_upserted") or 0)
+    cand = substrate.get("candidate_regeneration") or {}
+    candidate_count = int(cand.get("candidate_count") or 0)
+    if entities_upserted <= 0 and candidate_count <= 0:
+        return None
+    from vector.domains.cortex.operational_runtime.graph_density_promotion import (
+        PROMOTION_TRIGGER_AFTER_PHASE_04_V1,
+        schedule_graph_density_pass_v1,
+    )
+
+    return schedule_graph_density_pass_v1(
+        tenant_id=tenant_id,
+        trigger=PROMOTION_TRIGGER_AFTER_PHASE_04_V1,
+        force=False,
+        session=db,
+    )
+
+
 def run_identity_substrate_projection_for_pipeline_v1(
     db: Session,
     *,
@@ -115,6 +145,11 @@ def run_identity_substrate_projection_for_pipeline_v1(
         dry_run=False,
         anchor_limit=anchor_limit,
     )
+    graph_density_promotion = schedule_graph_density_promotion_after_identity_substrate_v1(
+        db,
+        tenant_id=tenant_id,
+        substrate=substrate,
+    )
     audit = build_identity_substrate_projection_receipt_v1(
         db,
         tenant_id=tenant_id,
@@ -126,6 +161,7 @@ def run_identity_substrate_projection_for_pipeline_v1(
     return {
         "identity_continuity_substrate": substrate,
         "identity_substrate_audit": audit,
+        "graph_density_promotion": graph_density_promotion,
         "anchor_limit_applied": anchor_limit,
         "counts_before": counts_before,
         "counts_after": audit.get("counts_after"),

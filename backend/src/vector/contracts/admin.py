@@ -3810,6 +3810,25 @@ class AdminCortexOrgLinkReplayJobEnqueueResponse(BaseModel):
     job: AdminCortexOrgLinkReplayJobItem
 
 
+class AdminCortexOrgLinkReplayJobRunResponse(BaseModel):
+    """Phase 04 Step 10 — synchronous org link replay job result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    org_link_replay_schema_version: int
+    tenant_id: str
+    job: AdminCortexOrgLinkReplayJobItem
+
+
+class AdminCortexGraphDensityPromotionRunRequest(BaseModel):
+    """War-room unlock — inline graph density promotion pass for a tenant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    force: bool = False
+    trigger: str = Field(default="manual", min_length=1, max_length=128)
+
+
 class AdminCortexIdentityWorkerTaskStatusResponse(BaseModel):
     """Phase 04 Step 19 — Celery AsyncResult snapshot for tenant-bound tasks only."""
 
@@ -3850,6 +3869,10 @@ class AdminCortexIdentityBackfillFromAnchorsRequest(BaseModel):
 
     dry_run: bool = False
     anchor_limit: int = Field(default=5_000, ge=1, le=50_000)
+    include_candidate_regen: bool = Field(
+        default=True,
+        description="When true (default), run anchor continuity candidate regen after handle backfill.",
+    )
 
 
 class AdminCortexIdentityBackfillFromAnchorsResponse(BaseModel):

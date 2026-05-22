@@ -63,7 +63,7 @@ def test_materialize_backlog_route_not_registered(
 
 
 @pytest.mark.integration
-def test_graph_density_promotion_run_route_not_registered(
+def test_graph_density_promotion_run_route_registered(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
@@ -74,5 +74,7 @@ def test_graph_density_promotion_run_route_not_registered(
     r = client.post(
         f"/admin/tenants/{tid}/cortex/operational-runtime/graph-density-promotion/run",
         auth=("admin", "integration-admin-password"),
+        json={"force": False, "trigger": "manual"},
     )
-    assert r.status_code == 404
+    assert r.status_code == 200
+    assert r.json()["gate_id"] == "G-P085-PROMO-01"

@@ -185,5 +185,7 @@ def test_admin_org_link_replay_run_list_detail(
         auth=("admin", "integration-admin-password"),
         json={"job_kind": "authoritative_replay", "dry_run": False},
     )
-    assert post.status_code == 410
-    assert "execution/rerun" in post.json()["detail"]["replacement"]
+    assert post.status_code == 200
+    body = post.json()
+    assert body["job"]["status"] == "completed"
+    assert body["job"]["job_kind"] == "authoritative_replay"

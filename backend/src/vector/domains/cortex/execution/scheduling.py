@@ -231,6 +231,11 @@ def verify_phase03_identity_projection_boundary_v1() -> list[str]:
         errors.append("missing_run_identity_substrate_projection_for_pipeline_v1")
     if not callable(getattr(id_mod, "build_identity_substrate_projection_receipt_v1", None)):
         errors.append("missing_build_identity_substrate_projection_receipt_v1")
+    proj = inspect.getsource(id_mod.run_identity_substrate_projection_for_pipeline_v1)
+    if "schedule_graph_density_promotion_after_identity_substrate_v1" not in proj:
+        errors.append("phase03_missing_graph_density_promotion_hook")
+    if not callable(getattr(id_mod, "schedule_graph_density_promotion_after_identity_substrate_v1", None)):
+        errors.append("phase03_missing_graph_density_promotion_helper")
     return errors
 
 

@@ -52,10 +52,12 @@ def test_replay_job_enqueue_sets_celery_id_and_pollable(
     post = client.post(
         f"/admin/tenants/{tid}/cortex/identity/replay-jobs/enqueue",
         auth=("admin", "integration-admin-password"),
-        json={"job_kind": "authoritative_replay", "dry_run": False},
+        json={"job_kind": "candidate_regen", "dry_run": False},
     )
-    assert post.status_code == 410
-    assert "execution/rerun" in post.json()["detail"]["replacement"]
+    assert post.status_code == 200
+    body = post.json()
+    assert body["celery_task_id"] == fake_id
+    assert body["job"]["job_kind"] == "candidate_regen"
 
 
 def test_worker_task_unknown_returns_404(

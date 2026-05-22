@@ -137,6 +137,7 @@ from vector.contracts.admin import (
     AdminCortexOrgLinkReplayJobListResponse,
     AdminCortexOrgLinkReplayJobReceiptItem,
     AdminCortexOrgLinkReplayJobRunRequest,
+    AdminCortexOrgLinkReplayJobRunResponse,
     AdminCortexOrgLinkTemporalStripItem,
     AdminCortexOrgLinkTemporalTimelineResponse,
     AdminCortexOrgMergeCreateRequest,
@@ -2986,6 +2987,97 @@ def build_admin_router() -> APIRouter:
             ],
         )
 
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/replay-jobs/run",
+        response_model=AdminCortexOrgLinkReplayJobRunResponse,
+    )
+    def admin_cortex_identity_org_link_replay_jobs_run(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgLinkReplayJobRunRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkReplayJobRunResponse:
+        """Phase 04 Step 10 — synchronous org link replay (e.g. candidate_regen)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.org_link_replay_runtime import (
+            ORG_LINK_REPLAY_SCHEMA_VERSION,
+            OrgLinkReplayError,
+            execute_org_link_replay_job,
+            org_link_replay_job_public_dict,
+        )
+
+        try:
+            job = execute_org_link_replay_job(
+                db,
+                tenant_id=tenant_id,
+                job_kind=body.job_kind,
+                pinned_rule_version=body.pinned_rule_version,
+                dry_run=body.dry_run,
+                scope_json=body.scope_json,
+            )
+        except OrgLinkReplayError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        db.commit()
+        db.refresh(job)
+        return AdminCortexOrgLinkReplayJobRunResponse(
+            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identity/replay-jobs/enqueue",
+        response_model=AdminCortexOrgLinkReplayJobEnqueueResponse,
+    )
+    def admin_cortex_identity_org_link_replay_jobs_enqueue(
+        tenant_id: uuid.UUID,
+        body: AdminCortexOrgLinkReplayJobEnqueueRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexOrgLinkReplayJobEnqueueResponse:
+        """Phase 04 Step 19 — enqueue async org link replay (e.g. candidate_regen)."""
+        _assert_tenant(db, tenant_id)
+        from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
+        from vector.domains.cortex.identity.org_link_replay_runtime import (
+            ORG_LINK_REPLAY_SCHEMA_VERSION,
+            create_queued_org_link_replay_job,
+            org_link_replay_job_public_dict,
+        )
+
+        job = create_queued_org_link_replay_job(
+            db,
+            tenant_id=tenant_id,
+            job_kind=body.job_kind,
+            pinned_rule_version=body.pinned_rule_version,
+            dry_run=body.dry_run,
+            scope_json=body.scope_json,
+        )
+        db.flush()
+        try:
+            async_result = run_org_link_replay_job_task.delay(
+                str(tenant_id),
+                body.job_kind,
+                body.pinned_rule_version,
+                body.dry_run,
+                body.scope_json,
+                str(job.id),
+            )
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"celery_enqueue_failed:{exc}",
+            ) from exc
+        job.celery_task_id = str(async_result.id)
+        db.commit()
+        db.refresh(job)
+        path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{async_result.id}"
+        return AdminCortexOrgLinkReplayJobEnqueueResponse(
+            org_link_replay_schema_version=ORG_LINK_REPLAY_SCHEMA_VERSION,
+            tenant_id=str(tenant_id),
+            celery_task_id=str(async_result.id),
+            worker_task_status_path=path,
+            job=AdminCortexOrgLinkReplayJobItem.model_validate(org_link_replay_job_public_dict(job)),
+        )
+
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/worker-tasks/{celery_task_id}",
         response_model=AdminCortexIdentityWorkerTaskStatusResponse,
@@ -3923,18 +4015,29 @@ def build_admin_router() -> APIRouter:
         body: AdminCortexIdentityBackfillFromAnchorsRequest,
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexIdentityBackfillFromAnchorsResponse:
-        """Phase 04 Step 20 — upsert org handles from Phase 03 identity anchors (candidate lane only)."""
+        """Phase 04 Step 20 — upsert org handles from Phase 03 identity anchors (+ optional candidate regen)."""
         _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.identity.backfill import (
-            run_anchor_handle_backfill,
-        )
+        if body.include_candidate_regen:
+            from vector.domains.cortex.identity.continuity_rebuild import (
+                run_identity_handles_and_candidates_refresh,
+            )
 
-        raw = run_anchor_handle_backfill(
-            db,
-            tenant_id=tenant_id,
-            dry_run=body.dry_run,
-            anchor_limit=body.anchor_limit,
-        )
+            raw = run_identity_handles_and_candidates_refresh(
+                db,
+                tenant_id=tenant_id,
+                dry_run=body.dry_run,
+                anchor_limit=body.anchor_limit,
+            )
+        else:
+            from vector.domains.cortex.identity.backfill import run_anchor_handle_backfill
+
+            raw = run_anchor_handle_backfill(
+                db,
+                tenant_id=tenant_id,
+                dry_run=body.dry_run,
+                anchor_limit=body.anchor_limit,
+                skip_candidate_regen=True,
+            )
         db.commit()
         return AdminCortexIdentityBackfillFromAnchorsResponse.model_validate(raw)
 

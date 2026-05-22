@@ -12,6 +12,7 @@ from starlette import status
 
 from vector.api.http.deps import get_db
 from vector.contracts.admin import (
+    AdminCortexGraphDensityPromotionRunRequest,
     AdminCortexOperationalRuntimeGapMatrixCatalogResponse,
     AdminCortexOperationalRuntimePhaseBoundariesCatalogResponse,
     AdminCortexOperationalRuntimeProgramCatalogResponse,
@@ -177,6 +178,7 @@ from vector.domains.cortex.operational_runtime.graph_density import (
 from vector.domains.cortex.operational_runtime.graph_density_promotion import (
     build_graph_density_promotion_catalog_v1,
     evaluate_promotion_backlog_schedule_v1,
+    public_graph_density_promotion_run_payload_v1,
     run_graph_density_promotion_pass_v1,
     schedule_graph_density_pass_v1,
 )
@@ -458,6 +460,31 @@ def register_cortex_operational_runtime_routes(router: APIRouter) -> None:
     def admin_catalog_cortex_operational_runtime_graph_density_promotion_gate() -> dict[str, object]:
         """Phase 08.5 Step 11 — static **G-P085-PROMO-01** gate."""
         return verify_gp085_promotion_gate_static()
+
+    @router.post(
+        "/tenants/{tenant_id}/cortex/operational-runtime/graph-density-promotion/run",
+        response_model=None,
+    )
+    def admin_tenant_cortex_operational_runtime_graph_density_promotion_run(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        body: AdminCortexGraphDensityPromotionRunRequest | None = None,
+    ) -> JSONResponse | dict[str, object]:
+        """Phase 08.5 Step 11 — inline lawful edge promotion pass (**G-P085-PROMO-01**)."""
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"error": "tenant_not_found"},
+            )
+        req = body or AdminCortexGraphDensityPromotionRunRequest()
+        out = schedule_graph_density_pass_v1(
+            tenant_id=tenant_id,
+            trigger=req.trigger,
+            force=req.force,
+            session=db,
+        )
+        db.commit()
+        return public_graph_density_promotion_run_payload_v1(out)
 
     @router.get(
         "/catalog/cortex/operational-runtime/graph-orphan-continuity",

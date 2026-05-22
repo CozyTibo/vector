@@ -22,7 +22,7 @@
 | 5 | **Done** | 2026-05-22 | Identity backfill A1: 7286 active org handles on Fizzer |
 | 6 | **Done** | 2026-05-22 | Candidate regen A3: 2000 link candidates (global cap) |
 | 7 | **Done** | 2026-05-22 | Promotion A2: 200 authoritative links (pass cap) |
-| 8 | Pending | — | Fix 3–5 |
+| 8 | **Done** | 2026-05-22 | Fix 3–5: phase-03 promotion hook + backfill regen + admin APIs |
 | 9 | Pending | — | GRAPH → A5 |
 | 10 | Pending | — | RETRIEVAL → A6 |
 | 11 | Pending | — | 48h alive panel (Track A) |
@@ -98,6 +98,15 @@
 - **Result:** `authoritative_links_before=0` → `authoritative_links_after=200` (`org.persona_belongs_to_handle`); `promoted_count=200`, `skipped_count=0`; `unpromoted_remaining=1800` (upstream cap omission per pass).
 - **A2:** Pass — wedge ≥1 and at 200/pass cap per plan §6.2.
 - **Code:** `step07_graph_density_promotion.py` (`evaluate_a2_authoritative_links_v1`); wedge script calls `schedule_graph_density_pass_v1(force=True, trigger=manual)`; tests `test_step07_graph_density_promotion.py`.
+
+### Step 8 completion record (Fix 3–5 code ship)
+
+- **Command:** `cd backend && .venv/bin/python scripts/unlock_step08_fixes_shipped.py`
+- **Artifact:** [`baselines/fizzer_step08_2026-05-22.json`](baselines/fizzer_step08_2026-05-22.json)
+- **Fix 3:** `schedule_graph_density_promotion_after_identity_substrate_v1` wired from `run_identity_substrate_projection_for_pipeline_v1` (inline `schedule_graph_density_pass_v1`, trigger `after_phase_04`, not phase-04 sidecar).
+- **Fix 4:** `POST …/identity/backfill/from-canonical-anchors` accepts `include_candidate_regen` (default true) → `run_identity_handles_and_candidates_refresh`.
+- **Fix 5:** `POST …/operational-runtime/graph-density-promotion/run`; `POST …/identity/replay-jobs/run` + `/enqueue` restored; removed from `admin_bypass_guard` forbidden list.
+- **Tests:** `test_step08_fixes_shipped.py`; updated phase03 boundary, step10/11, m8 admin route tests.
 
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py
