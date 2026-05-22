@@ -1,7 +1,17 @@
 import { getApiBase } from "./canonicalApi";
 
-const TENANT_SCOPED_BASE_RE =
-  /\/admin\/tenants\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TENANT_UUID =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+const TENANT_SCOPED_BASE_RE = new RegExp(
+  `/admin/tenants/${TENANT_UUID}(?:/overview)?$`,
+  "i",
+);
+
+const LEGACY_TENANT_OVERVIEW_RE = new RegExp(
+  `^/admin/tenants/${TENANT_UUID}/overview$`,
+  "i",
+);
 
 /** API origin only — strips accidental per-tenant suffixes from VITE_API_BASE_URL. */
 export function normalizeApiBase(): string {
@@ -15,6 +25,9 @@ export function normalizeApiBase(): string {
 export function adminApiPath(tenantId: string, path: string): string {
   let p = path.startsWith("/") ? path : `/${path}`;
 
+  if (LEGACY_TENANT_OVERVIEW_RE.test(p)) {
+    return `/admin/tenants/${tenantId}/cortex/pipeline/overview`;
+  }
   if (p.startsWith("/cortex/")) {
     return `/admin/tenants/${tenantId}${p}`;
   }

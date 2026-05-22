@@ -27,7 +27,8 @@ export default function AdminCortexOverviewPage() {
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
   const exec = executionQ.data?.execution;
-  const continuity = executionQ.data?.continuity_status ?? undefined;
+  const continuity =
+    executionQ.data?.continuity_status ?? phasesQ.data?.continuity_status ?? undefined;
   const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
   const attentionItems = phasesQ.data?.attention_items ?? [];
   const sched = ingestionQ.data?.scheduler;
@@ -62,8 +63,8 @@ export default function AdminCortexOverviewPage() {
                   {" "}
                   · FSM {exec.fsm_state ?? "—"} · cursor {exec.phase_cursor ?? "—"}
                 </>
-              ) : executionQ.isError ? (
-                <span className="text-red-700"> · execution unavailable</span>
+              ) : executionQ.isError && !exec ? (
+                <span className="text-red-700"> · execution slice unavailable</span>
               ) : null}
             </p>
           </div>

@@ -141,12 +141,13 @@ def build_pipeline_overview_phases_v1(
     cache_key = f"{tenant_id}:phases"
 
     def _build() -> dict[str, Any]:
-        _, phases, attention_items, attention = _cached_continuity_bundle_v1(
+        continuity_status, phases, attention_items, attention = _cached_continuity_bundle_v1(
             session, settings, tenant_id=tenant_id
         )
         return {
             "surface_kind": "pipeline_overview_phases",
             "tenant_id": str(tenant_id),
+            "continuity_status": continuity_status,
             "phases": phases,
             "attention": attention,
             "attention_items": attention_items,

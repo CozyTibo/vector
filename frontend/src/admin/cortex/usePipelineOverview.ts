@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
-import type { AttentionItem, PipelineOverview } from "./pipelineTypes";
+import type { AttentionItem, ContinuityStatus, PipelineOverview } from "./pipelineTypes";
 import type { PipelineExecutionSlice } from "./fetchPipelineOverviewSlice";
 import {
   fetchPipelineExecutionSlice,
@@ -33,6 +33,7 @@ export type PipelineOverviewPhases = {
   phases: PipelineOverview["phases"];
   attention: string[];
   attention_items: AttentionItem[];
+  continuity_status: ContinuityStatus | null;
 };
 
 export type PipelineOverviewExecution = PipelineExecutionSlice & {
@@ -77,6 +78,7 @@ export function usePipelineOverviewPhases() {
         phases: data.phases,
         attention: data.attention,
         attention_items: data.attention_items,
+        continuity_status: data.continuity_status ?? null,
       };
     },
     enabled: Boolean(tenantId),

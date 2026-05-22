@@ -37,7 +37,27 @@ from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 from vector.settings import Settings
 
 
+def register_legacy_pipeline_overview_alias(router: APIRouter) -> None:
+    """Misconfigured frontends called ``…/tenants/{id}/overview`` (no cortex/pipeline)."""
+
+    @router.get(
+        "/tenants/{tenant_id}/overview",
+        response_model=AdminCortexPipelineOverviewResponse,
+        include_in_schema=False,
+    )
+    def get_legacy_tenant_pipeline_overview(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelineOverviewResponse:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
+        raw = build_pipeline_overview_v1(db, settings, tenant_id=tenant_id)
+        return AdminCortexPipelineOverviewResponse.model_validate(raw)
+
+
 def register_cortex_pipeline_routes(router: APIRouter) -> None:
+    register_legacy_pipeline_overview_alias(router)
     pr = APIRouter(prefix="/tenants/{tenant_id}/cortex/pipeline", tags=["cortex-pipeline"])
 
     def _assert_tenant(db: Session, tenant_id: uuid.UUID) -> None:

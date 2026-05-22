@@ -53,7 +53,7 @@ export async function fetchPipelineExecutionSlice(tenantId: string): Promise<Pip
   const body = await trySlice<{
     execution: PipelineOverview["execution"];
     continuity_status?: ContinuityStatus | null;
-  }>(tenantId, "/cortex/pipeline/overview/execution", 20_000);
+  }>(tenantId, "/cortex/pipeline/overview/execution", 45_000);
   if (body) {
     return {
       execution: body.execution,
@@ -72,20 +72,26 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
     phases: PipelineOverview["phases"];
     attention: string[];
     attention_items?: AttentionItem[];
-  }>(tenantId, "/cortex/pipeline/overview/phases", 30_000);
+    continuity_status?: ContinuityStatus | null;
+  }>(tenantId, "/cortex/pipeline/overview/phases", 45_000);
   if (body) {
     return {
       phases: body.phases,
       attention: body.attention,
       attention_items: body.attention_items ?? [],
+      continuity_status: body.continuity_status ?? null,
     };
   }
   const full = await fetchMonolithOverview(tenantId);
+  const extended = full as PipelineOverview & {
+    attention_items?: AttentionItem[];
+    continuity_status?: ContinuityStatus | null;
+  };
   return {
     phases: full.phases,
     attention: full.attention,
-    attention_items:
-      (full as PipelineOverview & { attention_items?: AttentionItem[] }).attention_items ?? [],
+    attention_items: extended.attention_items ?? [],
+    continuity_status: extended.continuity_status ?? null,
   };
 }
 
