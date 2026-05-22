@@ -20,10 +20,50 @@ export type PhaseOverview = {
   route: string;
 };
 
+export type ContinuitySignal = {
+  key: string;
+  label: string;
+  value: string;
+  severity?: "ok" | "warn" | "bad" | null;
+};
+
+export type ContinuityStatus = {
+  state: "AUTONOMOUS" | "DEGRADED" | "WEDGE_DEPENDENT" | "STALLED" | "BROKEN";
+  state_label?: string;
+  execution_lane: "HEALTHY" | "DEGRADED" | "BLOCKED" | "WAITING" | "UNKNOWN";
+  canonical_lane: "HEALTHY" | "DEGRADED" | "BLOCKED" | "WAITING" | "UNKNOWN";
+  last_full_chain_at?: string | null;
+  last_full_chain_ago?: string | null;
+  last_retrieval_epoch?: string | null;
+  last_retrieval_epoch_at?: string | null;
+  last_retrieval_epoch_ago?: string | null;
+  last_synthesis_at?: string | null;
+  last_synthesis_ago?: string | null;
+  topology_wait?: boolean;
+  aa_continuity_soak?: {
+    active?: boolean;
+    hours_elapsed?: number | null;
+    hours_required?: number;
+    detail?: string | null;
+  };
+  progression_class?: string | null;
+};
+
+export type AttentionItem = {
+  priority: "P0" | "P1" | "P2";
+  title: string;
+  impact: string;
+  action: string;
+  phase?: string | null;
+};
+
 export type PipelineOverviewPhase = {
   phase: OperatorPhase;
   status: PhaseStatus;
   status_label: string;
+  headline?: string;
+  continuity_advancing?: boolean;
+  signals?: ContinuitySignal[];
   processed_count: number | null;
   object_count_label: string | null;
   backlog_count: number | null;
@@ -70,8 +110,10 @@ export type PipelineOverview = {
     lease_status: string | null;
     block_reason_code: string | null;
   };
+  continuity_status?: ContinuityStatus | null;
   phases: PipelineOverviewPhase[];
   attention: string[];
+  attention_items?: AttentionItem[];
   scheduler?: {
     env_scheduler_enabled: boolean;
     paused_via_redis: boolean;
@@ -89,7 +131,7 @@ export const OPERATOR_PHASES: Array<{ phase: OperatorPhase; label: string; route
   { phase: "canonical", label: "Canonical", route: "canonical" },
   { phase: "identity", label: "Identity", route: "identity" },
   { phase: "graph", label: "Graph", route: "graph" },
-  { phase: "reconstruction", label: "Reconstruction", route: "reconstruction" },
+  { phase: "reconstruction", label: "Traversal", route: "reconstruction" },
   { phase: "retrieval", label: "Retrieval", route: "retrieval" },
   { phase: "synthesis", label: "Synthesis", route: "synthesis" },
 ];

@@ -1,7 +1,7 @@
 import { adminFetch, adminJson } from "../../lib/adminFetch";
 import { adminApiPath } from "../../lib/adminApiUrl";
 import { readErrorDetail } from "../../lib/canonicalApi";
-import type { PipelineOverview } from "./pipelineTypes";
+import type { AttentionItem, ContinuityStatus, PipelineOverview } from "./pipelineTypes";
 
 let monolithInflight: Promise<PipelineOverview> | null = null;
 let monolithTenantId: string | null = null;
@@ -44,25 +44,49 @@ async function trySlice<T>(
   }
 }
 
-export async function fetchPipelineExecutionSlice(tenantId: string) {
-  const body = await trySlice<{ execution: PipelineOverview["execution"] }>(
-    tenantId,
-    "/cortex/pipeline/overview/execution",
-    20_000,
-  );
-  if (body) return body.execution;
+export type PipelineExecutionSlice = {
+  execution: PipelineOverview["execution"];
+  continuity_status?: ContinuityStatus | null;
+};
+
+export async function fetchPipelineExecutionSlice(tenantId: string): Promise<PipelineExecutionSlice> {
+  const body = await trySlice<{
+    execution: PipelineOverview["execution"];
+    continuity_status?: ContinuityStatus | null;
+  }>(tenantId, "/cortex/pipeline/overview/execution", 20_000);
+  if (body) {
+    return {
+      execution: body.execution,
+      continuity_status: body.continuity_status ?? null,
+    };
+  }
   const full = await fetchMonolithOverview(tenantId);
-  return full.execution;
+  return {
+    execution: full.execution,
+    continuity_status: (full as PipelineOverview & { continuity_status?: ContinuityStatus }).continuity_status ?? null,
+  };
 }
 
 export async function fetchPipelinePhasesSlice(tenantId: string) {
   const body = await trySlice<{
     phases: PipelineOverview["phases"];
     attention: string[];
+    attention_items?: AttentionItem[];
   }>(tenantId, "/cortex/pipeline/overview/phases", 30_000);
-  if (body) return body;
+  if (body) {
+    return {
+      phases: body.phases,
+      attention: body.attention,
+      attention_items: body.attention_items ?? [],
+    };
+  }
   const full = await fetchMonolithOverview(tenantId);
-  return { phases: full.phases, attention: full.attention };
+  return {
+    phases: full.phases,
+    attention: full.attention,
+    attention_items:
+      (full as PipelineOverview & { attention_items?: AttentionItem[] }).attention_items ?? [],
+  };
 }
 
 export async function fetchPipelineIngestionSlice(tenantId: string) {

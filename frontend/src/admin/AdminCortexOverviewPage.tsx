@@ -1,11 +1,14 @@
 import { Link, useParams } from "react-router-dom";
 
+import { ContinuityAttentionList } from "./cortex/ContinuityAttentionList";
+import { ContinuityStatusCard } from "./cortex/ContinuityStatusCard";
 import { PipelineActions } from "./cortex/PipelineActions";
 import { RecentIngestionRuns } from "./cortex/RecentIngestionRuns";
-import { PipelineStrip } from "./cortex/PipelineStrip";
+import {
+  OperationalPhaseStrip,
+  phasesForOperationalStrip,
+} from "./cortex/OperationalPhaseStrip";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
-import type { PhaseOverview, PipelineOverview } from "./cortex/pipelineTypes";
-import { OPERATOR_PHASES } from "./cortex/pipelineTypes";
 import {
   usePipelineOverviewExecution,
   usePipelineOverviewIngestion,
@@ -13,30 +16,6 @@ import {
 } from "./cortex/usePipelineOverview";
 import { titleConnector } from "./cortexAdminTypes";
 import { StatusBadge } from "./ui/StatusBadge";
-
-function phasesForStrip(phases: PipelineOverview["phases"] | undefined): PhaseOverview[] {
-  return OPERATOR_PHASES.map((meta) => {
-    const row = phases?.find((p) => p.phase === meta.phase);
-    const status = row?.status ?? "waiting";
-    const statusLabel =
-      row?.status_label?.trim() ||
-      (status === "healthy"
-        ? "Healthy"
-        : status === "running"
-          ? "Running"
-          : status === "blocked"
-            ? "Blocked"
-            : status === "degraded"
-              ? "Has gaps"
-              : "Waiting");
-    return {
-      ...meta,
-      status,
-      statusLabel,
-      objectCountLabel: row?.object_count_label ?? null,
-    };
-  });
-}
 
 export default function AdminCortexOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
@@ -47,9 +26,10 @@ export default function AdminCortexOverviewPage() {
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
-  const exec = executionQ.data;
-  const phases = phasesForStrip(phasesQ.data?.phases);
-  const attention = phasesQ.data?.attention ?? [];
+  const exec = executionQ.data?.execution;
+  const continuity = executionQ.data?.continuity_status ?? undefined;
+  const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
+  const attentionItems = phasesQ.data?.attention_items ?? [];
   const sched = ingestionQ.data?.scheduler;
   const runnableConnectors = ingestionQ.data?.runnable_connectors ?? [];
 
@@ -64,14 +44,19 @@ export default function AdminCortexOverviewPage() {
 
   return (
     <div className="space-y-6">
+      <ContinuityStatusCard
+        status={continuity}
+        loading={executionQ.isPending && !executionQ.data}
+      />
+
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-stone-900">Pipeline</h2>
+            <h2 className="text-lg font-semibold text-stone-900">Pipeline continuity</h2>
             <p className="text-sm text-stone-600">
-              Execution lease is authoritative
+              Lease FSM is authoritative
               {executionQ.isPending && !exec ? (
-                <span className="text-stone-400"> · loading FSM…</span>
+                <span className="text-stone-400"> · loading…</span>
               ) : exec ? (
                 <>
                   {" "}
@@ -87,7 +72,9 @@ export default function AdminCortexOverviewPage() {
           ) : exec?.block_reason_code ? (
             <StatusBadge tone="bad">{exec.block_reason_code}</StatusBadge>
           ) : exec ? (
-            <StatusBadge tone="ok">{exec.lease_status ?? "idle"}</StatusBadge>
+            <StatusBadge tone={exec.lease_status === "running" ? "ok" : "warn"}>
+              {exec.lease_status ?? "idle"}
+            </StatusBadge>
           ) : null}
         </div>
         <div className="mt-4">
@@ -96,7 +83,7 @@ export default function AdminCortexOverviewPage() {
           ) : phasesError ? (
             <p className="text-sm text-red-700">{phasesError}</p>
           ) : (
-            <PipelineStrip phases={phases} />
+            <OperationalPhaseStrip phases={operationalPhases} />
           )}
         </div>
       </section>
@@ -108,19 +95,9 @@ export default function AdminCortexOverviewPage() {
             <SectionSkeleton variant="attention" />
           </div>
         </section>
-      ) : attention.length > 0 ? (
-        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-amber-950">What needs attention</h3>
-          <p className="mt-1 text-xs text-amber-800/90">
-            Plain-language reasons a step is waiting, blocked, or has gaps. Open the phase tab for detail.
-          </p>
-          <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-amber-900">
-            {attention.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      ) : (
+        <ContinuityAttentionList items={attentionItems} />
+      )}
 
       {ingestionQ.isPending && !ingestionQ.data ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">

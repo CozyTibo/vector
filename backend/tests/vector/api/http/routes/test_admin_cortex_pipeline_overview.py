@@ -52,11 +52,19 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
     }
     ingestion = next(p for p in body["phases"] if p["phase"] == "ingestion")
     assert ingestion["status_label"]
-    assert ingestion["object_count_label"]
-    assert "issues" in ingestion
+    assert ingestion.get("headline")
+    assert "signals" in ingestion
+    assert "continuity_status" in body
+    assert body["continuity_status"]["state"] in {
+        "AUTONOMOUS",
+        "DEGRADED",
+        "WEDGE_DEPENDENT",
+        "STALLED",
+        "BROKEN",
+    }
     for phase in body["phases"]:
         assert phase["status_label"]
-        assert "object_count_label" in phase
+        assert "signals" in phase
     assert "execution" in body
     assert isinstance(body["attention"], list)
     assert isinstance(body["recent_ingestion_runs"], list)
@@ -84,8 +92,10 @@ def test_pipeline_overview_slices_match_full(client: TestClient, db_session: Ses
     assert phases["surface_kind"] == "pipeline_overview_phases"
     assert ingestion["surface_kind"] == "pipeline_overview_ingestion"
     assert execution["execution"] == full["execution"]
+    assert execution.get("continuity_status") == full.get("continuity_status")
     assert phases["phases"] == full["phases"]
     assert phases["attention"] == full["attention"]
+    assert phases.get("attention_items") == full.get("attention_items")
     assert ingestion["scheduler"] == full["scheduler"]
     assert ingestion["runnable_connectors"] == full["runnable_connectors"]
     assert ingestion["recent_ingestion_runs"] == full["recent_ingestion_runs"]

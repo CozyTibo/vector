@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
-import type { PipelineOverview } from "./pipelineTypes";
+import type { AttentionItem, PipelineOverview } from "./pipelineTypes";
+import type { PipelineExecutionSlice } from "./fetchPipelineOverviewSlice";
 import {
   fetchPipelineExecutionSlice,
   fetchPipelineIngestionSlice,
@@ -31,6 +32,11 @@ export type PipelineOverviewPhases = {
   tenant_id: string;
   phases: PipelineOverview["phases"];
   attention: string[];
+  attention_items: AttentionItem[];
+};
+
+export type PipelineOverviewExecution = PipelineExecutionSlice & {
+  tenant_id: string;
 };
 
 export type PipelineOverviewIngestion = {
@@ -51,7 +57,10 @@ export function usePipelineOverviewExecution() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   return useQuery({
     queryKey: pipelineOverviewExecutionQueryKey(tenantId),
-    queryFn: () => fetchPipelineExecutionSlice(tenantId),
+    queryFn: async () => {
+      const data = await fetchPipelineExecutionSlice(tenantId);
+      return { tenant_id: tenantId, ...data };
+    },
     enabled: Boolean(tenantId),
     ...sliceQueryOpts,
   });
@@ -63,7 +72,12 @@ export function usePipelineOverviewPhases() {
     queryKey: pipelineOverviewPhasesQueryKey(tenantId),
     queryFn: async () => {
       const data = await fetchPipelinePhasesSlice(tenantId);
-      return { tenant_id: tenantId, ...data };
+      return {
+        tenant_id: tenantId,
+        phases: data.phases,
+        attention: data.attention,
+        attention_items: data.attention_items,
+      };
     },
     enabled: Boolean(tenantId),
     ...sliceQueryOpts,

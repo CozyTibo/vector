@@ -58,18 +58,20 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
     def get_pipeline_overview_execution(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexPipelineOverviewExecutionResponse:
         _assert_tenant(db, tenant_id)
-        raw = build_pipeline_overview_execution_v1(db, tenant_id=tenant_id)
+        raw = build_pipeline_overview_execution_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewExecutionResponse.model_validate(raw)
 
     @pr.get("/overview/phases", response_model=AdminCortexPipelineOverviewPhasesResponse)
     def get_pipeline_overview_phases(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexPipelineOverviewPhasesResponse:
         _assert_tenant(db, tenant_id)
-        raw = build_pipeline_overview_phases_v1(db, tenant_id=tenant_id)
+        raw = build_pipeline_overview_phases_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewPhasesResponse.model_validate(raw)
 
     @pr.get("/overview/ingestion", response_model=AdminCortexPipelineOverviewIngestionResponse)

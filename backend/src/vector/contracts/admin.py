@@ -4509,6 +4509,44 @@ class AdminCortexIngestionExhaustCoverageResponse(BaseModel):
     connectors: list[AdminCortexExhaustConnectorCoverage]
 
 
+class AdminCortexContinuitySignal(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    key: str
+    label: str
+    value: str
+    severity: Literal["ok", "warn", "bad"] | None = None
+
+
+class AdminCortexContinuityStatus(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    state: Literal["AUTONOMOUS", "DEGRADED", "WEDGE_DEPENDENT", "STALLED", "BROKEN"]
+    state_label: str = ""
+    execution_lane: Literal["HEALTHY", "DEGRADED", "BLOCKED", "WAITING", "UNKNOWN"] = "UNKNOWN"
+    canonical_lane: Literal["HEALTHY", "DEGRADED", "BLOCKED", "WAITING", "UNKNOWN"] = "UNKNOWN"
+    last_full_chain_at: str | None = None
+    last_full_chain_ago: str | None = None
+    last_retrieval_epoch: str | None = None
+    last_retrieval_epoch_at: str | None = None
+    last_retrieval_epoch_ago: str | None = None
+    last_synthesis_at: str | None = None
+    last_synthesis_ago: str | None = None
+    topology_wait: bool = False
+    aa_continuity_soak: dict[str, Any] = Field(default_factory=dict)
+    progression_class: str | None = None
+
+
+class AdminCortexAttentionItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    priority: Literal["P0", "P1", "P2"]
+    title: str
+    impact: str
+    action: str
+    phase: str | None = None
+
+
 class AdminCortexPipelinePhaseOverview(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -4523,6 +4561,9 @@ class AdminCortexPipelinePhaseOverview(BaseModel):
     ]
     status: Literal["healthy", "running", "waiting", "blocked", "degraded"]
     status_label: str = ""
+    headline: str = ""
+    continuity_advancing: bool = False
+    signals: list[AdminCortexContinuitySignal] = Field(default_factory=list)
     processed_count: int | None = None
     object_count_label: str | None = None
     backlog_count: int | None = None
@@ -4577,6 +4618,7 @@ class AdminCortexPipelineOverviewExecutionResponse(BaseModel):
     surface_kind: str = "pipeline_overview_execution"
     tenant_id: uuid.UUID
     execution: AdminCortexPipelineExecutionSnapshot
+    continuity_status: AdminCortexContinuityStatus | None = None
 
 
 class AdminCortexPipelineOverviewPhasesResponse(BaseModel):
@@ -4586,6 +4628,7 @@ class AdminCortexPipelineOverviewPhasesResponse(BaseModel):
     tenant_id: uuid.UUID
     phases: list[AdminCortexPipelinePhaseOverview]
     attention: list[str] = Field(default_factory=list)
+    attention_items: list[AdminCortexAttentionItem] = Field(default_factory=list)
 
 
 class AdminCortexPipelineOverviewIngestionResponse(BaseModel):
@@ -4605,8 +4648,10 @@ class AdminCortexPipelineOverviewResponse(BaseModel):
     surface_kind: str = "pipeline_overview"
     tenant_id: uuid.UUID
     execution: AdminCortexPipelineExecutionSnapshot
+    continuity_status: AdminCortexContinuityStatus | None = None
     phases: list[AdminCortexPipelinePhaseOverview]
     attention: list[str] = Field(default_factory=list)
+    attention_items: list[AdminCortexAttentionItem] = Field(default_factory=list)
     scheduler: AdminCortexGlobalScheduler | None = None
     runnable_connectors: list[str] = Field(default_factory=list)
     recent_ingestion_runs: list[AdminCortexPipelineRecentIngestionRunItem] = Field(default_factory=list)
