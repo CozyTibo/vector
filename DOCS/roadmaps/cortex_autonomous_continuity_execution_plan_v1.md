@@ -333,10 +333,10 @@ run_tenant_convergence_v1:
 | Step | Work | Owner | Done when | Status |
 |------|------|-------|-----------|--------|
 | 0.1 | Implement P0-A schema packaging + CI smoke | Backend | CI + staging worker walk validate | **Done** (see §Phase 0.1 completion below) |
-| 0.2 | Deploy worker + API images | Ops | Prod deploy SHA recorded | Pending |
-| 0.3 | P0-C new pipeline run or recovery | Ops | New run id, not `failed` |
-| 0.4 | P0-B prod proof SQL | Ops | Phase 05 COMPLETED, walks after graph phase |
-| 0.5 | Document deploy SHA in `DOCS/audits/baselines/continuity_p0_<date>.json` | Eng | Artifact committed |
+| 0.2 | Deploy worker + API images | Ops | Prod deploy SHA recorded | **Done** (see §Phase 0.2 completion) |
+| 0.3 | P0-C new pipeline run or recovery | Ops | New run id, not `failed` | Pending |
+| 0.4 | P0-B prod proof SQL | Ops | Phase 05 COMPLETED, walks after graph phase | Pending |
+| 0.5 | Document deploy SHA in `DOCS/audits/baselines/continuity_p0_<date>.json` | Eng | Artifact committed | **Done** (with 0.2) |
 
 #### Phase 0.1 completion (P0-A + P0-D)
 
@@ -351,6 +351,24 @@ Implemented **2026-05-22**:
 | Unit tests | `backend/tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py` |
 
 **Next step (0.2):** deploy image to prod so phase 05 can complete (P0-B proof is step 0.4).
+
+#### Phase 0.2 completion (deploy API + worker)
+
+Completed **2026-05-22** (GitHub Actions deploy on push to `main`):
+
+| Item | Value |
+|------|-------|
+| Deploy git SHA | `0146cd05149c03a8b6e9572e1bc6739f24584b2e` |
+| API ECS service | `vector-backend-service` → task def `vector-backend:149` |
+| Worker ECS service | `vector-worker-service` → task def `vector-backend-worker:110` |
+| ECR API image | `vector-backend:0146cd05149c03a8b6e9572e1bc6739f24584b2e` |
+| ECR worker image | `vector-worker:0146cd05149c03a8b6e9572e1bc6739f24584b2e` |
+| Baseline artifact | [`DOCS/audits/baselines/continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) |
+| Ops scripts | `backend/scripts/prod_deploy_backend_worker.sh`, `backend/scripts/record_continuity_p0_deploy.py` |
+| CI | `deploy.yml` — `services-stable` wait + image tag verification vs `GITHUB_SHA` |
+| Worker image gate | `backend/worker.Dockerfile` — same P0-A `walk_policy_packaging_ok` build step as API |
+
+**Next step (0.3):** recover or start pipeline run so phase 05 can execute on the new worker.
 
 ### Phase 1 — Propagation + downstream continuity (days 4–10)
 
@@ -398,6 +416,8 @@ Implemented **2026-05-22**:
 
 ```bash
 cd backend
+# After deploy (step 0.2):
+CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity_p0_deploy.py
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f  # after P1-G
 ```

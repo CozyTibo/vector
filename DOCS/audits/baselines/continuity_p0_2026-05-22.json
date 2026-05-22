@@ -1,0 +1,29 @@
+{
+  "phase": "continuity_p0",
+  "step": "0.2_deploy_backend_worker",
+  "recorded_at": "2026-05-22T21:44:15.287374+00:00",
+  "git_sha_full": "0146cd05149c03a8b6e9572e1bc6739f24584b2e",
+  "git_sha_short": "0146cd05149c",
+  "aws_region": "eu-west-1",
+  "ecs_cluster": "vector-prod",
+  "api": {
+    "service": "vector-backend-service",
+    "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:149",
+    "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:0146cd05149c03a8b6e9572e1bc6739f24584b2e",
+    "image_tag": "0146cd05149c03a8b6e9572e1bc6739f24584b2e"
+  },
+  "worker": {
+    "service": "vector-worker-service",
+    "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:110",
+    "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:0146cd05149c03a8b6e9572e1bc6739f24584b2e",
+    "image_tag": "0146cd05149c03a8b6e9572e1bc6739f24584b2e"
+  },
+  "verification": {
+    "api_image_matches_git_sha": true,
+    "worker_image_matches_git_sha": true,
+    "both_services_on_same_tag": true,
+    "deploy_step_02_pass": true
+  },
+  "p0_a_schema_packaging_commit": "789b25fbcc360488975b9fabb0ae90960fca54c1",
+  "notes": "Step 0.2 complete when both ECS services run ECR tags equal deploy git SHA (includes bundled OCTS walk policy under traversal/schemas)."
+}

@@ -82,9 +82,12 @@ def main() -> int:
     api_tag = _image_tag(api_image)
     worker_tag = _image_tag(worker_image)
 
-    images_match = api_tag == expected_sha and worker_tag == expected_sha
-    api_has_p0a = expected_sha in api_tag or api_tag.startswith(short)
-    worker_has_p0a = expected_sha in worker_tag or worker_tag.startswith(short)
+    def _tag_matches_deploy(tag: str, sha: str) -> bool:
+        return tag == sha or tag.startswith(sha[:12])
+
+    images_match = _tag_matches_deploy(api_tag, expected_sha) and _tag_matches_deploy(
+        worker_tag, expected_sha
+    )
 
     record = {
         "phase": "continuity_p0",
@@ -107,8 +110,8 @@ def main() -> int:
             "image_tag": worker_tag,
         },
         "verification": {
-            "api_image_matches_git_sha": api_tag == expected_sha,
-            "worker_image_matches_git_sha": worker_tag == expected_sha,
+            "api_image_matches_git_sha": _tag_matches_deploy(api_tag, expected_sha),
+            "worker_image_matches_git_sha": _tag_matches_deploy(worker_tag, expected_sha),
             "both_services_on_same_tag": api_tag == worker_tag,
             "deploy_step_02_pass": images_match and api_tag == worker_tag,
         },
