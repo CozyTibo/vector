@@ -87,9 +87,13 @@ def test_phase_summary_detail_matches_summary_extras(
     db_session.commit()
     full = client.get(f"/admin/tenants/{tid}/cortex/pipeline/phases/{phase}/summary").json()
     detail = client.get(
-        f"/admin/tenants/{tid}/cortex/pipeline/phases/{phase}/summary/detail"
+        f"/admin/tenants/{tid}/cortex/pipeline/phases/{phase}/summary-detail"
     ).json()
     assert detail["surface_kind"] == "phase_summary_detail"
+    nested = client.get(
+        f"/admin/tenants/{tid}/cortex/pipeline/phases/{phase}/summary/detail"
+    )
+    assert nested.status_code == 200
     assert detail["phase"] == phase
     for key, value in detail.items():
         if key in ("surface_kind", "phase", "tenant_id"):

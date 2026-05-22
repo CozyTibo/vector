@@ -112,6 +112,45 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
                 ) from exc
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from exc
 
+    def _phase_summary_detail(
+        tenant_id: uuid.UUID,
+        phase: str,
+        db: Session,
+        settings: Settings,
+    ) -> AdminCortexPipelinePhaseSummaryDetailResponse:
+        _assert_tenant(db, tenant_id)
+        try:
+            raw = build_phase_summary_detail_v1(db, settings, tenant_id=tenant_id, phase=phase)
+            return AdminCortexPipelinePhaseSummaryDetailResponse.model_validate(raw)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    # Register detail routes before /summary (more specific paths first).
+    @pr.get(
+        "/phases/{phase}/summary-detail",
+        response_model=AdminCortexPipelinePhaseSummaryDetailResponse,
+    )
+    def get_phase_summary_detail(
+        tenant_id: uuid.UUID,
+        phase: str,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelinePhaseSummaryDetailResponse:
+        return _phase_summary_detail(tenant_id, phase, db, settings)
+
+    @pr.get(
+        "/phases/{phase}/summary/detail",
+        response_model=AdminCortexPipelinePhaseSummaryDetailResponse,
+        include_in_schema=False,
+    )
+    def get_phase_summary_detail_nested(
+        tenant_id: uuid.UUID,
+        phase: str,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelinePhaseSummaryDetailResponse:
+        return _phase_summary_detail(tenant_id, phase, db, settings)
+
     @pr.get("/phases/{phase}/summary", response_model=AdminCortexPipelinePhaseSummaryResponse)
     def get_phase_summary(
         tenant_id: uuid.UUID,
@@ -123,23 +162,6 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         try:
             raw = build_phase_summary_v1(db, settings, tenant_id=tenant_id, phase=phase)
             return AdminCortexPipelinePhaseSummaryResponse.model_validate(raw)
-        except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    @pr.get(
-        "/phases/{phase}/summary/detail",
-        response_model=AdminCortexPipelinePhaseSummaryDetailResponse,
-    )
-    def get_phase_summary_detail(
-        tenant_id: uuid.UUID,
-        phase: str,
-        db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
-    ) -> AdminCortexPipelinePhaseSummaryDetailResponse:
-        _assert_tenant(db, tenant_id)
-        try:
-            raw = build_phase_summary_detail_v1(db, settings, tenant_id=tenant_id, phase=phase)
-            return AdminCortexPipelinePhaseSummaryDetailResponse.model_validate(raw)
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
