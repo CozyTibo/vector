@@ -21,7 +21,7 @@
 | 4 | **Done** | 2026-05-22 | Deploy triggered + prod wedge: 7715 deferrals released; A4 validated |
 | 5 | **Done** | 2026-05-22 | Identity backfill A1: 7286 active org handles on Fizzer |
 | 6 | **Done** | 2026-05-22 | Candidate regen A3: 2000 link candidates (global cap) |
-| 7 | Pending | — | Promotion A2 |
+| 7 | **Done** | 2026-05-22 | Promotion A2: 200 authoritative links (pass cap) |
 | 8 | Pending | — | Fix 3–5 |
 | 9 | Pending | — | GRAPH → A5 |
 | 10 | Pending | — | RETRIEVAL → A6 |
@@ -90,6 +90,14 @@
 - **Result:** `link_candidates_before=0` → `link_candidates_after=2000` (`org.persona_belongs_to_handle`); `candidate_count=2000` at global cap (`p04.candidate.exact_notion_user_id_v1` dominated emission; later rules skipped after cap).
 - **A3:** Pass — wedge ≥50 and at 2000 cap per plan §6.2.
 - **Code:** `step06_candidate_regen.py` (`evaluate_a3_candidate_links_v1`); wedge script + tests `test_step06_candidate_regen.py`.
+
+### Step 7 completion record (graph density promotion A2)
+
+- **Command:** `cd backend && .venv/bin/python scripts/unlock_step07_graph_density_promotion.py`
+- **Artifact:** [`baselines/fizzer_step07_2026-05-22.json`](baselines/fizzer_step07_2026-05-22.json)
+- **Result:** `authoritative_links_before=0` → `authoritative_links_after=200` (`org.persona_belongs_to_handle`); `promoted_count=200`, `skipped_count=0`; `unpromoted_remaining=1800` (upstream cap omission per pass).
+- **A2:** Pass — wedge ≥1 and at 200/pass cap per plan §6.2.
+- **Code:** `step07_graph_density_promotion.py` (`evaluate_a2_authoritative_links_v1`); wedge script calls `schedule_graph_density_pass_v1(force=True, trigger=manual)`; tests `test_step07_graph_density_promotion.py`.
 
 ```bash
 cd backend && UNLOCK_DEPLOY_GIT_SHA=$(git rev-parse HEAD) .venv/bin/python scripts/unlock_step04_deploy_validate.py
