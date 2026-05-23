@@ -534,6 +534,28 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_SYNTHESIS_PER_ISLAND_MAX_SCOPES",
         description="P2-D: max synthesis scopes executed per island per pipeline run.",
     )
+    cortex_synthesis_job_running_stale_seconds: int = Field(
+        default=86_400,
+        ge=60,
+        le=604_800,
+        validation_alias="CORTEX_SYNTHESIS_JOB_RUNNING_STALE_SECONDS",
+        description=(
+            "Phase A1: running synthesis jobs older than this are reconciled to failed "
+            "(stale_running_reconciled)."
+        ),
+    )
+    cortex_synthesis_job_running_alert_threshold: int = Field(
+        default=10,
+        ge=1,
+        le=10_000,
+        validation_alias="CORTEX_SYNTHESIS_JOB_RUNNING_ALERT_THRESHOLD",
+        description="Phase A1: admin health alert when tenant running job count is at or above this.",
+    )
+    cortex_synthesis_job_reconcile_on_materialize: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_JOB_RECONCILE_ON_MATERIALIZE",
+        description="Phase A1: reconcile stale running jobs before phase_08 materialization.",
+    )
     cortex_substrate_continuation_stall_seconds: int = Field(
         default=1800,
         ge=300,

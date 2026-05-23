@@ -2177,5 +2177,35 @@
     "released_total_probe": 7749,
     "trace_only": true,
     "snapshot_only": false
+  },
+  "step_a1_synthesis_job_reconcile": {
+    "validated_at": "2026-05-23T00:42:03.085907+00:00",
+    "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_a1_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "histogram_present": true,
+      "running_below_threshold": true,
+      "reconcile_applied_or_trace": true,
+      "no_stale_running_after_reconcile": true
+    },
+    "checks_advisory": {
+      "running_before": 1043,
+      "running_after": 0,
+      "reconciled_count": 1043,
+      "failed_after": 1043,
+      "completed_after": 1,
+      "stale_running_after": 0,
+      "running_alert_threshold": 10
+    },
+    "wiring_ok": true,
+    "running_before": 1043,
+    "running_after": 0,
+    "reconciled_count": 1043,
+    "stale_seconds": 0,
+    "dry_run": false,
+    "trace_only": true
   }
 }

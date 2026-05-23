@@ -294,6 +294,12 @@ def build_s_leg_health_predicates_v1(
 
 
 def _count_tenant_jobs_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str, int]:
+    from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
+        count_stale_running_synthesis_jobs_v1,
+        synthesis_job_running_alert_threshold_v1,
+        synthesis_job_running_stale_seconds_v1,
+    )
+
     total = int(
         session.scalar(
             select(func.count())
@@ -313,7 +319,43 @@ def _count_tenant_jobs_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str
         )
         or 0
     )
-    return {"total": total, "failed": failed}
+    running = int(
+        session.scalar(
+            select(func.count())
+            .select_from(CortexSynthesisJob)
+            .where(
+                CortexSynthesisJob.tenant_id == tenant_id,
+                CortexSynthesisJob.status == "running",
+            )
+        )
+        or 0
+    )
+    queued = int(
+        session.scalar(
+            select(func.count())
+            .select_from(CortexSynthesisJob)
+            .where(
+                CortexSynthesisJob.tenant_id == tenant_id,
+                CortexSynthesisJob.status == "queued",
+            )
+        )
+        or 0
+    )
+    stale_running = count_stale_running_synthesis_jobs_v1(
+        session,
+        tenant_id=tenant_id,
+        stale_after_seconds=synthesis_job_running_stale_seconds_v1(),
+    )
+    alert_threshold = synthesis_job_running_alert_threshold_v1()
+    return {
+        "total": total,
+        "failed": failed,
+        "running": running,
+        "queued": queued,
+        "stale_running": stale_running,
+        "running_alert_threshold": alert_threshold,
+        "running_over_threshold": running >= alert_threshold,
+    }
 
 
 def _count_recent_critical_sd_artifacts_v1(
@@ -423,6 +465,27 @@ def evaluate_synthesis_alerts_v1(
                 "message": f"substrate_health_state={substrate_health}",
             }
         )
+    running_jobs = int(health.get("tenant_jobs_running") or 0)
+    running_threshold = int(health.get("synthesis_job_running_alert_threshold") or 10)
+    if running_jobs >= running_threshold:
+        alerts.append(
+            {
+                "alert_id": "synthesis_jobs_running_over_threshold",
+                "severity": "critical",
+                "message": (
+                    f"running synthesis jobs {running_jobs} >= threshold {running_threshold}"
+                ),
+            }
+        )
+    stale_running = int(health.get("tenant_jobs_stale_running") or 0)
+    if stale_running > 0:
+        alerts.append(
+            {
+                "alert_id": "synthesis_jobs_stale_running",
+                "severity": "warning",
+                "message": f"stale running synthesis jobs={stale_running}",
+            }
+        )
     return alerts
 
 
@@ -462,6 +525,11 @@ def build_synthesis_runtime_health_v1(
         "tenant_job_failure_percent": failure_pct,
         "tenant_jobs_total": job_counts["total"],
         "tenant_jobs_failed": job_counts["failed"],
+        "tenant_jobs_running": job_counts["running"],
+        "tenant_jobs_queued": job_counts["queued"],
+        "tenant_jobs_stale_running": job_counts["stale_running"],
+        "synthesis_job_running_alert_threshold": job_counts["running_alert_threshold"],
+        "synthesis_jobs_running_over_threshold": job_counts["running_over_threshold"],
         "recent_job_rollup": rollup,
         "recent_critical_sd_artifacts_1h": recent_critical_sd,
         "last_replay_divergence_at": get_last_synthesis_replay_divergence_at_v1(),

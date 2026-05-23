@@ -114,6 +114,13 @@ jobs:
             tests/vector/domains/cortex/execution/test_execution_ingest_deferral_monitoring.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_ingest_deferral.py
 
+      - name: Verify Phase A1 synthesis job lifecycle (step A.1)
+        run: |
+          cd backend
+          VECTOR_SETTINGS_SKIP_DOTENV=1 PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/synthesis/test_phase_a1_synthesis_job_lifecycle.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_synthesis_job_lifecycle.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

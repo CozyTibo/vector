@@ -94,6 +94,11 @@ from vector.domains.cortex.synthesis.synthesis_job_envelope import (
     compute_synthesis_job_envelope_digest_v1,
     synthesis_policy_pack_digest_v1,
 )
+from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
+    ORPHAN_RUNNING_CODE_V1,
+    resolve_synthesis_job_before_execute_v1,
+    terminalize_synthesis_job_failed_v1,
+)
 from vector.domains.cortex.synthesis.synthesis_repository import (
     create_synthesis_job_row_v1,
     envelope_json_for_persistence_v1,
@@ -294,8 +299,17 @@ def execute_synthesis_job_envelope_v1(
                 run["artifact_digest"] = art.artifact_digest
             return run
 
-    if job_id is not None:
-        job = session.get(CortexSynthesisJob, job_id)
+    resolved_job_id = job_id
+    if resolved_job_id is None and idem_key:
+        resolved_job_id = resolve_synthesis_job_before_execute_v1(
+            session,
+            tenant_id=tenant_id,
+            idempotency_key=str(idem_key),
+            envelope_digest=envelope_digest,
+        )
+
+    if resolved_job_id is not None:
+        job = session.get(CortexSynthesisJob, resolved_job_id)
         if job is None or job.tenant_id != tenant_id:
             raise SynthesisOrchestratorError("synthesis_job_not_found")
         if job.status not in {"queued", "running"}:
@@ -315,6 +329,7 @@ def execute_synthesis_job_envelope_v1(
 
     job.status = "running"
     job.started_at = datetime.now(UTC)
+    session.flush()
     trace: list[dict[str, Any]] = []
     retrieval_ingress_digest: str | None = None
     retrieval_subqueries: list[dict[str, Any]] = []
@@ -750,10 +765,11 @@ def execute_synthesis_job_envelope_v1(
         SynthesisReplayEquivalenceError,
         SynthesisOrchestratorError,
     ) as exc:
-        job.status = "failed"
-        job.error_detail = getattr(exc, "code", str(exc))
-        job.completed_at = datetime.now(UTC)
-        job.execution_trace_json = list(trace)
+        terminalize_synthesis_job_failed_v1(
+            job,
+            error_code=getattr(exc, "code", str(exc)),
+            execution_trace=trace,
+        )
         session.flush()
         fail_ms = int((time.perf_counter() - job_started_perf) * 1000)
         if isinstance(exc, SynthesisLegalityError) and getattr(exc, "code", "") == "synthesis_forbidden":
@@ -798,6 +814,14 @@ def execute_synthesis_job_envelope_v1(
             http_status=http_status,
             detail=getattr(exc, "detail", None),
         ) from exc
+    finally:
+        if job.status == "running":
+            terminalize_synthesis_job_failed_v1(
+                job,
+                error_code=ORPHAN_RUNNING_CODE_V1,
+                execution_trace=trace,
+            )
+            session.flush()
 
 
 def get_synthesis_job_detail_v1(session: Session, *, tenant_id: uuid.UUID, job_id: uuid.UUID) -> dict[str, Any]:

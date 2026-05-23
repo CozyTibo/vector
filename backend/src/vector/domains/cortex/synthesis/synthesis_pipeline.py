@@ -148,20 +148,32 @@ def materialize_synthesis_for_pipeline_v1(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Run bounded pipeline-default synthesis jobs and publish synthesis epoch."""
+    from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
+        maybe_reconcile_synthesis_jobs_on_materialize_v1,
+    )
     from vector.domains.cortex.synthesis.synthesis_per_island import (
         is_per_island_synthesis_enabled_v1,
         materialize_synthesis_per_island_v1,
     )
 
     cfg = settings or get_settings()
+    job_reconcile = maybe_reconcile_synthesis_jobs_on_materialize_v1(
+        session,
+        tenant_id=tenant_id,
+        settings=cfg,
+    )
     if is_per_island_synthesis_enabled_v1():
-        return materialize_synthesis_per_island_v1(
+        out = materialize_synthesis_per_island_v1(
             session,
             tenant_id=tenant_id,
             pipeline_run_id=pipeline_run_id,
             published_index_epoch=published_index_epoch,
             settings=cfg,
         )
+        if job_reconcile is not None:
+            out = dict(out)
+            out["synthesis_job_reconcile"] = job_reconcile
+        return out
     index_epoch = published_index_epoch or get_published_index_epoch_v1(session, tenant_id=tenant_id)
     if not index_epoch:
         return {
@@ -224,6 +236,8 @@ def materialize_synthesis_for_pipeline_v1(
             materialize_output=empty_out,
             scopes=[],
         )
+        if job_reconcile is not None:
+            empty_out["synthesis_job_reconcile"] = job_reconcile
         return empty_out
 
     workloads_applied = len({s.get("workload") for s in scopes if s.get("workload")})
@@ -317,6 +331,8 @@ def materialize_synthesis_for_pipeline_v1(
         "scope_empty": False,
         "workloads_applied": workloads_applied,
     }
+    if job_reconcile is not None:
+        final_out["synthesis_job_reconcile"] = job_reconcile
     from vector.domains.cortex.synthesis.synthesis_activation_audit import (
         persist_synthesis_activation_audit_v1,
     )
