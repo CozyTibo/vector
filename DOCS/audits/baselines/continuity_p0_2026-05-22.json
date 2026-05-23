@@ -2345,8 +2345,8 @@
   "trace_only_policy": {
     "schema_version": 1,
     "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
-    "updated_at": "2026-05-23T01:24:08.282338+00:00",
-    "last_prod_signoff_step": "step_a6_synthesis_terminal_transitions"
+    "updated_at": "2026-05-23T01:32:14.002245+00:00",
+    "last_prod_signoff_step": "step_b1_retrieval_publish_contract"
   },
   "step_a5_trace_only_ban": {
     "validated_at": "2026-05-23T01:14:27.645370+00:00",
@@ -2420,6 +2420,48 @@
     "stale_running_after": 0,
     "stale_queued_after": 0,
     "dry_run": true,
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "step_b1_retrieval_publish_contract": {
+    "validated_at": "2026-05-23T01:32:14.002192+00:00",
+    "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_b1_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "publish_contract_schema_version": true,
+      "published_epoch_row_present": true,
+      "no_inflight_building_epochs": true,
+      "published_epoch_entries_align": true,
+      "published_epoch_build_state": true,
+      "prod_signoff_valid": true
+    },
+    "checks_advisory": {
+      "published_index_epoch": "epoch-fb8c13c67db3",
+      "entries_in_materialized_epoch": 1599,
+      "entries_with_island_scope_in_epoch": 1200,
+      "building_epochs_inflight": 0,
+      "latest_phase_07_has_publish_contract_audit": false,
+      "sql_epoch_alignment": {
+        "published_index_epoch": "epoch-fb8c13c67db3",
+        "materialized_index_epoch": "epoch-fb8c13c67db3",
+        "epochs_align": true,
+        "build_state": "PUBLISHED",
+        "entries_in_materialized_epoch": 1599,
+        "entries_off_materialized_epoch": 1678,
+        "entries_with_island_scope_in_epoch": 1200,
+        "all_entries_share_published_epoch": true
+      }
+    },
+    "wiring_ok": true,
+    "published_index_epoch": "epoch-fb8c13c67db3",
+    "epochs_align": true,
+    "entries_in_materialized_epoch": 1599,
+    "building_epochs_inflight": 0,
     "use_deployed_closure": true,
     "trace_only": false,
     "signoff_grade": "prod",

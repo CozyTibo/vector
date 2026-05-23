@@ -175,6 +175,7 @@ def _proof_script_paths_v1(repo_root: Path) -> list[Path]:
     scripts = repo_root / "backend" / "scripts"
     patterns = (
         "continuity_p0_phase_a*_proof.py",
+        "continuity_p0_phase_b*_proof.py",
         "continuity_p3_phase*_proof.py",
     )
     out: list[Path] = []

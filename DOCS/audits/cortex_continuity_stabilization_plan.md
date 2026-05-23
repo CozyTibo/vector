@@ -264,7 +264,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 
 | Step | Goal | Why | Subsystem | Remove / simplify | Success | Validate | Rollback | Type |
 |------|------|-----|-----------|-------------------|---------|----------|----------|------|
-| **B1** | **Single publish contract:** materialize → publish → same `index_epoch` on all new entries | Fixes B3 root cause | `retrieval_component_materialization.py`, `retrieval_index_materialization.py`, phase 07 runner | Stop publishing epoch before island mat completes | All new entries share `published_index_epoch` | SQL: epoch on entries = `get_published_index_epoch_v1` | Feature flag off island scope | **retrieval** |
+| **B1** | ~~**Single publish contract:** materialize → publish → same `index_epoch` on all new entries~~ **Done 2026-05-23** | Fixes B3 root cause | `retrieval_publish_contract.py`, component + pipeline mat, phase 07 | Stop publishing epoch before island mat completes | All new entries share `published_index_epoch` | SQL: epoch on entries = `get_published_index_epoch_v1` | Feature flag off island scope | **retrieval** |
 | **B2** | On epoch change: re-materialize primary island OR bump `island_scope` tags | Lawful invalidation | `materialize_retrieval_index_for_pipeline_v1` | N/A | `retrieval_entries_in_scope > 0` for current epoch | Per-island count in phase 08 output | Skip re-mat (slower) | **retrieval** |
 | **B3** | Wire phase 07 → registry `last_retrieval_epoch` on success | Inspect truth | `execution_island_registry.py` | Sync-on-inspect only → sync on publish | Registry epoch matches DB | `build_island_registry_inspect_v1` | Manual SQL update | **orchestration** |
 | **B4** | Phase 05: require `walks_persisted > 0` when scheduling eligible | Walks drive downstream | `phase_runners` phase 05, `schedule_octs_walks` | Empty COMPLETED_EMPTY walks | Receipt shows walks_persisted ≥ 1 | Phase 05 `output_json` | Loosen threshold | **runtime** |
@@ -804,7 +804,7 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 - [x] P0/P3 continuity proof scripts use shared policy helpers
 - [x] Phase A baseline audit: zero `trace_only: true` violations
 
-**Next step:** ~~A6~~ → **Phase B** (retrieval heartbeat / publish contract).
+**Next step:** ~~A6~~ → ~~**B1**~~ → **B2** (retrieval epoch / island scope alignment).
 
 ---
 
@@ -857,7 +857,69 @@ GROUP BY 1;
 - [x] `finally` guarantees no orphan `running`
 - [x] Prod histogram: inflight stable
 
-**Phase A complete.** Next: **B1** — single publish contract for retrieval index epoch.
+**Phase A complete.** Next: ~~**B1**~~ → **B2** — epoch-change re-materialization / island scope tags.
+
+---
+
+## Step B.1 completion — retrieval single publish contract (R-REC-1)
+
+**Completed:** 2026-05-23  
+**Goal:** One `BUILDING` epoch per pipeline materialization pass; defer per-entry publish until a single `publish_retrieval_index_epoch_v1` barrier; align entries with `get_published_index_epoch_v1`.
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Contract module | `retrieval_publish_contract.py` — `begin_pipeline_retrieval_index_build_v1`, `finalize_pipeline_retrieval_index_build_v1`, `audit_published_epoch_entry_alignment_v1`, `materialize_entry_respecting_publish_contract_v1` |
+| Component mat | `materialize_retrieval_index_for_largest_island_v1` — begin/finalize contract; `auto_publish=False` on all entries |
+| Pipeline mat | Non–P1-C branch uses same begin/finalize contract |
+| Entry guard | `materialize_retrieval_index_entry_v1` skips `ensure_published_index_epoch_v1` while epoch is `BUILDING` |
+| Phase 07 | `run_phase_07_retrieval_v1` attaches `published_index_epoch` + `publish_contract_audit` on receipt |
+| Proof | `continuity_p0_retrieval_publish_contract.py` + `continuity_p0_phase_b1_retrieval_publish_contract_proof.py` |
+| CI | `.github/workflows/deploy.yml` — B.1 pytest gate |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b1_retrieval_publish_contract_proof.py \
+  --use-deployed-closure
+```
+
+Requires prod DB env (`DB_PROD_*`). Sign-off writes `step_b1_retrieval_publish_contract` on [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.json).
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `published_index_epoch` | `epoch-fb8c13c67db3` |
+| `epochs_align` | true |
+| `entries_in_materialized_epoch` | 1599 |
+| `entries_with_island_scope_in_epoch` | 1200 |
+| `building_epochs_inflight` | 0 |
+| `p0_b1_pass` | true |
+
+Closure: `2ab8776fafc8861ef69571f1531da1fd4f880a04` (`--use-deployed-closure`). Post-deploy phase 07 receipts will include `publish_contract_audit` (currently absent on last receipt — code lands with this commit).
+
+### SQL (R-REC-1 alignment — operator)
+
+```sql
+SELECT index_epoch, COUNT(*) AS n,
+       COUNT(*) FILTER (
+         WHERE (omission_summary->>'island_scope_id') IS NOT NULL
+       ) AS tagged
+FROM cortex_retrieval_index_entries
+WHERE tenant_id = 'c08ef32b-f89a-40f6-9566-e19b5329436f'
+GROUP BY 1 ORDER BY MAX(created_at) DESC;
+```
+
+### Exit gates
+
+- [x] Pipeline/component materialization: one `BUILDING` epoch, single finalize publish
+- [x] Per-entry materialization cannot publish mid-pass while `BUILDING`
+- [x] Phase 07 receipt carries published epoch + contract audit
+- [x] Static wiring + proof evaluator + CI gate
+- [ ] B-G1 full (100% island tags on **new** passes) — partial until post-deploy recurrence (B2)
+
+**Next step:** **B2** — epoch-change re-materialization and island scope tag alignment on published epoch.
 
 ---
 

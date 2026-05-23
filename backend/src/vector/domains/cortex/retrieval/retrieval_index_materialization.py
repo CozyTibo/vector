@@ -276,7 +276,9 @@ def materialize_retrieval_index_entry_v1(
     if not epoch:
         raise RetrievalIndexMaterializationError("index_epoch_required")
     if auto_publish:
-        ensure_published_index_epoch_v1(session, tenant_id=tenant_id, index_epoch=epoch)
+        building_row = get_index_epoch_row_v1(session, tenant_id=tenant_id, index_epoch=epoch)
+        if building_row is None or building_row.build_state != "BUILDING":
+            ensure_published_index_epoch_v1(session, tenant_id=tenant_id, index_epoch=epoch)
     kind = str(index_kind or "causal_chain").strip()
     if index_key:
         ikey = str(index_key).strip()
@@ -399,12 +401,16 @@ def materialize_retrieval_index_for_pipeline_v1(
         CortexTcreReconstructionJob,
     )
 
+    from vector.domains.cortex.retrieval.retrieval_publish_contract import (
+        RETRIEVAL_PUBLISH_CONTRACT_SCHEMA_VERSION,
+        begin_pipeline_retrieval_index_build_v1,
+        finalize_pipeline_retrieval_index_build_v1,
+    )
+
     replay = derive_substrate_pipeline_replay_identity_v1(
         tenant_id=tenant_id, pipeline_run_id=pipeline_run_id
     )
-    epoch_row = start_retrieval_index_build_v1(session, tenant_id=tenant_id, index_epoch=None)
-    epoch_row = transition_retrieval_index_build_v1(session, epoch_row=epoch_row, to_state="BUILDING")
-    epoch_name = epoch_row.index_epoch
+    _, epoch_name = begin_pipeline_retrieval_index_build_v1(session, tenant_id=tenant_id)
 
     tcre_candidates = int(
         session.scalar(
@@ -440,6 +446,7 @@ def materialize_retrieval_index_for_pipeline_v1(
         "tcre_candidates": tcre_candidates,
         "walks_candidates": walks_candidates,
         "org_link_candidates": org_link_candidates,
+        "publish_contract_schema_version": RETRIEVAL_PUBLISH_CONTRACT_SCHEMA_VERSION,
     }
 
     job = session.scalar(
@@ -510,20 +517,22 @@ def materialize_retrieval_index_for_pipeline_v1(
                 {"source": "org_link", "org_link_id": str(link.id), "code": exc.code}
             )
 
-    published = publish_retrieval_index_epoch_v1(
-        session, tenant_id=tenant_id, index_epoch=epoch_name
+    finalized = finalize_pipeline_retrieval_index_build_v1(
+        session,
+        tenant_id=tenant_id,
+        index_epoch=epoch_name,
+        pipeline_run_id=pipeline_run_id,
+        sync_island_registry=False,
     )
-    stats["build_state"] = published.build_state
-    stats["entry_count"] = published.entry_count
-    stats["output_index_hash"] = published.output_index_hash
-    stats["ok"] = published.build_state == "PUBLISHED"
+    stats.update(finalized)
+    stats["ok"] = bool(finalized.get("ok"))
     from vector.domains.cortex.execution.progression_status import (
         classify_retrieval_materialization_outcome_v1,
     )
 
     stats["retrieval_card_classification"] = classify_retrieval_materialization_outcome_v1(
         entries_materialized=int(stats.get("entries_materialized") or 0),
-        entry_count=int(published.entry_count or 0),
+        entry_count=int(finalized.get("entry_count") or 0),
         tcre_candidates=tcre_candidates,
         walks_candidates=walks_candidates,
         org_link_candidates=org_link_candidates,

@@ -154,6 +154,13 @@ jobs:
             tests/vector/domains/cortex/synthesis/test_phase_a6_synthesis_terminal_transitions.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_synthesis_terminal_transitions.py
 
+      - name: Verify Phase B1 retrieval publish contract (step B.1)
+        run: |
+          cd backend
+          VECTOR_SETTINGS_SKIP_DOTENV=1 PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/retrieval/test_retrieval_publish_contract.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_retrieval_publish_contract.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

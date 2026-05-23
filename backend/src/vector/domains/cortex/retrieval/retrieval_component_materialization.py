@@ -16,9 +16,11 @@ from vector.domains.cortex.operational_runtime.substrate_traversal_scheduling im
 )
 from vector.domains.cortex.retrieval.retrieval_index_materialization import (
     derive_substrate_pipeline_replay_identity_v1,
-    publish_retrieval_index_epoch_v1,
-    start_retrieval_index_build_v1,
-    transition_retrieval_index_build_v1,
+)
+from vector.domains.cortex.retrieval.retrieval_publish_contract import (
+    RETRIEVAL_PUBLISH_CONTRACT_SCHEMA_VERSION,
+    begin_pipeline_retrieval_index_build_v1,
+    finalize_pipeline_retrieval_index_build_v1,
 )
 from vector.domains.cortex.retrieval.retrieval_skip_registry import (
     RET_SKIP_GRAPH_DISCONNECTED_V1,
@@ -168,9 +170,7 @@ def materialize_retrieval_index_for_largest_island_v1(
     replay = derive_substrate_pipeline_replay_identity_v1(
         tenant_id=tenant_id, pipeline_run_id=pipeline_run_id
     )
-    epoch_row = start_retrieval_index_build_v1(session, tenant_id=tenant_id, index_epoch=None)
-    epoch_row = transition_retrieval_index_build_v1(session, epoch_row=epoch_row, to_state="BUILDING")
-    epoch_name = epoch_row.index_epoch
+    _, epoch_name = begin_pipeline_retrieval_index_build_v1(session, tenant_id=tenant_id)
 
     store = resolve_octs_walk_store_v1(session)
     walks_in_island = sum(
@@ -209,6 +209,7 @@ def materialize_retrieval_index_for_largest_island_v1(
         "outside_island_scope_entity_count": outside_count,
         "islands_eligible_count": island_meta.get("islands_eligible_count"),
         "largest_island_selected": True,
+        "publish_contract_schema_version": RETRIEVAL_PUBLISH_CONTRACT_SCHEMA_VERSION,
         **island_meta,
     }
 
@@ -221,11 +222,14 @@ def materialize_retrieval_index_for_largest_island_v1(
             }
         )
         stats["retrieval_outcome"] = "blocked_no_eligible_island"
-        published = publish_retrieval_index_epoch_v1(
-            session, tenant_id=tenant_id, index_epoch=epoch_name
+        finalized = finalize_pipeline_retrieval_index_build_v1(
+            session,
+            tenant_id=tenant_id,
+            index_epoch=epoch_name,
+            pipeline_run_id=pipeline_run_id,
+            sync_island_registry=False,
         )
-        stats["build_state"] = published.build_state
-        stats["entry_count"] = published.entry_count
+        stats.update(finalized)
         stats["ok"] = False
         return stats
 
@@ -340,16 +344,17 @@ def materialize_retrieval_index_for_largest_island_v1(
                 }
             )
 
-    published = publish_retrieval_index_epoch_v1(
-        session, tenant_id=tenant_id, index_epoch=epoch_name
+    finalized = finalize_pipeline_retrieval_index_build_v1(
+        session,
+        tenant_id=tenant_id,
+        index_epoch=epoch_name,
+        pipeline_run_id=pipeline_run_id,
     )
-    stats["build_state"] = published.build_state
-    stats["entry_count"] = published.entry_count
-    stats["output_index_hash"] = published.output_index_hash
-    stats["ok"] = published.build_state == "PUBLISHED"
+    stats.update(finalized)
+    stats["ok"] = bool(finalized.get("ok"))
     stats["retrieval_card_classification"] = classify_retrieval_materialization_outcome_v1(
         entries_materialized=int(stats.get("entries_materialized") or 0),
-        entry_count=int(published.entry_count or 0),
+        entry_count=int(finalized.get("entry_count") or 0),
         tcre_candidates=int(stats.get("tcre_candidates") or 0),
         walks_candidates=walks_in_island,
         org_link_candidates=links_in_island,
@@ -363,19 +368,6 @@ def materialize_retrieval_index_for_largest_island_v1(
         walks_candidates=walks_in_island,
         org_link_candidates=links_in_island,
     )
-    try:
-        from vector.domains.cortex.operational_runtime.execution_island_registry import (
-            is_execution_island_registry_enabled_v1,
-            sync_execution_island_registry_v1,
-        )
-
-        if is_execution_island_registry_enabled_v1():
-            stats["island_registry_sync"] = sync_execution_island_registry_v1(
-                session,
-                tenant_id=tenant_id,
-            )
-    except Exception as exc:  # noqa: BLE001
-        stats["island_registry_sync"] = {"synced": False, "error": str(exc)[:500]}
     return stats
 
 

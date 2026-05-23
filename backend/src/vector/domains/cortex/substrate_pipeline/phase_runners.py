@@ -340,6 +340,19 @@ def run_phase_07_retrieval_v1(
         published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
         if published:
             out = {**out, "published_index_epoch": published}
+        if out.get("publish_contract_audit") is None and published:
+            from vector.domains.cortex.retrieval.retrieval_publish_contract import (
+                audit_published_epoch_entry_alignment_v1,
+            )
+
+            out = {
+                **out,
+                "publish_contract_audit": audit_published_epoch_entry_alignment_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    index_epoch=published,
+                ),
+            }
         ret_class = classify_retrieval_materialization_outcome_v1(
             entries_materialized=int(out.get("entries_materialized") or out.get("entry_count") or 0),
             entry_count=int(out.get("entry_count") or 0),
