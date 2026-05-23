@@ -107,6 +107,13 @@ jobs:
             tests/vector/domains/cortex/synthesis/test_synthesis_per_island.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_per_island_synthesis.py
 
+      - name: Verify P2-E ingest deferral monitoring (step 3.4)
+        run: |
+          cd backend
+          PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/execution/test_execution_ingest_deferral_monitoring.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_ingest_deferral.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

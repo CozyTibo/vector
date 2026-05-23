@@ -1206,7 +1206,7 @@ class Settings(BaseSettings):
         description="Soft per-run Calls deep-ingestion budget before checkpoint-and-resume.",
     )
     cortex_github_pr_fetch_max_repos: int = Field(
-        default=8,
+        default=16,
         ge=0,
         le=200,
         validation_alias="CORTEX_GITHUB_PR_FETCH_MAX_REPOS",
@@ -1220,14 +1220,14 @@ class Settings(BaseSettings):
         description="Max pull requests per repo per sync (GitHub REST `/pulls` first page).",
     )
     cortex_github_prs_max_pages_per_repo: int = Field(
-        default=5,
+        default=10,
         ge=1,
         le=200,
         validation_alias="CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO",
         description="Max paginated `/pulls` pages per repo per sync.",
     )
     cortex_github_reviews_max_pages_per_pr: int = Field(
-        default=2,
+        default=5,
         ge=1,
         le=100,
         validation_alias="CORTEX_GITHUB_REVIEWS_MAX_PAGES_PER_PR",
@@ -1331,11 +1331,19 @@ class Settings(BaseSettings):
         ),
     )
     cortex_github_repo_time_budget_seconds: int = Field(
-        default=25,
+        default=120,
         ge=1,
         le=600,
         validation_alias="CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS",
         description="Soft per-run GitHub deep-ingestion budget before checkpoint-and-resume.",
+    )
+    cortex_execution_ingest_deferral_monitoring_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_EXECUTION_INGEST_DEFERRAL_MONITORING",
+        description=(
+            "P2-E: expose GitHub ingest caps + deferral release monitor on execution inspect; "
+            "persist deferral snapshots on canonical drain."
+        ),
     )
 
     @field_validator("cortex_traversal_component_schedule_enabled", mode="before")

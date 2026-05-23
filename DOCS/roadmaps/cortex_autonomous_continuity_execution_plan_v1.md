@@ -626,7 +626,7 @@ Executed **2026-05-22** on Fizzer prod:
 | 3.1 | P2-C island registry | Registry persisted per eligible component | **Done** (see §Phase 3.1 completion) |
 | 3.2 | P2-B event triggers (hash-change walk schedule) | **Done** (see §Phase 3.2 completion) |
 | 3.3 | P2-D per-island synthesis | **Done** (see §Phase 3.3 completion) |
-| 3.4 | P2-E ingest caps + deferral release monitoring |
+| 3.4 | P2-E ingest caps + deferral release monitoring | **Done** (see §Phase 3.4 completion) |
 
 #### Phase 3.1 completion (P2-C execution island registry)
 
@@ -675,7 +675,24 @@ Executed **2026-05-22** on Fizzer prod:
 | CI gate | `deploy.yml` → `test_synthesis_per_island.py`, `test_continuity_p3_per_island_synthesis.py` |
 | Prod script | `python backend/scripts/continuity_p3_phase33_per_island_synthesis_proof.py --trace-only` (snapshot); `--max-islands 1 --max-scopes-per-island 2` for bounded drive |
 
-**Next step (3.4):** P2-E ingest caps + deferral release monitoring.
+#### Phase 3.4 completion (P2-E ingest caps + deferral release monitoring)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Ingest caps | Raised defaults: PR pages **10**, repos **16**, repo budget **120s**, reviews **5**; extended cap snapshot on inspect |
+| Deferral monitor | `deferral_release_monitor` — counts, pressure breakdown, topology parent gaps; `probe_deferral_releases_v1` for release paths |
+| Canonical drain | `run_canonical_backlog_drain_v1` persists lease `detail_json.deferral_release_monitor` |
+| Exhaust honesty | `exhaust_registry_honesty` block (declared GitHub/Slack maturity + missing resource types) |
+| Settings | `CORTEX_EXECUTION_INGEST_DEFERRAL_MONITORING` (default on) |
+| Admin inspect | `GET …/cortex/execution/state` → `ingest_deferral_monitoring` block |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_3_4_p2e_ingest_deferral` (`p3_4_pass: true`) |
+| Code | `execution_ingest_deferral_monitoring.py`, `continuity_p3_ingest_deferral.py`, `deferral_store.probe_deferral_releases_v1` |
+| CI gate | `deploy.yml` → `test_execution_ingest_deferral_monitoring.py`, `test_continuity_p3_ingest_deferral.py` |
+| Prod script | `python backend/scripts/continuity_p3_phase34_ingest_deferral_proof.py --trace-only` |
+
+**Phase 3 complete.** Next: Phase 4 operational hardening per program plan.
 
 ---
 
@@ -726,6 +743,8 @@ python scripts/continuity_p3_phase31_island_registry_proof.py --trace-only
 python scripts/continuity_p3_phase32_event_triggers_proof.py --trace-only
 # P2-D per-island synthesis (step 3.3):
 python scripts/continuity_p3_phase33_per_island_synthesis_proof.py --trace-only
+# P2-E ingest caps + deferral monitoring (step 3.4):
+python scripts/continuity_p3_phase34_ingest_deferral_proof.py --trace-only
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

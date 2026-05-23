@@ -92,6 +92,11 @@ def build_execution_inspect_v1(
     )
 
     per_island_synthesis = build_per_island_synthesis_inspect_v1(session, tenant_id=tenant_id)
+    from vector.domains.cortex.execution.execution_ingest_deferral_monitoring import (
+        build_ingest_deferral_inspect_v1,
+    )
+
+    ingest_deferral_monitoring = build_ingest_deferral_inspect_v1(session, tenant_id=tenant_id)
     return {
         "surface_kind": "execution_inspect",
         "tenant_id": str(tenant_id),
@@ -115,6 +120,7 @@ def build_execution_inspect_v1(
         "island_registry": island_registry,
         "event_triggers": event_triggers,
         "per_island_synthesis": per_island_synthesis,
+        "ingest_deferral_monitoring": ingest_deferral_monitoring,
         "progression": progression,
         "transitions": [
             {

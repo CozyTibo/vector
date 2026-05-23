@@ -365,6 +365,30 @@ def release_deferrals_with_materialized_parents(
     return int(getattr(res, "rowcount", 0) or 0)
 
 
+def probe_deferral_releases_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    bundle_id: str,
+) -> dict[str, Any]:
+    """Run release paths and return before/after deferral counts (P2-E monitoring)."""
+    before = count_deferrals(db, tenant_id=tenant_id, bundle_id=bundle_id)
+    released_missing_parent = release_deferrals_when_missing_parent_ref_materialized_v1(
+        db, tenant_id=tenant_id, bundle_id=bundle_id
+    )
+    released_materialized_parent = release_deferrals_with_materialized_parents(
+        db, tenant_id=tenant_id, bundle_id=bundle_id
+    )
+    after = count_deferrals(db, tenant_id=tenant_id, bundle_id=bundle_id)
+    return {
+        "released_missing_parent_ref": int(released_missing_parent),
+        "released_materialized_parent": int(released_materialized_parent),
+        "released_total": int(released_missing_parent) + int(released_materialized_parent),
+        "deferral_counts_before": before,
+        "deferral_counts_after": after,
+    }
+
+
 def count_deferrals(
     db: Session,
     *,

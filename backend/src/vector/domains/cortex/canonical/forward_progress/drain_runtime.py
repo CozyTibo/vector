@@ -247,6 +247,19 @@ def drain_forward_progress_backlog(
     )
     deferral_counts = count_deferrals(db, tenant_id=tenant_id, bundle_id=bundle_id)
     deferral_pressure = summarize_deferral_pressure(db, tenant_id=tenant_id, bundle_id=bundle_id)
+    from vector.domains.cortex.execution.execution_ingest_deferral_monitoring import (
+        is_ingest_deferral_monitoring_enabled_v1,
+        record_deferral_release_monitor_v1,
+    )
+
+    if is_ingest_deferral_monitoring_enabled_v1():
+        record_deferral_release_monitor_v1(
+            db,
+            tenant_id=tenant_id,
+            bundle_id=bundle_id,
+            deferral_counts=deferral_counts,
+            deferral_pressure=deferral_pressure,
+        )
     hit_slice_cap = batches_run >= max_batches and (candidate_more_remain or untreated_estimate > 0)
 
     canonical_outcome = _classify_drain_outcome(

@@ -2144,5 +2144,38 @@
     "islands_synthesized_count": 0,
     "trace_only": true,
     "snapshot_only": false
+  },
+  "step_3_4_p2e_ingest_deferral": {
+    "validated_at": "2026-05-23T00:10:58.461946+00:00",
+    "closure_git_sha": "8e30ba5d3613f8d3dcee410dede5d30ac0dd94f9",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p3_4_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "monitoring_enabled": true,
+      "static_wiring_ok": true,
+      "panel_surface_kind": true,
+      "ingest_caps_snapshot_present": true,
+      "meets_fix6_recommended": true,
+      "deferral_counts_present": true,
+      "deferral_pressure_sample": true,
+      "exhaust_registry_honesty": true,
+      "github_exhaust_declared": true,
+      "execution_inspect_exposes_ingest_deferral": true,
+      "release_probe_ran": true,
+      "release_probe_has_counts": true
+    },
+    "checks_advisory": {
+      "deferred_total": 8216,
+      "deferred_retry_ready": 7750,
+      "released_total_probe": 7749,
+      "github_maturity_level": 3
+    },
+    "wiring_ok": true,
+    "meets_fix6_recommended": true,
+    "deferred_total": 8216,
+    "released_total_probe": 7749,
+    "trace_only": true,
+    "snapshot_only": false
   }
 }
