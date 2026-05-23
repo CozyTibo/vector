@@ -49,6 +49,57 @@ def test_lawful_empty_requires_documentation() -> None:
     )
 
 
+def test_aa1_fails_on_scope_empty_with_retrieval_entries() -> None:
+    tenant_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    run = MagicMock()
+    run.id = run_id
+    lease = MagicMock()
+    lease.status = "active"
+    lease.attempt_count = 0
+    lease.last_error = None
+
+    def _phase_row(status: str, *, output: dict | None = None) -> MagicMock:
+        row = MagicMock()
+        row.status = status
+        row.started_at = None
+        row.completed_at = None
+        row.output_json = output or {}
+        return row
+
+    def _get_phase(_session, *, pipeline_run_id, phase_id):  # noqa: ANN001
+        if phase_id == PHASE_08_SYNTHESIS:
+            return _phase_row(
+                PHASE_STATUS_COMPLETED,
+                output={
+                    "outcome": PHASE_OUTCOME_COMPLETED_EMPTY,
+                    "jobs_completed": 0,
+                    "scope_empty": True,
+                    "retrieval_entries_in_epoch": 100,
+                },
+            )
+        return _phase_row(PHASE_STATUS_COMPLETED)
+
+    session = MagicMock()
+    with (
+        patch(
+            "vector.domains.cortex.substrate_pipeline.continuity_proof_panel._resolve_pipeline_run_v1",
+            return_value=run,
+        ),
+        patch(
+            "vector.domains.cortex.substrate_pipeline.continuity_proof_panel.get_tenant_execution_lease_v1",
+            return_value=lease,
+        ),
+        patch(
+            "vector.domains.cortex.substrate_pipeline.continuity_proof_panel.get_phase_run_v1",
+            side_effect=_get_phase,
+        ),
+    ):
+        gate = evaluate_aa1_phase_chain_v1(session, tenant_id=tenant_id, pipeline_run_id=run_id)
+    assert gate["verdict"] == "FAIL"
+    assert gate["evidence"]["lawful_empty"] is False
+
+
 def test_aa1_fails_on_completed_empty_without_lawful_proof() -> None:
     tenant_id = uuid.uuid4()
     run_id = uuid.uuid4()

@@ -837,6 +837,14 @@ class Settings(BaseSettings):
             "a fresh run with new phase 03–05 receipts (no mirror of prior 02–04)."
         ),
     )
+    cortex_phase08_fail_on_empty_scope_with_entries: bool = Field(
+        default=True,
+        validation_alias="CORTEX_PHASE08_FAIL_ON_EMPTY_SCOPE_WITH_ENTRIES",
+        description=(
+            "C1: phase 08 must FAIL (not COMPLETED_EMPTY) when published epoch has retrieval "
+            "entries but zero synthesis scopes/jobs were scheduled."
+        ),
+    )
     cortex_execution_dual_lane_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_EXECUTION_DUAL_LANE",

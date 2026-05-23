@@ -275,7 +275,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 
 | Step | Goal | Why | Subsystem | Remove / simplify | Success | Validate | Rollback | Type |
 |------|------|-----|-----------|-------------------|---------|----------|----------|------|
-| **C1** | Phase 08 FAIL if scopes=0 but entries exist in epoch | Stop COMPLETED_EMPTY lie | `synthesis_pipeline.py`, `synthesis_per_island.py` | N/A | `jobs_completed ≥ 1` or explicit FAIL | Phase receipt + AA1 | Allow empty (old) | **synthesis** |
+| **C1** | ~~Phase 08 FAIL if scopes=0 but entries exist in epoch~~ **Done 2026-05-23** | Stop COMPLETED_EMPTY lie | `phase08_empty_scope_truth_gate.py`, phase 08 runner, AA1 | N/A | `jobs_completed ≥ 1` or explicit FAIL | Phase receipt + AA1 | `CORTEX_PHASE08_FAIL_ON_EMPTY_SCOPE_WITH_ENTRIES=0` | **synthesis** |
 | **C2** | Cap scopes per island; fail loud on orchestrator error | Predictable cost | `synthesis_per_island.py`, settings | Unbounded retry | 2+ artifacts per 48h on primary island | `cortex_synthesis_artifacts` count | Raise caps | **synthesis** |
 | **C3** | Merge proof scripts → `continuity_audit_snapshot.py` | One ops entrypoint | `backend/scripts/*proof*` | 10+ phase scripts (keep 1–2 CI) | Single command outputs JSON + panel | Doc in plan | Keep old scripts deprecated | **cleanup** |
 | **C4** | Restart 48h AA clock **after** A+B+C on strict gates | Honest M3 | `continuity_p2_aa_clock.py` | Old T0 baseline | New `continuity_aa_clock_T0_*.json` | Daily `continuity_p2_phase24_aa_clock_proof.py` | N/A | **ops** |
@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → **C1** — phase 08 FAIL when scopes=0 but entries exist.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → **C2** — cap scopes per island.
 
 ---
 
@@ -1171,6 +1171,50 @@ Auto-drives graph-hash change + fresh run when SQL window empty. `--drive-fresh-
 
 ---
 
+## Step C.1 completion — phase 08 empty scope truth gate
+
+**Completed:** 2026-05-23  
+**Goal:** Phase 08 must not fake-green `COMPLETED_EMPTY` when the published retrieval epoch has entries but zero synthesis scopes were scheduled (C1 / AA1).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Gate module | `phase08_empty_scope_truth_gate.py` — entry count, violation eval, attach to materialize output |
+| Phase 08 runner | `run_substrate_phase_08_synthesis_v1` — `fail_phase_with_receipt` on violation (explicit FAIL) |
+| AA1 panel | `_lawful_empty_synthesis_v1` rejects `empty_scope_violation` and entries-with-zero-jobs |
+| Settings | `CORTEX_PHASE08_FAIL_ON_EMPTY_SCOPE_WITH_ENTRIES` (default on) |
+| Proof | `continuity_p0_phase08_empty_scope_truth.py` + `continuity_p0_phase_c1_phase08_empty_scope_truth_proof.py` |
+| CI | `ci.yml` — C.1 gate + proof evaluator + AA1 regression test |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c1_phase08_empty_scope_truth_proof.py \
+  --use-deployed-closure
+```
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `legacy_empty_scope_lies` (pre-drive) | 1 (`ce7df86d…` corrected by drive) |
+| `post_gate_empty_scope_lies` | 0 |
+| `truthful_phase08_slices` | ≥1 |
+| `retrieval_entries_in_epoch` | 1599 |
+| `wiring_ok` | true |
+| `p0_c1_pass` | true |
+| Rollback | `CORTEX_PHASE08_FAIL_ON_EMPTY_SCOPE_WITH_ENTRIES=0` |
+
+### Exit gates
+
+- [x] Phase 08 fails loudly when entries exist but `scopes_scheduled=0` and `jobs_completed=0`
+- [x] Lawful empty only when `retrieval_entries_in_epoch=0` (documented `scope_empty`)
+- [x] AA1 no longer passes fake-green empty synthesis
+- [x] Static wiring + proof evaluator + CI gate
+- [x] Cleared for **C2**
+
+---
+
 ## Execution order summary (single page)
 
 ```text
@@ -1211,6 +1255,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b5_graph_hash_a
 
 # Phase B6 — fresh pipeline run on graph change (done; re-run if only stale mirrors)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b6_post_ingestion_fresh_pipeline_run_proof.py --use-deployed-closure
+
+# Phase C1 — phase 08 empty scope truth (done; re-run if COMPLETED_EMPTY lies return)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c1_phase08_empty_scope_truth_proof.py --use-deployed-closure
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

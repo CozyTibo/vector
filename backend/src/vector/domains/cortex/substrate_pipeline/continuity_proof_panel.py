@@ -137,11 +137,25 @@ def _phase08_output_evidence_v1(
         "artifacts_published": int(out.get("artifacts_published") or 0),
         "empty_scope_reason": str(out.get("empty_scope_reason") or out.get("error_code") or ""),
         "per_island_mode": bool(out.get("per_island_mode")),
+        "retrieval_entries_in_epoch": int(out.get("retrieval_entries_in_epoch") or 0),
+        "empty_scope_violation": bool(out.get("empty_scope_violation")),
+        "phase08_empty_scope_gate_ok": bool(
+            (out.get("phase08_empty_scope_gate") or {}).get("ok")
+            if isinstance(out.get("phase08_empty_scope_gate"), Mapping)
+            else True
+        ),
     }
 
 
 def _lawful_empty_synthesis_v1(out: Mapping[str, Any]) -> bool:
     """Lawful empty: documented scope_empty / COMPLETED_EMPTY — not fake-green completion."""
+    if bool(out.get("empty_scope_violation")):
+        return False
+    gate = out.get("phase08_empty_scope_gate")
+    if isinstance(gate, Mapping) and bool(gate.get("violation")):
+        return False
+    if int(out.get("retrieval_entries_in_epoch") or 0) > 0 and int(out.get("jobs_completed") or 0) == 0:
+        return False
     if not bool(out.get("scope_empty")):
         return False
     if int(out.get("jobs_completed") or 0) > 0:
@@ -150,7 +164,7 @@ def _lawful_empty_synthesis_v1(out: Mapping[str, Any]) -> bool:
     if outcome == PHASE_OUTCOME_COMPLETED_EMPTY:
         return True
     reason = str(out.get("empty_scope_reason") or "").strip()
-    return bool(reason)
+    return bool(reason) and int(out.get("retrieval_entries_in_epoch") or 0) == 0
 
 
 def evaluate_aa1_phase_chain_v1(

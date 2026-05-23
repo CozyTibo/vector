@@ -49,7 +49,9 @@ jobs:
             tests/vector/domains/cortex/substrate_pipeline/test_graph_hash_autonomous_chain.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_graph_hash_autonomous_chain.py \
             tests/vector/domains/cortex/substrate_pipeline/test_post_ingestion_fresh_pipeline_run.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_post_ingestion_fresh_pipeline_run.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_post_ingestion_fresh_pipeline_run.py \
+            tests/vector/domains/cortex/synthesis/test_phase08_empty_scope_truth_gate.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase08_empty_scope_truth.py
 
   frontend:
     runs-on: ubuntu-latest

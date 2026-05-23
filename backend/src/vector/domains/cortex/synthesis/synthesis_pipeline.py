@@ -445,6 +445,28 @@ def run_substrate_phase_08_synthesis_v1(
             published_index_epoch=published,
             settings=cfg,
         )
+        from vector.domains.cortex.synthesis.phase08_empty_scope_truth_gate import (
+            attach_phase08_empty_scope_truth_gate_v1,
+            should_fail_phase08_for_empty_scope_violation_v1,
+        )
+
+        out = attach_phase08_empty_scope_truth_gate_v1(
+            session,
+            tenant_id=tenant_id,
+            materialize_output=out,
+            published_index_epoch=published,
+        )
+        if should_fail_phase08_for_empty_scope_violation_v1(out):
+            fail_phase_with_receipt_v1(
+                session,
+                pipeline_run_id=prid,
+                phase_id=PHASE_08_SYNTHESIS,
+                tenant_id=tenant_id,
+                raw_output=out,
+                started_at=started_at,
+                error=str(out.get("error_code") or "phase08_empty_scope_with_retrieval_entries"),
+            )
+            return out
         if out.get("jobs_failed") and not out.get("artifact_digests"):
             fail_phase_with_receipt_v1(
                 session,
