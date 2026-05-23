@@ -29,7 +29,7 @@ PROMOTION_RULE_COUNT_GREEN_MIN = 3
 ANCHORS_MISSING_ENTITY_PCT_GREEN_MAX = 50.0
 CANDIDATE_INFLATION_RATIO_GREEN_MAX = 3.0
 
-_EXECUTION_INDEX_KINDS = frozenset({"materialization", "walk", "causal_chain"})
+_EXECUTION_INDEX_KINDS = frozenset({"materialization", "walk", "causal_chain", "causal_edge"})
 
 
 def _to_int(value: Any) -> int:
@@ -160,6 +160,23 @@ def _query_graph_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str
     }
 
 
+def _retrieval_freshness_green_minutes_v1() -> int:
+    try:
+        from vector.settings import get_settings
+
+        return max(1, int(get_settings().cortex_retrieval_freshness_green_minutes))
+    except Exception:  # noqa: BLE001
+        return 120
+
+
+def _freshness_severity(freshness_minutes: float | None) -> str:
+    if freshness_minutes is None:
+        return "unknown"
+    if freshness_minutes <= _retrieval_freshness_green_minutes_v1():
+        return "ok"
+    return "bad"
+
+
 def _query_retrieval_product_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
     tid = str(tenant_id)
     published = session.execute(
@@ -248,6 +265,8 @@ def _query_retrieval_product_v1(session: Session, *, tenant_id: uuid.UUID) -> di
             if execution_pct is not None
             else "unknown"
         ),
+        "freshness_minutes_severity": _freshness_severity(freshness_minutes),
+        "freshness_green_minutes": _retrieval_freshness_green_minutes_v1(),
     }
 
 
@@ -385,6 +404,7 @@ def build_semantic_readiness_v1(
             "candidate_inflation_ratio_green_max": CANDIDATE_INFLATION_RATIO_GREEN_MAX,
             "retrieval_org_link_pct_green_max": RETRIEVAL_ORG_LINK_PCT_GREEN_MAX,
             "retrieval_execution_index_pct_green_min": RETRIEVAL_EXECUTION_PCT_GREEN_MIN,
+            "retrieval_freshness_green_minutes": _retrieval_freshness_green_minutes_v1(),
         },
     }
 

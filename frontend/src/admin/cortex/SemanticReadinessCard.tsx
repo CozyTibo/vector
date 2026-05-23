@@ -124,7 +124,32 @@ export function SemanticReadinessCard({
           <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">
             Retrieval execution index %
           </dt>
-          <dd className="mt-1 text-lg font-semibold tabular-nums">{r.execution_index_pct ?? "—"}%</dd>
+          <dd className="mt-1 flex items-center gap-2">
+            <span className="text-lg font-semibold tabular-nums">{r.execution_index_pct ?? "—"}%</span>
+            {r.execution_index_pct_severity ? (
+              <StatusBadge tone={severityTone(r.execution_index_pct_severity)}>
+                {r.execution_index_pct_severity}
+              </StatusBadge>
+            ) : null}
+          </dd>
+        </div>
+        <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
+          <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">
+            Retrieval freshness
+          </dt>
+          <dd className="mt-1 flex items-center gap-2">
+            <span className="text-lg font-semibold tabular-nums">
+              {r.freshness_minutes != null ? `${r.freshness_minutes} min` : "—"}
+            </span>
+            {r.freshness_minutes_severity ? (
+              <StatusBadge tone={severityTone(r.freshness_minutes_severity)}>
+                {r.freshness_minutes_severity}
+              </StatusBadge>
+            ) : null}
+          </dd>
+          {r.freshness_green_minutes != null ? (
+            <p className="mt-1 text-xs text-stone-500">Target ≤{r.freshness_green_minutes} min when worker healthy</p>
+          ) : null}
         </div>
         <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
           <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">

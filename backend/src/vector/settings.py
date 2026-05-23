@@ -891,6 +891,13 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_RETRIEVAL_MAX_CANONICAL_MATS_PER_EPOCH",
         description="Wave S3: max canonical materialization index rows per pass.",
     )
+    cortex_retrieval_freshness_green_minutes: int = Field(
+        default=120,
+        ge=1,
+        le=10_080,
+        validation_alias="CORTEX_RETRIEVAL_FRESHNESS_GREEN_MINUTES",
+        description="Wave S3: semantic readiness green threshold for retrieval row staleness.",
+    )
     cortex_phase05_require_walks_when_scheduling_eligible: bool = Field(
         default=True,
         validation_alias="CORTEX_PHASE05_REQUIRE_WALKS_WHEN_ELIGIBLE",

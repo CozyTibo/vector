@@ -156,6 +156,8 @@ export type SemanticRetrievalProduct = {
   org_link_pct: number | null;
   execution_index_pct: number | null;
   freshness_minutes: number | null;
+  freshness_minutes_severity?: "ok" | "bad" | "unknown";
+  freshness_green_minutes?: number;
   org_link_pct_severity?: "ok" | "bad" | "unknown";
   execution_index_pct_severity?: "ok" | "bad" | "unknown";
   index_kind_counts?: Array<{ index_kind: string; count: number }>;

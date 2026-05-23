@@ -145,6 +145,33 @@ python scripts/identity_continuity_audit_snapshot.py \
 
 Baseline template: [`baselines/identity_continuity_fizzer_wave_s2_baseline.json`](baselines/identity_continuity_fizzer_wave_s2_baseline.json)
 
+## Wave S3 — Retrieval semantics (COMPLETE)
+
+| Step | Deliverable |
+|------|-------------|
+| S3.1 | Phase 07 order: walks → TCRE → canonical mats → capped `org_link` |
+| S3.2 | Publish-contract L1 mix gate (`retrieval_semantic_mix_violation`) |
+| S3.3 | Island backfill script for `d7e41b3c763d38e9` |
+| S3.4 | Admin freshness severity (≤120 min green) |
+
+**Island backfill (S3.3):**
+
+```bash
+cd backend
+python scripts/retrieval_island_semantic_backfill.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f \
+  --island-scope-id d7e41b3c763d38e9
+
+python scripts/retrieval_island_semantic_backfill.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f \
+  --apply \
+  --out ../DOCS/audits/baselines/retrieval_island_backfill_receipt.json
+```
+
+**Rollback:** `CORTEX_RETRIEVAL_SEMANTIC_MIX_GATE=0` (emergency only — do not leave disabled in prod).
+
+Baseline: [`baselines/retrieval_semantics_fizzer_wave_s3_baseline.json`](baselines/retrieval_semantics_fizzer_wave_s3_baseline.json)
+
 ---
 
 ## Do not use for routine ops

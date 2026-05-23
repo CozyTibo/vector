@@ -59,6 +59,15 @@
 | S2.3 Anchor→entity boundary write | Done | `identity_anchor_boundary_v1.py`, `backfill.py` |
 | S2.4 Second link_type + baseline | Deferred | `identity_continuity_audit_snapshot.py`, wave S2 baseline JSON |
 
+## Wave S3 — Retrieval semantics (COMPLETE)
+
+| Step | Status | Artifact |
+|------|--------|----------|
+| S3.1 Phase 07 materialization order + caps | Done | `retrieval_semantic_orchestration_v1.py`, `retrieval_canonical_materialization_v1.py` |
+| S3.2 Mix gate in publish contract | Done | `retrieval_semantic_mix_v1.py`, `retrieval_publish_contract.py` |
+| S3.3 Island backfill script | Done | `scripts/retrieval_island_semantic_backfill.py` |
+| S3.4 Freshness metric on admin | Done | `semantic_readiness_v1.py`, Semantic readiness card |
+
 ---
 
 ## 0. The phase transition (read this once)

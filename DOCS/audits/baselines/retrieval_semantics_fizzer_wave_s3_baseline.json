@@ -1,0 +1,29 @@
+{
+  "baseline_kind": "retrieval_semantics_wave_s3",
+  "schema_version": 1,
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "tenant_label": "Fizzer",
+  "primary_island_scope_id": "d7e41b3c763d38e9",
+  "captured_at_utc": null,
+  "purpose": "Wave S3 retrieval semantics sign-off — execution-shaped published epochs, not org_link mirrors.",
+  "acceptance_targets": {
+    "org_link_pct_max": 30,
+    "execution_index_pct_min": 60,
+    "org_entity_pct_max": 10,
+    "freshness_minutes_max_when_healthy": 120
+  },
+  "post_s2_reference": {
+    "published_org_link_pct_approx": 98.4,
+    "execution_index_pct_approx": 1.6
+  },
+  "repro_commands": {
+    "semantic_readiness": "cd backend && python -c \"from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import build_semantic_readiness_v1\"",
+    "graph_truth_audit": "cd backend && python scripts/graph_truth_audit_snapshot.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json",
+    "island_backfill": "cd backend && python scripts/retrieval_island_semantic_backfill.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --island-scope-id d7e41b3c763d38e9"
+  },
+  "rollback": "CORTEX_RETRIEVAL_SEMANTIC_MIX_GATE=0 disables L1 fail-loud (emergency only).",
+  "notes": [
+    "Phase 07 materialization order: walk → TCRE → canonical materialization → capped org_link.",
+    "Fill measured fields after deploy via semantic-readiness API or graph_truth_audit snapshot."
+  ]
+}

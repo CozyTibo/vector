@@ -4700,6 +4700,8 @@ class AdminCortexSemanticRetrievalProduct(BaseModel):
     org_link_pct: float | None = None
     execution_index_pct: float | None = None
     freshness_minutes: float | None = None
+    freshness_minutes_severity: Literal["ok", "bad", "unknown"] = "unknown"
+    freshness_green_minutes: int | None = None
     org_link_pct_severity: Literal["ok", "bad", "unknown"] = "unknown"
     execution_index_pct_severity: Literal["ok", "bad", "unknown"] = "unknown"
 
