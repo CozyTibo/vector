@@ -869,6 +869,20 @@ class Settings(BaseSettings):
             "new epoch from the prior published epoch (lookup_id map)."
         ),
     )
+    cortex_retrieval_max_org_link_entries_per_epoch: int = Field(
+        default=500,
+        ge=0,
+        le=50_000,
+        validation_alias="CORTEX_RETRIEVAL_MAX_ORG_LINK_ENTRIES_PER_EPOCH",
+        description="Wave S3: cap org_link rows materialized per BUILDING epoch (island-scoped).",
+    )
+    cortex_retrieval_max_canonical_materializations_per_epoch: int = Field(
+        default=800,
+        ge=1,
+        le=50_000,
+        validation_alias="CORTEX_RETRIEVAL_MAX_CANONICAL_MATS_PER_EPOCH",
+        description="Wave S3: max canonical materialization index rows per pass.",
+    )
     cortex_phase05_require_walks_when_scheduling_eligible: bool = Field(
         default=True,
         validation_alias="CORTEX_PHASE05_REQUIRE_WALKS_WHEN_ELIGIBLE",

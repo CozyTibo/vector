@@ -241,116 +241,23 @@ def materialize_retrieval_index_for_largest_island_v1(
         stats["ok"] = False
         return stats
 
-    prid = str(pipeline_run_id)
-    walk_by_id = {
-        record.walk_id: record for record in store.list_walk_records_for_tenant_v1(tenant_id)
-    }
-    jobs = list(
-        session.scalars(
-            select(CortexTcreReconstructionJob)
-            .where(
-                CortexTcreReconstructionJob.tenant_id == tenant_id,
-                CortexTcreReconstructionJob.status == "completed",
-                CortexTcreReconstructionJob.job_kind == "reconstruct",
-            )
-            .order_by(CortexTcreReconstructionJob.completed_at.desc())
-            .limit(max(1, min(int(max_tcre_jobs), 50)))
-        ).all()
+    from vector.domains.cortex.retrieval.retrieval_semantic_orchestration_v1 import (
+        run_wave_s3_retrieval_materialization_pass_v1,
     )
-    stats["tcre_candidates"] = len(jobs)
-    for job in jobs:
-        scope = dict(job.scope_json or {})
-        if str(scope.get("substrate_pipeline_run_id") or "") != prid:
-            continue
-        walk_raw = scope.get("octs_walk_id")
-        if walk_raw:
-            walk = walk_by_id.get(uuid.UUID(str(walk_raw)))
-            if walk is None or not walk_record_intersects_island_v1(walk, island):
-                continue
-        try:
-            out = materialize_retrieval_index_from_tcre_job_v1(
-                session,
-                tenant_id=tenant_id,
-                job=job,
-                replay_identity=replay,
-                index_epoch=epoch_name,
-                auto_publish=False,
-            )
-            stats["entries_materialized"] += len(out.get("materialized_lookup_ids") or [])
-            stats["tcre_job_id"] = str(job.id)
-            break
-        except (RetrievalTcreBindingError, RetrievalLegalityError) as exc:
-            stats["skip_reasons"].append(
-                {
-                    "source": "tcre_job",
-                    "code": getattr(exc, "code", str(exc)),
-                    "island_scope_id": island_scope_id,
-                }
-            )
 
-    for record in store.list_walk_records_for_tenant_v1(tenant_id):
-        if str(record.status) != "completed" or not record.walk_payload:
-            continue
-        if not walk_record_intersects_island_v1(record, island):
-            continue
-        walk_replay = replay
-        durable_row = durable_row_from_walk_record_v1(
-            session, tenant_id=tenant_id, walk_id=record.walk_id
-        )
-        if durable_row is not None and durable_row.replay_identity:
-            walk_replay = str(durable_row.replay_identity)
-        try:
-            materialize_retrieval_index_from_walk_v1(
-                session,
-                tenant_id=tenant_id,
-                record=record,
-                replay_identity=walk_replay,
-                index_epoch=epoch_name,
-                auto_publish=False,
-                omission_summary=omission_base,
-            )
-            stats["entries_materialized"] += 1
-        except (RetrievalOctsBindingError, RetrievalLegalityError) as exc:
-            stats["skip_reasons"].append(
-                {
-                    "source": "walk",
-                    "walk_id": str(record.walk_id),
-                    "code": normalize_retrieval_skip_reason_v1(getattr(exc, "code", str(exc))),
-                    "island_scope_id": island_scope_id,
-                }
-            )
-
-    for link in session.scalars(
-        select(CortexOrgLink).where(
-            CortexOrgLink.tenant_id == tenant_id,
-            CortexOrgLink.revoked_at.is_(None),
-            CortexOrgLink.source_entity_id.in_(island),
-            CortexOrgLink.target_entity_id.in_(island),
-        )
-    ).all():
-        if not org_link_within_island_v1(link, island):
-            continue
-        try:
-            materialize_retrieval_index_from_graph_ref_v1(
-                session,
-                tenant_id=tenant_id,
-                ref_kind="org_link_id",
-                ref_value=str(link.id),
-                replay_identity=replay,
-                index_epoch=epoch_name,
-                auto_publish=False,
-                omission_summary=omission_base,
-            )
-            stats["entries_materialized"] += 1
-        except (RetrievalGraphBindingError, RetrievalLegalityError) as exc:
-            stats["skip_reasons"].append(
-                {
-                    "source": "org_link",
-                    "org_link_id": str(link.id),
-                    "code": getattr(exc, "code", str(exc)),
-                    "island_scope_id": island_scope_id,
-                }
-            )
+    pass_stats = run_wave_s3_retrieval_materialization_pass_v1(
+        session,
+        tenant_id=tenant_id,
+        pipeline_run_id=pipeline_run_id,
+        index_epoch=epoch_name,
+        replay_identity=replay,
+        island=island,
+        omission_summary=omission_base,
+        max_tcre_jobs=max_tcre_jobs,
+    )
+    stats.update(pass_stats)
+    stats["entries_materialized"] = int(pass_stats.get("entries_materialized") or 0)
+    stats["tcre_candidates"] = int(pass_stats.get("tcre_candidates") or stats.get("tcre_candidates") or 0)
 
     finalized = finalize_pipeline_retrieval_index_build_v1(
         session,
