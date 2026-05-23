@@ -447,8 +447,34 @@ def evaluate_aa7_no_wedge_scripts_v1(
     *,
     ops_log_text: str | None,
     wedge_free_ack: bool = False,
+    aa_hold_active: bool = False,
+    wedge_free_ack_allowed: bool = True,
 ) -> dict[str, Any]:
     """AA7 — no manual wedge scripts in evaluation window (ops log when provided)."""
+    if wedge_free_ack and not wedge_free_ack_allowed:
+        return _gate(
+            "AA7",
+            verdict="FAIL",
+            criterion="wedge-free ack only allowed at 48h clock start (C2), not daily checks",
+            evidence={
+                "wedge_free_ack": True,
+                "wedge_free_ack_allowed": False,
+                "aa_hold_active": aa_hold_active,
+            },
+            detail="wedge_free_ack_not_allowed_during_hold",
+        )
+    if aa_hold_active and not ops_log_text:
+        return _gate(
+            "AA7",
+            verdict="FAIL",
+            criterion="unlock_step09/10/12 banned during 48h AA hold — supply --ops-log-path",
+            evidence={
+                "aa_hold_active": True,
+                "wedge_free_ack_allowed": wedge_free_ack_allowed,
+                "banned_patterns": list(WEDGE_SCRIPT_PATTERNS_V1),
+            },
+            detail="wedge_scripts_banned_during_48h_hold",
+        )
     if ops_log_text:
         hits = [p for p in WEDGE_SCRIPT_PATTERNS_V1 if p in ops_log_text]
         passed = len(hits) == 0
@@ -459,12 +485,12 @@ def evaluate_aa7_no_wedge_scripts_v1(
             evidence={"wedge_hits": hits, "patterns_checked": list(WEDGE_SCRIPT_PATTERNS_V1)},
             detail="ops_log_clean" if passed else "wedge_scripts_detected",
         )
-    if wedge_free_ack:
+    if wedge_free_ack and wedge_free_ack_allowed:
         return _gate(
             "AA7",
             verdict="PASS",
             criterion="Operator wedge-free acknowledgment (no ops log supplied)",
-            evidence={"wedge_free_ack": True},
+            evidence={"wedge_free_ack": True, "wedge_free_ack_allowed": True},
             detail="acknowledged_wedge_free",
         )
     return _gate(
@@ -484,8 +510,24 @@ def build_continuity_proof_panel_v1(
     window_hours: int = 24,
     ops_log_text: str | None = None,
     wedge_free_ack: bool = False,
+    repo_root: Any = None,
+    baseline_date: str | None = None,
+    at_clock_start: bool = False,
 ) -> dict[str, Any]:
     """Evaluate AA1–AA7 and return structured panel payload."""
+    from pathlib import Path
+
+    from vector.domains.cortex.substrate_pipeline.continuity_cleanup_freeze import (
+        evaluate_aa7_hold_policy_context_v1,
+    )
+
+    hold_ctx = evaluate_aa7_hold_policy_context_v1(
+        repo_root=Path(repo_root) if repo_root is not None else None,
+        baseline_date=baseline_date,
+        at_clock_start=at_clock_start,
+    )
+    aa_hold_active = bool(hold_ctx.get("aa_hold_active"))
+    wedge_ack_allowed = bool(hold_ctx.get("wedge_free_ack_allowed"))
     gates = [
         evaluate_aa1_phase_chain_v1(
             session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id
@@ -500,7 +542,10 @@ def build_continuity_proof_panel_v1(
         ),
         evaluate_aa6_forward_progress_v1(session, tenant_id=tenant_id, window_hours=window_hours),
         evaluate_aa7_no_wedge_scripts_v1(
-            ops_log_text=ops_log_text, wedge_free_ack=wedge_free_ack
+            ops_log_text=ops_log_text,
+            wedge_free_ack=wedge_free_ack,
+            aa_hold_active=aa_hold_active,
+            wedge_free_ack_allowed=wedge_ack_allowed,
         ),
     ]
     pass_count = sum(1 for g in gates if g["verdict"] == "PASS")
@@ -520,6 +565,7 @@ def build_continuity_proof_panel_v1(
         "window_hours": window_hours,
         "gates": {g["gate_id"]: g for g in gates},
         "gate_order": list(AA_GATE_IDS_V1),
+        "cleanup_freeze": hold_ctx,
         "summary": {
             "pass_count": pass_count,
             "fail_count": fail_count,
@@ -527,6 +573,7 @@ def build_continuity_proof_panel_v1(
             "total_gates": len(AA_GATE_IDS_V1),
             "m3_autonomously_alive": m3_alive,
             "metric_tier": "M3" if m3_alive else "below_M3",
+            "aa_hold_active": aa_hold_active,
         },
     }
 

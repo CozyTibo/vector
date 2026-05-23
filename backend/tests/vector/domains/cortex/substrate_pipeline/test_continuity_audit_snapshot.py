@@ -70,9 +70,15 @@ def test_build_snapshot_monkeypatched(monkeypatch) -> None:
         "snapshot_c2_synthesis_scope_caps_v1",
         lambda *_a, **_k: {"phase_c2_schema_version": 1},
     )
+    monkeypatch.setattr(
+        "vector.domains.cortex.substrate_pipeline.continuity_audit_snapshot."
+        "build_cleanup_freeze_snapshot_v1",
+        lambda *_a, **_k: {"surface_kind": "continuity_cleanup_freeze", "wiring": {"wiring_ok": True}},
+    )
 
     out = build_continuity_audit_snapshot_v1(None, tenant_id=tenant_id)  # type: ignore[arg-type]
     assert out["surface_kind"] == AUDIT_SNAPSHOT_SURFACE_KIND
     assert out["phase_c3_schema_version"] == PHASE_C3_AUDIT_SNAPSHOT_SCHEMA_VERSION
     assert "c1_phase08_empty_scope_truth" in out["phase_snapshots"]
     assert len(out["deprecated_proof_scripts"]) >= 10
+    assert out["cleanup_freeze"]["surface_kind"] == "continuity_cleanup_freeze"

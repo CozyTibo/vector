@@ -66,7 +66,8 @@ jobs:
             tests/vector/domains/cortex/operational_runtime/test_graph_density_promotion_convergence_schedule.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d3_graph_promotion_schedule.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d4_permanent_orphan_omission.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d5_legacy_coordinator_enqueue_deletion.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d5_legacy_coordinator_enqueue_deletion.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_cleanup_freeze.py
 
   frontend:
     runs-on: ubuntu-latest

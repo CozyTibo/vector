@@ -295,12 +295,12 @@ Phases are **ordered by operational impact**, not architecture elegance.
 
 | System | Verdict | Action |
 |--------|---------|--------|
-| 15+ `continuity_p*_phase**_proof.py` | **Collapse** | One `continuity_audit_snapshot.py` + panel |
+| 15+ `continuity_p*_phase**_proof.py` | ~~**Collapse**~~ **Done** | One `continuity_audit_snapshot.py` + panel |
 | `continuity_p0_2026-05-22.json` step sprawl | **Simplify** | One `continuity_baseline.json` with strict fields only |
-| Legacy substrate coordinator | **Delete** enqueue (keep guard) | Already M4 redirect |
-| `unlock_step09/10/12` in runbooks | **Ban** from prod 48h | AA7 |
-| Per-island synthesis before B1 | **Freeze features** until scopes > 0 | Code can stay; gate sign-off |
-| Island registry sync every inspect | **Throttle** | Publish-time sync only |
+| Legacy substrate coordinator | ~~**Delete** enqueue~~ **Done** (D5) | M4 redirect + D5 guards |
+| `unlock_step09/10/12` in runbooks | ~~**Ban** from prod 48h~~ **Done** | AA7 hold policy + script guards |
+| Per-island synthesis before B1 | ~~**Freeze features**~~ **Done** | B1+C1 sign-off freeze on inspect |
+| Island registry sync every inspect | ~~**Throttle**~~ **Done** (B3) | Publish-time sync only; inspect `sync=False` |
 | Second pipeline truth (completed vs dirty) | **Clarify** | Admin shows both; sign-off uses lease |
 | Global degradation brief at 0 jobs | **Hide** until C1 passes | Admin gating |
 
@@ -1692,6 +1692,51 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d5_legacy_coord
 
 ---
 
+## Cleanup / freeze completion (required, non-numbered)
+
+**Completed:** 2026-05-23  
+**Goal:** Enforce the four stabilization cleanup policies that are not separate numbered phase steps but block honest M3 sign-off.
+
+### What was implemented
+
+| Policy | Implementation |
+|--------|----------------|
+| **Proof collapse** | `deprecated_continuity_proof_script_names_v1()` auto-catalogues all `continuity_*_proof.py` scripts (39+); canonical ops entrypoint remains `continuity_audit_snapshot.py` + embedded `continuity_proof_panel` |
+| **AA7 / unlock ban (48h)** | `evaluate_aa7_no_wedge_scripts_v1` fails during active C4 hold without `--ops-log-path`; `--wedge-free-ack` only at clock start (`at_clock_start=True`); `unlock_step09/10/12` scripts call `assert_wedge_script_allowed_v1` |
+| **Per-island sign-off freeze** | `evaluate_per_island_synthesis_signoff_freeze_v1` — requires B1 in-scope retrieval entries + C1 phase-08 scopes; `build_per_island_synthesis_inspect_v1` exposes `signoff_frozen`; global degradation brief hidden until C1 proven |
+| **Island registry inspect throttle** | `build_island_registry_inspect_v1(sync=False)` default (B3); sync only via `record_retrieval_publish_on_island_registry_v1` on publish |
+
+| Module | `continuity_cleanup_freeze.py` — wiring verify + snapshot embedded in audit snapshot |
+| CI | `test_continuity_cleanup_freeze.py` |
+
+### Validate (local)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python -m pytest \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_cleanup_freeze.py \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_audit_snapshot.py -q
+
+# Daily ops (canonical):
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_audit_snapshot.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
+
+# Daily 48h hold (no default --wedge-free-ack):
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p2_phase24_aa_clock_proof.py \
+  --use-deployed-closure --ops-log-path /path/to/ops.log
+```
+
+### Exit gates
+
+- [x] All per-phase proof scripts deprecated; audit snapshot is canonical CLI
+- [x] AA7 hard-fails wedge scripts during active 48h hold without ops log
+- [x] Wedge-free ack disallowed on daily hold checks (C4 start only)
+- [x] `unlock_step09/10/12` blocked at runtime during hold (`CORTEX_ALLOW_UNLOCK_WEDGE_SCRIPTS=1` emergency only)
+- [x] Per-island synthesis inspect sign-off frozen until B1+C1 scope proof
+- [x] Island registry inspect does not sync by default
+
+---
+
 ## Execution order summary (single page)
 
 ```text
@@ -1745,6 +1790,10 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_audit_snapshot.py \
 
 # Phase C5 — AA5 jobs_completed gate (done; re-run after AA panel changes)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c5_aa5_synthesis_jobs_completed_proof.py --use-deployed-closure
+
+# Cleanup / freeze — canonical daily snapshot (replaces legacy panel + per-phase scripts for ops)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_audit_snapshot.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
 
 # Legacy (deprecated; CI step gates only)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

@@ -20,6 +20,9 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_phase08_empty_scope_
 from vector.domains.cortex.substrate_pipeline.continuity_p0_phase_c2_synthesis_scope_caps import (
     snapshot_c2_synthesis_scope_caps_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_cleanup_freeze import (
+    build_cleanup_freeze_snapshot_v1,
+)
 from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation import (
     DEPRECATED_CONTINUITY_PROOF_SCRIPTS_V1,
 )
@@ -83,6 +86,14 @@ def build_continuity_audit_snapshot_v1(
         window_hours=window_hours,
         ops_log_text=ops_log_text,
         wedge_free_ack=wedge_free_ack,
+        repo_root=repo_root,
+        baseline_date=baseline_date,
+    )
+    cleanup_freeze = build_cleanup_freeze_snapshot_v1(
+        session,
+        tenant_id=tenant_id,
+        repo_root=repo_root,
+        baseline_date=baseline_date,
     )
     panel_text = format_continuity_proof_panel_text_v1(panel)
     substrate_sql = build_substrate_sql_snapshot_v1(session, tenant_id=tenant_id)
@@ -115,6 +126,7 @@ def build_continuity_audit_snapshot_v1(
         "substrate_sql": substrate_sql,
         "phase_snapshots": phase_snapshots,
         "baseline_rollup": baseline_rollup,
+        "cleanup_freeze": cleanup_freeze,
         "deprecated_proof_scripts": list(DEPRECATED_CONTINUITY_PROOF_SCRIPTS_V1),
         "canonical_entrypoint": "backend/scripts/continuity_audit_snapshot.py",
         "summary": {

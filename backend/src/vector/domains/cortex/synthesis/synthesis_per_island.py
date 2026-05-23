@@ -217,6 +217,10 @@ def materialize_synthesis_per_island_v1(
     max_scopes_per_island_override: int | None = None,
 ) -> dict[str, Any]:
     """Run bounded synthesis per execution island and publish a single synthesis epoch."""
+    from vector.domains.cortex.substrate_pipeline.continuity_cleanup_freeze import (
+        evaluate_per_island_synthesis_signoff_freeze_v1,
+    )
+
     cfg = settings or get_settings()
     index_epoch = published_index_epoch or get_published_index_epoch_v1(session, tenant_id=tenant_id)
     if not index_epoch:
@@ -348,12 +352,17 @@ def materialize_synthesis_per_island_v1(
             }
         )
 
+    signoff_freeze = evaluate_per_island_synthesis_signoff_freeze_v1(
+        session, tenant_id=tenant_id
+    )
     global_brief = build_global_degradation_brief_v1(
         tenant_entity_count=tenant_entity_count,
         islands=islands,
         island_results=island_results,
         published_index_epoch=index_epoch,
     )
+    if signoff_freeze.get("global_degradation_brief_hidden"):
+        global_brief = None
 
     artifact_ids: list[uuid.UUID] = []
     if job_ids:
@@ -424,6 +433,7 @@ def materialize_synthesis_per_island_v1(
         "islands_processed": len(island_results),
         "island_results": island_results,
         "global_degradation_brief": global_brief,
+        "per_island_signoff_freeze": signoff_freeze,
         "scope_empty": scope_empty,
         "scopes_overflow": scopes_overflow,
         "per_island_scope_cap_audit": per_island_cap_audit,
@@ -455,6 +465,13 @@ def build_per_island_synthesis_inspect_v1(
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
     """Admin inspect block for P2-D per-island synthesis."""
+    from vector.domains.cortex.substrate_pipeline.continuity_cleanup_freeze import (
+        evaluate_per_island_synthesis_signoff_freeze_v1,
+    )
+
+    signoff_freeze = evaluate_per_island_synthesis_signoff_freeze_v1(
+        session, tenant_id=tenant_id
+    )
     index_epoch = get_published_index_epoch_v1(session, tenant_id=tenant_id)
     islands = list_execution_island_registry_v1(session, tenant_id=tenant_id)
     tenant_entity_count = count_active_org_entities_v1(session, tenant_id=tenant_id)
@@ -492,4 +509,10 @@ def build_per_island_synthesis_inspect_v1(
         "island_count": len(islands),
         "outside_island_scope_entity_count": max(0, tenant_entity_count - covered),
         "islands": island_previews,
+        "signoff_freeze": signoff_freeze,
+        "signoff_frozen": bool(signoff_freeze.get("signoff_frozen")),
+        "signoff_eligible": bool(signoff_freeze.get("signoff_eligible")),
+        "global_degradation_brief_hidden": bool(
+            signoff_freeze.get("global_degradation_brief_hidden")
+        ),
     }

@@ -148,6 +148,9 @@ def main() -> int:
             tenant_id=tenant_id,
             pipeline_run_id=pipeline_run_id,
             wedge_free_ack=args.wedge_free_ack,
+            repo_root=REPO_ROOT,
+            baseline_date=args.baseline_date,
+            at_clock_start=True,
         )
     panel_text = format_continuity_proof_panel_text_v1(panel)
     print(panel_text)

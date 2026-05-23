@@ -90,7 +90,11 @@ def main() -> int:
     parser.add_argument("--baseline-date", default="2026-05-22")
     parser.add_argument("--wait-for-deploy", type=int, default=600)
     parser.add_argument("--trace-only", action="store_true")
-    parser.add_argument("--wedge-free-ack", action="store_true", default=True)
+    parser.add_argument(
+        "--wedge-free-ack",
+        action="store_true",
+        help="Only valid at C4 clock start — daily hold checks must use --ops-log-path (AA7)",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -128,6 +132,9 @@ def main() -> int:
             tenant_id=tenant_id,
             pipeline_run_id=pipeline_run_id,
             wedge_free_ack=args.wedge_free_ack,
+            repo_root=REPO_ROOT,
+            baseline_date=args.baseline_date,
+            at_clock_start=False,
         )
     panel_text = format_continuity_proof_panel_text_v1(panel)
     print(panel_text)

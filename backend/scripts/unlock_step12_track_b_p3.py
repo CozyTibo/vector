@@ -116,6 +116,20 @@ def _lease_snapshot(db: Session, tenant_id: uuid.UUID) -> dict:
 
 
 def main() -> dict:
+    import sys
+    from pathlib import Path as _PathGuard
+
+    from vector.domains.cortex.substrate_pipeline.continuity_cleanup_freeze import (
+        WedgeScriptBannedDuringHoldError,
+        assert_wedge_script_allowed_v1,
+    )
+
+    try:
+        assert_wedge_script_allowed_v1(__file__, repo_root=_PathGuard(__file__).resolve().parents[2])
+    except WedgeScriptBannedDuringHoldError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2) from exc
+
     captured_at = datetime.now(UTC).isoformat()
     settings = get_settings()
     engine = create_engine(_db_url())
