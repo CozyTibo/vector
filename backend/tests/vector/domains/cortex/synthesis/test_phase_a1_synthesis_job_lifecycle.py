@@ -28,6 +28,8 @@ from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.models.user import User
 
+pytestmark = pytest.mark.integration
+
 
 def _tenant_with_owner(db_session: Session) -> uuid.UUID:
     user = User(email=f"a1-{uuid.uuid4().hex[:10]}@example.com", full_name="A1 User")

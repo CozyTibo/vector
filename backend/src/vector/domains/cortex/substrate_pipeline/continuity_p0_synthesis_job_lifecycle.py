@@ -27,7 +27,7 @@ def verify_a1_synthesis_job_lifecycle_wiring_v1() -> dict[str, Any]:
     """Static wiring: orchestrator finally + materialize pre-reconcile."""
     errors: list[str] = []
     orch_src = inspect.getsource(execute_synthesis_job_envelope_v1)
-    if "finally:" not in orch_src or "ORPHAN_RUNNING_CODE_V1" not in orch_src:
+    if "finally:" not in orch_src or "ensure_synthesis_job_terminal_after_execute_v1" not in orch_src:
         errors.append("orchestrator_missing_orphan_running_finally")
     if "prepare_synthesis_job_row_for_execute_v1" not in orch_src:
         errors.append("orchestrator_missing_prepare_enqueue")
