@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase A step A4 — strict AA1/AA6 continuity proof panel prod proof."""
+"""Phase C step C3 — unified continuity audit snapshot prod proof."""
 
 from __future__ import annotations
 
@@ -36,10 +36,9 @@ print = functools.partial(print, flush=True)  # noqa: A001
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from vector.domains.cortex.substrate_pipeline.continuity_p0_aa_panel_strict import (
-    DEFAULT_TENANT_ID,
-    evaluate_p0_a4_aa_panel_strict_proof_v1,
-    verify_a4_aa_panel_strict_wiring_v1,
+from vector.domains.cortex.substrate_pipeline.continuity_audit_snapshot import (
+    build_continuity_audit_snapshot_v1,
+    format_continuity_audit_snapshot_text_v1,
 )
 from vector.domains.cortex.substrate_pipeline.continuity_p0_baseline import (
     continuity_p0_baseline_path_v1,
@@ -47,9 +46,12 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_baseline import (
     probe_prod_ecs_deploy_v1,
     save_continuity_p0_baseline_v1,
 )
-from vector.domains.cortex.substrate_pipeline.continuity_proof_panel import (
-    build_continuity_proof_panel_v1,
-    format_continuity_proof_panel_text_v1,
+from vector.domains.cortex.substrate_pipeline.continuity_p0_phase_c3_audit_snapshot import (
+    evaluate_p0_c3_audit_snapshot_proof_v1,
+    verify_c3_audit_snapshot_wiring_v1,
+)
+from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation import (
+    warn_deprecated_continuity_proof_script_v1,
 )
 from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
     TraceOnlyProdSignoffError,
@@ -57,6 +59,7 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy im
     resolve_trace_only_cli_v1,
     save_p0_step_baseline_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_proof_panel import DEFAULT_TENANT_ID
 
 TENANT_DEFAULT = str(DEFAULT_TENANT_ID)
 
@@ -77,23 +80,15 @@ def _git_sha(expected: str | None) -> str:
 
 
 def main() -> int:
-    from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation import (
-        warn_deprecated_continuity_proof_script_v1,
-    )
-
     warn_deprecated_continuity_proof_script_v1(__file__)
 
-    parser = argparse.ArgumentParser(description="Phase A.4 strict AA1/AA6 panel prod proof")
+    parser = argparse.ArgumentParser(description="Phase C.3 continuity audit snapshot prod proof")
     parser.add_argument("--tenant", default=TENANT_DEFAULT)
     parser.add_argument("--closure-sha", default="")
     parser.add_argument("--baseline-date", default="2026-05-22")
-    parser.add_argument("--window-hours", type=int, default=24)
+    parser.add_argument("--dry-run", action="store_true")
     add_trace_only_ci_argparse_v1(parser)
-    parser.add_argument(
-        "--use-deployed-closure",
-        action="store_true",
-        help="Use prod API ECS tag as closure SHA (same as A.2/A.3)",
-    )
+    parser.add_argument("--use-deployed-closure", action="store_true")
     args = parser.parse_args()
 
     try:
@@ -114,24 +109,25 @@ def main() -> int:
     tenant_id = uuid.UUID(args.tenant)
     deploy_started = datetime.now(UTC)
     prod_deploy = probe_prod_ecs_deploy_v1(expected_sha=closure_sha)
+    wiring = verify_c3_audit_snapshot_wiring_v1(repo_root=REPO_ROOT)
 
-    wiring = verify_a4_aa_panel_strict_wiring_v1()
     engine = create_engine(_db_url())
     SessionLocal = sessionmaker(bind=engine)
     with SessionLocal() as session:
-        panel = build_continuity_proof_panel_v1(
+        snapshot = build_continuity_audit_snapshot_v1(
             session,
             tenant_id=tenant_id,
-            window_hours=args.window_hours,
-            wedge_free_ack=True,
+            repo_root=REPO_ROOT,
+            baseline_date=args.baseline_date,
         )
-    panel_text = format_continuity_proof_panel_text_v1(panel)
+    snapshot_text = format_continuity_audit_snapshot_text_v1(snapshot)
 
-    proof = evaluate_p0_a4_aa_panel_strict_proof_v1(
+    proof = evaluate_p0_c3_audit_snapshot_proof_v1(
         closure_git_sha=closure_sha,
         prod_deploy=prod_deploy,
-        panel=panel,
-        panel_text=panel_text,
+        snapshot=snapshot,
+        snapshot_text=snapshot_text,
+        wiring=wiring,
         deploy_recorded_at=deploy_started,
         trace_only=trace_only,
     )
@@ -143,31 +139,23 @@ def main() -> int:
         date_suffix=args.baseline_date,
     )
     baseline = load_continuity_p0_baseline_v1(baseline_path)
-    gates = dict(panel.get("gates") or {})
-    aa1_ev = dict((gates.get("AA1") or {}).get("evidence") or {})
-    aa6_ev = dict((gates.get("AA6") or {}).get("evidence") or {})
+    summary = dict(snapshot.get("summary") or {})
     step_record = {
         "validated_at": datetime.now(UTC).isoformat(),
         "closure_git_sha": closure_sha,
         "tenant_id": str(tenant_id),
-        "p0_a4_pass": proof["p0_a4_pass"],
+        "p0_c3_pass": proof["p0_c3_pass"],
         "checks": proof["checks"],
         "checks_advisory": proof.get("checks_advisory"),
         "wiring_ok": wiring.get("wiring_ok"),
-        "strict_aa_panel_schema_version": panel.get("strict_aa_panel_schema_version"),
-        "aa1_verdict": (gates.get("AA1") or {}).get("verdict"),
-        "aa6_verdict": (gates.get("AA6") or {}).get("verdict"),
-        "aa1_jobs_completed": aa1_ev.get("jobs_completed"),
-        "aa1_lawful_empty": aa1_ev.get("lawful_empty"),
-        "aa6_forward_progress_signals": aa6_ev.get("forward_progress_signals"),
-        "aa6_mat_only_pass": aa6_ev.get("mat_only_pass"),
-        "m3_autonomously_alive": bool((panel.get("summary") or {}).get("m3_autonomously_alive")),
+        "panel_fail_count": summary.get("panel_fail_count"),
+        "m3_autonomously_alive": summary.get("m3_autonomously_alive"),
         "use_deployed_closure": args.use_deployed_closure,
     }
     saved = save_p0_step_baseline_v1(
         baseline_path,
         baseline,
-        step_key="step_a4_aa_panel_strict",
+        step_key="step_c3_continuity_audit_snapshot",
         step_record=step_record,
         trace_only=trace_only,
         save_fn=save_continuity_p0_baseline_v1,
@@ -177,7 +165,7 @@ def main() -> int:
     else:
         print(f"baseline updated: {saved}")
 
-    return 0 if proof["p0_a4_pass"] else 1
+    return 0 if proof["p0_c3_pass"] else 1
 
 
 if __name__ == "__main__":

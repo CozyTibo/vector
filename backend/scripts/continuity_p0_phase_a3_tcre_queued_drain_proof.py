@@ -74,6 +74,12 @@ def _git_sha(expected: str | None) -> str:
 
 
 def main() -> int:
+    from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation import (
+        warn_deprecated_continuity_proof_script_v1,
+    )
+
+    warn_deprecated_continuity_proof_script_v1(__file__)
+
     parser = argparse.ArgumentParser(description="Phase A.3 TCRE queued drain prod proof")
     parser.add_argument("--tenant", default=TENANT_DEFAULT)
     parser.add_argument("--closure-sha", default="")

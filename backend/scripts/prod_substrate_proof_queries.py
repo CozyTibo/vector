@@ -53,6 +53,12 @@ def q(cur, sql: str, params: tuple = ()) -> list:
 
 
 def main() -> dict[str, Any]:
+    from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation import (
+        warn_deprecated_continuity_proof_script_v1,
+    )
+
+    warn_deprecated_continuity_proof_script_v1(__file__)
+
     pairs = stub_routing_pairs()
     pair_count = len(pairs)
     # build temp table via VALUES for routable check
@@ -338,6 +344,29 @@ def main() -> dict[str, Any]:
 
     out["alive_baseline"] = extract_alive_baseline_metrics(out)
     validate_baseline_snapshot(out)
+
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from vector.domains.cortex.substrate_pipeline.continuity_substrate_sql_snapshot import (
+            build_substrate_sql_snapshot_v1,
+        )
+
+        db_url = (
+            f"postgresql+psycopg://{os.environ['DB_PROD_USER']}:{os.environ['DB_PROD_PASSWORD']}"
+            f"@{os.environ['DB_PROD_HOST']}:{os.environ.get('DB_PROD_PORT', '5432')}"
+            f"/{os.environ.get('DB_PROD_DATABASE', 'postgres')}"
+        )
+        SessionLocal = sessionmaker(bind=create_engine(db_url))
+        with SessionLocal() as session:
+            out["substrate_sql_core_v1"] = build_substrate_sql_snapshot_v1(
+                session, tenant_id=TID
+            )
+        out["canonical_audit_entrypoint"] = "backend/scripts/continuity_audit_snapshot.py"
+    except Exception as exc:  # noqa: BLE001
+        out["substrate_sql_core_v1_error"] = str(exc)[:500]
+
     return out
 
 

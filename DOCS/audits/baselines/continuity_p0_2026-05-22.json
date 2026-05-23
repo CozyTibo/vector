@@ -2345,8 +2345,8 @@
   "trace_only_policy": {
     "schema_version": 1,
     "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
-    "updated_at": "2026-05-23T02:46:19.595324+00:00",
-    "last_prod_signoff_step": "step_c2_synthesis_per_island_scope_caps"
+    "updated_at": "2026-05-23T02:53:48.047116+00:00",
+    "last_prod_signoff_step": "step_c3_continuity_audit_snapshot"
   },
   "step_a5_trace_only_ban": {
     "validated_at": "2026-05-23T01:14:27.645370+00:00",
@@ -5024,6 +5024,220 @@
       "receipt_outcome": "FAILED",
       "has_phase08_empty_scope_gate": false
     },
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "step_c3_continuity_audit_snapshot": {
+    "validated_at": "2026-05-23T02:53:48.047092+00:00",
+    "closure_git_sha": "f947a74c53ad01277616591c9e4fd9c30932523a",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_c3_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "phase_c3_schema_version": true,
+      "audit_snapshot_surface_kind": true,
+      "panel_embedded": true,
+      "panel_text_present": true,
+      "substrate_sql_embedded": true,
+      "phase_snapshots_c1_c2": true,
+      "deprecated_scripts_catalogued": true,
+      "text_prints_aa_panel": true,
+      "text_prints_substrate_sql": true,
+      "unified_command_emits_json_fields": true,
+      "prod_signoff_valid": true
+    },
+    "checks_advisory": {
+      "panel_fail_count": 3,
+      "m3_autonomously_alive": false,
+      "obligation_epoch_gap": 3,
+      "obligation_epoch_gap_ok": false,
+      "obligation_epoch_gap_ok_when_lease_present": false,
+      "baseline_rollup": {
+        "baseline_path": "/Users/thibaulthagler/code/vector/DOCS/audits/baselines/continuity_p0_2026-05-22.json",
+        "baseline_present": true,
+        "step_count": 34,
+        "steps_passed": 30,
+        "steps": {
+          "step_0_3_pipeline_recovery": {
+            "validated_at": null,
+            "pass": null,
+            "pass_field": null
+          },
+          "step_0_4_phase05_proof": {
+            "validated_at": null,
+            "pass": true,
+            "pass_field": "p0_b_pass"
+          },
+          "step_0_2_deploy": {
+            "validated_at": null,
+            "pass": null,
+            "pass_field": null
+          },
+          "step_0_5_phase0_closure": {
+            "validated_at": null,
+            "pass": null,
+            "pass_field": null
+          },
+          "step_0_6_p0_signoff": {
+            "validated_at": null,
+            "pass": true,
+            "pass_field": "p0_signoff_pass"
+          },
+          "step_1_1_p3_component_scheduling": {
+            "validated_at": null,
+            "pass": true,
+            "pass_field": "p1_1_pass"
+          },
+          "step_1_2_p3_deploy": {
+            "validated_at": null,
+            "pass": true,
+            "pass_field": "schedule_pass"
+          },
+          "step_1_3_p1b_promotion": {
+            "validated_at": null,
+            "pass": true,
+            "pass_field": "p1_3_pass"
+          },
+          "step_1_4_p1d_tcre_resume": {
+            "validated_at": null,
+            "pass": true,
+            "pass_field": "p1_4_pass"
+          },
+          "step_1_5_p1de_downstream": {
+            "validated_at": null,
+            "pass": true,
+            "pass_field": "p1_5_pass"
+          },
+          "step_1_6_p1c_retrieval_island": {
+            "validated_at": "2026-05-22T22:59:45.687450+00:00",
+            "pass": true,
+            "pass_field": "p1_6_pass"
+          },
+          "step_2_1_p1f_dual_lane_lease": {
+            "validated_at": "2026-05-22T23:04:47.420290+00:00",
+            "pass": true,
+            "pass_field": "p2_1_pass"
+          },
+          "step_2_2_continuity_proof_panel": {
+            "validated_at": "2026-05-22T23:09:22.168527+00:00",
+            "pass": true,
+            "pass_field": "p2_2_pass"
+          },
+          "step_2_3_p2a_dual_lane_worker": {
+            "validated_at": "2026-05-22T23:52:42.640030+00:00",
+            "pass": true,
+            "pass_field": "p2_3_pass"
+          },
+          "step_2_4_aa48_clock": {
+            "validated_at": "2026-05-22T23:55:33.841293+00:00",
+            "pass": true,
+            "pass_field": "p2_4_pass"
+          },
+          "step_3_1_p2c_island_registry": {
+            "validated_at": "2026-05-22T23:59:09.955354+00:00",
+            "pass": true,
+            "pass_field": "p3_1_pass"
+          },
+          "step_3_2_p2b_event_triggers": {
+            "validated_at": "2026-05-23T00:02:57.335080+00:00",
+            "pass": true,
+            "pass_field": "p3_2_pass"
+          },
+          "step_3_3_p2d_per_island_synthesis": {
+            "validated_at": "2026-05-23T00:07:10.080873+00:00",
+            "pass": true,
+            "pass_field": "p3_3_pass"
+          },
+          "step_3_4_p2e_ingest_deferral": {
+            "validated_at": "2026-05-23T00:10:58.461946+00:00",
+            "pass": true,
+            "pass_field": "p3_4_pass"
+          },
+          "step_a1_synthesis_job_reconcile": {
+            "validated_at": "2026-05-23T01:13:40.492165+00:00",
+            "pass": true,
+            "pass_field": "p0_a1_pass"
+          },
+          "step_a2_ecs_deploy_align": {
+            "validated_at": "2026-05-23T00:48:01.892449+00:00",
+            "pass": true,
+            "pass_field": "p0_a2_pass"
+          },
+          "step_a3_tcre_queued_drain": {
+            "validated_at": "2026-05-23T00:54:23.826400+00:00",
+            "pass": true,
+            "pass_field": "p0_a3_pass"
+          },
+          "step_a4_aa_panel_strict": {
+            "validated_at": "2026-05-23T01:14:23.454619+00:00",
+            "pass": true,
+            "pass_field": "p0_a4_pass"
+          },
+          "step_a5_trace_only_ban": {
+            "validated_at": "2026-05-23T01:14:27.645370+00:00",
+            "pass": true,
+            "pass_field": "p0_a5_pass"
+          },
+          "step_a6_synthesis_terminal_transitions": {
+            "validated_at": "2026-05-23T01:24:08.282305+00:00",
+            "pass": true,
+            "pass_field": "p0_a6_pass"
+          },
+          "step_b1_retrieval_publish_contract": {
+            "validated_at": "2026-05-23T01:32:14.002192+00:00",
+            "pass": true,
+            "pass_field": "p0_b1_pass"
+          },
+          "step_b2_retrieval_epoch_scope_alignment": {
+            "validated_at": "2026-05-23T01:39:42.812201+00:00",
+            "pass": true,
+            "pass_field": "p0_b2_pass"
+          },
+          "step_b3_retrieval_registry_epoch": {
+            "validated_at": "2026-05-23T01:45:54.841230+00:00",
+            "pass": true,
+            "pass_field": "p0_b3_pass"
+          },
+          "step_b4_phase05_walks_persisted": {
+            "validated_at": "2026-05-23T01:51:22.631130+00:00",
+            "pass": true,
+            "pass_field": "p0_b4_pass"
+          },
+          "step_b5_graph_hash_autonomous_chain": {
+            "validated_at": "2026-05-23T02:01:02.580408+00:00",
+            "pass": true,
+            "pass_field": "p0_b5_pass"
+          },
+          "step_b6_post_ingestion_fresh_pipeline_run": {
+            "validated_at": "2026-05-23T02:24:51.744764+00:00",
+            "pass": true,
+            "pass_field": "p0_b6_pass"
+          },
+          "step_c1_phase08_empty_scope_truth": {
+            "validated_at": "2026-05-23T02:34:16.517586+00:00",
+            "pass": true,
+            "pass_field": "p0_c1_pass"
+          },
+          "step_c2_synthesis_per_island_scope_caps": {
+            "validated_at": "2026-05-23T02:46:19.595278+00:00",
+            "pass": true,
+            "pass_field": "p0_c2_pass"
+          },
+          "step_c3_continuity_audit_snapshot": {
+            "validated_at": "2026-05-23T02:53:15.190748+00:00",
+            "pass": false,
+            "pass_field": "p0_c3_pass"
+          }
+        }
+      },
+      "canonical_entrypoint": "backend/scripts/continuity_audit_snapshot.py"
+    },
+    "wiring_ok": true,
+    "panel_fail_count": 3,
+    "m3_autonomously_alive": false,
     "use_deployed_closure": true,
     "trace_only": false,
     "signoff_grade": "prod",

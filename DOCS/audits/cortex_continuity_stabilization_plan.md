@@ -277,7 +277,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 |------|------|-----|-----------|-------------------|---------|----------|----------|------|
 | **C1** | ~~Phase 08 FAIL if scopes=0 but entries exist in epoch~~ **Done 2026-05-23** | Stop COMPLETED_EMPTY lie | `phase08_empty_scope_truth_gate.py`, phase 08 runner, AA1 | N/A | `jobs_completed ≥ 1` or explicit FAIL | Phase receipt + AA1 | `CORTEX_PHASE08_FAIL_ON_EMPTY_SCOPE_WITH_ENTRIES=0` | **synthesis** |
 | **C2** | Cap scopes per island; fail loud on orchestrator error | Predictable cost | `synthesis_per_island.py`, settings | Unbounded retry | 2+ artifacts per 48h on primary island | `cortex_synthesis_artifacts` count | Raise caps | **synthesis** |
-| **C3** | Merge proof scripts → `continuity_audit_snapshot.py` | One ops entrypoint | `backend/scripts/*proof*` | 10+ phase scripts (keep 1–2 CI) | Single command outputs JSON + panel | Doc in plan | Keep old scripts deprecated | **cleanup** |
+| **C3** | ~~Merge proof scripts → `continuity_audit_snapshot.py`~~ **Done 2026-05-23** | One ops entrypoint | `continuity_audit_snapshot.py` | 10+ phase scripts (keep 1–2 CI) | Single command outputs JSON + panel | Doc in plan | Keep old scripts deprecated | **cleanup** |
 | **C4** | Restart 48h AA clock **after** A+B+C on strict gates | Honest M3 | `continuity_p2_aa_clock.py` | Old T0 baseline | New `continuity_aa_clock_T0_*.json` | Daily `continuity_p2_phase24_aa_clock_proof.py` | N/A | **ops** |
 | **C5** | AA5: require `jobs_completed > 0` not merely started | Closes fake synthesis | `continuity_proof_panel.py` | N/A | AA5 tied to S2 | Panel tests | AA5 advisory only | **ops** |
 
@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → ~~**C2**~~ → **C5** — synthesis activation schedule.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → ~~**C2**~~ → ~~**C3**~~ → **C5** (then **C4** 48h clock restart).
 
 ---
 
@@ -1260,6 +1260,54 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c2_synthesis_sc
 
 ---
 
+## Step C.3 completion — unified continuity audit snapshot
+
+**Completed:** 2026-05-23  
+**Goal:** Merge operator proof entrypoints into one command that emits JSON + AA panel text + substrate SQL headline metrics + C1/C2 phase slices (C3 cleanup).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Audit snapshot | `continuity_audit_snapshot.py` — `build_continuity_audit_snapshot_v1`, text formatter, baseline rollup |
+| Substrate SQL core | `continuity_substrate_sql_snapshot.py` — merged headline queries from `prod_substrate_proof_queries` |
+| Canonical CLI | `backend/scripts/continuity_audit_snapshot.py` (`--json`, default text+JSON) |
+| Deprecation | `continuity_proof_deprecation.py` — warnings on 16 legacy proof scripts + panel + prod SQL |
+| `prod_substrate_proof_queries.py` | attaches `substrate_sql_core_v1` + deprecation; points to audit snapshot |
+| Proof | `continuity_p0_phase_c3_audit_snapshot.py` + `continuity_p0_phase_c3_audit_snapshot_proof.py` |
+| CI | `ci.yml` — C.3 audit snapshot + proof evaluator tests |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c3_audit_snapshot_proof.py \
+  --use-deployed-closure
+# Daily ops (replaces panel + prod_substrate_proof_queries for headline truth):
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_audit_snapshot.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
+```
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `wiring_ok` | true |
+| `unified_command_emits_json_fields` | true |
+| `deprecated_scripts_catalogued` | 16 |
+| `obligation_epoch_gap` | 3 (advisory; tracked in snapshot summary) |
+| `panel_fail_count` | 3 (advisory; AA gates still visible in panel) |
+| `p0_c3_pass` | true |
+| Rollback | keep using legacy per-phase scripts (deprecated, still run for CI gates) |
+
+### Exit gates
+
+- [x] Single `continuity_audit_snapshot.py` emits panel + JSON + substrate SQL + C1/C2 slices
+- [x] Legacy proof scripts emit `DeprecationWarning` and remain for CI step gates
+- [x] `prod_substrate_proof_queries.py` merged core metrics into snapshot module
+- [x] Static wiring + proof evaluator + CI gate
+- [x] Cleared for **C5** then **C4**
+
+---
+
 ## Execution order summary (single page)
 
 ```text
@@ -1267,7 +1315,7 @@ Week 0 (incident):  A1 → A2 → A3 → A4 → A6
 Week 1 (heart):     B1 → B2 → B3 → B4 → B5 → B6
 Week 2 (truth):     C1 → C2 → C5 → C3 → C4 (restart 48h clock)
 Parallel:           D1, D2, D3, D5
-Ongoing:            Daily: continuity_proof_panel + SQL recurrence queries
+Ongoing:            Daily: continuity_audit_snapshot.py (--json)
 Banned:             unlock_step*, trace-only baseline sign-off
 ```
 
@@ -1307,9 +1355,13 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c1_phase08_empt
 # Phase C2 — per-island scope caps + orchestrator fail-loud (done; re-run if artifact velocity drops)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c2_synthesis_scope_caps_proof.py --use-deployed-closure
 
-# Daily operator truth (after C3)
+# Phase C3 — unified audit snapshot (done; daily ops entrypoint)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_audit_snapshot.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
+
+# Legacy (deprecated; CI step gates only)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
-python scripts/prod_substrate_proof_queries.py   # until merged into continuity_audit_snapshot.py
+python scripts/prod_substrate_proof_queries.py
 
 # Deploy truth
 CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity_p0_deploy.py
