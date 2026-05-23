@@ -42,6 +42,75 @@ def build_operator_primary_kpi_v1(
 ) -> dict[str, Any]:
     """Top-level admin KPI block for pipeline overview slices."""
     settings = settings or get_settings()
+    from vector.domains.cortex.substrate_pipeline.wave_s5_cleanup_v1 import (
+        is_semantic_primary_operator_kpi_enabled_v1,
+    )
+
+    if is_semantic_primary_operator_kpi_enabled_v1():
+        from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import (
+            build_semantic_readiness_v1,
+        )
+
+        semantic = build_semantic_readiness_v1(session, tenant_id=tenant_id)
+        graph = dict(semantic.get("graph_truth") or {})
+        retrieval = dict(semantic.get("retrieval") or {})
+        synthesis = dict(semantic.get("synthesis") or {})
+        primary_key = "unique_auth_pairs"
+        primary_value = int(graph.get("unique_auth_pairs") or 0)
+        metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+        registry_enabled = is_execution_island_registry_enabled_v1()
+        islands_raw = list_execution_island_registry_v1(session, tenant_id=tenant_id)
+        islands = [
+            {
+                "island_scope_id": row["island_scope_id"],
+                "entity_count": row["entity_count"],
+                "authoritative_edge_count": row["authoritative_edge_count"],
+                "last_retrieval_epoch": row.get("last_retrieval_epoch"),
+                "last_walk_at": row.get("last_walk_at"),
+                "registry_snapshot_at": row.get("registry_snapshot_at"),
+                "live_authoritative_edge_count": row.get("authoritative_edge_count"),
+            }
+            for row in islands_raw[:_ADMIN_ISLAND_LIST_CAP_V1]
+        ]
+        registry_inspect = build_island_registry_inspect_v1(session, tenant_id=tenant_id, sync=False)
+        return {
+            "surface_kind": "operator_primary_kpi",
+            "schema_version": PHASE_D1_OPERATOR_KPI_SCHEMA_VERSION,
+            "semantic_primary_active": True,
+            "hide_from_overview": True,
+            "primary_metric_key": primary_key,
+            "primary_metric_value": primary_value,
+            "semantic_operator_panel": semantic.get("semantic_operator_panel"),
+            "dup_factor": graph.get("dup_factor"),
+            "promotion_rule_count": graph.get("promotion_rule_count"),
+            "retrieval_org_link_pct": retrieval.get("org_link_pct"),
+            "retrieval_execution_index_pct": retrieval.get("execution_index_pct"),
+            "published_claims_7d": synthesis.get("published_claims_7d"),
+            "retrieval_freshness_minutes": retrieval.get("freshness_minutes"),
+            "drainable_routable_estimate": int(metrics.get("drainable_routable_estimate") or 0),
+            "untreated_routable_estimate": int(metrics.get("untreated_routable_estimate") or 0),
+            "raw_minus_mat_admin_gap": int(metrics.get("raw_minus_mat_admin_gap") or 0),
+            "raw_minus_mat_banner_deprecated": True,
+            "diagnostic_only": True,
+            "deferral_counts": dict(metrics.get("deferral_counts") or {}),
+            "operator_kpi_primary": "semantic_readiness_panel",
+            "canonical_backlog_count": _canonical_operator_backlog_count(metrics),
+            "execution_island_registry_enabled": registry_enabled,
+            "execution_island_count": len(islands_raw),
+            "execution_islands": islands,
+            "island_registry_inspect": {
+                "surface_kind": registry_inspect.get("surface_kind"),
+                "island_count": registry_inspect.get("island_count"),
+                "traversal_propagation": registry_inspect.get("traversal_propagation"),
+                "registry_snapshot_at": registry_inspect.get("registry_snapshot_at"),
+            },
+            "deferral_omission": build_deferral_omission_operator_block_v1(
+                session,
+                tenant_id=tenant_id,
+                deferral_counts=dict(metrics.get("deferral_counts") or {}),
+            ),
+        }
+
     metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
     drainable_primary = is_admin_primary_kpi_drainable_enabled_v1(settings=settings)
 
@@ -73,6 +142,8 @@ def build_operator_primary_kpi_v1(
     return {
         "surface_kind": "operator_primary_kpi",
         "schema_version": PHASE_D1_OPERATOR_KPI_SCHEMA_VERSION,
+        "semantic_primary_active": False,
+        "hide_from_overview": False,
         "primary_metric_key": primary_key,
         "primary_metric_value": primary_value,
         "drainable_routable_estimate": int(metrics.get("drainable_routable_estimate") or 0),

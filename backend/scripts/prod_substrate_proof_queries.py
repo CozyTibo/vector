@@ -52,12 +52,25 @@ def q(cur, sql: str, params: tuple = ()) -> list:
     return [dict(zip(cols, row)) for row in cur.fetchall()]
 
 
-def main() -> dict[str, Any]:
+def main(*, allow_deprecated: bool = False) -> dict[str, Any]:
+    import sys
+
     from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation import (
+        CANONICAL_AUDIT_SNAPSHOT_SCRIPT_V1,
+        deprecation_message_for_script_v1,
         warn_deprecated_continuity_proof_script_v1,
     )
 
     warn_deprecated_continuity_proof_script_v1(__file__)
+    if not allow_deprecated:
+        print(
+            deprecation_message_for_script_v1(__file__)
+            + f" Prefer backend/scripts/{CANONICAL_AUDIT_SNAPSHOT_SCRIPT_V1} and "
+            "backend/scripts/graph_truth_audit_snapshot.py. "
+            "Pass --allow-deprecated to run this script anyway.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
 
     pairs = stub_routing_pairs()
     pair_count = len(pairs)
@@ -377,12 +390,17 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         help="Write JSON snapshot to path (validated before write)",
     )
+    parser.add_argument(
+        "--allow-deprecated",
+        action="store_true",
+        help="Wave S5: allow running deprecated script (operators should use continuity/graph truth snapshots)",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = _parse_args()
-    payload = main()
+    payload = main(allow_deprecated=bool(args.allow_deprecated))
     text = json.dumps(payload, indent=2, default=str)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

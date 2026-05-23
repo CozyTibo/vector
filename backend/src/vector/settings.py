@@ -951,6 +951,14 @@ class Settings(BaseSettings):
             "(org_link-heavy mirror)."
         ),
     )
+    cortex_wave_s5_semantic_primary_operator_kpi: bool = Field(
+        default=True,
+        validation_alias="CORTEX_WAVE_S5_SEMANTIC_PRIMARY_OPERATOR_KPI",
+        description=(
+            "Wave S5: admin overview uses semantic readiness six-metric panel as primary; "
+            "hides raw link / raw-minus-mat vanity KPIs."
+        ),
+    )
     cortex_synthesis_eligible_scopes_use_island_in_scope: bool = Field(
         default=True,
         validation_alias="CORTEX_SYNTHESIS_ELIGIBLE_SCOPES_USE_ISLAND_IN_SCOPE",
