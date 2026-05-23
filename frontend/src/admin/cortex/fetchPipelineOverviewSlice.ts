@@ -52,23 +52,27 @@ async function trySlice<T>(
 export type PipelineExecutionSlice = {
   execution: PipelineOverview["execution"];
   continuity_status?: ContinuityStatus | null;
+  operator_primary_kpi?: OperatorPrimaryKpi | null;
 };
 
 export async function fetchPipelineExecutionSlice(tenantId: string): Promise<PipelineExecutionSlice> {
   const body = await trySlice<{
     execution: PipelineOverview["execution"];
     continuity_status?: ContinuityStatus | null;
+    operator_primary_kpi?: OperatorPrimaryKpi | null;
   }>(tenantId, "/cortex/pipeline/overview/execution", 45_000);
   if (body) {
     return {
       execution: body.execution,
       continuity_status: body.continuity_status ?? null,
+      operator_primary_kpi: body.operator_primary_kpi ?? null,
     };
   }
   const full = await fetchMonolithOverview(tenantId);
   return {
     execution: full.execution,
     continuity_status: (full as PipelineOverview & { continuity_status?: ContinuityStatus }).continuity_status ?? null,
+    operator_primary_kpi: full.operator_primary_kpi ?? null,
   };
 }
 
