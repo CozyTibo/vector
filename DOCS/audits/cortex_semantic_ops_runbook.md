@@ -97,7 +97,31 @@ Compare results to baseline JSON before/after each wave.
 | S0.2 | Admin semantic readiness card + API + graph page truth metrics |
 | S0.3 | This runbook + [`graph_truth_fizzer_wave_s0_baseline.json`](baselines/graph_truth_fizzer_wave_s0_baseline.json) |
 
-**Next wave (S1):** authoritative link dedupe + idempotent promotion (`dup_factor ≤ 1.05`).
+## Wave S1 — Graph dedupe & idempotent promotion (COMPLETE)
+
+| Step | Deliverable |
+|------|-------------|
+| S1.1 | Partial unique index `uq_cortex_org_links_auth_active_endpoints` + idempotent `append_authoritative_org_link` |
+| S1.2 | `scripts/revoke_duplicate_authoritative_links.py` (`--dry-run` default, `--apply` + `--out`) |
+| S1.3 | Phase 04 receipt: `unique_auth_pairs`, `unique_pairs_delta`, `dup_factor` |
+| S1.4 | Promotion schedules on **promotable** pairs only; receipts include `unique_pairs_delta` |
+
+**Migrate (revokes dupes + index):** `alembic upgrade head` (revision `20260523_0092`).
+
+**Operator dedupe (tenant-scoped, receipted):**
+
+```bash
+cd backend
+python scripts/revoke_duplicate_authoritative_links.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f
+
+python scripts/revoke_duplicate_authoritative_links.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f \
+  --apply \
+  --out ../DOCS/audits/baselines/graph_truth_fizzer_wave_s1_dedupe_receipt.json
+```
+
+Re-run graph truth snapshot and compare `dup_factor` to S0 baseline (target **≤ 1.05**).
 
 ---
 

@@ -41,6 +41,15 @@
 | S0.2 Admin truth metrics | Done | Semantic readiness card, `GET …/semantic-readiness`, graph page |
 | S0.3 Baseline + runbook | Done | `graph_truth_fizzer_wave_s0_baseline.json`, `cortex_semantic_ops_runbook.md` |
 
+## Wave S1 — Graph dedupe & idempotent promotion (COMPLETE)
+
+| Step | Status | Artifact |
+|------|--------|----------|
+| S1.1 Unique constraint + idempotent promotion | Done | `20260523_0092`, `link_ledger.py`, `graph_truth_metrics_v1.py` |
+| S1.2 Duplicate revoke script + receipt | Done | `scripts/revoke_duplicate_authoritative_links.py`, `graph_truth_dedupe_v1.py` |
+| S1.3 Phase 04 `unique_pairs_delta` | Done | `projection_export.py` phase 04 output |
+| S1.4 Stop promotion spin when Δ=0 | Done | `graph_density_promotion.py` promotable gating + receipts |
+
 ---
 
 ## 0. The phase transition (read this once)
