@@ -829,6 +829,14 @@ class Settings(BaseSettings):
             "(prod proof / continuity); disable to rollback autonomous chain drives."
         ),
     )
+    cortex_post_ingestion_fresh_run_on_graph_change_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_POST_INGESTION_FRESH_RUN_ON_GRAPH_CHANGE",
+        description=(
+            "B6: on graph projection hash change, supersede the running pipeline run and start "
+            "a fresh run with new phase 03–05 receipts (no mirror of prior 02–04)."
+        ),
+    )
     cortex_execution_dual_lane_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_EXECUTION_DUAL_LANE",

@@ -268,8 +268,8 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | **B2** | ~~On epoch change: re-materialize primary island OR bump `island_scope` tags~~ **Done 2026-05-23** | Lawful invalidation | `retrieval_epoch_scope_alignment.py`, pipeline/component mat, phase 07 | N/A | `retrieval_entries_in_scope > 0` for current epoch | Per-island count in phase 08 output | `CORTEX_RETRIEVAL_EPOCH_SCOPE_REALIGN=0` | **retrieval** |
 | **B3** | ~~Wire phase 07 → registry `last_retrieval_epoch` on success~~ **Done 2026-05-23** | Inspect truth | `execution_island_registry.py`, phase 07, publish contract | Sync-on-inspect only → sync on publish | Registry epoch matches DB | `build_island_registry_inspect_v1` (read-only default) | Disable registry / manual sync | **orchestration** |
 | **B4** | ~~Phase 05: require `walks_persisted > 0` when scheduling eligible~~ **Done 2026-05-23** | Walks drive downstream | `phase05_walks_persisted_gate.py`, phase 05, `schedule_octs_walks` | Empty COMPLETED_EMPTY walks | Receipt shows walks_persisted ≥ 1 | Phase 05 `output_json` | `CORTEX_PHASE05_REQUIRE_WALKS_WHEN_ELIGIBLE=0` | **runtime** |
-| **B5** | Graph-hash trigger → walk → TCRE → 07 chain (one integration test) | Proves autonomous chain | `execution_event_triggers.py`, dual-lane | Manual full slices only | End-to-end without unlock in CI | Integration test + prod SQL window | Disable trigger | **orchestration** |
-| **B6** | Post-ingestion **new pipeline run** after graph change (not only recover in place) | Fresh 03/04/05 receipts | `orchestrator.py`, `start_substrate_pipeline_run_v1` | Eternal `ce7df86d` mirror | New run id OR phases 03–05 re-run timestamps | SQL phase `started_at` | Keep old run | **orchestration** |
+| **B5** | ~~Graph-hash trigger → walk → TCRE → 07 chain~~ **Done 2026-05-23** | Proves autonomous chain | `graph_hash_autonomous_chain.py` | Manual full slices only | End-to-end without unlock in CI | Integration test + prod SQL window | Disable trigger | **orchestration** |
+| **B6** | ~~Post-ingestion **new pipeline run** after graph change~~ **Done 2026-05-23** | Fresh 03/04/05 receipts | `post_ingestion_fresh_pipeline_run.py`, triggers | Eternal `ce7df86d` mirror | New run id OR phases 03–05 re-run timestamps | SQL phase `started_at` | Keep old run | **orchestration** |
 
 ### Phase C — Synthesis + truthful continuity
 
@@ -966,7 +966,7 @@ Auto-runs tag realign from prior published epoch when Fizzer primary in-scope co
 - [x] Phase 07/08 expose `retrieval_entries_in_scope` for primary island
 - [x] B-G2: Fizzer primary island `d7e41b3c763d38e9` in-scope &gt; 0 on published epoch (prod proof)
 
-**Next step:** ~~**B3**~~ → ~~**B4**~~ → ~~**B5**~~ → **B6** — synthesis island scope.
+**Next step:** ~~**B3**~~ → ~~**B4**~~ → ~~**B5**~~ → ~~**B6**~~ → **Phase C** (synthesis truth gates).
 
 ---
 
@@ -1028,7 +1028,7 @@ WHERE r.tenant_id = 'c08ef32b-f89a-40f6-9566-e19b5329436f';
 - [x] Inspect default is read-only (`sync=False`)
 - [x] B-G5: primary island registry epoch aligned with published epoch (prod proof)
 
-**Next step:** ~~**B4**~~ → ~~**B5**~~ → **B6** — synthesis island scope.
+**Next step:** ~~**B4**~~ → ~~**B5**~~ → ~~**B6**~~ → **Phase C**.
 
 ---
 
@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → **B6** — synthesis island scope.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → **C1** — phase 08 FAIL when scopes=0 but entries exist.
 
 ---
 
@@ -1119,7 +1119,55 @@ Auto-drives `04→05→06(sync)→07` when no complete chain in SQL window. `--d
 - [x] Chain runner: 04 → 05 → sync TCRE (receipt) → 07 without unlock scripts
 - [x] Static wiring + proof evaluator + CI gate
 - [x] Prod SQL window evidence or auto-drive pass
-- [x] Cleared for **B6** (synthesis island scope)
+- [x] Cleared for **B6** (fresh pipeline run on graph change)
+
+---
+
+## Step B.6 completion — post-ingestion fresh pipeline run after graph change
+
+**Completed:** 2026-05-23  
+**Goal:** On authoritative graph projection hash change, start a **new** pipeline run with fresh phase 03–05 receipts — not eternal in-place mirror of `ce7df86d` (B6 / orchestration).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Fresh-run module | `post_ingestion_fresh_pipeline_run.py` — supersede running run, create `graph_hash_changed` run, requeue 03–05 (no mirror) |
+| Graph-hash trigger | `trigger_graph_hash_walk_schedule_v1` calls fresh run before walk schedule; sets `fresh_pipeline_run_id`, `no_phase_mirror` |
+| Execution rewind | `dual_lane_worker` + `run_tenant_convergence_v1` switch lease to fresh run and rewind to phase 03 after phase 04 |
+| Repository | `create_pipeline_run_v1(..., allow_coalesce_running=False)` for B6 |
+| Recovery | `recover_continuity_p0_pipeline_v1(..., mirror_completed_phases=False)` opt-out |
+| Settings | `CORTEX_POST_INGESTION_FRESH_RUN_ON_GRAPH_CHANGE` (default on) |
+| Proof | `continuity_p0_post_ingestion_fresh_pipeline_run.py` + `continuity_p0_phase_b6_post_ingestion_fresh_pipeline_run_proof.py` |
+| CI | `ci.yml` — B.6 unit + proof evaluator tests |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b6_post_ingestion_fresh_pipeline_run_proof.py \
+  --use-deployed-closure
+```
+
+Auto-drives graph-hash change + fresh run when SQL window empty. `--drive-fresh-run` forces.
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `fresh_pipeline_run_id` | `bf19b56a-f6f9-444f-8ebf-9808b95c2e50` |
+| `superseded_pipeline_run_ids` | includes prior running run (not eternal mirror) |
+| Fresh `phase_03/04/05` `started_at` | all after new run `created_at` |
+| `no_phase_mirror` | true |
+| `p0_b6_pass` | true |
+| Rollback | `CORTEX_POST_INGESTION_FRESH_RUN_ON_GRAPH_CHANGE=0` |
+
+### Exit gates
+
+- [x] Graph-hash change supersedes running pipeline and creates new run
+- [x] Phases 03–05 re-queued empty on fresh run (no 02–04 mirror)
+- [x] Execution lane rewinds to phase 03 when `fresh_pipeline_run_id` present
+- [x] Static wiring + proof evaluator + CI gate
+- [x] Prod SQL evidence or auto-drive pass
+- [x] **Phase B complete** — cleared for **Phase C**
 
 ---
 
@@ -1127,7 +1175,7 @@ Auto-drives `04→05→06(sync)→07` when no complete chain in SQL window. `--d
 
 ```text
 Week 0 (incident):  A1 → A2 → A3 → A4 → A6
-Week 1 (heart):     B1 → B2 → B3 → B4 → B5
+Week 1 (heart):     B1 → B2 → B3 → B4 → B5 → B6
 Week 2 (truth):     C1 → C2 → C5 → C3 → C4 (restart 48h clock)
 Parallel:           D1, D2, D3, D5
 Ongoing:            Daily: continuity_proof_panel + SQL recurrence queries
@@ -1160,6 +1208,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a6_synthesis_te
 
 # Phase B5 — graph-hash autonomous chain (done; re-run if chain evidence stale)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b5_graph_hash_autonomous_chain_proof.py --use-deployed-closure
+
+# Phase B6 — fresh pipeline run on graph change (done; re-run if only stale mirrors)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b6_post_ingestion_fresh_pipeline_run_proof.py --use-deployed-closure
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

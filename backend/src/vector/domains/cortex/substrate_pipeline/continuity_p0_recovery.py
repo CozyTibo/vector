@@ -254,6 +254,7 @@ def recover_continuity_p0_pipeline_v1(
     source_pipeline_run_id: uuid.UUID | None = None,
     resume_from_phase: str = PHASE_05_TRAVERSAL,
     enqueue_celery: bool = True,
+    mirror_completed_phases: bool = True,
 ) -> dict[str, Any]:
     """P0-C: new post-ingestion run (default) or in-place failed-run recovery + execution enqueue."""
     source = None
@@ -309,7 +310,7 @@ def recover_continuity_p0_pipeline_v1(
         return {"recovered": False, "reason": "pipeline_run_create_failed"}
 
     mirrored: list[str] = []
-    if source is not None and source.id != run_id:
+    if mirror_completed_phases and source is not None and source.id != run_id:
         mirrored = mirror_completed_phases_between_runs_v1(
             session,
             source_pipeline_run_id=source.id,

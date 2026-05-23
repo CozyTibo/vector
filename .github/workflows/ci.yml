@@ -47,7 +47,9 @@ jobs:
             tests/vector/domains/cortex/substrate_pipeline/test_phase05_walks_persisted_gate.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase05_walks_persisted.py \
             tests/vector/domains/cortex/substrate_pipeline/test_graph_hash_autonomous_chain.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_graph_hash_autonomous_chain.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_graph_hash_autonomous_chain.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_post_ingestion_fresh_pipeline_run.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_post_ingestion_fresh_pipeline_run.py
 
   frontend:
     runs-on: ubuntu-latest

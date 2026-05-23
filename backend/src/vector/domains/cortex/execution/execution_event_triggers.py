@@ -143,18 +143,34 @@ def trigger_graph_hash_walk_schedule_v1(
     prior = str(detail.get(DETAIL_KEY_LAST_GRAPH_HASH_V1) or "").strip()
     changed = bool(new_hash) and new_hash != prior
 
+    schedule_target_run_id = pipeline_run_id
+    fresh_run: dict[str, Any] | None = None
+    if changed and pipeline_run_id is not None:
+        from vector.domains.cortex.substrate_pipeline.post_ingestion_fresh_pipeline_run import (
+            start_fresh_pipeline_run_after_graph_change_v1,
+        )
+
+        fresh_run = start_fresh_pipeline_run_after_graph_change_v1(
+            session,
+            tenant_id=tenant_id,
+            graph_projection_stable_hash=new_hash,
+            prior_pipeline_run_id=pipeline_run_id,
+        )
+        if fresh_run.get("started") and fresh_run.get("fresh_pipeline_run_id"):
+            schedule_target_run_id = uuid.UUID(str(fresh_run["fresh_pipeline_run_id"]))
+
     schedule_out: dict[str, Any] | None = None
     if (changed or force_schedule) and new_hash:
         schedule_out = schedule_octs_walks_for_tenant_v1(
             tenant_id=tenant_id,
             trigger=TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_HASH_CHANGED_V1,
-            pipeline_run_id=pipeline_run_id,
+            pipeline_run_id=schedule_target_run_id,
             graph_projection_stable_hash=new_hash,
             force=force_schedule,
             session=session,
         )
 
-    manifest = {
+    manifest: dict[str, Any] = {
         "trigger": EVENT_TRIGGER_GRAPH_HASH_V1,
         "triggered": changed or force_schedule,
         "at": _now_iso(),
@@ -164,6 +180,12 @@ def trigger_graph_hash_walk_schedule_v1(
         "walk_schedule": schedule_out,
         "walks_scheduled": bool((schedule_out or {}).get("scheduled")),
     }
+    if fresh_run and fresh_run.get("started") and fresh_run.get("fresh_pipeline_run_id"):
+        manifest["fresh_pipeline_run_id"] = fresh_run["fresh_pipeline_run_id"]
+        manifest["superseded_pipeline_run_ids"] = list(fresh_run.get("superseded_pipeline_run_ids") or [])
+        manifest["resume_from_phase"] = fresh_run.get("resume_from_phase")
+        manifest["no_phase_mirror"] = True
+
     if lease is not None and new_hash:
         lease_detail = dict(lease.detail_json or {})
         lease_detail[DETAIL_KEY_LAST_GRAPH_HASH_V1] = new_hash
@@ -176,11 +198,12 @@ def trigger_graph_hash_walk_schedule_v1(
 
     if changed:
         _LOGGER.info(
-            "graph_hash_changed_walk_schedule tenant_id=%s prior=%s new=%s scheduled=%s",
+            "graph_hash_changed_walk_schedule tenant_id=%s prior=%s new=%s scheduled=%s fresh_run=%s",
             tenant_id,
             prior[:12] if prior else "—",
             new_hash[:12],
             bool((schedule_out or {}).get("scheduled")),
+            (fresh_run or {}).get("fresh_pipeline_run_id"),
         )
 
     return manifest

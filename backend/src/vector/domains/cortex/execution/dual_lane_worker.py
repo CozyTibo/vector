@@ -292,6 +292,20 @@ def _run_execution_lane_slice_v1(
         if phase == PHASE_04_GRAPH:
             out = run_phase_04_graph_v1(session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id)
             store_last_phase_receipt_on_lease_v1(lease, phase_output=out, session=session)
+            from vector.domains.cortex.substrate_pipeline.post_ingestion_fresh_pipeline_run import (
+                resolve_pipeline_run_id_after_phase04_v1,
+            )
+
+            pipeline_run_id, switch = resolve_pipeline_run_id_after_phase04_v1(
+                out,
+                current_pipeline_run_id=pipeline_run_id,
+            )
+            if switch.get("switched"):
+                lease.pipeline_run_id = pipeline_run_id
+                session.flush()
+                graph_hash = out.get("graph_projection_stable_hash_sha256")
+                phase = PHASE_03_IDENTITY
+                continue
             graph_hash = out.get("graph_projection_stable_hash_sha256")
             phase = PHASE_05_TRAVERSAL
             continue

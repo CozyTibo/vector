@@ -39,5 +39,13 @@ PIPELINE_STATUS_FAILED: Final[str] = "failed"
 PIPELINE_STATUS_PARTIAL: Final[str] = "partial"
 
 PIPELINE_TRIGGER_POST_INGESTION: Final[str] = "post_ingestion"
+PIPELINE_TRIGGER_GRAPH_HASH_CHANGED: Final[str] = "graph_hash_changed"
 PIPELINE_TRIGGER_FLUSH_RERUN: Final[str] = "flush_rerun"
 PIPELINE_TRIGGER_MANUAL: Final[str] = "manual"
+
+# B6: phases that must receive fresh receipts after authoritative graph change.
+GRAPH_CHANGE_FRESH_PHASES_V1: Final[tuple[str, ...]] = (
+    PHASE_03_IDENTITY,
+    PHASE_04_GRAPH,
+    PHASE_05_TRAVERSAL,
+)

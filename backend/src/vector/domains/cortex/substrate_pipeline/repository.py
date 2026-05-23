@@ -93,10 +93,12 @@ def create_pipeline_run_v1(
     bundle_id: str | None,
     idempotency_key: str,
     celery_root_task_id: str | None = None,
+    allow_coalesce_running: bool = True,
 ) -> CortexSubstratePipelineRun:
-    existing = get_running_pipeline_run_v1(session, tenant_id=tenant_id)
-    if existing is not None:
-        return existing
+    if allow_coalesce_running:
+        existing = get_running_pipeline_run_v1(session, tenant_id=tenant_id)
+        if existing is not None:
+            return existing
 
     run = CortexSubstratePipelineRun(
         id=uuid.uuid4(),
