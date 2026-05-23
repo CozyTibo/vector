@@ -558,6 +558,14 @@ class Settings(BaseSettings):
             "Rollback false: restore raw_minus_mat_admin_gap as primary hero metric."
         ),
     )
+    cortex_github_caps_enforce_code_defaults: bool = Field(
+        default=True,
+        validation_alias="CORTEX_GITHUB_CAPS_ENFORCE_CODE_DEFAULTS",
+        description=(
+            "Phase D2: prod/ECS must expose GitHub ingest caps 10/16/120 (code defaults). "
+            "Rollback false: allow legacy 5/8/25 env overrides (deferral growth risk)."
+        ),
+    )
     cortex_synthesis_job_running_stale_seconds: int = Field(
         default=86_400,
         ge=60,

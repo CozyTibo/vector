@@ -21,6 +21,18 @@
         {
           "name": "ENV",
           "value": "production"
+        },
+        {
+          "name": "CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO",
+          "value": "10"
+        },
+        {
+          "name": "CORTEX_GITHUB_PR_FETCH_MAX_REPOS",
+          "value": "16"
+        },
+        {
+          "name": "CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS",
+          "value": "120"
         }
       ],
       "logConfiguration": {

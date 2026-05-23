@@ -19,9 +19,9 @@ FIX6_RECOMMENDED_GITHUB_CAPS_V1: dict[str, tuple[int, int]] = {
 }
 
 FIX6_ENV_ALIASES_V1: dict[str, tuple[str, int]] = {
-    "cortex_github_prs_max_pages_per_repo": ("CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO", 5),
-    "cortex_github_pr_fetch_max_repos": ("CORTEX_GITHUB_PR_FETCH_MAX_REPOS", 8),
-    "cortex_github_repo_time_budget_seconds": ("CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS", 25),
+    "cortex_github_prs_max_pages_per_repo": ("CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO", 10),
+    "cortex_github_pr_fetch_max_repos": ("CORTEX_GITHUB_PR_FETCH_MAX_REPOS", 16),
+    "cortex_github_repo_time_budget_seconds": ("CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS", 120),
 }
 
 _FORBIDDEN_SYNTHESIS_LEGALITY_V1: frozenset[str] = frozenset({"synthesis_forbidden"})

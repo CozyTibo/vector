@@ -60,7 +60,9 @@ jobs:
             tests/vector/domains/cortex/synthesis/test_phase_c5_aa5_synthesis_jobs_completed_gate.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c5_aa5_synthesis_jobs_completed.py \
             tests/vector/domains/cortex/pipeline/test_pipeline_admin_operator_kpi.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d1_admin_operator_primary_kpi.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d1_admin_operator_primary_kpi.py \
+            tests/vector/domains/cortex/ingestion/test_github_ingest_caps_code_defaults.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d2_github_caps_align.py
 
   frontend:
     runs-on: ubuntu-latest

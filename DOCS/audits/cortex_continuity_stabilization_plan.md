@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1–C5**~~ → ~~**D1**~~ → **D2** (parallel) + hold **48h AA clock** daily until M3.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1–C5**~~ → ~~**D1**~~ → ~~**D2**~~ → **D3** (parallel) + hold **48h AA clock** daily until M3.
 
 ---
 
@@ -1456,7 +1456,64 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d1_admin_operat
 - [x] Static wiring + proof evaluator + CI gate
 - [ ] Prod baseline `step_d1_admin_operator_primary_kpi` (run prod script after deploy)
 
-**Next step:** **D2** — prod env GitHub ingest caps aligned to code defaults.
+**Next step:** ~~**D2**~~ → **D3** — graph promotion worker on schedule.
+
+---
+
+## Step D.2 completion — GitHub ingest caps = code defaults (10/16/120)
+
+**Completed:** 2026-05-23  
+**Goal:** Prod ECS env matches code defaults for Fix-6 trio; remove legacy 5/8/25 overrides that inflated deferral growth (D2 / D-G4).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Manifest | `github_ingest_caps_code_defaults.py` — 10 pages/repo, 16 repos, 120s budget |
+| ECS merge | `ecs_align_github_ingest_caps.py` — upsert env on task definition JSON |
+| Deploy | `.github/workflows/deploy.yml` — align caps on API + worker before register |
+| Infra | `infra/ecs/backend-task.json`, `worker-task.json` — explicit cap env vars |
+| Fix-6 aliases | `step12_track_b_p3.py` — env fallbacks 10/16/120 (not legacy 5/8/25) |
+| Settings | `CORTEX_GITHUB_CAPS_ENFORCE_CODE_DEFAULTS` (default on) |
+| Proof | `continuity_p0_phase_d2_github_caps_align.py` + prod script (ECS probe + deferral totals) |
+| CI | D2 merge helper + proof evaluator tests |
+
+### Validate (local)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python -m pytest \
+  tests/vector/domains/cortex/ingestion/test_github_ingest_caps_code_defaults.py \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d2_github_caps_align.py -q
+```
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d2_github_caps_align_proof.py \
+  --use-deployed-closure
+```
+
+Requires a deploy that ran the D2 cap-align steps (or manual ECS env at 10/16/120). Use `--skip-ecs-probe` only for wiring/dry-run.
+
+| Check | Expected |
+|-------|----------|
+| `settings_defaults_match_code` | true |
+| `infra_ecs_json_has_code_defaults` | true |
+| `prod_api_ecs_caps_match_code_defaults` | true (after deploy) |
+| `prod_worker_ecs_caps_match_code_defaults` | true (after deploy) |
+| `no_legacy_low_override_*` | true (not 5/8/25) |
+| `deferral_totals_snapshot_present` | true |
+| Rollback | `CORTEX_GITHUB_CAPS_ENFORCE_CODE_DEFAULTS=0` + remove ECS cap env |
+
+### Exit gates
+
+- [x] Code defaults documented and match `settings.py` Field defaults
+- [x] Deploy workflow merges caps into every API/worker task registration
+- [x] Infra ECS JSON templates carry explicit cap env
+- [x] Static wiring + proof evaluator + CI gate
+- [ ] Prod baseline `step_d2_github_caps_code_defaults` (after deploy + prod proof)
 
 ---
 
@@ -1466,7 +1523,7 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d1_admin_operat
 Week 0 (incident):  A1 → A2 → A3 → A4 → A6
 Week 1 (heart):     B1 → B2 → B3 → B4 → B5 → B6
 Week 2 (truth):     C1 → C2 → C5 → C3 → C4 (restart 48h clock)
-Parallel:           ~~D1~~, D2, D3, D5
+Parallel:           ~~D1~~, ~~D2~~, D3, D5
 Ongoing:            Daily: continuity_audit_snapshot.py (--json)
 Banned:             unlock_step*, trace-only baseline sign-off
 ```
