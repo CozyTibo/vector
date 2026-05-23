@@ -4664,6 +4664,70 @@ class AdminCortexPipelineNextScheduledIngestion(BaseModel):
     connectors_eligible_now: list[str] = Field(default_factory=list)
 
 
+class AdminCortexPromotionByRuleRow(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    rule_id: str
+    auth_edge_rows: int = 0
+    unique_pairs: int = 0
+
+
+class AdminCortexSemanticGraphTruth(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    active_entities: int = 0
+    entities_in_auth_graph: int = 0
+    entities_isolated: int = 0
+    entities_in_auth_graph_pct: float = 0.0
+    auth_edge_rows: int = 0
+    auth_edge_rows_deprecated_primary: bool = True
+    unique_auth_pairs: int = 0
+    dup_factor: float | None = None
+    dup_factor_severity: Literal["ok", "warn", "bad", "unknown"] = "unknown"
+    promotion_rule_count: int = 0
+    promotions_by_rule_id: list[AdminCortexPromotionByRuleRow] = Field(default_factory=list)
+    primary_metric_key: str = "unique_auth_pairs"
+    connected_components: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexSemanticRetrievalProduct(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    published_index_epoch: str | None = None
+    published_at: datetime | None = None
+    entry_count: int = 0
+    index_kind_counts: list[dict[str, Any]] = Field(default_factory=list)
+    org_link_pct: float | None = None
+    execution_index_pct: float | None = None
+    freshness_minutes: float | None = None
+    org_link_pct_severity: Literal["ok", "bad", "unknown"] = "unknown"
+    execution_index_pct_severity: Literal["ok", "bad", "unknown"] = "unknown"
+
+
+class AdminCortexSemanticSynthesisTruth(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    jobs_by_status: list[dict[str, Any]] = Field(default_factory=list)
+    artifacts_total: int = 0
+    artifacts_published: int = 0
+    artifacts_with_claims: int = 0
+    fail_loud_expected_when_retrieval_weak: bool = True
+
+
+class AdminCortexSemanticReadinessResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "semantic_readiness"
+    schema_version: int = 1
+    tenant_id: uuid.UUID
+    captured_at_utc: str | None = None
+    product_substrate: str = "retrieval"
+    graph_truth: AdminCortexSemanticGraphTruth
+    retrieval: AdminCortexSemanticRetrievalProduct
+    synthesis: AdminCortexSemanticSynthesisTruth
+    thresholds: dict[str, Any] = Field(default_factory=dict)
+
+
 class AdminCortexPipelineOverviewExecutionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -4672,6 +4736,7 @@ class AdminCortexPipelineOverviewExecutionResponse(BaseModel):
     execution: AdminCortexPipelineExecutionSnapshot
     continuity_status: AdminCortexContinuityStatus | None = None
     operator_primary_kpi: AdminCortexOperatorPrimaryKpi | None = None
+    semantic_readiness: AdminCortexSemanticReadinessResponse | None = None
 
 
 class AdminCortexPipelineOverviewPhasesResponse(BaseModel):
@@ -4706,6 +4771,7 @@ class AdminCortexPipelineOverviewResponse(BaseModel):
     execution: AdminCortexPipelineExecutionSnapshot
     continuity_status: AdminCortexContinuityStatus | None = None
     operator_primary_kpi: AdminCortexOperatorPrimaryKpi | None = None
+    semantic_readiness: AdminCortexSemanticReadinessResponse | None = None
     phases: list[AdminCortexPipelinePhaseOverview]
     attention: list[str] = Field(default_factory=list)
     attention_items: list[AdminCortexAttentionItem] = Field(default_factory=list)

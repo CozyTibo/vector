@@ -129,6 +129,56 @@ export type DeferralOmissionPosture = {
   operator_actions?: string[];
 };
 
+export type PromotionByRuleRow = {
+  rule_id: string;
+  auth_edge_rows: number;
+  unique_pairs: number;
+};
+
+export type SemanticGraphTruth = {
+  active_entities: number;
+  entities_in_auth_graph: number;
+  entities_isolated: number;
+  entities_in_auth_graph_pct: number;
+  auth_edge_rows: number;
+  auth_edge_rows_deprecated_primary?: boolean;
+  unique_auth_pairs: number;
+  dup_factor: number | null;
+  dup_factor_severity: "ok" | "warn" | "bad" | "unknown";
+  promotion_rule_count: number;
+  promotions_by_rule_id: PromotionByRuleRow[];
+  primary_metric_key: string;
+};
+
+export type SemanticRetrievalProduct = {
+  published_index_epoch: string | null;
+  entry_count: number;
+  org_link_pct: number | null;
+  execution_index_pct: number | null;
+  freshness_minutes: number | null;
+  org_link_pct_severity?: "ok" | "bad" | "unknown";
+  execution_index_pct_severity?: "ok" | "bad" | "unknown";
+  index_kind_counts?: Array<{ index_kind: string; count: number }>;
+};
+
+export type SemanticSynthesisTruth = {
+  artifacts_with_claims: number;
+  artifacts_published: number;
+  artifacts_total: number;
+  jobs_by_status?: Array<{ status: string; count: number }>;
+};
+
+export type SemanticReadiness = {
+  surface_kind?: string;
+  schema_version?: number;
+  tenant_id: string;
+  product_substrate: string;
+  graph_truth: SemanticGraphTruth;
+  retrieval: SemanticRetrievalProduct;
+  synthesis: SemanticSynthesisTruth;
+  thresholds?: Record<string, number>;
+};
+
 export type OperatorPrimaryKpi = {
   surface_kind?: string;
   schema_version?: number;

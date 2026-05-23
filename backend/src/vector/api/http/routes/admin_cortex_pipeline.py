@@ -19,6 +19,7 @@ from vector.contracts.admin import (
     AdminCortexPipelinePhaseSummaryResponse,
     AdminCortexPipelineRunRequest,
     AdminCortexPipelineRunResponse,
+    AdminCortexSemanticReadinessResponse,
 )
 from vector.domains.cortex.ingestion.admin_overview import invalidate_cortex_ingestion_admin_caches_v1
 from vector.domains.cortex.pipeline.pipeline_admin_overview import (
@@ -26,6 +27,9 @@ from vector.domains.cortex.pipeline.pipeline_admin_overview import (
     build_pipeline_overview_ingestion_v1,
     build_pipeline_overview_phases_v1,
     build_pipeline_overview_v1,
+)
+from vector.domains.cortex.pipeline.pipeline_admin_semantic_readiness import (
+    build_semantic_readiness_admin_v1,
 )
 from vector.domains.cortex.pipeline.pipeline_admin_run import pipeline_run_v1
 from vector.domains.cortex.pipeline.pipeline_phase_views import (
@@ -159,6 +163,16 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         _assert_tenant(db, tenant_id)
         raw = build_pipeline_overview_ingestion_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewIngestionResponse.model_validate(raw)
+
+    @pr.get("/semantic-readiness", response_model=AdminCortexSemanticReadinessResponse)
+    def get_semantic_readiness(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexSemanticReadinessResponse:
+        _assert_tenant(db, tenant_id)
+        raw = build_semantic_readiness_admin_v1(db, settings, tenant_id=tenant_id)
+        return AdminCortexSemanticReadinessResponse.model_validate(raw)
 
     @pr.post("/run", response_model=AdminCortexPipelineRunResponse)
     def post_pipeline_run(

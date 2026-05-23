@@ -4,6 +4,7 @@ import { ContinuityAttentionList } from "./cortex/ContinuityAttentionList";
 import { ContinuityStatusCard } from "./cortex/ContinuityStatusCard";
 import { DeferralOmissionCard } from "./cortex/DeferralOmissionCard";
 import { OperatorPrimaryKpiCard } from "./cortex/OperatorPrimaryKpiCard";
+import { SemanticReadinessCard } from "./cortex/SemanticReadinessCard";
 import { PipelineActions } from "./cortex/PipelineActions";
 import { RecentIngestionRuns } from "./cortex/RecentIngestionRuns";
 import {
@@ -33,6 +34,7 @@ export default function AdminCortexOverviewPage() {
     executionQ.data?.continuity_status ?? phasesQ.data?.continuity_status ?? undefined;
   const operatorKpi =
     executionQ.data?.operator_primary_kpi ?? phasesQ.data?.operator_primary_kpi ?? undefined;
+  const semanticReadiness = executionQ.data?.semantic_readiness ?? undefined;
   const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
   const attentionItems = phasesQ.data?.attention_items ?? [];
   const sched = ingestionQ.data?.scheduler;
@@ -51,6 +53,11 @@ export default function AdminCortexOverviewPage() {
 
   return (
     <div className="space-y-6">
+      <SemanticReadinessCard
+        data={semanticReadiness}
+        loading={executionQ.isPending && !semanticReadiness}
+      />
+
       <ContinuityStatusCard
         status={continuity}
         loading={(executionQ.isPending && !continuity) || (phasesQ.isPending && !continuity)}

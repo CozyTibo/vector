@@ -23,7 +23,12 @@ _SLICE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
     """Drop cached pipeline overview so operator actions refresh immediately."""
+    from vector.domains.cortex.pipeline.pipeline_admin_semantic_readiness import (
+        invalidate_semantic_readiness_cache_v1,
+    )
+
     key = str(tenant_id)
+    invalidate_semantic_readiness_cache_v1(tenant_id)
     with _OVERVIEW_CACHE_LOCK:
         _OVERVIEW_CACHE.pop(key, None)
         for suffix in ("execution", "phases", "ingestion", "continuity_bundle"):
@@ -48,6 +53,9 @@ from vector.domains.cortex.pipeline.canonical_operator_metrics import (
 )
 from vector.domains.cortex.pipeline.pipeline_admin_operator_kpi import (
     build_operator_primary_kpi_v1,
+)
+from vector.domains.cortex.pipeline.pipeline_admin_semantic_readiness import (
+    build_semantic_readiness_admin_v1,
 )
 from vector.settings import Settings
 
@@ -150,6 +158,9 @@ def build_pipeline_overview_execution_v1(
             "continuity_status": continuity_status,
             "operator_primary_kpi": build_operator_primary_kpi_v1(
                 session, tenant_id=tenant_id, settings=settings
+            ),
+            "semantic_readiness": build_semantic_readiness_admin_v1(
+                session, settings, tenant_id=tenant_id
             ),
         }
 
@@ -333,6 +344,9 @@ def _build_pipeline_overview_v1_uncached(
         "continuity_status": continuity_status,
         "operator_primary_kpi": build_operator_primary_kpi_v1(
             session, tenant_id=tenant_id, settings=settings
+        ),
+        "semantic_readiness": build_semantic_readiness_admin_v1(
+            session, settings, tenant_id=tenant_id
         ),
         "phases": phases,
         "attention": attention,

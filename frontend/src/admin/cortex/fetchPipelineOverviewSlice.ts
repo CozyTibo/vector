@@ -6,6 +6,7 @@ import type {
   ContinuityStatus,
   OperatorPrimaryKpi,
   PipelineOverview,
+  SemanticReadiness,
 } from "./pipelineTypes";
 
 let monolithInflight: Promise<PipelineOverview> | null = null;
@@ -53,26 +54,38 @@ export type PipelineExecutionSlice = {
   execution: PipelineOverview["execution"];
   continuity_status?: ContinuityStatus | null;
   operator_primary_kpi?: OperatorPrimaryKpi | null;
+  semantic_readiness?: SemanticReadiness | null;
 };
+
+export async function fetchSemanticReadinessSlice(tenantId: string): Promise<SemanticReadiness | null> {
+  return trySlice<SemanticReadiness>(tenantId, "/cortex/pipeline/semantic-readiness", 30_000);
+}
 
 export async function fetchPipelineExecutionSlice(tenantId: string): Promise<PipelineExecutionSlice> {
   const body = await trySlice<{
     execution: PipelineOverview["execution"];
     continuity_status?: ContinuityStatus | null;
     operator_primary_kpi?: OperatorPrimaryKpi | null;
+    semantic_readiness?: SemanticReadiness | null;
   }>(tenantId, "/cortex/pipeline/overview/execution", 45_000);
   if (body) {
     return {
       execution: body.execution,
       continuity_status: body.continuity_status ?? null,
       operator_primary_kpi: body.operator_primary_kpi ?? null,
+      semantic_readiness: body.semantic_readiness ?? null,
     };
   }
   const full = await fetchMonolithOverview(tenantId);
+  const monolith = full as PipelineOverview & {
+    continuity_status?: ContinuityStatus;
+    semantic_readiness?: SemanticReadiness | null;
+  };
   return {
     execution: full.execution,
-    continuity_status: (full as PipelineOverview & { continuity_status?: ContinuityStatus }).continuity_status ?? null,
+    continuity_status: monolith.continuity_status ?? null,
     operator_primary_kpi: full.operator_primary_kpi ?? null,
+    semantic_readiness: monolith.semantic_readiness ?? null,
   };
 }
 

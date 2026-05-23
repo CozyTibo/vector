@@ -155,14 +155,29 @@ def _build_phase_summary_extra_v1(
         }
 
     if key == "graph":
+        from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import (
+            build_semantic_readiness_v1,
+        )
+
         graph_env = project_graph_completeness_v1(session, tenant_id=tenant_id)
         trav_env = project_traversal_completeness_v1(session, tenant_id=tenant_id)
         metrics = dict(graph_env.get("metrics") or {})
+        truth = dict(build_semantic_readiness_v1(session, tenant_id=tenant_id).get("graph_truth") or {})
+        auth_rows = int(truth.get("auth_edge_rows") or metrics.get("authoritative_link_count") or 0)
+        unique_pairs = int(truth.get("unique_auth_pairs") or 0)
         return {
             "graph_metrics": metrics,
+            "graph_truth": truth,
             "traversal_substrate_state": trav_env.get("substrate_state"),
             "node_count": int(metrics.get("entity_count") or graph_env.get("total_objects") or 0),
-            "edge_count": int(metrics.get("authoritative_link_count") or 0),
+            "edge_count": auth_rows,
+            "auth_edge_rows": auth_rows,
+            "auth_edge_rows_deprecated_primary": True,
+            "unique_auth_pairs": unique_pairs,
+            "dup_factor": truth.get("dup_factor"),
+            "dup_factor_severity": truth.get("dup_factor_severity"),
+            "promotion_rule_count": int(truth.get("promotion_rule_count") or 0),
+            "promotions_by_rule_id": list(truth.get("promotions_by_rule_id") or []),
             "orphan_count": int(metrics.get("orphan_node_count") or graph_env.get("unresolved_count") or 0),
             "degraded_count": int(graph_env.get("degraded_count") or 0),
         }
