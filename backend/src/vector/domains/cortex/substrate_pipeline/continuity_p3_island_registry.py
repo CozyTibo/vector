@@ -93,6 +93,11 @@ def evaluate_p3_1_island_registry_proof_v1(
         ),
         "traversal_propagation_mode": propagation.get("traversal_propagation_mode"),
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_31_pass = all(checks.values())
 
     return {

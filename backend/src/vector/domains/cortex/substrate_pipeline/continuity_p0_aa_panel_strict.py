@@ -78,6 +78,11 @@ def evaluate_p0_a4_aa_panel_strict_proof_v1(
         "aa6_untreated_decreased": aa6_ev.get("untreated_decreased"),
         "m3_autonomously_alive": bool((panel.get("summary") or {}).get("m3_autonomously_alive")),
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_a4_pass = all(checks.values())
     return {
         "step": P0_A4_STEP,

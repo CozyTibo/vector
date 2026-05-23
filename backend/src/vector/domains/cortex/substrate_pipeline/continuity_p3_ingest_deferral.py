@@ -114,6 +114,11 @@ def evaluate_p3_4_ingest_deferral_proof_v1(
         "released_total_probe": int(probe.get("released_total") or 0),
         "github_maturity_level": (exhaust.get("github") or {}).get("maturity_level"),
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_34_pass = all(checks.values())
     return {
         "step": P3_4_STEP,

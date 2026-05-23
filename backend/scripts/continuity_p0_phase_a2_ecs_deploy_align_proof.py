@@ -33,6 +33,12 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_ecs_deploy_align imp
     verify_a2_ecs_deploy_align_wiring_v1,
     wait_for_prod_ecs_deploy_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+    TraceOnlyProdSignoffError,
+    add_trace_only_ci_argparse_v1,
+    resolve_trace_only_cli_v1,
+    save_p0_step_baseline_v1,
+)
 
 
 def _git_sha(expected: str | None) -> str:
@@ -62,11 +68,7 @@ def main() -> int:
         action="store_true",
         help="Single ECS probe; no wait loop",
     )
-    parser.add_argument(
-        "--trace-only",
-        action="store_true",
-        help="Skip deploy gate failures (CI/static only)",
-    )
+    add_trace_only_ci_argparse_v1(parser)
     parser.add_argument(
         "--use-deployed-closure",
         action="store_true",
@@ -78,6 +80,12 @@ def main() -> int:
         help="ECS-only: update worker task to API image tag before probe/wait",
     )
     args = parser.parse_args()
+
+    try:
+        trace_only = resolve_trace_only_cli_v1(requested=args.trace_only)
+    except TraceOnlyProdSignoffError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     closure_sha = _git_sha(args.closure_sha or os.environ.get("CONTINUITY_DEPLOY_GIT_SHA"))
     if args.use_deployed_closure:
@@ -99,7 +107,7 @@ def main() -> int:
         deploy_drive = drive_prod_ecs_deploy_align_v1(repo_root=REPO_ROOT, closure_sha=closure_sha)
         if not deploy_drive.get("acquired"):
             print(json.dumps(deploy_drive, indent=2), file=sys.stderr)
-            if not args.trace_only:
+            if not trace_only:
                 return 1
 
     if args.probe_only:
@@ -109,7 +117,7 @@ def main() -> int:
             expected_sha=closure_sha,
             timeout_seconds=args.wait_for_deploy,
         )
-        if prod_deploy.get("wait_outcome") == "timeout" and not args.trace_only:
+        if prod_deploy.get("wait_outcome") == "timeout" and not trace_only:
             print(
                 f"timeout: api={prod_deploy['api']['image_tag']} "
                 f"worker={prod_deploy['worker']['image_tag']} "
@@ -123,7 +131,7 @@ def main() -> int:
         wiring=wiring,
         deploy_drive=deploy_drive,
         deploy_recorded_at=deploy_started,
-        trace_only=args.trace_only,
+        trace_only=trace_only,
     )
     print(json.dumps(proof, indent=2, default=str))
 
@@ -133,7 +141,7 @@ def main() -> int:
     )
     baseline = load_continuity_p0_baseline_v1(baseline_path)
     ver = dict(prod_deploy.get("verification") or {})
-    baseline["step_a2_ecs_deploy_align"] = {
+    step_record = {
         "validated_at": datetime.now(UTC).isoformat(),
         "closure_git_sha": closure_sha,
         "p0_a2_pass": proof["p0_a2_pass"],
@@ -148,11 +156,20 @@ def main() -> int:
         "deploy_ran": bool(args.deploy),
         "realign_ran": bool(args.realign_worker),
         "use_deployed_closure": bool(args.use_deployed_closure),
-        "trace_only": args.trace_only,
         "realign_drive": realign_drive,
     }
-    save_continuity_p0_baseline_v1(baseline_path, baseline)
-    print(f"baseline updated: {baseline_path}")
+    saved = save_p0_step_baseline_v1(
+        baseline_path,
+        baseline,
+        step_key="step_a2_ecs_deploy_align",
+        step_record=step_record,
+        trace_only=trace_only,
+        save_fn=save_continuity_p0_baseline_v1,
+    )
+    if saved is None:
+        print("baseline write skipped (CI --trace-only)", file=sys.stderr)
+    else:
+        print(f"baseline updated: {saved}")
 
     return 0 if proof["p0_a2_pass"] else 1
 

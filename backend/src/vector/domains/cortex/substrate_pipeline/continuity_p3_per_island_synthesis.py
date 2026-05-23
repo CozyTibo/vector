@@ -127,6 +127,11 @@ def evaluate_p3_3_per_island_synthesis_proof_v1(
             default=0,
         ),
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_33_pass = all(checks.values())
     return {
         "step": P3_3_STEP,

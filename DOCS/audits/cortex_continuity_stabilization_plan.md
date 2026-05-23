@@ -4,7 +4,8 @@
 **Phase A step A.1:** **Done** (2026-05-23) — see [Step A.1 completion](#step-a1-completion--synthesis-job-lifecycle)  
 **Phase A step A.2:** **Done** (2026-05-23) — see [Step A.2 completion](#step-a2-completion--ecs-deploy-alignment)  
 **Phase A step A.3:** **Done** (2026-05-23) — see [Step A.3 completion](#step-a3-completion--tcre-queued-drain)
-**Phase A step A.4:** **Done** (2026-05-23) — see [Step A.4 completion](#step-a4-completion--strict-aa-panel-gates)  
+**Phase A step A.4:** **Done** (2026-05-23) — see [Step A.4 completion](#step-a4-completion--strict-aa-panel-gates)
+**Phase A step A.5:** **Done** (2026-05-23) — see [Step A.5 completion](#step-a5-completion--trace-only-ban)  
 **Supersedes for stabilization work:** optimistic Phase 1–3 completion narratives and open-ended “Phase 4 operational hardening” without recurrence gates  
 **Authoritative truth sources:**
 
@@ -255,7 +256,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | **A2** | ~~Align ECS API + worker to **same SHA**~~ **Done 2026-05-23** | Worker must run epoch fix + deferral monitor | `continuity_p0_ecs_deploy_align.py`, `prod_deploy_backend_worker.sh` | N/A | `deploy_matches_closure_sha: true` | Prod: both on `2ab8776…`; baseline `step_a2_ecs_deploy_align` | Redeploy prior tag | **ops** |
 | **A3** | ~~Drain stuck TCRE `queued` job~~ **Done 2026-05-23** | Unblocks 06→07 resume | `tcre_job_lifecycle.py`, `tcre_resume.py` | N/A | 0 queued older than 1h | Prod: 1 job drained; baseline `step_a3_tcre_queued_drain` | Re-queue job | **runtime** |
 | **A4** | ~~Tighten AA1 + AA6 in proof panel~~ **Done 2026-05-23** | Stop false M3 confidence | `continuity_proof_panel.py` | Mat-only AA6 fallback removed | AA1 FAIL on empty 08; AA6 requires delta/progress/untreated↓ | Unit tests + prod panel | Revert gate logic | **ops** |
-| **A5** | Ban `--trace-only` as prod sign-off | Baselines must mean something | All `continuity_p3_*_proof.py` | Document CI-only mode | Baseline updates require `trace_only: false` | Code review + baseline schema | N/A | **cleanup** |
+| **A5** | ~~Ban `--trace-only` as prod sign-off~~ **Done 2026-05-23** | Baselines must mean something | `continuity_p0_trace_only_policy.py` + P0/P3 proof scripts | CI-only via `VECTOR_CONTINUITY_CI_ONLY_TRACE=1` | Baseline writes require `trace_only: false` | A5 proof + unit tests | N/A | **cleanup** |
 | **A6** | Fix synthesis job terminal transitions | Prevent A1 recurrence | `synthesis_orchestrator.py` | Remove duplicate enqueue paths | 24h soak: running stable | CloudWatch + SQL cron | Revert orchestrator | **runtime** |
 
 ### Phase B — Recurrence stabilization (retrieval heartbeat)
@@ -529,7 +530,7 @@ Lawful synthesis means:
 
 **Anti-fake-green checklist (all phases):**
 
-- [ ] No baseline update without `trace_only: false`
+- [x] No baseline update without `trace_only: false` — **enforced (A.5)**
 - [ ] No sign-off if only inspect JSON improved
 - [ ] SQL recurrence queries attached to baseline file
 - [ ] Phase 08 empty outcome investigated and classified (bug vs lawful empty)
@@ -732,7 +733,7 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 ```bash
 cd backend
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a4_aa_panel_strict_proof.py \
-  --use-deployed-closure --trace-only
+  --use-deployed-closure
 ```
 
 | Gate / metric | Before (weak) | After (strict) |
@@ -752,7 +753,56 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 
 **Note:** Strict AA1/AA6 ship on next ECS deploy of this closure SHA. Until then, prod panel run uses **local** gate logic via proof script (DB truth + local code).
 
-**Next step:** **A5** — ban `--trace-only` as production baseline sign-off.
+**Next step:** ~~A5~~ → **A6** (synthesis job terminal transitions).
+
+---
+
+## Step A.5 completion — trace-only prod sign-off ban
+
+**Completed:** 2026-05-23  
+**Goal:** Stop fake-green baselines signed with `--trace-only` (skipped ECS deploy gate).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Policy | `continuity_p0_trace_only_policy.py` — CI env gate, baseline write ban, `prod_signoff_valid` check |
+| Proof scripts | P0 phase A (`a1`–`a4`) + P3 (`31`–`34`): `add_trace_only_ci_argparse_v1`, `save_p0_step_baseline_v1` (skips write when trace-only) |
+| Evaluators | All step proofs add `prod_signoff_valid: not trace_only` to pass criteria |
+| Proof | `continuity_p0_phase_a5_trace_only_ban_proof.py` audits Phase A baseline steps |
+| CI | `.github/workflows/deploy.yml` — A.5 pytest gate |
+
+### CI-only mode
+
+```bash
+# Wiring probe in CI only — does NOT update committed baseline
+export VECTOR_CONTINUITY_CI_ONLY_TRACE=1
+python scripts/continuity_p0_phase_a4_aa_panel_strict_proof.py --trace-only
+```
+
+Production sign-off (writes baseline):
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a5_trace_only_ban_proof.py --use-deployed-closure
+```
+
+| Check | Result |
+|-------|--------|
+| `--trace-only` without CI env | **exit 2** (rejected) |
+| Phase A steps `trace_only` | **false** (a1–a4 re-signed) |
+| `p0_a5_pass` | **true** |
+| Scripts wired | 9 proof scripts |
+
+Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.json) → `step_a5_trace_only_ban`, root `trace_only_policy`.
+
+### Exit gates
+
+- [x] Baseline merge refuses `trace_only=True`
+- [x] P0/P3 continuity proof scripts use shared policy helpers
+- [x] Phase A baseline audit: zero `trace_only: true` violations
+
+**Next step:** **A6** — fix synthesis job terminal transitions (`synthesis_orchestrator.py`).
 
 ---
 
@@ -782,8 +832,11 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a2_ecs_deploy_a
 # Phase A3 — TCRE queued drain (done; re-run if queued jobs age in)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a3_tcre_queued_drain_proof.py --use-deployed-closure --lease-only
 
-# Phase A4 — strict AA1/AA6 panel gates (done; re-run after gate changes)
-VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a4_aa_panel_strict_proof.py --use-deployed-closure --trace-only
+# Phase A4 — strict AA1/AA6 panel gates (done; prod sign-off — no --trace-only)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a4_aa_panel_strict_proof.py --use-deployed-closure
+
+# Phase A5 — trace-only ban audit (done)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a5_trace_only_ban_proof.py --use-deployed-closure
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

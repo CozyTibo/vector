@@ -2179,7 +2179,7 @@
     "snapshot_only": false
   },
   "step_a1_synthesis_job_reconcile": {
-    "validated_at": "2026-05-23T00:42:03.085907+00:00",
+    "validated_at": "2026-05-23T01:13:40.492165+00:00",
     "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
     "p0_a1_pass": true,
@@ -2189,24 +2189,29 @@
       "histogram_present": true,
       "running_below_threshold": true,
       "reconcile_applied_or_trace": true,
-      "no_stale_running_after_reconcile": true
+      "no_stale_running_after_reconcile": true,
+      "reconciled_rows_when_incident": true,
+      "prod_signoff_valid": true
     },
     "checks_advisory": {
-      "running_before": 1043,
+      "running_before": 0,
       "running_after": 0,
-      "reconciled_count": 1043,
+      "reconciled_count": 0,
       "failed_after": 1043,
       "completed_after": 1,
       "stale_running_after": 0,
       "running_alert_threshold": 10
     },
     "wiring_ok": true,
-    "running_before": 1043,
+    "running_before": 0,
     "running_after": 0,
-    "reconciled_count": 1043,
+    "reconciled_count": 0,
     "stale_seconds": 0,
-    "dry_run": false,
-    "trace_only": true
+    "dry_run": true,
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
   },
   "step_a2_ecs_deploy_align": {
     "validated_at": "2026-05-23T00:48:01.892449+00:00",
@@ -2297,7 +2302,7 @@
     "trace_only": false
   },
   "step_a4_aa_panel_strict": {
-    "validated_at": "2026-05-23T01:03:05.927903+00:00",
+    "validated_at": "2026-05-23T01:14:23.454619+00:00",
     "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
     "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
     "p0_a4_pass": true,
@@ -2311,7 +2316,8 @@
       "aa6_mat_only_pass_documented": true,
       "aa6_forward_progress_signals_documented": true,
       "panel_prints_aa1": true,
-      "panel_prints_aa6": true
+      "panel_prints_aa6": true,
+      "prod_signoff_valid": true
     },
     "checks_advisory": {
       "aa1_verdict": "FAIL",
@@ -2331,6 +2337,44 @@
     "aa6_forward_progress_signals": [],
     "aa6_mat_only_pass": true,
     "m3_autonomously_alive": false,
-    "trace_only": true
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "trace_only_policy": {
+    "schema_version": 1,
+    "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
+    "updated_at": "2026-05-23T01:14:27.645382+00:00",
+    "last_prod_signoff_step": "step_a5_trace_only_ban"
+  },
+  "step_a5_trace_only_ban": {
+    "validated_at": "2026-05-23T01:14:27.645370+00:00",
+    "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "p0_a5_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "trace_only_policy_present": true,
+      "phase_a_steps_prod_signoff": true,
+      "no_phase_a_trace_only_violations": true,
+      "ci_env_documented": true
+    },
+    "checks_advisory": {
+      "checked_steps": [
+        "step_a1_synthesis_job_reconcile",
+        "step_a2_ecs_deploy_align",
+        "step_a3_tcre_queued_drain",
+        "step_a4_aa_panel_strict"
+      ],
+      "violations": [],
+      "scripts_checked": 9
+    },
+    "wiring_ok": true,
+    "scripts_checked": 9,
+    "phase_a_violations": [],
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
   }
 }

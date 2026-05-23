@@ -141,6 +141,12 @@ jobs:
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_aa_panel_strict.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_proof_panel.py
 
+      - name: Verify Phase A5 trace-only ban (step A.5)
+        run: |
+          cd backend
+          VECTOR_SETTINGS_SKIP_DOTENV=1 PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_trace_only_policy.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

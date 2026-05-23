@@ -48,6 +48,12 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_tcre_job_drain impor
     evaluate_p0_a3_tcre_job_drain_proof_v1,
     snapshot_tcre_job_drain_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+    TraceOnlyProdSignoffError,
+    add_trace_only_ci_argparse_v1,
+    resolve_trace_only_cli_v1,
+    save_p0_step_baseline_v1,
+)
 
 TENANT_DEFAULT = str(DEFAULT_TENANT_ID)
 
@@ -80,7 +86,7 @@ def main() -> int:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--snapshot-only", action="store_true")
-    parser.add_argument("--trace-only", action="store_true")
+    add_trace_only_ci_argparse_v1(parser)
     parser.add_argument(
         "--use-deployed-closure",
         action="store_true",
@@ -92,6 +98,12 @@ def main() -> int:
         help="Resume lease at phase 07 without Celery enqueue (for local prod proof)",
     )
     args = parser.parse_args()
+
+    try:
+        trace_only = resolve_trace_only_cli_v1(requested=args.trace_only)
+    except TraceOnlyProdSignoffError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     dry_run = args.dry_run or args.snapshot_only
     closure_sha = _git_sha(args.closure_sha or os.environ.get("CONTINUITY_DEPLOY_GIT_SHA"))
@@ -106,8 +118,6 @@ def main() -> int:
     tenant_id = uuid.UUID(args.tenant)
     deploy_started = datetime.now(UTC)
     prod_deploy = probe_prod_ecs_deploy_v1(expected_sha=closure_sha)
-    if args.trace_only:
-        prod_deploy["verification"]["deploy_matches_closure_sha"] = True
 
     engine = create_engine(_db_url())
     SessionLocal = sessionmaker(bind=engine)
@@ -138,7 +148,7 @@ def main() -> int:
         snapshot=snapshot,
         drain_drive=drain_drive,
         deploy_recorded_at=deploy_started,
-        trace_only=args.trace_only,
+        trace_only=trace_only,
     )
     print(json.dumps(proof, indent=2, default=str))
 
@@ -148,7 +158,7 @@ def main() -> int:
     )
     baseline = load_continuity_p0_baseline_v1(baseline_path)
     hist_after = dict((drain_drive or {}).get("histogram_after") or snapshot.get("histogram") or {})
-    baseline["step_a3_tcre_queued_drain"] = {
+    step_record = {
         "validated_at": datetime.now(UTC).isoformat(),
         "closure_git_sha": closure_sha,
         "tenant_id": str(tenant_id),
@@ -161,10 +171,21 @@ def main() -> int:
         "jobs_drained": int((drain_drive or {}).get("jobs_drained") or 0),
         "queued_after": int(hist_after.get("queued", 0)),
         "dry_run": dry_run,
-        "trace_only": args.trace_only,
+        "lease_only": args.lease_only,
+        "use_deployed_closure": args.use_deployed_closure,
     }
-    save_continuity_p0_baseline_v1(baseline_path, baseline)
-    print(f"baseline updated: {baseline_path}")
+    saved = save_p0_step_baseline_v1(
+        baseline_path,
+        baseline,
+        step_key="step_a3_tcre_queued_drain",
+        step_record=step_record,
+        trace_only=trace_only,
+        save_fn=save_continuity_p0_baseline_v1,
+    )
+    if saved is None:
+        print("baseline write skipped (CI --trace-only)", file=sys.stderr)
+    else:
+        print(f"baseline updated: {saved}")
 
     return 0 if proof["p0_a3_pass"] else 1
 

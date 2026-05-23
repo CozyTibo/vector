@@ -278,6 +278,11 @@ def evaluate_p0_a2_ecs_deploy_align_proof_v1(
         "poll_count": prod_deploy.get("poll_count"),
         "deploy_exit_code": (deploy_drive or {}).get("exit_code"),
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_a2_pass = all(checks.values())
     return {
         "step": P0_A2_STEP,

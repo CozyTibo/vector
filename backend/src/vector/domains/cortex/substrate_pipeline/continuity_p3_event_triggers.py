@@ -134,6 +134,11 @@ def evaluate_p3_2_event_triggers_proof_v1(
         "live_graph_hash": triggers.get("live_graph_projection_stable_hash"),
         "stored_graph_hash_after_drive": graph_manifest.get("new_hash"),
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_32_pass = all(checks.values())
     return {
         "step": P3_2_STEP,

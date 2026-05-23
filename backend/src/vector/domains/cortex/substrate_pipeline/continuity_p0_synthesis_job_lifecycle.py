@@ -120,6 +120,11 @@ def evaluate_p0_a1_synthesis_job_lifecycle_proof_v1(
         "stale_running_after": stale_running_after,
         "running_alert_threshold": threshold,
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_a1_pass = all(checks.values())
     return {
         "step": P0_A1_STEP,

@@ -138,6 +138,11 @@ def evaluate_p0_a3_tcre_job_drain_proof_v1(
         "completed_after": int(hist_after.get("completed", 0)),
         "lease_phase_cursor": (snapshot.get("execution_footprint") or {}).get("lease_phase_cursor"),
     }
+    from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+        merge_prod_signoff_checks_v1,
+    )
+
+    checks = merge_prod_signoff_checks_v1(checks, trace_only=trace_only)
     step_a3_pass = all(checks.values())
     return {
         "step": P0_A3_STEP,

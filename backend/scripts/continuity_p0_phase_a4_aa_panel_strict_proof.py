@@ -51,6 +51,12 @@ from vector.domains.cortex.substrate_pipeline.continuity_proof_panel import (
     build_continuity_proof_panel_v1,
     format_continuity_proof_panel_text_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+    TraceOnlyProdSignoffError,
+    add_trace_only_ci_argparse_v1,
+    resolve_trace_only_cli_v1,
+    save_p0_step_baseline_v1,
+)
 
 TENANT_DEFAULT = str(DEFAULT_TENANT_ID)
 
@@ -76,13 +82,19 @@ def main() -> int:
     parser.add_argument("--closure-sha", default="")
     parser.add_argument("--baseline-date", default="2026-05-22")
     parser.add_argument("--window-hours", type=int, default=24)
-    parser.add_argument("--trace-only", action="store_true")
+    add_trace_only_ci_argparse_v1(parser)
     parser.add_argument(
         "--use-deployed-closure",
         action="store_true",
         help="Use prod API ECS tag as closure SHA (same as A.2/A.3)",
     )
     args = parser.parse_args()
+
+    try:
+        trace_only = resolve_trace_only_cli_v1(requested=args.trace_only)
+    except TraceOnlyProdSignoffError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     closure_sha = _git_sha(args.closure_sha or os.environ.get("CONTINUITY_DEPLOY_GIT_SHA"))
     if args.use_deployed_closure:
@@ -96,8 +108,6 @@ def main() -> int:
     tenant_id = uuid.UUID(args.tenant)
     deploy_started = datetime.now(UTC)
     prod_deploy = probe_prod_ecs_deploy_v1(expected_sha=closure_sha)
-    if args.trace_only:
-        prod_deploy["verification"]["deploy_matches_closure_sha"] = True
 
     wiring = verify_a4_aa_panel_strict_wiring_v1()
     engine = create_engine(_db_url())
@@ -117,7 +127,7 @@ def main() -> int:
         panel=panel,
         panel_text=panel_text,
         deploy_recorded_at=deploy_started,
-        trace_only=args.trace_only,
+        trace_only=trace_only,
     )
     proof["wiring"] = wiring
     print(json.dumps(proof, indent=2, default=str))
@@ -130,7 +140,7 @@ def main() -> int:
     gates = dict(panel.get("gates") or {})
     aa1_ev = dict((gates.get("AA1") or {}).get("evidence") or {})
     aa6_ev = dict((gates.get("AA6") or {}).get("evidence") or {})
-    baseline["step_a4_aa_panel_strict"] = {
+    step_record = {
         "validated_at": datetime.now(UTC).isoformat(),
         "closure_git_sha": closure_sha,
         "tenant_id": str(tenant_id),
@@ -146,10 +156,20 @@ def main() -> int:
         "aa6_forward_progress_signals": aa6_ev.get("forward_progress_signals"),
         "aa6_mat_only_pass": aa6_ev.get("mat_only_pass"),
         "m3_autonomously_alive": bool((panel.get("summary") or {}).get("m3_autonomously_alive")),
-        "trace_only": args.trace_only,
+        "use_deployed_closure": args.use_deployed_closure,
     }
-    save_continuity_p0_baseline_v1(baseline_path, baseline)
-    print(f"baseline updated: {baseline_path}")
+    saved = save_p0_step_baseline_v1(
+        baseline_path,
+        baseline,
+        step_key="step_a4_aa_panel_strict",
+        step_record=step_record,
+        trace_only=trace_only,
+        save_fn=save_continuity_p0_baseline_v1,
+    )
+    if saved is None:
+        print("baseline write skipped (CI --trace-only)", file=sys.stderr)
+    else:
+        print(f"baseline updated: {saved}")
 
     return 0 if proof["p0_a4_pass"] else 1
 

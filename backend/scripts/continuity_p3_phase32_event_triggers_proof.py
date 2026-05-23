@@ -49,6 +49,12 @@ from vector.domains.cortex.substrate_pipeline.continuity_p3_event_triggers impor
     evaluate_p3_2_event_triggers_proof_v1,
     snapshot_event_triggers_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_trace_only_policy import (
+    TraceOnlyProdSignoffError,
+    add_trace_only_ci_argparse_v1,
+    resolve_trace_only_cli_v1,
+    save_p0_step_baseline_v1,
+)
 
 TENANT_DEFAULT = str(DEFAULT_TENANT_ID)
 DEFAULT_PIPELINE_RUN = "ce7df86d-b229-4467-ad28-1109ed119d34"
@@ -76,13 +82,19 @@ def main() -> int:
     parser.add_argument("--closure-sha", default="")
     parser.add_argument("--baseline-date", default="2026-05-22")
     parser.add_argument("--wait-for-deploy", type=int, default=600)
-    parser.add_argument("--trace-only", action="store_true")
+    add_trace_only_ci_argparse_v1(parser)
     parser.add_argument(
         "--wiring-only",
         action="store_true",
         help="Static wiring + snapshot only; skip graph-hash drive",
     )
     args = parser.parse_args()
+
+    try:
+        trace_only = resolve_trace_only_cli_v1(requested=args.trace_only)
+    except TraceOnlyProdSignoffError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     closure_sha = _git_sha(args.closure_sha or os.environ.get("CONTINUITY_DEPLOY_GIT_SHA"))
     tenant_id = uuid.UUID(args.tenant)
@@ -93,7 +105,7 @@ def main() -> int:
     prod_deploy: dict = {}
     while True:
         prod_deploy = probe_prod_ecs_deploy_v1(expected_sha=closure_sha)
-        if prod_deploy["verification"]["deploy_matches_closure_sha"] or args.trace_only:
+        if prod_deploy["verification"]["deploy_matches_closure_sha"] or trace_only:
             break
         if time.monotonic() >= deadline:
             break
@@ -123,7 +135,7 @@ def main() -> int:
         snapshot=snapshot,
         graph_hash_drive=graph_drive,
         deploy_recorded_at=deploy_started,
-        trace_only=args.trace_only,
+        trace_only=trace_only,
     )
     print(json.dumps(proof, indent=2, default=str))
 
@@ -132,7 +144,7 @@ def main() -> int:
         date_suffix=args.baseline_date,
     )
     baseline = load_continuity_p0_baseline_v1(baseline_path)
-    baseline["step_3_2_p2b_event_triggers"] = {
+    step_record = {
         "validated_at": datetime.now(UTC).isoformat(),
         "closure_git_sha": closure_sha,
         "tenant_id": str(tenant_id),
@@ -143,11 +155,20 @@ def main() -> int:
         "graph_hash_changed": bool(
             ((graph_drive or {}).get("graph_hash_trigger") or {}).get("hash_changed")
         ),
-        "trace_only": args.trace_only,
         "wiring_only": args.wiring_only,
     }
-    save_continuity_p0_baseline_v1(baseline_path, baseline)
-    print(f"baseline updated: {baseline_path}")
+    saved = save_p0_step_baseline_v1(
+        baseline_path,
+        baseline,
+        step_key="step_3_2_p2b_event_triggers",
+        step_record=step_record,
+        trace_only=trace_only,
+        save_fn=save_continuity_p0_baseline_v1,
+    )
+    if saved is None:
+        print("baseline write skipped (CI --trace-only)", file=sys.stderr)
+    else:
+        print(f"baseline updated: {saved}")
 
     return 0 if proof["p3_2_pass"] else 1
 
