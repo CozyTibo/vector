@@ -813,6 +813,14 @@ class Settings(BaseSettings):
             "new epoch from the prior published epoch (lookup_id map)."
         ),
     )
+    cortex_phase05_require_walks_when_scheduling_eligible: bool = Field(
+        default=True,
+        validation_alias="CORTEX_PHASE05_REQUIRE_WALKS_WHEN_ELIGIBLE",
+        description=(
+            "B4: when traversal scheduling is eligible, phase 05 / schedule pass must persist "
+            "at least one walk (BLOCKED receipt if zero)."
+        ),
+    )
     cortex_execution_dual_lane_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_EXECUTION_DUAL_LANE",

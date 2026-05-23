@@ -226,12 +226,49 @@ def run_phase_05_traversal_v1(
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_05_TRAVERSAL)
     started_at = utc_now_iso_v1()
     try:
+        if graph_projection_stable_hash is None:
+            p04 = get_phase_run_v1(
+                session,
+                pipeline_run_id=pipeline_run_id,
+                phase_id=PHASE_04_GRAPH,
+            )
+            if p04 is not None and isinstance(p04.output_json, dict):
+                graph_projection_stable_hash = str(
+                    p04.output_json.get("graph_projection_stable_hash_sha256") or ""
+                ) or None
+
+        from vector.domains.cortex.substrate_pipeline.phase05_walks_persisted_gate import (
+            evaluate_phase05_schedule_context_v1,
+            resolve_phase05_traversal_outcome_v1,
+            supplement_phase05_walks_when_eligible_v1,
+            summarize_phase05_walk_output_v1,
+        )
+
+        schedule_context = evaluate_phase05_schedule_context_v1(session, tenant_id=tenant_id)
         out = run_traversal_slice_for_pipeline_v1(
             session,
             tenant_id=tenant_id,
             pipeline_run_id=pipeline_run_id,
             graph_projection_stable_hash=graph_projection_stable_hash,
         )
+        out = {
+            **out,
+            "schedule_evaluation": schedule_context.get("evaluation"),
+            "scheduling_eligible": bool(schedule_context.get("scheduling_eligible")),
+        }
+        out = supplement_phase05_walks_when_eligible_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            raw_output=out,
+            schedule_context=schedule_context,
+            graph_projection_stable_hash=graph_projection_stable_hash,
+        )
+        outcome, blocked_reason, out = resolve_phase05_traversal_outcome_v1(
+            out,
+            schedule_context,
+        )
+        summary = summarize_phase05_walk_output_v1(out)
         return complete_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
@@ -239,6 +276,9 @@ def run_phase_05_traversal_v1(
             tenant_id=tenant_id,
             raw_output=out,
             started_at=started_at,
+            outcome=outcome,
+            blocked_reason=blocked_reason,
+            processed_count=summary["walks_persisted"],
             input_epoch=graph_projection_stable_hash,
         )
     except Exception as exc:  # noqa: BLE001

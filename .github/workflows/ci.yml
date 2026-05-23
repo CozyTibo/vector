@@ -43,7 +43,9 @@ jobs:
             tests/vector/domains/cortex/retrieval/test_retrieval_publish_contract.py \
             tests/vector/domains/cortex/retrieval/test_retrieval_epoch_scope_alignment.py \
             tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_retrieval_registry_epoch.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_retrieval_registry_epoch.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_phase05_walks_persisted_gate.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase05_walks_persisted.py
 
   frontend:
     runs-on: ubuntu-latest

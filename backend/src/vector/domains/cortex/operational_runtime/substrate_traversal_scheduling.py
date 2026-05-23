@@ -446,13 +446,18 @@ def schedule_octs_walks_for_tenant_v1(
             pipeline_run_id=pipeline_run_id,
             graph_projection_stable_hash=graph_projection_stable_hash,
         )
-        return {
+        result = {
             "scheduled": True,
             "path": "inline_execution_slice",
             "trigger": trigger,
             "evaluation": eval_out,
             "pass": pass_out,
         }
+        from vector.domains.cortex.substrate_pipeline.phase05_walks_persisted_gate import (
+            enforce_schedule_pass_walks_persisted_v1,
+        )
+
+        return enforce_schedule_pass_walks_persisted_v1(result, evaluation=eval_out)
 
     if session is not None:
         return _run(session)

@@ -2345,8 +2345,8 @@
   "trace_only_policy": {
     "schema_version": 1,
     "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
-    "updated_at": "2026-05-23T01:45:54.841256+00:00",
-    "last_prod_signoff_step": "step_b3_retrieval_registry_epoch"
+    "updated_at": "2026-05-23T01:51:22.631163+00:00",
+    "last_prod_signoff_step": "step_b4_phase05_walks_persisted"
   },
   "step_a5_trace_only_ban": {
     "validated_at": "2026-05-23T01:14:27.645370+00:00",
@@ -2536,6 +2536,68 @@
     "registry_rows_stale_vs_published": 0,
     "primary_island_epoch_aligned": true,
     "drive_sync": false,
+    "dry_run": false,
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "step_b4_phase05_walks_persisted": {
+    "validated_at": "2026-05-23T01:51:22.631130+00:00",
+    "closure_git_sha": "d550edac747390de11ef88820f9457e90edf570a",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_b4_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "phase_b4_schema_version": true,
+      "tenant_has_durable_walks": true,
+      "recent_slice_with_walks": true,
+      "no_eligible_completed_empty_lies": true,
+      "latest_slice_walks_when_present": true,
+      "prod_signoff_valid": true
+    },
+    "checks_advisory": {
+      "latest_phase_05": {
+        "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+        "completed_at": "2026-05-22T21:52:09.107608+00:00",
+        "status": "completed",
+        "receipt_outcome": "COMPLETED_EMPTY",
+        "scheduling_eligible": false,
+        "walks_persisted": 0,
+        "walks_available": 8,
+        "phase05_walks_gate_ok": null
+      },
+      "slice_summaries": [
+        {
+          "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
+          "completed_at": "2026-05-22T21:52:09.107608+00:00",
+          "status": "completed",
+          "receipt_outcome": "COMPLETED_EMPTY",
+          "scheduling_eligible": false,
+          "walks_persisted": 0,
+          "walks_available": 8,
+          "phase05_walks_gate_ok": null
+        },
+        {
+          "pipeline_run_id": "faa5469f-849b-4e19-bc26-e9ec001e926f",
+          "completed_at": "2026-05-22T21:36:34.061739+00:00",
+          "status": "completed",
+          "receipt_outcome": "COMPLETED",
+          "scheduling_eligible": false,
+          "walks_persisted": 8,
+          "walks_available": 8,
+          "phase05_walks_gate_ok": null
+        }
+      ],
+      "schedule_drive": null,
+      "durable_walk_row_count": 28
+    },
+    "wiring_ok": true,
+    "durable_walk_row_count": 28,
+    "slices_with_walks": 2,
+    "latest_walks_persisted": 0,
+    "drive_schedule": false,
     "dry_run": false,
     "use_deployed_closure": true,
     "trace_only": false,
