@@ -146,6 +146,7 @@ def materialize_synthesis_for_pipeline_v1(
     pipeline_run_id: uuid.UUID,
     published_index_epoch: str | None = None,
     settings: Settings | None = None,
+    epoch_scope_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run bounded pipeline-default synthesis jobs and publish synthesis epoch."""
     from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
@@ -173,6 +174,14 @@ def materialize_synthesis_for_pipeline_v1(
         if job_reconcile is not None:
             out = dict(out)
             out["synthesis_job_reconcile"] = job_reconcile
+        if epoch_scope_snapshot:
+            out = dict(out)
+            out["synthesis_epoch_scope_alignment"] = epoch_scope_snapshot
+            out["retrieval_entries_in_scope"] = int(
+                epoch_scope_snapshot.get("retrieval_entries_in_scope")
+                or out.get("retrieval_entries_in_scope")
+                or 0
+            )
         return out
     index_epoch = published_index_epoch or get_published_index_epoch_v1(session, tenant_id=tenant_id)
     if not index_epoch:
@@ -438,24 +447,75 @@ def run_substrate_phase_08_synthesis_v1(
     begin_phase_v1(session, pipeline_run_id=prid, phase_id=PHASE_08_SYNTHESIS)
     started_at = utc_now_iso_v1()
     try:
+        scope_snapshot: dict[str, Any] = {}
+        if published:
+            from vector.domains.cortex.synthesis.synthesis_epoch_scope_alignment_v1 import (
+                ensure_retrieval_scope_for_synthesis_v1,
+            )
+            from vector.domains.cortex.synthesis.synthesis_retrieval_semantic_gate_v1 import (
+                SynthesisRetrievalSemanticError,
+                enforce_retrieval_semantic_before_synthesis_v1,
+            )
+
+            try:
+                enforce_retrieval_semantic_before_synthesis_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    published_index_epoch=published,
+                )
+            except SynthesisRetrievalSemanticError as exc:
+                fail_phase_with_receipt_v1(
+                    session,
+                    pipeline_run_id=prid,
+                    phase_id=PHASE_08_SYNTHESIS,
+                    tenant_id=tenant_id,
+                    raw_output=dict(exc.detail or {}),
+                    started_at=started_at,
+                    error=str(exc.code),
+                )
+                return dict(exc.detail or {})
+            scope_snapshot = ensure_retrieval_scope_for_synthesis_v1(
+                session,
+                tenant_id=tenant_id,
+                published_index_epoch=published,
+            )
+
         out = materialize_synthesis_for_pipeline_v1(
             session,
             tenant_id=tenant_id,
             pipeline_run_id=prid,
             published_index_epoch=published,
             settings=cfg,
+            epoch_scope_snapshot=scope_snapshot,
         )
         from vector.domains.cortex.synthesis.phase08_empty_scope_truth_gate import (
             attach_phase08_empty_scope_truth_gate_v1,
             should_fail_phase08_for_empty_scope_violation_v1,
         )
+        from vector.domains.cortex.synthesis.synthesis_epoch_scope_alignment_v1 import (
+            attach_synthesis_epoch_scope_gate_v1,
+            should_fail_phase08_for_epoch_scope_violation_v1,
+        )
 
+        if scope_snapshot:
+            out = attach_synthesis_epoch_scope_gate_v1(out, scope_snapshot=scope_snapshot)
         out = attach_phase08_empty_scope_truth_gate_v1(
             session,
             tenant_id=tenant_id,
             materialize_output=out,
             published_index_epoch=published,
         )
+        if should_fail_phase08_for_epoch_scope_violation_v1(out):
+            fail_phase_with_receipt_v1(
+                session,
+                pipeline_run_id=prid,
+                phase_id=PHASE_08_SYNTHESIS,
+                tenant_id=tenant_id,
+                raw_output=out,
+                started_at=started_at,
+                error=str(out.get("error_code") or "synthesis_epoch_scope_zero_in_scope"),
+            )
+            return out
         if should_fail_phase08_for_empty_scope_violation_v1(out):
             fail_phase_with_receipt_v1(
                 session,

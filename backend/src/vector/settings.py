@@ -930,6 +930,27 @@ class Settings(BaseSettings):
             "entries but zero synthesis scopes/jobs were scheduled."
         ),
     )
+    cortex_synthesis_epoch_scope_gate_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_EPOCH_SCOPE_GATE",
+        description=(
+            "Wave S4: phase 08 fails when published epoch has retrieval rows but zero "
+            "primary-island in-scope entries (epoch/scope alignment)."
+        ),
+    )
+    cortex_synthesis_empty_claims_gate_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_EMPTY_CLAIMS_GATE",
+        description="Wave S4 Q3: block publish and fail phase 08 on published artifacts with empty claims.",
+    )
+    cortex_synthesis_retrieval_semantic_gate_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_RETRIEVAL_SEMANTIC_GATE",
+        description=(
+            "Wave S4 Q1: phase 08 fails when published retrieval epoch fails semantic mix "
+            "(org_link-heavy mirror)."
+        ),
+    )
     cortex_synthesis_eligible_scopes_use_island_in_scope: bool = Field(
         default=True,
         validation_alias="CORTEX_SYNTHESIS_ELIGIBLE_SCOPES_USE_ISLAND_IN_SCOPE",
