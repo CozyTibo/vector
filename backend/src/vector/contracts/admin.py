@@ -4597,6 +4597,8 @@ class AdminCortexOperatorPrimaryKpi(BaseModel):
     execution_islands: list[AdminCortexOperatorPrimaryKpiIslandItem] = Field(default_factory=list)
     island_registry_inspect: dict[str, Any] = Field(default_factory=dict)
     deferral_omission: AdminCortexDeferralOmissionPosture | None = None
+    semantic_primary_active: bool = False
+    hide_from_overview: bool = False
 
 
 class AdminCortexPipelinePhaseOverview(BaseModel):
@@ -4734,6 +4736,16 @@ class AdminCortexIdentityContinuityTruth(BaseModel):
     second_link_type_policy: str = "deferred_until_prod_evidence_ge_100_edges"
 
 
+class AdminCortexSemanticOperatorMetric(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    key: str
+    label: str
+    value: Any = None
+    severity: Literal["ok", "bad", "warn", "unknown"] = "unknown"
+    green_rule: str | None = None
+
+
 class AdminCortexSemanticReadinessResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -4746,6 +4758,7 @@ class AdminCortexSemanticReadinessResponse(BaseModel):
     identity_continuity: AdminCortexIdentityContinuityTruth | None = None
     retrieval: AdminCortexSemanticRetrievalProduct
     synthesis: AdminCortexSemanticSynthesisTruth
+    semantic_operator_panel: list[AdminCortexSemanticOperatorMetric] = Field(default_factory=list)
     thresholds: dict[str, Any] = Field(default_factory=dict)
 
 

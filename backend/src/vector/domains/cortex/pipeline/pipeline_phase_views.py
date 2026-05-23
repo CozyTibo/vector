@@ -65,7 +65,15 @@ _EXPLORER_COLUMNS: dict[str, list[str]] = {
     "ingestion": ["connector", "external_id", "ingested_at", "resource_type", "payload_preview"],
     "canonical": ["canonical_type", "source", "entity", "updated_at", "status"],
     "identity": ["kind", "display", "anchors", "confidence"],
-    "graph": ["edge_type", "source", "target", "evidence", "continuity"],
+    "graph": [
+        "edge_type",
+        "promotion_rule",
+        "source",
+        "target",
+        "created_at",
+        "evidence",
+        "continuity",
+    ],
     "reconstruction": ["job_id", "status", "created_at", "scope"],
     "retrieval": ["index_type", "coverage", "object_count", "status"],
     "synthesis": ["artifact_type", "scope", "created_at", "status"],
@@ -380,16 +388,18 @@ def build_phase_explorer_v1(
         )
 
     if key == "graph":
+        link_filters = (
+            CortexOrgLink.tenant_id == tenant_id,
+            CortexOrgLink.link_authority == "authoritative",
+            CortexOrgLink.revoked_at.is_(None),
+        )
         total = int(
-            session.scalar(
-                select(func.count()).select_from(CortexOrgLink).where(CortexOrgLink.tenant_id == tenant_id)
-            )
-            or 0
+            session.scalar(select(func.count()).select_from(CortexOrgLink).where(*link_filters)) or 0
         )
         links = list(
             session.scalars(
                 select(CortexOrgLink)
-                .where(CortexOrgLink.tenant_id == tenant_id)
+                .where(*link_filters)
                 .order_by(CortexOrgLink.created_at.desc())
                 .offset(off)
                 .limit(lim + 1)
@@ -398,7 +408,9 @@ def build_phase_explorer_v1(
         truncated = len(links) > lim
         if truncated:
             links = links[:lim]
-        explorer = list_org_link_explorer_rows(session, tenant_id=tenant_id, limit=lim)
+        explorer = list_org_link_explorer_rows(
+            session, tenant_id=tenant_id, limit=lim, authoritative_only=True
+        )
         explorer_by_id = {str(r.get("link_id")): r for r in explorer}
         rows = []
         for link in links:
@@ -406,12 +418,28 @@ def build_phase_explorer_v1(
             rows.append(
                 {
                     "edge_type": link.link_type,
+                    "promotion_rule": link.rule_id or ex.get("rule_version") or "—",
                     "source": str(link.source_entity_id),
                     "target": str(link.target_entity_id),
+                    "created_at": link.created_at.isoformat() if link.created_at else None,
                     "evidence": ex.get("evidence_count", 0),
                     "continuity": ex.get("replay_state") or ex.get("drift_class") or "n/a",
                     "link_id": str(link.id),
-                    "evidence_detail": {**ex, "link_authority": link.link_authority},
+                    "evidence_detail": {
+                        **ex,
+                        "link_authority": link.link_authority,
+                        "promoted_from_candidate_id": (
+                            str(link.promoted_from_candidate_id)
+                            if link.promoted_from_candidate_id
+                            else None
+                        ),
+                        "rule_id": link.rule_id,
+                        "link_class": link.link_class,
+                        "valid_from": link.valid_from.isoformat() if link.valid_from else None,
+                        "valid_to": link.valid_to.isoformat() if link.valid_to else None,
+                        "evidence_raw_record_ids": link.evidence_raw_record_ids or [],
+                        "metadata_json": link.metadata_json or {},
+                    },
                 }
             )
         return _explorer_envelope(

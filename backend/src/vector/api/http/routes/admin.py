@@ -67,7 +67,9 @@ from vector.contracts.admin import (
     AdminCortexIdentityBackfillRunItem,
     AdminCortexIdentityBackfillRunsListResponse,
     AdminCortexIdentityContinuityEvidenceInspectResponse,
+    AdminCortexIdentityContinuityEntityInspectorResponse,
     AdminCortexIdentityContinuityHealthResponse,
+    AdminCortexIdentityContinuitySearchResponse,
     AdminCortexIdentityContinuityRebuildRequest,
     AdminCortexIdentityContinuityRebuildResponse,
     AdminCortexIdentityContinuityVerifyResponse,
@@ -3877,6 +3879,78 @@ def build_admin_router() -> APIRouter:
             anchor_scan_limit=anchor_scan_limit,
         )
         return AdminCortexIdentityContinuityHealthResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/continuity-inspector/search",
+        response_model=AdminCortexIdentityContinuitySearchResponse,
+    )
+    def admin_cortex_identity_continuity_search(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        slack_user_id: Annotated[str | None, Query()] = None,
+        github_login: Annotated[str | None, Query()] = None,
+        notion_user_id: Annotated[str | None, Query()] = None,
+        email: Annotated[str | None, Query()] = None,
+        entity_id: Annotated[str | None, Query()] = None,
+        handle_id: Annotated[str | None, Query()] = None,
+        canonical_entity_id: Annotated[str | None, Query()] = None,
+    ) -> AdminCortexIdentityContinuitySearchResponse:
+        _assert_tenant(db, tenant_id)
+        if not any(
+            (
+                slack_user_id,
+                github_login,
+                notion_user_id,
+                email,
+                entity_id,
+                handle_id,
+                canonical_entity_id,
+            )
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Provide at least one search parameter.",
+            )
+        from vector.domains.cortex.identity.identity_continuity_inspector_v1 import (
+            resolve_continuity_search_v1,
+        )
+
+        raw = resolve_continuity_search_v1(
+            db,
+            tenant_id=tenant_id,
+            slack_user_id=slack_user_id,
+            github_login=github_login,
+            notion_user_id=notion_user_id,
+            email=email,
+            entity_id=entity_id,
+            handle_id=handle_id,
+            canonical_entity_id=canonical_entity_id,
+        )
+        return AdminCortexIdentityContinuitySearchResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/continuity-inspector/entities/{entity_id}",
+        response_model=AdminCortexIdentityContinuityEntityInspectorResponse,
+    )
+    def admin_cortex_identity_continuity_entity(
+        tenant_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityContinuityEntityInspectorResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.identity_continuity_inspector_v1 import (
+            build_identity_continuity_entity_inspector_v1,
+        )
+
+        try:
+            raw = build_identity_continuity_entity_inspector_v1(
+                db, tenant_id=tenant_id, entity_id=entity_id
+            )
+        except ValueError as exc:
+            if str(exc) == "entity_not_found":
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexIdentityContinuityEntityInspectorResponse.model_validate(raw)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/readiness-economics",
