@@ -14,6 +14,9 @@ from vector.domains.cortex.canonical.canonical_phase_admin_lite import (
 )
 from vector.domains.cortex.canonical.forward_progress.deferral_store import count_deferrals
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+from vector.domains.cortex.canonical.permanent_orphan_omission_doctrine import (
+    evaluate_permanent_orphan_omission_posture_v1,
+)
 from vector.domains.cortex.pipeline.canonical_operator_metrics import (
     snapshot_canonical_operator_metrics_v1,
 )
@@ -286,7 +289,7 @@ def build_continuity_status_v1(
         canonical_lane = "HEALTHY"
     elif topology_wait or retry_ready > 500 or untreated > 5000:
         canonical_lane = "DEGRADED"
-    elif permanent_pct > 50 and defer_total > 20:
+    elif permanent_pct > 50 and defer_total > 20 and not permanent_omission_ok:
         canonical_lane = "DEGRADED"
     elif untreated > 0 and execution_lane == "BLOCKED":
         canonical_lane = "WAITING"
@@ -475,6 +478,8 @@ def build_continuity_phase_cards_v1(
     permanent = int(deferral.get("deferred_permanent_orphan") or 0)
     defer_total = int(deferral.get("deferred_total") or 0)
     permanent_pct = int(round(100 * permanent / defer_total)) if defer_total else 0
+    omission_posture = evaluate_permanent_orphan_omission_posture_v1(deferral_counts=deferral)
+    permanent_omission_ok = bool(omission_posture.get("is_bounded_omission_not_failure"))
     topology_wait = int(deferral.get("deferred_waiting_cooldown") or 0) > 0
     can_status: PhaseStatus = "healthy"
     if retry_ready > 1000 or drainable > 10000:
@@ -505,7 +510,12 @@ def build_continuity_phase_cards_v1(
                 severity="warn" if drainable else "ok",
             ),
             _signal("retry_ready", "Retry-ready deferrals", retry_ready, severity="warn" if retry_ready else "ok"),
-            _signal("permanent_orphan_pct", "Permanent orphan %", f"{permanent_pct}%", severity="warn" if permanent_pct > 30 else "ok"),
+            _signal(
+                "permanent_orphan_omission",
+                "Permanent orphan (omission)",
+                f"{permanent:,} ({permanent_pct}% of deferrals)",
+                severity="ok" if permanent_omission_ok else "warn",
+            ),
             _signal("untreated_routable", "Untreated routable", untreated, severity="warn" if untreated else "ok"),
             _signal("topology_wait", "Topology wait", topology_wait, severity="warn" if topology_wait else "ok"),
         ],

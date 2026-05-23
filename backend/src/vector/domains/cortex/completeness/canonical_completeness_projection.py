@@ -16,6 +16,9 @@ from vector.domains.cortex.canonical.forward_progress.deferral_store import coun
 from vector.domains.cortex.canonical.transform_runtime import (
     resolve_default_bundle_id_for_stub_transform,
 )
+from vector.domains.cortex.canonical.permanent_orphan_omission_doctrine import (
+    evaluate_permanent_orphan_omission_posture_v1,
+)
 from vector.domains.cortex.completeness._completeness_common import build_stage_envelope_v1, pct
 from vector.infrastructure.db.models.cortex_canonical_failure_case import CortexCanonicalFailureCase
 from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
@@ -68,6 +71,9 @@ def project_canonical_completeness_v1(
     untreated_routable_estimate = 0
     drainable_routable_estimate = 0
     deferral_counts: dict[str, int] = {}
+    deferral_omission: dict[str, Any] = evaluate_permanent_orphan_omission_posture_v1(
+        deferral_counts={}
+    )
     if bundle_id and not admin_fast:
         untreated_routable_estimate = list_untreated_routable_count_estimate(
             session, tenant_id=tenant_id, bundle_id=bundle_id
@@ -76,6 +82,9 @@ def project_canonical_completeness_v1(
             session, tenant_id=tenant_id, bundle_id=bundle_id, drainable_only=True
         )
         deferral_counts = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
+        deferral_omission = evaluate_permanent_orphan_omission_posture_v1(
+            deferral_counts=deferral_counts
+        )
         deferred_total = int(deferral_counts.get("deferred_total") or 0)
         if deferred_total:
             omission_classes["canonical_deferrals_active"] = deferred_total
@@ -112,6 +121,11 @@ def project_canonical_completeness_v1(
             "drainable_routable_estimate": drainable_routable_estimate,
             "deferral_counts": deferral_counts,
             "operator_kpi_primary": "drainable_routable_estimate",
+            "deferral_omission_posture": deferral_omission.get("posture"),
+            "deferred_permanent_orphan": int(deferral_counts.get("deferred_permanent_orphan") or 0),
+            "chase_zero_deferrals_forbidden": deferral_omission.get(
+                "chase_zero_deferrals_forbidden"
+            ),
             "unsupported_count": unsupported,
             "parse_failed_count": parse_failed,
             "schema_drift_count": schema_drift,

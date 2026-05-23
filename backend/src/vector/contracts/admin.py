@@ -4557,6 +4557,27 @@ class AdminCortexOperatorPrimaryKpiIslandItem(BaseModel):
     last_walk_at: str | None = None
 
 
+class AdminCortexDeferralOmissionPosture(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "deferral_omission_posture"
+    schema_version: int = 1
+    enabled: bool = True
+    runbook_path: str = ""
+    omission_class: str = ""
+    posture: str = ""
+    permanent_orphan_count: int = 0
+    deferral_total: int = 0
+    deferred_retry_ready: int = 0
+    permanent_share_pct: int = 0
+    chase_zero_deferrals_forbidden: bool = False
+    is_bounded_omission_not_failure: bool = False
+    fizzer_reference_count: int = 0
+    headline: str = ""
+    summary: str = ""
+    operator_actions: list[str] = Field(default_factory=list)
+
+
 class AdminCortexOperatorPrimaryKpi(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -4575,6 +4596,7 @@ class AdminCortexOperatorPrimaryKpi(BaseModel):
     execution_island_count: int = 0
     execution_islands: list[AdminCortexOperatorPrimaryKpiIslandItem] = Field(default_factory=list)
     island_registry_inspect: dict[str, Any] = Field(default_factory=dict)
+    deferral_omission: AdminCortexDeferralOmissionPosture | None = None
 
 
 class AdminCortexPipelinePhaseOverview(BaseModel):

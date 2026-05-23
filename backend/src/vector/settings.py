@@ -558,6 +558,14 @@ class Settings(BaseSettings):
             "Rollback false: restore raw_minus_mat_admin_gap as primary hero metric."
         ),
     )
+    cortex_canonical_permanent_orphan_omission_doc_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_CANONICAL_PERMANENT_ORPHAN_OMISSION_DOC",
+        description=(
+            "Phase D4: surface permanent_orphan deferrals as bounded omission in admin + runbook. "
+            "Rollback false: legacy copy may imply deferral_total must reach zero."
+        ),
+    )
     cortex_github_caps_enforce_code_defaults: bool = Field(
         default=True,
         validation_alias="CORTEX_GITHUB_CAPS_ENFORCE_CODE_DEFAULTS",

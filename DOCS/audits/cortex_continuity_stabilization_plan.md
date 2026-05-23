@@ -288,7 +288,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | **D1** | Admin primary KPI = `drainable_routable` + island list | Stop raw−mat hero | `pipeline_admin_overview.py`, `canonical_completeness_projection.py` | Deprecate raw−mat banner | UI shows island KPIs | Screenshot + API contract | Restore old KPI | **admin** |
 | **D2** | Prod env: GitHub caps = code defaults (10/16/120…) | Slow deferral growth | `settings.py`, ECS task env | Conflicting env vars | Deferral growth rate ↓ week over week | `deferral_totals` trend | Lower caps | **ops** |
 | **D3** | Promotion worker: verify Celery/inline on schedule | Graph floor for island | `graph_density_promotion` task | Manual promotion only | `auth_links` increases when candidates exist | SQL trend 48h | N/A | **graph** |
-| **D4** | Document permanent orphan class (466) as omission not failure | Stops chasing 0 deferrals | Docs + admin copy | N/A | Operators accept bounded debt | Runbook | N/A | **ops** |
+| **D4** | ~~Document permanent orphan class (466) as omission not failure~~ **Done 2026-05-23** | Stops chasing 0 deferrals | Docs + admin copy | N/A | Operators accept bounded debt | Runbook | `CORTEX_CANONICAL_PERMANENT_ORPHAN_OMISSION_DOC=0` | **ops** |
 | **D5** | Delete legacy coordinator enqueue paths | One motion path | `substrate_pipeline/coordinator`, `scheduling.py` guards | Coordinator task | Grep + CI guard stays green | `test_schedule_substrate_pipeline` | Restore dead code | **cleanup** |
 
 ### Challenge: what should NOT exist
@@ -1456,7 +1456,7 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d1_admin_operat
 - [x] Static wiring + proof evaluator + CI gate
 - [ ] Prod baseline `step_d1_admin_operator_primary_kpi` (run prod script after deploy)
 
-**Next step:** ~~**D2**~~ → ~~**D3**~~ → **D5** — delete legacy coordinator enqueue paths.
+**Next step:** ~~**D2**~~ → ~~**D3**~~ → ~~**D4**~~ → **D5** — delete legacy coordinator enqueue paths.
 
 ---
 
@@ -1572,6 +1572,69 @@ Use `--no-drive` for wiring-only (no live promotion passes on prod tenant).
 - [x] Static wiring + proof evaluator + CI gate
 - [ ] Prod baseline `step_d3_graph_promotion_on_convergence_schedule` (after deploy + prod proof)
 
+**Next step:** ~~**D4**~~ → **D5** — delete legacy coordinator enqueue paths.
+
+---
+
+## Step D.4 completion — permanent orphan (466) as bounded omission
+
+**Completed:** 2026-05-23  
+**Goal:** Document Fizzer-class `permanent_orphan` deferrals as bounded omission, not a drain failure; stop operators chasing `deferral_total → 0` (D4).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Doctrine | `permanent_orphan_omission_doctrine.py` — posture, Fizzer reference 466, operator block |
+| Runbook | `DOCS/cortex/operational-runtime/canonical_permanent_orphan_omission_runbook.md` |
+| KPI block | `pipeline_admin_operator_kpi.py` — `deferral_omission` on `operator_primary_kpi` |
+| Canonical projection | `canonical_completeness_projection.py` — `deferral_omission_posture`, `chase_zero_deferrals_forbidden` metrics |
+| Continuity cards | `continuity_overview_v1.py` — “Permanent orphan (omission)” signal; canonical lane not blocked on count alone |
+| Operator snapshot | `operator_snapshot.py` — guidance references D4 runbook |
+| Contracts | `AdminCortexDeferralOmissionPosture` on `AdminCortexOperatorPrimaryKpi` |
+| Settings | `CORTEX_CANONICAL_PERMANENT_ORPHAN_OMISSION_DOC` (default on) |
+| Admin UI | `DeferralOmissionCard.tsx` on cortex overview; `CanonicalSummaryPanels` omission copy |
+| Proof | `continuity_p0_phase_d4_permanent_orphan_omission.py` + prod script |
+| CI | D4 wiring + proof evaluator tests |
+
+### Validate (local)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python -m pytest \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d4_permanent_orphan_omission.py \
+  tests/vector/api/http/routes/test_admin_cortex_pipeline_overview.py -q
+```
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d4_permanent_orphan_omission_proof.py \
+  --use-deployed-closure
+```
+
+| Check | Expected |
+|-------|----------|
+| `static_wiring_ok` | true |
+| `runbook_present` | true |
+| `permanent_orphan_posture_documented` | `accepted_bounded_debt` when permanent > 0 |
+| `chase_zero_deferrals_forbidden_when_permanent_present` | true when permanent share ≥ 20% |
+| `overview_exposes_deferral_omission` | true |
+| `fizzer_reference_documented` | 466 |
+| Rollback | `CORTEX_CANONICAL_PERMANENT_ORPHAN_OMISSION_DOC=0` |
+
+### Exit gates
+
+- [x] Runbook + doctrine codify permanent orphan as omission class
+- [x] Pipeline overview exposes `deferral_omission` block
+- [x] Admin UI surfaces deferral omission card + canonical tab copy
+- [x] Continuity canonical card labels permanent orphans as omission (not blocker)
+- [x] Static wiring + proof evaluator + CI gate
+- [ ] Prod baseline `step_d4_permanent_orphan_omission_doctrine` (after deploy + prod proof)
+
+**Next step:** **D5** — delete legacy coordinator enqueue paths.
+
 ---
 
 ## Execution order summary (single page)
@@ -1580,7 +1643,7 @@ Use `--no-drive` for wiring-only (no live promotion passes on prod tenant).
 Week 0 (incident):  A1 → A2 → A3 → A4 → A6
 Week 1 (heart):     B1 → B2 → B3 → B4 → B5 → B6
 Week 2 (truth):     C1 → C2 → C5 → C3 → C4 (restart 48h clock)
-Parallel:           ~~D1~~, ~~D2~~, ~~D3~~, D5
+Parallel:           ~~D1~~, ~~D2~~, ~~D3~~, ~~D4~~, D5
 Ongoing:            Daily: continuity_audit_snapshot.py (--json)
 Banned:             unlock_step*, trace-only baseline sign-off
 ```
@@ -1634,6 +1697,9 @@ python scripts/prod_substrate_proof_queries.py
 
 # Deploy truth
 CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity_p0_deploy.py
+
+# Phase D4 — permanent orphan omission doctrine (done; re-run after admin copy changes)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d4_permanent_orphan_omission_proof.py --use-deployed-closure
 
 # Phase C4 — restart 48h AA clock after A+B+C (done; run once after deploy)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c4_aa_clock_restart_proof.py --use-deployed-closure

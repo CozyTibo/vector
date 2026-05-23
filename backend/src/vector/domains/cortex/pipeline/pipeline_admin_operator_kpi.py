@@ -12,6 +12,9 @@ from vector.domains.cortex.operational_runtime.execution_island_registry import 
     is_execution_island_registry_enabled_v1,
     list_execution_island_registry_v1,
 )
+from vector.domains.cortex.canonical.permanent_orphan_omission_doctrine import (
+    build_deferral_omission_operator_block_v1,
+)
 from vector.domains.cortex.pipeline.canonical_operator_metrics import (
     OPERATOR_KPI_DEPRECATED_RAW_GAP_V1,
     OPERATOR_KPI_PRIMARY_DRAINABLE_V1,
@@ -87,4 +90,9 @@ def build_operator_primary_kpi_v1(
             "island_count": registry_inspect.get("island_count"),
             "traversal_propagation": registry_inspect.get("traversal_propagation"),
         },
+        "deferral_omission": build_deferral_omission_operator_block_v1(
+            session,
+            tenant_id=tenant_id,
+            deferral_counts=dict(metrics.get("deferral_counts") or {}),
+        ),
     }

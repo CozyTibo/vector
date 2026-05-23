@@ -64,7 +64,8 @@ jobs:
             tests/vector/domains/cortex/ingestion/test_github_ingest_caps_code_defaults.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d2_github_caps_align.py \
             tests/vector/domains/cortex/operational_runtime/test_graph_density_promotion_convergence_schedule.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d3_graph_promotion_schedule.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d3_graph_promotion_schedule.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d4_permanent_orphan_omission.py
 
   frontend:
     runs-on: ubuntu-latest

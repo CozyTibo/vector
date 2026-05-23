@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { ContinuityAttentionList } from "./cortex/ContinuityAttentionList";
 import { ContinuityStatusCard } from "./cortex/ContinuityStatusCard";
+import { DeferralOmissionCard } from "./cortex/DeferralOmissionCard";
 import { OperatorPrimaryKpiCard } from "./cortex/OperatorPrimaryKpiCard";
 import { PipelineActions } from "./cortex/PipelineActions";
 import { RecentIngestionRuns } from "./cortex/RecentIngestionRuns";
@@ -51,6 +52,11 @@ export default function AdminCortexOverviewPage() {
 
       <OperatorPrimaryKpiCard
         kpi={operatorKpi}
+        loading={phasesQ.isPending && !phasesQ.data}
+      />
+
+      <DeferralOmissionCard
+        omission={operatorKpi?.deferral_omission ?? undefined}
         loading={phasesQ.isPending && !phasesQ.data}
       />
 

@@ -110,6 +110,25 @@ export type OperatorPrimaryKpiIsland = {
   last_walk_at?: string | null;
 };
 
+export type DeferralOmissionPosture = {
+  surface_kind?: string;
+  schema_version?: number;
+  enabled?: boolean;
+  runbook_path?: string;
+  omission_class?: string;
+  posture?: string;
+  permanent_orphan_count?: number;
+  deferral_total?: number;
+  deferred_retry_ready?: number;
+  permanent_share_pct?: number;
+  chase_zero_deferrals_forbidden?: boolean;
+  is_bounded_omission_not_failure?: boolean;
+  fizzer_reference_count?: number;
+  headline?: string;
+  summary?: string;
+  operator_actions?: string[];
+};
+
 export type OperatorPrimaryKpi = {
   surface_kind?: string;
   schema_version?: number;
@@ -123,6 +142,7 @@ export type OperatorPrimaryKpi = {
   execution_island_registry_enabled?: boolean;
   execution_islands: OperatorPrimaryKpiIsland[];
   deferral_counts?: Record<string, number>;
+  deferral_omission?: DeferralOmissionPosture | null;
 };
 
 export type PipelineOverview = {

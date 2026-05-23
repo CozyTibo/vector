@@ -151,10 +151,16 @@ def _build_operator_guidance(
     if untreated <= 0:
         return "Substrate canonical coverage is complete for routable pairs."
     lines: list[str] = []
-    permanent = int(deferral_counts.get("deferred_permanent_orphan") or 0)
+    from vector.domains.cortex.canonical.permanent_orphan_omission_doctrine import (
+        evaluate_permanent_orphan_omission_posture_v1,
+    )
+
+    omission = evaluate_permanent_orphan_omission_posture_v1(deferral_counts=deferral_counts)
+    permanent = int(omission.get("permanent_orphan_count") or 0)
     if permanent > 0:
         lines.append(
-            f"{permanent:,} rows classified as permanent topology orphans (missing ingest parents)."
+            f"{permanent:,} permanent topology orphans — bounded omission per D4 runbook "
+            f"(do not chase deferral_total → 0)."
         )
     for row in deferral_pressure[:5]:
         rt = str(row.get("resource_type") or "")
