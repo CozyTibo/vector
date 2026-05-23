@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { ContinuityAttentionList } from "./cortex/ContinuityAttentionList";
 import { ContinuityStatusCard } from "./cortex/ContinuityStatusCard";
+import { OperatorPrimaryKpiCard } from "./cortex/OperatorPrimaryKpiCard";
 import { PipelineActions } from "./cortex/PipelineActions";
 import { RecentIngestionRuns } from "./cortex/RecentIngestionRuns";
 import {
@@ -26,6 +27,7 @@ export default function AdminCortexOverviewPage() {
 
   const exec = phasesQ.data?.execution ?? null;
   const continuity = phasesQ.data?.continuity_status ?? undefined;
+  const operatorKpi = phasesQ.data?.operator_primary_kpi ?? undefined;
   const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
   const attentionItems = phasesQ.data?.attention_items ?? [];
   const sched = ingestionQ.data?.scheduler;
@@ -44,6 +46,11 @@ export default function AdminCortexOverviewPage() {
     <div className="space-y-6">
       <ContinuityStatusCard
         status={continuity}
+        loading={phasesQ.isPending && !phasesQ.data}
+      />
+
+      <OperatorPrimaryKpiCard
+        kpi={operatorKpi}
         loading={phasesQ.isPending && !phasesQ.data}
       />
 

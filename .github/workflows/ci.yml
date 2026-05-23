@@ -58,7 +58,9 @@ jobs:
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c3_audit_snapshot.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c4_aa_clock_restart.py \
             tests/vector/domains/cortex/synthesis/test_phase_c5_aa5_synthesis_jobs_completed_gate.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c5_aa5_synthesis_jobs_completed.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c5_aa5_synthesis_jobs_completed.py \
+            tests/vector/domains/cortex/pipeline/test_pipeline_admin_operator_kpi.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d1_admin_operator_primary_kpi.py
 
   frontend:
     runs-on: ubuntu-latest

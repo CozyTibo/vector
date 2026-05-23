@@ -1,7 +1,12 @@
 import { adminFetch, adminJson } from "../../lib/adminFetch";
 import { adminApiPath } from "../../lib/adminApiUrl";
 import { readErrorDetail } from "../../lib/canonicalApi";
-import type { AttentionItem, ContinuityStatus, PipelineOverview } from "./pipelineTypes";
+import type {
+  AttentionItem,
+  ContinuityStatus,
+  OperatorPrimaryKpi,
+  PipelineOverview,
+} from "./pipelineTypes";
 
 let monolithInflight: Promise<PipelineOverview> | null = null;
 let monolithTenantId: string | null = null;
@@ -74,6 +79,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
     attention_items?: AttentionItem[];
     continuity_status?: ContinuityStatus | null;
     execution?: PipelineOverview["execution"] | null;
+    operator_primary_kpi?: OperatorPrimaryKpi | null;
   }>(tenantId, "/cortex/pipeline/overview/phases", 45_000);
   if (body) {
     return {
@@ -82,6 +88,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
       attention_items: body.attention_items ?? [],
       continuity_status: body.continuity_status ?? null,
       execution: body.execution ?? null,
+      operator_primary_kpi: body.operator_primary_kpi ?? null,
     };
   }
   const full = await fetchMonolithOverview(tenantId);
@@ -95,6 +102,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
     attention_items: extended.attention_items ?? [],
     continuity_status: extended.continuity_status ?? null,
     execution: full.execution ?? null,
+    operator_primary_kpi: full.operator_primary_kpi ?? null,
   };
 }
 

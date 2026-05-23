@@ -55,6 +55,10 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
     assert ingestion.get("headline")
     assert "signals" in ingestion
     assert "continuity_status" in body
+    kpi = body.get("operator_primary_kpi") or {}
+    assert kpi.get("primary_metric_key") == "drainable_routable_estimate"
+    assert kpi.get("raw_minus_mat_banner_deprecated") is True
+    assert isinstance(kpi.get("execution_islands"), list)
     assert body["continuity_status"]["state"] in {
         "AUTONOMOUS",
         "DEGRADED",

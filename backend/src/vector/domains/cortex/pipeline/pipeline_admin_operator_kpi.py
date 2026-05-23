@@ -1,0 +1,90 @@
+"""Phase D step D1 — operator primary KPI on pipeline overview (drainable + islands)."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from sqlalchemy.orm import Session
+
+from vector.domains.cortex.operational_runtime.execution_island_registry import (
+    build_island_registry_inspect_v1,
+    is_execution_island_registry_enabled_v1,
+    list_execution_island_registry_v1,
+)
+from vector.domains.cortex.pipeline.canonical_operator_metrics import (
+    OPERATOR_KPI_DEPRECATED_RAW_GAP_V1,
+    OPERATOR_KPI_PRIMARY_DRAINABLE_V1,
+    _canonical_operator_backlog_count,
+    snapshot_canonical_operator_metrics_v1,
+)
+from vector.settings import Settings, get_settings
+
+P0_D1_STEP: str = "step_d1_admin_operator_primary_kpi"
+PHASE_D1_OPERATOR_KPI_SCHEMA_VERSION: int = 1
+_ADMIN_ISLAND_LIST_CAP_V1 = 32
+
+
+def is_admin_primary_kpi_drainable_enabled_v1(*, settings: Settings | None = None) -> bool:
+    if settings is None:
+        settings = get_settings()
+    return bool(getattr(settings, "cortex_admin_primary_kpi_drainable", True))
+
+
+def build_operator_primary_kpi_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Top-level admin KPI block for pipeline overview slices."""
+    settings = settings or get_settings()
+    metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+    drainable_primary = is_admin_primary_kpi_drainable_enabled_v1(settings=settings)
+
+    primary_key = (
+        OPERATOR_KPI_PRIMARY_DRAINABLE_V1
+        if drainable_primary
+        else OPERATOR_KPI_DEPRECATED_RAW_GAP_V1
+    )
+    primary_value = int(
+        metrics.get("drainable_routable_estimate" if drainable_primary else "raw_minus_mat_admin_gap")
+        or 0
+    )
+
+    registry_enabled = is_execution_island_registry_enabled_v1()
+    islands_raw = list_execution_island_registry_v1(session, tenant_id=tenant_id)
+    islands = [
+        {
+            "island_scope_id": row["island_scope_id"],
+            "entity_count": row["entity_count"],
+            "authoritative_edge_count": row["authoritative_edge_count"],
+            "last_retrieval_epoch": row.get("last_retrieval_epoch"),
+            "last_walk_at": row.get("last_walk_at"),
+        }
+        for row in islands_raw[:_ADMIN_ISLAND_LIST_CAP_V1]
+    ]
+
+    registry_inspect = build_island_registry_inspect_v1(session, tenant_id=tenant_id, sync=False)
+
+    return {
+        "surface_kind": "operator_primary_kpi",
+        "schema_version": PHASE_D1_OPERATOR_KPI_SCHEMA_VERSION,
+        "primary_metric_key": primary_key,
+        "primary_metric_value": primary_value,
+        "drainable_routable_estimate": int(metrics.get("drainable_routable_estimate") or 0),
+        "untreated_routable_estimate": int(metrics.get("untreated_routable_estimate") or 0),
+        "raw_minus_mat_admin_gap": int(metrics.get("raw_minus_mat_admin_gap") or 0),
+        "deferral_counts": dict(metrics.get("deferral_counts") or {}),
+        "operator_kpi_primary": metrics.get("operator_kpi_primary"),
+        "raw_minus_mat_banner_deprecated": drainable_primary,
+        "canonical_backlog_count": _canonical_operator_backlog_count(metrics),
+        "execution_island_registry_enabled": registry_enabled,
+        "execution_island_count": len(islands_raw),
+        "execution_islands": islands,
+        "island_registry_inspect": {
+            "surface_kind": registry_inspect.get("surface_kind"),
+            "island_count": registry_inspect.get("island_count"),
+            "traversal_propagation": registry_inspect.get("traversal_propagation"),
+        },
+    }

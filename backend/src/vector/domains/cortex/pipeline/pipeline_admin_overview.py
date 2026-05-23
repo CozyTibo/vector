@@ -1,4 +1,8 @@
-"""Build ``GET …/cortex/pipeline/overview`` from execution lease + completeness projections."""
+"""Build ``GET …/cortex/pipeline/overview`` from execution lease + completeness projections.
+
+Operator primary KPI (D1 / Fix 7): ``operator_primary_kpi`` exposes
+``drainable_routable_estimate`` via ``_canonical_operator_backlog_count`` — not raw−mat hero.
+"""
 
 from __future__ import annotations
 
@@ -36,7 +40,21 @@ from vector.domains.cortex.execution.admin_commands import build_execution_inspe
 from vector.domains.cortex.pipeline.continuity_overview_v1 import (
     build_continuity_overview_bundle_v1,
 )
+from vector.domains.cortex.pipeline.canonical_operator_metrics import (
+    _canonical_operator_backlog_count,
+    snapshot_canonical_operator_metrics_v1,
+)
+from vector.domains.cortex.pipeline.pipeline_admin_operator_kpi import (
+    build_operator_primary_kpi_v1,
+)
 from vector.settings import Settings
+
+# Fix 7 / D1 static wiring probes read drainable helpers from this module.
+__all__ = [
+    "_canonical_operator_backlog_count",
+    "build_operator_primary_kpi_v1",
+    "snapshot_canonical_operator_metrics_v1",
+]
 
 
 def _cached_continuity_bundle_v1(
@@ -127,6 +145,9 @@ def build_pipeline_overview_execution_v1(
             "tenant_id": str(tenant_id),
             "execution": _build_execution_snapshot_v1(session, tenant_id=tenant_id),
             "continuity_status": continuity_status,
+            "operator_primary_kpi": build_operator_primary_kpi_v1(
+                session, tenant_id=tenant_id, settings=settings
+            ),
         }
 
     return _cached_slice_v1(cache_key=cache_key, build=_build)
@@ -150,6 +171,9 @@ def build_pipeline_overview_phases_v1(
             "tenant_id": str(tenant_id),
             "execution": _build_execution_snapshot_v1(session, tenant_id=tenant_id),
             "continuity_status": continuity_status,
+            "operator_primary_kpi": build_operator_primary_kpi_v1(
+                session, tenant_id=tenant_id, settings=settings
+            ),
             "phases": phases,
             "attention": attention,
             "attention_items": attention_items,
@@ -304,6 +328,9 @@ def _build_pipeline_overview_v1_uncached(
         "tenant_id": str(tenant_id),
         "execution": execution,
         "continuity_status": continuity_status,
+        "operator_primary_kpi": build_operator_primary_kpi_v1(
+            session, tenant_id=tenant_id, settings=settings
+        ),
         "phases": phases,
         "attention": attention,
         "attention_items": attention_items,

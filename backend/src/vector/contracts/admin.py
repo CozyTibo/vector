@@ -4547,6 +4547,36 @@ class AdminCortexAttentionItem(BaseModel):
     phase: str | None = None
 
 
+class AdminCortexOperatorPrimaryKpiIslandItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    island_scope_id: str
+    entity_count: int = 0
+    authoritative_edge_count: int = 0
+    last_retrieval_epoch: str | None = None
+    last_walk_at: str | None = None
+
+
+class AdminCortexOperatorPrimaryKpi(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "operator_primary_kpi"
+    schema_version: int = 1
+    primary_metric_key: str
+    primary_metric_value: int = 0
+    drainable_routable_estimate: int = 0
+    untreated_routable_estimate: int = 0
+    raw_minus_mat_admin_gap: int = 0
+    deferral_counts: dict[str, int] = Field(default_factory=dict)
+    operator_kpi_primary: str | None = None
+    raw_minus_mat_banner_deprecated: bool = True
+    canonical_backlog_count: int = 0
+    execution_island_registry_enabled: bool = False
+    execution_island_count: int = 0
+    execution_islands: list[AdminCortexOperatorPrimaryKpiIslandItem] = Field(default_factory=list)
+    island_registry_inspect: dict[str, Any] = Field(default_factory=dict)
+
+
 class AdminCortexPipelinePhaseOverview(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -4619,6 +4649,7 @@ class AdminCortexPipelineOverviewExecutionResponse(BaseModel):
     tenant_id: uuid.UUID
     execution: AdminCortexPipelineExecutionSnapshot
     continuity_status: AdminCortexContinuityStatus | None = None
+    operator_primary_kpi: AdminCortexOperatorPrimaryKpi | None = None
 
 
 class AdminCortexPipelineOverviewPhasesResponse(BaseModel):
@@ -4628,6 +4659,7 @@ class AdminCortexPipelineOverviewPhasesResponse(BaseModel):
     tenant_id: uuid.UUID
     execution: AdminCortexPipelineExecutionSnapshot | None = None
     continuity_status: AdminCortexContinuityStatus | None = None
+    operator_primary_kpi: AdminCortexOperatorPrimaryKpi | None = None
     phases: list[AdminCortexPipelinePhaseOverview]
     attention: list[str] = Field(default_factory=list)
     attention_items: list[AdminCortexAttentionItem] = Field(default_factory=list)
@@ -4651,6 +4683,7 @@ class AdminCortexPipelineOverviewResponse(BaseModel):
     tenant_id: uuid.UUID
     execution: AdminCortexPipelineExecutionSnapshot
     continuity_status: AdminCortexContinuityStatus | None = None
+    operator_primary_kpi: AdminCortexOperatorPrimaryKpi | None = None
     phases: list[AdminCortexPipelinePhaseOverview]
     attention: list[str] = Field(default_factory=list)
     attention_items: list[AdminCortexAttentionItem] = Field(default_factory=list)

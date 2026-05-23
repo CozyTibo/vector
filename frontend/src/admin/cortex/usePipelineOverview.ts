@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
-import type { AttentionItem, ContinuityStatus, PipelineOverview } from "./pipelineTypes";
+import type {
+  AttentionItem,
+  ContinuityStatus,
+  OperatorPrimaryKpi,
+  PipelineOverview,
+} from "./pipelineTypes";
 import type { PipelineExecutionSlice } from "./fetchPipelineOverviewSlice";
 import {
   fetchPipelineExecutionSlice,
@@ -35,6 +40,7 @@ export type PipelineOverviewPhases = {
   attention_items: AttentionItem[];
   continuity_status: ContinuityStatus | null;
   execution: PipelineOverview["execution"] | null;
+  operator_primary_kpi: OperatorPrimaryKpi | null;
 };
 
 export type PipelineOverviewExecution = PipelineExecutionSlice & {
@@ -81,6 +87,7 @@ export function usePipelineOverviewPhases() {
         attention_items: data.attention_items,
         continuity_status: data.continuity_status ?? null,
         execution: data.execution ?? null,
+        operator_primary_kpi: data.operator_primary_kpi ?? null,
       };
     },
     enabled: Boolean(tenantId),

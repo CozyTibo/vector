@@ -14,6 +14,9 @@ from vector.domains.cortex.canonical.canonical_phase_admin_lite import (
 )
 from vector.domains.cortex.canonical.forward_progress.deferral_store import count_deferrals
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+from vector.domains.cortex.pipeline.canonical_operator_metrics import (
+    snapshot_canonical_operator_metrics_v1,
+)
 from vector.domains.cortex.execution.admin_commands import build_execution_inspect_v1
 from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
 from vector.domains.cortex.execution.progression_status import build_substrate_progression_status_v1
@@ -260,9 +263,13 @@ def build_continuity_status_v1(
     else:
         execution_lane = "DEGRADED"
 
+    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
     untreated = int(
-        (canonical_metrics.get("forward_progress") or {}).get("untreated_estimate") or 0
+        (canonical_metrics.get("forward_progress") or {}).get("untreated_estimate")
+        or operator_metrics.get("untreated_routable_estimate")
+        or 0
     )
+    drainable = int(operator_metrics.get("drainable_routable_estimate") or 0)
     bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
     deferral: dict[str, int] = {}
     topology_wait = False
@@ -292,7 +299,7 @@ def build_continuity_status_v1(
     soak = evaluate_p2_autonomous_soak_v1(
         phase_cursor=phase_cursor,
         last_canonical_outcome=last_canonical_outcome,
-        drainable_routable_estimate=0,
+        drainable_routable_estimate=drainable,
         untreated_routable_estimate=untreated,
     )
     soak_active = bool(soak.get("p2_soak_t0_captured"))
@@ -380,6 +387,7 @@ def _phase_card(
     signals: list[dict[str, Any]],
     blockers: list[str] | None = None,
     last_success_at: str | None = None,
+    backlog_count: int | None = None,
 ) -> dict[str, Any]:
     return {
         "phase": phase,
@@ -390,7 +398,7 @@ def _phase_card(
         "signals": signals,
         "processed_count": None,
         "object_count_label": None,
-        "backlog_count": None,
+        "backlog_count": backlog_count,
         "last_success_at": last_success_at,
         "blockers": list(blockers or [])[:6],
         "issues": [],
@@ -456,29 +464,46 @@ def build_continuity_phase_cards_v1(
     )
 
     can_metrics = build_canonical_phase_summary_metrics_v1(session, tenant_id=tenant_id)
+    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
     bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
-    deferral: dict[str, int] = {}
-    if bundle_id:
+    deferral: dict[str, int] = dict(operator_metrics.get("deferral_counts") or {})
+    if bundle_id and not deferral:
         deferral = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
     untreated = int((can_metrics.get("forward_progress") or {}).get("untreated_estimate") or 0)
+    drainable = int(operator_metrics.get("drainable_routable_estimate") or 0)
     retry_ready = int(deferral.get("deferred_retry_ready") or 0)
     permanent = int(deferral.get("deferred_permanent_orphan") or 0)
     defer_total = int(deferral.get("deferred_total") or 0)
     permanent_pct = int(round(100 * permanent / defer_total)) if defer_total else 0
     topology_wait = int(deferral.get("deferred_waiting_cooldown") or 0) > 0
     can_status: PhaseStatus = "healthy"
-    if retry_ready > 1000 or untreated > 10000:
+    if retry_ready > 1000 or drainable > 10000:
         can_status = "blocked"
-    elif topology_wait or retry_ready > 0 or untreated > 500:
+    elif topology_wait or retry_ready > 0 or drainable > 500:
         can_status = "degraded"
     if fsm in ("CANONICAL", "CANONICAL_DRAINING") and lease_running:
         can_status = "running"
+    if drainable > 0:
+        can_headline = f"Drainable routable backlog ({drainable:,})"
+    elif topology_wait:
+        can_headline = "Topology wait"
+    elif retry_ready == 0:
+        can_headline = "Deferrals draining"
+    else:
+        can_headline = "Retry-ready pressure"
     can_card = _phase_card(
         phase="canonical",
         status=can_status,
-        headline="Topology wait" if topology_wait else "Deferrals draining" if retry_ready == 0 else "Retry-ready pressure",
-        continuity_advancing=retry_ready == 0 and untreated < 500 and not topology_wait,
+        headline=can_headline,
+        continuity_advancing=retry_ready == 0 and drainable < 500 and not topology_wait,
+        backlog_count=drainable,
         signals=[
+            _signal(
+                "drainable_routable",
+                "Drainable routable",
+                drainable,
+                severity="warn" if drainable else "ok",
+            ),
             _signal("retry_ready", "Retry-ready deferrals", retry_ready, severity="warn" if retry_ready else "ok"),
             _signal("permanent_orphan_pct", "Permanent orphan %", f"{permanent_pct}%", severity="warn" if permanent_pct > 30 else "ok"),
             _signal("untreated_routable", "Untreated routable", untreated, severity="warn" if untreated else "ok"),

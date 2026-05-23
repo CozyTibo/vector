@@ -102,8 +102,32 @@ export type PipelineNextScheduledIngestion = {
   connectors_eligible_now?: string[];
 };
 
+export type OperatorPrimaryKpiIsland = {
+  island_scope_id: string;
+  entity_count: number;
+  authoritative_edge_count: number;
+  last_retrieval_epoch?: string | null;
+  last_walk_at?: string | null;
+};
+
+export type OperatorPrimaryKpi = {
+  surface_kind?: string;
+  schema_version?: number;
+  primary_metric_key: string;
+  primary_metric_value: number;
+  drainable_routable_estimate: number;
+  untreated_routable_estimate: number;
+  raw_minus_mat_admin_gap: number;
+  raw_minus_mat_banner_deprecated?: boolean;
+  execution_island_count?: number;
+  execution_island_registry_enabled?: boolean;
+  execution_islands: OperatorPrimaryKpiIsland[];
+  deferral_counts?: Record<string, number>;
+};
+
 export type PipelineOverview = {
   tenant_id: string;
+  operator_primary_kpi?: OperatorPrimaryKpi | null;
   execution: {
     fsm_state: string | null;
     phase_cursor: string | null;

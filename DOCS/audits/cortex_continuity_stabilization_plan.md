@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1–C5**~~ → **Phase D** (parallel) + hold **48h AA clock** daily until M3.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1–C5**~~ → ~~**D1**~~ → **D2** (parallel) + hold **48h AA clock** daily until M3.
 
 ---
 
@@ -1399,13 +1399,74 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c5_aa5_synthesi
 
 ---
 
+## Step D.1 completion — admin primary KPI (drainable + islands)
+
+**Completed:** 2026-05-23  
+**Goal:** Admin primary KPI = `drainable_routable` + execution island list; deprecate raw−mat hero metric (D1 / D-G3).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Metrics | `canonical_operator_metrics.py` — shared drainable / untreated / deferral snapshot |
+| KPI block | `pipeline_admin_operator_kpi.py` — `build_operator_primary_kpi_v1` + island list (cap 32) |
+| Overview API | `pipeline_admin_overview.py` — `operator_primary_kpi` on full + execution + phases slices |
+| Continuity cards | `continuity_overview_v1.py` — canonical `backlog_count` = drainable; first signal `drainable_routable` |
+| Canonical tab | `canonical_phase_admin_lite.py` — `operator_metrics` + `drainable_estimate` on phase summary |
+| Contracts | `AdminCortexOperatorPrimaryKpi` on overview responses |
+| Settings | `CORTEX_ADMIN_PRIMARY_KPI_DRAINABLE` (default on; rollback → raw−mat primary) |
+| Admin UI | `OperatorPrimaryKpiCard.tsx` on cortex overview; `CanonicalSummaryPanels` leads with drainable |
+| Proof | `continuity_p0_phase_d1_admin_operator_primary_kpi.py` + prod script |
+| CI | D1 proof evaluator + operator KPI helper tests |
+
+### Validate (local)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python -m pytest \
+  tests/vector/domains/cortex/pipeline/test_pipeline_admin_operator_kpi.py \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d1_admin_operator_primary_kpi.py \
+  tests/vector/api/http/routes/test_admin_cortex_pipeline_overview.py -q
+```
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d1_admin_operator_primary_kpi_proof.py \
+  --use-deployed-closure
+```
+
+| Check | Expected |
+|-------|----------|
+| `primary_metric_is_drainable` | true |
+| `raw_minus_mat_banner_deprecated` | true |
+| `canonical_backlog_matches_drainable` | true |
+| `canonical_first_signal_drainable` | true |
+| `execution_islands_exposed` | true |
+| `fix7_admin_metric_truth` | true |
+| Rollback | `CORTEX_ADMIN_PRIMARY_KPI_DRAINABLE=0` → raw−mat primary |
+
+### Exit gates
+
+- [x] Pipeline overview exposes `operator_primary_kpi` with drainable primary + islands
+- [x] Canonical phase strip uses drainable backlog (not raw−mat hero)
+- [x] Admin UI shows drainable + island table on cortex overview
+- [x] Fix 7 static wiring (`evaluate_fix7_admin_metric_truth_v1`) passes
+- [x] Static wiring + proof evaluator + CI gate
+- [ ] Prod baseline `step_d1_admin_operator_primary_kpi` (run prod script after deploy)
+
+**Next step:** **D2** — prod env GitHub ingest caps aligned to code defaults.
+
+---
+
 ## Execution order summary (single page)
 
 ```text
 Week 0 (incident):  A1 → A2 → A3 → A4 → A6
 Week 1 (heart):     B1 → B2 → B3 → B4 → B5 → B6
 Week 2 (truth):     C1 → C2 → C5 → C3 → C4 (restart 48h clock)
-Parallel:           D1, D2, D3, D5
+Parallel:           ~~D1~~, D2, D3, D5
 Ongoing:            Daily: continuity_audit_snapshot.py (--json)
 Banned:             unlock_step*, trace-only baseline sign-off
 ```

@@ -9,10 +9,9 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.canonical.forward_progress.candidate_selection import (
-    list_untreated_routable_count_estimate,
+from vector.domains.cortex.pipeline.canonical_operator_metrics import (
+    snapshot_canonical_operator_metrics_v1,
 )
-from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.infrastructure.db.models.cortex_canonical_failure_case import CortexCanonicalFailureCase
 from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
     CortexCanonicalTransformMaterialization,
@@ -75,15 +74,9 @@ def build_canonical_phase_summary_metrics_v1(
         .limit(1)
     )
     freshness = _verification_freshness(last_ver)
-    untreated_estimate = 0
-    bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
-    if bundle_id is not None:
-        untreated_estimate = int(
-            list_untreated_routable_count_estimate(
-                session, tenant_id=tenant_id, bundle_id=bundle_id
-            )
-            or 0
-        )
+    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+    untreated_estimate = int(operator_metrics.get("untreated_routable_estimate") or 0)
+    drainable_estimate = int(operator_metrics.get("drainable_routable_estimate") or 0)
 
     health = {
         "materialization_row_count": mat_count,
@@ -93,6 +86,10 @@ def build_canonical_phase_summary_metrics_v1(
     }
     return {
         "health": health,
-        "forward_progress": {"untreated_estimate": untreated_estimate},
+        "forward_progress": {
+            "untreated_estimate": untreated_estimate,
+            "drainable_estimate": drainable_estimate,
+        },
+        "operator_metrics": operator_metrics,
         "failure_count": failure_count,
     }

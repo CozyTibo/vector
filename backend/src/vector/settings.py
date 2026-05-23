@@ -550,6 +550,14 @@ class Settings(BaseSettings):
             "Rollback false: started-only synthesis surfaces as ADVISORY not FAIL."
         ),
     )
+    cortex_admin_primary_kpi_drainable: bool = Field(
+        default=True,
+        validation_alias="CORTEX_ADMIN_PRIMARY_KPI_DRAINABLE",
+        description=(
+            "Phase D1: admin pipeline overview primary KPI is drainable_routable + island list. "
+            "Rollback false: restore raw_minus_mat_admin_gap as primary hero metric."
+        ),
+    )
     cortex_synthesis_job_running_stale_seconds: int = Field(
         default=86_400,
         ge=60,

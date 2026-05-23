@@ -18,7 +18,11 @@ type CanonicalMetrics = PhaseSummaryPayload & {
     last_verification_passed?: boolean | null;
     verification_freshness_label?: string;
   };
-  forward_progress?: { untreated_estimate?: number };
+  forward_progress?: { untreated_estimate?: number; drainable_estimate?: number };
+  operator_metrics?: {
+    drainable_routable_estimate?: number;
+    raw_minus_mat_admin_gap?: number;
+  };
   failure_count?: number;
 };
 
@@ -40,7 +44,13 @@ export function CanonicalSummaryPanels() {
 
   const m = metricsQ.data as CanonicalMetrics | undefined;
   const h = m?.health ?? {};
+  const drainable = Number(
+    m?.forward_progress?.drainable_estimate ??
+      m?.operator_metrics?.drainable_routable_estimate ??
+      0,
+  );
   const untreated = Number(m?.forward_progress?.untreated_estimate ?? m?.backlog_count ?? 0);
+  const rawGap = Number(m?.operator_metrics?.raw_minus_mat_admin_gap ?? 0);
   const failures = Number(h.active_canonical_failure_count ?? m?.failure_count ?? 0);
   const rollups = coverageQ.data ?? [];
 
@@ -52,16 +62,20 @@ export function CanonicalSummaryPanels() {
       {metricsQ.isPending && !m ? (
         <SectionSkeleton variant="cards" />
       ) : (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+            <p className="text-xs uppercase text-indigo-800">Drainable routable (primary)</p>
+            <p className="mt-1 text-lg font-semibold text-indigo-950">{drainable.toLocaleString()}</p>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <p className="text-xs uppercase text-amber-800">Untreated routable</p>
+            <p className="mt-1 text-lg font-semibold text-amber-950">{untreated.toLocaleString()}</p>
+          </div>
           <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
             <p className="text-xs uppercase text-stone-500">Materialized rows</p>
             <p className="mt-1 text-lg font-semibold">
               {Number(h.materialization_row_count ?? 0).toLocaleString()}
             </p>
-          </div>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm">
-            <p className="text-xs uppercase text-amber-800">Untreated backlog</p>
-            <p className="mt-1 text-lg font-semibold text-amber-950">{untreated.toLocaleString()}</p>
           </div>
           <div className="rounded-lg border border-red-100 bg-red-50 p-4 shadow-sm">
             <p className="text-xs uppercase text-red-800">Active failures</p>
@@ -80,6 +94,12 @@ export function CanonicalSummaryPanels() {
           </div>
         </section>
       )}
+
+      {!metricsQ.isPending && m ? (
+        <p className="text-xs text-stone-500">
+          Raw−materialized diagnostic gap: {rawGap.toLocaleString()} (not the primary operator KPI).
+        </p>
+      ) : null}
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-stone-900">Per-connector coverage</h2>
