@@ -168,12 +168,29 @@ export type SemanticSynthesisTruth = {
   jobs_by_status?: Array<{ status: string; count: number }>;
 };
 
+export type SemanticIdentityContinuity = {
+  anchor_boundary?: {
+    anchor_count?: number;
+    anchors_missing_org_entity?: number;
+    anchors_missing_org_entity_pct?: number | null;
+  };
+  candidate_rows?: number;
+  distinct_candidate_pairs?: number;
+  candidate_inflation_ratio?: number | null;
+  candidate_inflation_severity?: "ok" | "warn" | "bad" | "unknown";
+  anchors_missing_org_entity_pct?: number | null;
+  anchors_missing_severity?: "ok" | "warn" | "bad" | "unknown";
+  promotable_by_rule_id?: Array<{ rule_id: string; promotable_count: number }>;
+  second_link_type_policy?: string;
+};
+
 export type SemanticReadiness = {
   surface_kind?: string;
   schema_version?: number;
   tenant_id: string;
   product_substrate: string;
   graph_truth: SemanticGraphTruth;
+  identity_continuity?: SemanticIdentityContinuity | null;
   retrieval: SemanticRetrievalProduct;
   synthesis: SemanticSynthesisTruth;
   thresholds?: Record<string, number>;

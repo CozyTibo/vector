@@ -4714,6 +4714,21 @@ class AdminCortexSemanticSynthesisTruth(BaseModel):
     fail_loud_expected_when_retrieval_weak: bool = True
 
 
+class AdminCortexIdentityContinuityTruth(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    anchor_boundary: dict[str, Any] = Field(default_factory=dict)
+    candidate_rows: int = 0
+    distinct_candidate_pairs: int = 0
+    candidate_inflation_ratio: float | None = None
+    candidate_inflation_severity: Literal["ok", "warn", "bad", "unknown"] = "unknown"
+    anchors_missing_org_entity_pct: float | None = None
+    anchors_missing_severity: Literal["ok", "warn", "bad", "unknown"] = "unknown"
+    promotable_by_rule_id: list[dict[str, Any]] = Field(default_factory=list)
+    promotion_rule_count_green_min: int = 3
+    second_link_type_policy: str = "deferred_until_prod_evidence_ge_100_edges"
+
+
 class AdminCortexSemanticReadinessResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -4723,6 +4738,7 @@ class AdminCortexSemanticReadinessResponse(BaseModel):
     captured_at_utc: str | None = None
     product_substrate: str = "retrieval"
     graph_truth: AdminCortexSemanticGraphTruth
+    identity_continuity: AdminCortexIdentityContinuityTruth | None = None
     retrieval: AdminCortexSemanticRetrievalProduct
     synthesis: AdminCortexSemanticSynthesisTruth
     thresholds: dict[str, Any] = Field(default_factory=dict)

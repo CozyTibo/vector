@@ -259,6 +259,21 @@ def run_anchor_handle_backfill(
         db.flush()
 
     regen: dict[str, Any] | None = None
+    boundary: dict[str, Any] | None = None
+    if not dry_run:
+        from vector.domains.cortex.identity.identity_anchor_boundary_v1 import (
+            repair_anchor_org_entity_boundary_v1,
+        )
+
+        boundary = repair_anchor_org_entity_boundary_v1(
+            db,
+            tenant_id=tenant_id,
+            limit=anchor_limit,
+            dry_run=False,
+            backfill_job_id=run_id,
+        )
+
+    regen: dict[str, Any] | None = None
     if not dry_run and not skip_candidate_regen:
         from vector.domains.cortex.identity.anchor_continuity_candidates import (
             run_anchor_continuity_candidate_regeneration,
@@ -278,6 +293,7 @@ def run_anchor_handle_backfill(
         "legacy_lane_org_entities_tombstoned": legacy_lane_org_entities_tombstoned,
         "anchors_skipped_work_object_no_primitive": anchors_skipped_work_object_no_primitive,
         "candidate_regeneration": regen,
+        "anchor_entity_boundary": boundary,
     }
 
 

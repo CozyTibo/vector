@@ -25,6 +25,7 @@ export function SemanticReadinessCard({
   if (!data) return null;
 
   const g = data.graph_truth;
+  const ic = data.identity_continuity;
   const r = data.retrieval;
   const s = data.synthesis;
 
@@ -61,6 +62,44 @@ export function SemanticReadinessCard({
           </dt>
           <dd className="mt-1 text-lg font-semibold tabular-nums">{g.promotion_rule_count}</dd>
         </div>
+        {ic ? (
+          <>
+            <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
+              <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                Anchors missing org entity
+              </dt>
+              <dd className="mt-1 flex items-center gap-2">
+                <span className="text-lg font-semibold tabular-nums">
+                  {ic.anchors_missing_org_entity_pct ?? "—"}%
+                </span>
+                {ic.anchors_missing_severity ? (
+                  <StatusBadge tone={severityTone(ic.anchors_missing_severity)}>
+                    {ic.anchors_missing_severity}
+                  </StatusBadge>
+                ) : null}
+              </dd>
+            </div>
+            <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
+              <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                Candidate inflation ratio
+              </dt>
+              <dd className="mt-1 flex items-center gap-2">
+                <span className="text-lg font-semibold tabular-nums">
+                  {ic.candidate_inflation_ratio ?? "—"}
+                </span>
+                {ic.candidate_inflation_severity ? (
+                  <StatusBadge tone={severityTone(ic.candidate_inflation_severity)}>
+                    {ic.candidate_inflation_severity}
+                  </StatusBadge>
+                ) : null}
+              </dd>
+              <p className="mt-1 text-xs text-stone-500">
+                Rows {ic.candidate_rows?.toLocaleString() ?? "—"} /{" "}
+                {ic.distinct_candidate_pairs?.toLocaleString() ?? "—"} distinct pairs
+              </p>
+            </div>
+          </>
+        ) : null}
         <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
           <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">
             Entities in auth graph

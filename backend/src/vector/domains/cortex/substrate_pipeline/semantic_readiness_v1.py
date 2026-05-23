@@ -26,6 +26,8 @@ DUP_FACTOR_WARN_MIN = 1.1
 RETRIEVAL_ORG_LINK_PCT_GREEN_MAX = 30.0
 RETRIEVAL_EXECUTION_PCT_GREEN_MIN = 60.0
 PROMOTION_RULE_COUNT_GREEN_MIN = 3
+ANCHORS_MISSING_ENTITY_PCT_GREEN_MAX = 50.0
+CANDIDATE_INFLATION_RATIO_GREEN_MAX = 3.0
 
 _EXECUTION_INDEX_KINDS = frozenset({"materialization", "walk", "causal_chain"})
 
@@ -249,6 +251,74 @@ def _query_retrieval_product_v1(session: Session, *, tenant_id: uuid.UUID) -> di
     }
 
 
+def _candidate_inflation_severity(ratio: float | None) -> str:
+    if ratio is None:
+        return "unknown"
+    if ratio <= CANDIDATE_INFLATION_RATIO_GREEN_MAX:
+        return "ok"
+    return "bad"
+
+
+def _anchors_missing_severity(pct: float | None) -> str:
+    if pct is None:
+        return "unknown"
+    if pct <= ANCHORS_MISSING_ENTITY_PCT_GREEN_MAX:
+        return "ok"
+    if pct >= 80.0:
+        return "bad"
+    return "warn"
+
+
+def _query_identity_continuity_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
+    from vector.domains.cortex.identity.identity_anchor_boundary_v1 import (
+        snapshot_anchor_entity_boundary_v1,
+    )
+    from vector.domains.cortex.identity.identity_continuity_promotion_v1 import (
+        count_promotable_link_candidates_by_rule_v1,
+    )
+
+    tid = str(tenant_id)
+    boundary = snapshot_anchor_entity_boundary_v1(session, tenant_id=tenant_id)
+    cand = session.execute(
+        text(
+            """
+            SELECT COUNT(*)::bigint AS total,
+                   COUNT(DISTINCT (source_entity_id, target_entity_id, link_type))::bigint
+                     AS distinct_pairs,
+                   COUNT(DISTINCT rule_id)::bigint AS distinct_rules
+            FROM cortex_org_link_candidates WHERE tenant_id = :tenant
+            """
+        ),
+        {"tenant": tid},
+    ).mappings().first()
+    candidate_rows = _to_int(cand["total"]) if cand else 0
+    distinct_pairs = _to_int(cand["distinct_pairs"]) if cand else 0
+    inflation: float | None = None
+    if distinct_pairs > 0:
+        inflation = round(candidate_rows / distinct_pairs, 3)
+    return {
+        "anchor_boundary": boundary,
+        "candidate_rows": candidate_rows,
+        "distinct_candidate_pairs": distinct_pairs,
+        "candidate_inflation_ratio": inflation,
+        "candidate_inflation_severity": _candidate_inflation_severity(inflation),
+        "anchors_missing_org_entity_pct": boundary.get("anchors_missing_org_entity_pct"),
+        "anchors_missing_severity": _anchors_missing_severity(
+            boundary.get("anchors_missing_org_entity_pct")
+            if isinstance(boundary.get("anchors_missing_org_entity_pct"), (int, float))
+            else None
+        ),
+        "promotable_by_rule_id": count_promotable_link_candidates_by_rule_v1(session, tenant_id=tenant_id),
+        "promotion_rule_count_green_min": PROMOTION_RULE_COUNT_GREEN_MIN,
+        "second_link_type_policy": "deferred_until_prod_evidence_ge_100_edges",
+        "primary_metric_keys": [
+            "promotion_rule_count",
+            "anchors_missing_org_entity_pct",
+            "candidate_inflation_ratio",
+        ],
+    }
+
+
 def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
     tid = str(tenant_id)
     jobs = [
@@ -295,6 +365,7 @@ def build_semantic_readiness_v1(
 ) -> dict[str, Any]:
     """Lean semantic readiness payload for admin API and ops panels."""
     graph = _query_graph_truth_v1(session, tenant_id=tenant_id)
+    identity = _query_identity_continuity_v1(session, tenant_id=tenant_id)
     retrieval = _query_retrieval_product_v1(session, tenant_id=tenant_id)
     synthesis = _query_synthesis_truth_v1(session, tenant_id=tenant_id)
     return {
@@ -304,11 +375,14 @@ def build_semantic_readiness_v1(
         "captured_at_utc": datetime.now(UTC).isoformat(),
         "product_substrate": "retrieval",
         "graph_truth": graph,
+        "identity_continuity": identity,
         "retrieval": retrieval,
         "synthesis": synthesis,
         "thresholds": {
             "dup_factor_green_max": DUP_FACTOR_GREEN_MAX,
             "promotion_rule_count_green_min": PROMOTION_RULE_COUNT_GREEN_MIN,
+            "anchors_missing_entity_pct_green_max": ANCHORS_MISSING_ENTITY_PCT_GREEN_MAX,
+            "candidate_inflation_ratio_green_max": CANDIDATE_INFLATION_RATIO_GREEN_MAX,
             "retrieval_org_link_pct_green_max": RETRIEVAL_ORG_LINK_PCT_GREEN_MAX,
             "retrieval_execution_index_pct_green_min": RETRIEVAL_EXECUTION_PCT_GREEN_MIN,
         },
@@ -366,6 +440,7 @@ def build_graph_truth_audit_snapshot_v1(
 def format_semantic_readiness_text_v1(snapshot: dict[str, Any]) -> str:
     """Human-readable summary for CLI."""
     g = dict(snapshot.get("graph_truth") or {})
+    ic = dict(snapshot.get("identity_continuity") or {})
     r = dict(snapshot.get("retrieval") or {})
     s = dict(snapshot.get("synthesis") or {})
     lines = [
@@ -375,6 +450,10 @@ def format_semantic_readiness_text_v1(snapshot: dict[str, Any]) -> str:
         f"  Auth edge rows: {g.get('auth_edge_rows')} (dup_factor={g.get('dup_factor')}, "
         f"severity={g.get('dup_factor_severity')})",
         f"  Promotion rules with edges: {g.get('promotion_rule_count')}",
+        f"  Anchors missing org entity: {ic.get('anchors_missing_org_entity_pct')}% "
+        f"(severity={ic.get('anchors_missing_severity')})",
+        f"  Candidate inflation ratio: {ic.get('candidate_inflation_ratio')} "
+        f"(severity={ic.get('candidate_inflation_severity')})",
         f"  Entities in auth graph: {g.get('entities_in_auth_graph_pct')}%",
         f"  Published retrieval epoch: {r.get('published_index_epoch')}",
         f"  Retrieval org_link %: {r.get('org_link_pct')} | execution index %: {r.get('execution_index_pct')}",
