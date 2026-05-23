@@ -167,6 +167,14 @@ def materialize_retrieval_index_for_largest_island_v1(
         outside_island_scope_entity_count=outside_count,
     )
 
+    from vector.domains.cortex.retrieval.retrieval_epoch_scope_alignment import (
+        reconcile_primary_island_scope_on_epoch_change_v1,
+    )
+    from vector.domains.cortex.retrieval.retrieval_index_materialization import (
+        get_published_index_epoch_v1,
+    )
+
+    prior_published_epoch = get_published_index_epoch_v1(session, tenant_id=tenant_id)
     replay = derive_substrate_pipeline_replay_identity_v1(
         tenant_id=tenant_id, pipeline_run_id=pipeline_run_id
     )
@@ -352,6 +360,19 @@ def materialize_retrieval_index_for_largest_island_v1(
     )
     stats.update(finalized)
     stats["ok"] = bool(finalized.get("ok"))
+    scope_reconcile = reconcile_primary_island_scope_on_epoch_change_v1(
+        session,
+        tenant_id=tenant_id,
+        prior_published_epoch=prior_published_epoch,
+        new_published_epoch=str(finalized.get("published_index_epoch") or epoch_name),
+        island_scope_id=island_scope_id,
+        outside_island_scope_entity_count=outside_count,
+    )
+    stats["epoch_scope_reconcile"] = scope_reconcile
+    stats["retrieval_entries_in_scope"] = int(
+        scope_reconcile.get("retrieval_entries_in_scope") or 0
+    )
+    stats["prior_published_index_epoch"] = prior_published_epoch
     stats["retrieval_card_classification"] = classify_retrieval_materialization_outcome_v1(
         entries_materialized=int(stats.get("entries_materialized") or 0),
         entry_count=int(finalized.get("entry_count") or 0),

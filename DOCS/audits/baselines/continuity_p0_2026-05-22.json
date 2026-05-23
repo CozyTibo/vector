@@ -2345,8 +2345,8 @@
   "trace_only_policy": {
     "schema_version": 1,
     "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
-    "updated_at": "2026-05-23T01:32:14.002245+00:00",
-    "last_prod_signoff_step": "step_b1_retrieval_publish_contract"
+    "updated_at": "2026-05-23T01:39:42.812252+00:00",
+    "last_prod_signoff_step": "step_b2_retrieval_epoch_scope_alignment"
   },
   "step_a5_trace_only_ban": {
     "validated_at": "2026-05-23T01:14:27.645370+00:00",
@@ -2462,6 +2462,42 @@
     "epochs_align": true,
     "entries_in_materialized_epoch": 1599,
     "building_epochs_inflight": 0,
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "step_b2_retrieval_epoch_scope_alignment": {
+    "validated_at": "2026-05-23T01:39:42.812201+00:00",
+    "closure_git_sha": "c334219fd5543e08f6378747ec4180ee87771bd5",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_b2_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "epoch_scope_alignment_schema_version": true,
+      "published_epoch_present": true,
+      "primary_island_scope_resolved": true,
+      "primary_island_entries_in_scope_gt_zero": true,
+      "fizzer_primary_island_in_scope_gt_zero": true,
+      "prod_signoff_valid": true
+    },
+    "checks_advisory": {
+      "primary_island_scope_id": "d7e41b3c763d38e9",
+      "fizzer_primary_island_scope_id": "d7e41b3c763d38e9",
+      "retrieval_entries_in_scope": 1200,
+      "fizzer_primary_in_scope": 1200,
+      "tagged_entries_on_published_epoch": 1200,
+      "realign_drive": null,
+      "latest_phase_07_retrieval_entries_in_scope": null,
+      "latest_phase_08_primary_island_in_scope": 1200
+    },
+    "wiring_ok": true,
+    "primary_island_scope_id": "d7e41b3c763d38e9",
+    "fizzer_primary_in_scope": 1200,
+    "retrieval_entries_in_scope": 1200,
+    "drive_realign": false,
+    "dry_run": false,
     "use_deployed_closure": true,
     "trace_only": false,
     "signoff_grade": "prod",

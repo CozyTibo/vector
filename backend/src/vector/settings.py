@@ -805,6 +805,14 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_RETRIEVAL_MIN_COMPONENT_ENTITIES",
         description="P1-C: minimum |V| in a connected component to scope retrieval materialization.",
     )
+    cortex_retrieval_epoch_scope_realign_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_RETRIEVAL_EPOCH_SCOPE_REALIGN",
+        description=(
+            "B2: when published retrieval epoch changes, realign island_scope_id tags on the "
+            "new epoch from the prior published epoch (lookup_id map)."
+        ),
+    )
     cortex_execution_dual_lane_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_EXECUTION_DUAL_LANE",

@@ -353,6 +353,24 @@ def run_phase_07_retrieval_v1(
                     index_epoch=published,
                 ),
             }
+        if out.get("retrieval_entries_in_scope") is None and published:
+            from vector.domains.cortex.retrieval.retrieval_epoch_scope_alignment import (
+                count_retrieval_entries_in_scope_v1,
+                resolve_primary_island_scope_id_v1,
+            )
+
+            scope_id = str(out.get("island_scope_id") or "") or resolve_primary_island_scope_id_v1(
+                session, tenant_id=tenant_id
+            )[0]
+            out = {
+                **out,
+                "retrieval_entries_in_scope": count_retrieval_entries_in_scope_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    published_index_epoch=published,
+                    island_scope_id=scope_id,
+                ),
+            }
         ret_class = classify_retrieval_materialization_outcome_v1(
             entries_materialized=int(out.get("entries_materialized") or out.get("entry_count") or 0),
             entry_count=int(out.get("entry_count") or 0),

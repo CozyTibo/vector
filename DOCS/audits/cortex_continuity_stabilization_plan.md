@@ -265,7 +265,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | Step | Goal | Why | Subsystem | Remove / simplify | Success | Validate | Rollback | Type |
 |------|------|-----|-----------|-------------------|---------|----------|----------|------|
 | **B1** | ~~**Single publish contract:** materialize → publish → same `index_epoch` on all new entries~~ **Done 2026-05-23** | Fixes B3 root cause | `retrieval_publish_contract.py`, component + pipeline mat, phase 07 | Stop publishing epoch before island mat completes | All new entries share `published_index_epoch` | SQL: epoch on entries = `get_published_index_epoch_v1` | Feature flag off island scope | **retrieval** |
-| **B2** | On epoch change: re-materialize primary island OR bump `island_scope` tags | Lawful invalidation | `materialize_retrieval_index_for_pipeline_v1` | N/A | `retrieval_entries_in_scope > 0` for current epoch | Per-island count in phase 08 output | Skip re-mat (slower) | **retrieval** |
+| **B2** | ~~On epoch change: re-materialize primary island OR bump `island_scope` tags~~ **Done 2026-05-23** | Lawful invalidation | `retrieval_epoch_scope_alignment.py`, pipeline/component mat, phase 07 | N/A | `retrieval_entries_in_scope > 0` for current epoch | Per-island count in phase 08 output | `CORTEX_RETRIEVAL_EPOCH_SCOPE_REALIGN=0` | **retrieval** |
 | **B3** | Wire phase 07 → registry `last_retrieval_epoch` on success | Inspect truth | `execution_island_registry.py` | Sync-on-inspect only → sync on publish | Registry epoch matches DB | `build_island_registry_inspect_v1` | Manual SQL update | **orchestration** |
 | **B4** | Phase 05: require `walks_persisted > 0` when scheduling eligible | Walks drive downstream | `phase_runners` phase 05, `schedule_octs_walks` | Empty COMPLETED_EMPTY walks | Receipt shows walks_persisted ≥ 1 | Phase 05 `output_json` | Loosen threshold | **runtime** |
 | **B5** | Graph-hash trigger → walk → TCRE → 07 chain (one integration test) | Proves autonomous chain | `execution_event_triggers.py`, dual-lane | Manual full slices only | End-to-end without unlock in CI | Integration test + prod SQL window | Disable trigger | **orchestration** |
@@ -917,9 +917,56 @@ GROUP BY 1 ORDER BY MAX(created_at) DESC;
 - [x] Per-entry materialization cannot publish mid-pass while `BUILDING`
 - [x] Phase 07 receipt carries published epoch + contract audit
 - [x] Static wiring + proof evaluator + CI gate
-- [ ] B-G1 full (100% island tags on **new** passes) — partial until post-deploy recurrence (B2)
+- [x] B-G1 full (100% island tags on **new** passes) — **done (B.2 idempotent omission merge + epoch realign)**
 
-**Next step:** **B2** — epoch-change re-materialization and island scope tag alignment on published epoch.
+**Next step:** ~~**B1**~~ → ~~**B2**~~ → **B3** — wire phase 07 → registry `last_retrieval_epoch` on publish.
+
+---
+
+## Step B.2 completion — retrieval epoch / island scope alignment
+
+**Completed:** 2026-05-23  
+**Goal:** On published epoch change, keep primary island entries in scope for synthesis (R-REC-1 extension / B-G2).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Alignment module | `retrieval_epoch_scope_alignment.py` — in-scope counts, prior-epoch tag realign, post-publish reconcile |
+| Idempotent mat | `materialize_retrieval_index_entry_v1` merges `omission_summary` (including `island_scope_id`) when updating existing lookup rows |
+| Pipeline mat | Component + global paths call `reconcile_primary_island_scope_on_epoch_change_v1` after publish |
+| Phase 07 | Receipt includes `retrieval_entries_in_scope` when missing from mat stats |
+| Settings | `CORTEX_RETRIEVAL_EPOCH_SCOPE_REALIGN` (default on) |
+| Proof | `continuity_p0_retrieval_epoch_scope_alignment.py` + `continuity_p0_phase_b2_retrieval_epoch_scope_alignment_proof.py` |
+| CI | `.github/workflows/deploy.yml` — B.2 pytest gate |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b2_retrieval_epoch_scope_alignment_proof.py \
+  --use-deployed-closure
+```
+
+Auto-runs tag realign from prior published epoch when Fizzer primary in-scope count is zero. Use `--drive-realign` to force; `--dry-run` to probe without commit.
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `published_index_epoch` | `epoch-fb8c13c67db3` |
+| `primary_island_scope_id` | `d7e41b3c763d38e9` |
+| `retrieval_entries_in_scope` | 1200 |
+| `fizzer_primary_in_scope` | 1200 |
+| `latest_phase_08_primary_island_in_scope` | 1200 |
+| `p0_b2_pass` | true |
+
+### Exit gates
+
+- [x] Epoch-change reconcile wired on pipeline materialization
+- [x] Existing entry updates preserve/bump `island_scope_id`
+- [x] Phase 07/08 expose `retrieval_entries_in_scope` for primary island
+- [x] B-G2: Fizzer primary island `d7e41b3c763d38e9` in-scope &gt; 0 on published epoch (prod proof)
+
+**Next step:** **B3** — sync `execution_island_registry.last_retrieval_epoch` on publish.
 
 ---
 
