@@ -42,7 +42,8 @@ jobs:
             tests/vector/domains/cortex/synthesis/test_synthesis_per_island.py \
             tests/vector/domains/cortex/retrieval/test_retrieval_publish_contract.py \
             tests/vector/domains/cortex/retrieval/test_retrieval_epoch_scope_alignment.py \
-            tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py
+            tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_retrieval_registry_epoch.py
 
   frontend:
     runs-on: ubuntu-latest

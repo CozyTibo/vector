@@ -2345,8 +2345,8 @@
   "trace_only_policy": {
     "schema_version": 1,
     "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
-    "updated_at": "2026-05-23T01:39:42.812252+00:00",
-    "last_prod_signoff_step": "step_b2_retrieval_epoch_scope_alignment"
+    "updated_at": "2026-05-23T01:45:54.841256+00:00",
+    "last_prod_signoff_step": "step_b3_retrieval_registry_epoch"
   },
   "step_a5_trace_only_ban": {
     "validated_at": "2026-05-23T01:14:27.645370+00:00",
@@ -2497,6 +2497,45 @@
     "fizzer_primary_in_scope": 1200,
     "retrieval_entries_in_scope": 1200,
     "drive_realign": false,
+    "dry_run": false,
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "step_b3_retrieval_registry_epoch": {
+    "validated_at": "2026-05-23T01:45:54.841230+00:00",
+    "closure_git_sha": "c334219fd5543e08f6378747ec4180ee87771bd5",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_b3_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "registry_publish_schema_version": true,
+      "published_epoch_present": true,
+      "registry_no_stale_epochs_vs_published": true,
+      "primary_island_registry_epoch_aligned": true,
+      "primary_island_in_scope_gt_zero": true,
+      "prod_signoff_valid": true
+    },
+    "checks_advisory": {
+      "published_index_epoch": "epoch-fb8c13c67db3",
+      "registry_rows_stale_vs_published": 0,
+      "registry_rows_in_scope_and_aligned": 1,
+      "primary_island": {
+        "island_scope_id": "d7e41b3c763d38e9",
+        "last_retrieval_epoch": "epoch-fb8c13c67db3",
+        "entries_in_scope_on_published": 1200,
+        "epoch_aligned": true
+      },
+      "registry_drive": null,
+      "latest_phase_07_has_registry_publish": true
+    },
+    "wiring_ok": true,
+    "published_index_epoch": "epoch-fb8c13c67db3",
+    "registry_rows_stale_vs_published": 0,
+    "primary_island_epoch_aligned": true,
+    "drive_sync": false,
     "dry_run": false,
     "use_deployed_closure": true,
     "trace_only": false,

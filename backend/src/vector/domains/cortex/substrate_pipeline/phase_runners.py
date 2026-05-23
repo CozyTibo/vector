@@ -379,6 +379,20 @@ def run_phase_07_retrieval_v1(
             org_link_candidates=int(out.get("org_link_candidates") or 0),
         )
         out["retrieval_outcome"] = ret_class
+        if published and bool(out.get("ok")):
+            from vector.domains.cortex.operational_runtime.execution_island_registry import (
+                record_retrieval_publish_on_island_registry_v1,
+            )
+
+            registry_publish = record_retrieval_publish_on_island_registry_v1(
+                session,
+                tenant_id=tenant_id,
+                published_index_epoch=published,
+                pipeline_run_id=pipeline_run_id,
+            )
+            out = {**out, "island_registry_publish": registry_publish}
+            if out.get("island_registry_sync") is None:
+                out["island_registry_sync"] = registry_publish
         return complete_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,

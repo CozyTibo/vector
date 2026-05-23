@@ -130,18 +130,18 @@ def finalize_pipeline_retrieval_index_build_v1(
         "publish_contract_audit": audit,
         "ok": published.build_state == "PUBLISHED" and bool(audit.get("epochs_align")),
     }
-    if sync_island_registry and pipeline_run_id is not None:
+    if sync_island_registry:
         try:
             from vector.domains.cortex.operational_runtime.execution_island_registry import (
-                is_execution_island_registry_enabled_v1,
-                sync_execution_island_registry_v1,
+                record_retrieval_publish_on_island_registry_v1,
             )
 
-            if is_execution_island_registry_enabled_v1():
-                out["island_registry_sync"] = sync_execution_island_registry_v1(
-                    session,
-                    tenant_id=tenant_id,
-                )
+            out["island_registry_sync"] = record_retrieval_publish_on_island_registry_v1(
+                session,
+                tenant_id=tenant_id,
+                published_index_epoch=str(out.get("published_index_epoch") or index_epoch),
+                pipeline_run_id=pipeline_run_id,
+            )
         except Exception as exc:  # noqa: BLE001
             out["island_registry_sync"] = {"synced": False, "error": str(exc)[:500]}
     return out

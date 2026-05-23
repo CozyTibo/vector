@@ -266,7 +266,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 |------|------|-----|-----------|-------------------|---------|----------|----------|------|
 | **B1** | ~~**Single publish contract:** materialize → publish → same `index_epoch` on all new entries~~ **Done 2026-05-23** | Fixes B3 root cause | `retrieval_publish_contract.py`, component + pipeline mat, phase 07 | Stop publishing epoch before island mat completes | All new entries share `published_index_epoch` | SQL: epoch on entries = `get_published_index_epoch_v1` | Feature flag off island scope | **retrieval** |
 | **B2** | ~~On epoch change: re-materialize primary island OR bump `island_scope` tags~~ **Done 2026-05-23** | Lawful invalidation | `retrieval_epoch_scope_alignment.py`, pipeline/component mat, phase 07 | N/A | `retrieval_entries_in_scope > 0` for current epoch | Per-island count in phase 08 output | `CORTEX_RETRIEVAL_EPOCH_SCOPE_REALIGN=0` | **retrieval** |
-| **B3** | Wire phase 07 → registry `last_retrieval_epoch` on success | Inspect truth | `execution_island_registry.py` | Sync-on-inspect only → sync on publish | Registry epoch matches DB | `build_island_registry_inspect_v1` | Manual SQL update | **orchestration** |
+| **B3** | ~~Wire phase 07 → registry `last_retrieval_epoch` on success~~ **Done 2026-05-23** | Inspect truth | `execution_island_registry.py`, phase 07, publish contract | Sync-on-inspect only → sync on publish | Registry epoch matches DB | `build_island_registry_inspect_v1` (read-only default) | Disable registry / manual sync | **orchestration** |
 | **B4** | Phase 05: require `walks_persisted > 0` when scheduling eligible | Walks drive downstream | `phase_runners` phase 05, `schedule_octs_walks` | Empty COMPLETED_EMPTY walks | Receipt shows walks_persisted ≥ 1 | Phase 05 `output_json` | Loosen threshold | **runtime** |
 | **B5** | Graph-hash trigger → walk → TCRE → 07 chain (one integration test) | Proves autonomous chain | `execution_event_triggers.py`, dual-lane | Manual full slices only | End-to-end without unlock in CI | Integration test + prod SQL window | Disable trigger | **orchestration** |
 | **B6** | Post-ingestion **new pipeline run** after graph change (not only recover in place) | Fresh 03/04/05 receipts | `orchestrator.py`, `start_substrate_pipeline_run_v1` | Eternal `ce7df86d` mirror | New run id OR phases 03–05 re-run timestamps | SQL phase `started_at` | Keep old run | **orchestration** |
@@ -919,7 +919,7 @@ GROUP BY 1 ORDER BY MAX(created_at) DESC;
 - [x] Static wiring + proof evaluator + CI gate
 - [x] B-G1 full (100% island tags on **new** passes) — **done (B.2 idempotent omission merge + epoch realign)**
 
-**Next step:** ~~**B1**~~ → ~~**B2**~~ → **B3** — wire phase 07 → registry `last_retrieval_epoch` on publish.
+**Next step:** ~~**B1**~~ → ~~**B2**~~ → ~~**B3**~~ → **B4** — phase 05 walks persisted gate.
 
 ---
 
@@ -966,7 +966,69 @@ Auto-runs tag realign from prior published epoch when Fizzer primary in-scope co
 - [x] Phase 07/08 expose `retrieval_entries_in_scope` for primary island
 - [x] B-G2: Fizzer primary island `d7e41b3c763d38e9` in-scope &gt; 0 on published epoch (prod proof)
 
-**Next step:** **B3** — sync `execution_island_registry.last_retrieval_epoch` on publish.
+**Next step:** ~~**B3**~~ → **B4** — phase 05 requires `walks_persisted > 0` when scheduling eligible.
+
+---
+
+## Step B.3 completion — island registry `last_retrieval_epoch` on publish
+
+**Completed:** 2026-05-23  
+**Goal:** Registry rows reflect the DB published retrieval epoch after phase 07 (B-G5 / R-REC-1 law item 4).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Registry resolver | `resolve_last_retrieval_epoch_for_scope_v1` — uses `get_published_index_epoch_v1` when island has in-scope entries (not max tagged epoch string) |
+| Publish hook | `record_retrieval_publish_on_island_registry_v1` — full registry sync + `audit_registry_published_epoch_alignment_v1` |
+| Publish contract | `finalize_pipeline_retrieval_index_build_v1` calls publish hook (no longer raw sync-only) |
+| Phase 07 | `run_phase_07_retrieval_v1` attaches `island_registry_publish` on success |
+| Inspect | `build_island_registry_inspect_v1(sync=False)` default — sync on publish, not every inspect |
+| Proof | `continuity_p0_retrieval_registry_epoch.py` + `continuity_p0_phase_b3_retrieval_registry_epoch_proof.py` |
+| CI | `ci.yml` includes B.3 proof evaluator tests |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b3_retrieval_registry_epoch_proof.py \
+  --use-deployed-closure
+```
+
+Auto-runs registry rebuild when rows are stale vs published epoch. Use `--drive-sync` to force; `--dry-run` to probe without commit.
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `published_index_epoch` | `epoch-fb8c13c67db3` |
+| Primary `last_retrieval_epoch` | `epoch-fb8c13c67db3` (aligned) |
+| `registry_rows_stale_vs_published` | 0 |
+| `entries_in_scope_on_published` (primary) | 1200 |
+| `p0_b3_pass` | true |
+
+### SQL (B-G5 — operator)
+
+```sql
+SELECT r.island_scope_id, r.last_retrieval_epoch, p.published_epoch
+FROM cortex_execution_island_registry r
+CROSS JOIN (
+  SELECT index_epoch AS published_epoch
+  FROM cortex_retrieval_index_epochs
+  WHERE tenant_id = 'c08ef32b-f89a-40f6-9566-e19b5329436f'
+    AND build_state = 'PUBLISHED'
+  ORDER BY published_at DESC NULLS LAST
+  LIMIT 1
+) p
+WHERE r.tenant_id = 'c08ef32b-f89a-40f6-9566-e19b5329436f';
+```
+
+### Exit gates
+
+- [x] `last_retrieval_epoch` derived from published getter when in-scope entries exist
+- [x] Phase 07 publish path syncs registry and records audit on receipt
+- [x] Inspect default is read-only (`sync=False`)
+- [x] B-G5: primary island registry epoch aligned with published epoch (prod proof)
+
+**Next step:** **B4** — phase 05 `walks_persisted > 0` when scheduling eligible.
 
 ---
 

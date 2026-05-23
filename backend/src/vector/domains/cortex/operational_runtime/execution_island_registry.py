@@ -32,7 +32,10 @@ from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexR
 from vector.infrastructure.db.models.cortex_octs_durable_walk_record import CortexOctsDurableWalkRecord
 
 P2_C_REGISTRY_SCHEMA_VERSION_V1: Final[int] = 1
+RETRIEVAL_REGISTRY_PUBLISH_SCHEMA_VERSION_V1: Final[int] = 1
+P0_B3_STEP: Final[str] = "step_b3_retrieval_registry_epoch"
 DEFAULT_MAX_ENTITY_IDS_PERSISTED_V1: Final[int] = 512
+FIZZER_PRIMARY_ISLAND_SCOPE_ID_V1: Final[str] = "d7e41b3c763d38e9"
 
 
 def is_execution_island_registry_enabled_v1() -> bool:
@@ -102,12 +105,13 @@ def _last_walk_at_for_island_v1(
     return latest
 
 
-def _last_retrieval_epoch_for_scope_v1(
+def _max_tagged_retrieval_epoch_for_scope_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
     island_scope_id: str,
 ) -> str | None:
+    """Legacy fallback: max ``index_epoch`` among island-tagged entries (any publish state)."""
     epochs: list[str] = []
     for row in session.scalars(
         select(CortexRetrievalIndexEntry).where(CortexRetrievalIndexEntry.tenant_id == tenant_id)
@@ -118,6 +122,56 @@ def _last_retrieval_epoch_for_scope_v1(
     if not epochs:
         return None
     return max(epochs)
+
+
+def resolve_last_retrieval_epoch_for_scope_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    island_scope_id: str,
+    published_index_epoch: str | None = None,
+) -> str | None:
+    """Prefer tenant ``PUBLISHED`` epoch when island has in-scope entries (B3 inspect truth)."""
+    from vector.domains.cortex.retrieval.retrieval_epoch_scope_alignment import (
+        count_retrieval_entries_in_scope_v1,
+    )
+    from vector.domains.cortex.retrieval.retrieval_index_materialization import (
+        get_published_index_epoch_v1,
+    )
+
+    scope = island_scope_id.strip()
+    if not scope:
+        return None
+    published = (published_index_epoch or "").strip() or get_published_index_epoch_v1(
+        session, tenant_id=tenant_id
+    )
+    if published:
+        in_scope = count_retrieval_entries_in_scope_v1(
+            session,
+            tenant_id=tenant_id,
+            published_index_epoch=published,
+            island_scope_id=scope,
+        )
+        if in_scope > 0:
+            return published
+    return _max_tagged_retrieval_epoch_for_scope_v1(
+        session,
+        tenant_id=tenant_id,
+        island_scope_id=scope,
+    )
+
+
+def _last_retrieval_epoch_for_scope_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    island_scope_id: str,
+) -> str | None:
+    return resolve_last_retrieval_epoch_for_scope_v1(
+        session,
+        tenant_id=tenant_id,
+        island_scope_id=island_scope_id,
+    )
 
 
 def _entity_ids_payload_v1(
@@ -198,6 +252,120 @@ def sync_execution_island_registry_v1(
     }
 
 
+def audit_registry_published_epoch_alignment_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    published_index_epoch: str | None = None,
+) -> dict[str, Any]:
+    """B-G5: registry ``last_retrieval_epoch`` vs DB published getter."""
+    from vector.domains.cortex.retrieval.retrieval_epoch_scope_alignment import (
+        count_retrieval_entries_in_scope_v1,
+    )
+    from vector.domains.cortex.retrieval.retrieval_index_materialization import (
+        get_published_index_epoch_v1,
+    )
+
+    published = (published_index_epoch or "").strip() or get_published_index_epoch_v1(
+        session, tenant_id=tenant_id
+    )
+    islands = list_execution_island_registry_v1(session, tenant_id=tenant_id)
+    row_audits: list[dict[str, Any]] = []
+    stale_rows = 0
+    aligned_with_in_scope = 0
+    for row in islands:
+        scope_id = str(row.get("island_scope_id") or "")
+        last_epoch = str(row.get("last_retrieval_epoch") or "")
+        in_scope = (
+            count_retrieval_entries_in_scope_v1(
+                session,
+                tenant_id=tenant_id,
+                published_index_epoch=published or "",
+                island_scope_id=scope_id,
+            )
+            if published and scope_id
+            else 0
+        )
+        aligned = bool(published) and last_epoch == published
+        if in_scope > 0 and not aligned:
+            stale_rows += 1
+        if in_scope > 0 and aligned:
+            aligned_with_in_scope += 1
+        row_audits.append(
+            {
+                "island_scope_id": scope_id,
+                "last_retrieval_epoch": last_epoch or None,
+                "entries_in_scope_on_published": in_scope,
+                "epoch_aligned": aligned,
+            }
+        )
+    primary = next(
+        (r for r in row_audits if r["island_scope_id"] == FIZZER_PRIMARY_ISLAND_SCOPE_ID_V1),
+        None,
+    )
+    return {
+        "published_index_epoch": published,
+        "registry_row_count": len(islands),
+        "registry_rows_epoch_aligned": sum(1 for r in row_audits if r["epoch_aligned"]),
+        "registry_rows_with_in_scope_on_published": sum(
+            1 for r in row_audits if int(r["entries_in_scope_on_published"] or 0) > 0
+        ),
+        "registry_rows_in_scope_and_aligned": aligned_with_in_scope,
+        "registry_rows_stale_vs_published": stale_rows,
+        "primary_island": primary,
+        "primary_island_epoch_aligned": bool(
+            primary and primary.get("epoch_aligned") and int(primary.get("entries_in_scope_on_published") or 0) > 0
+        ),
+        "row_audits": row_audits[:16],
+    }
+
+
+def record_retrieval_publish_on_island_registry_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    published_index_epoch: str | None = None,
+    pipeline_run_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Phase 07 publish hook — rebuild registry so ``last_retrieval_epoch`` matches DB."""
+    from vector.domains.cortex.retrieval.retrieval_index_materialization import (
+        get_published_index_epoch_v1,
+    )
+
+    published = (published_index_epoch or "").strip() or get_published_index_epoch_v1(
+        session, tenant_id=tenant_id
+    )
+    out: dict[str, Any] = {
+        "registry_publish_schema_version": RETRIEVAL_REGISTRY_PUBLISH_SCHEMA_VERSION_V1,
+        "published_index_epoch": published,
+        "pipeline_run_id": str(pipeline_run_id) if pipeline_run_id else None,
+    }
+    if not published:
+        out.update({"synced": False, "reason": "no_published_index_epoch"})
+        return out
+    if not is_execution_island_registry_enabled_v1():
+        out.update({"synced": False, "reason": "registry_disabled"})
+        out["registry_epoch_audit"] = audit_registry_published_epoch_alignment_v1(
+            session,
+            tenant_id=tenant_id,
+            published_index_epoch=published,
+        )
+        return out
+    sync_result = sync_execution_island_registry_v1(session, tenant_id=tenant_id)
+    audit = audit_registry_published_epoch_alignment_v1(
+        session,
+        tenant_id=tenant_id,
+        published_index_epoch=published,
+    )
+    out.update(sync_result)
+    out["registry_epoch_audit"] = audit
+    out["registry_epoch_aligned"] = (
+        int(audit.get("registry_rows_stale_vs_published") or 0) == 0
+        and bool(audit.get("primary_island_epoch_aligned"))
+    )
+    return out
+
+
 def list_execution_island_registry_v1(
     session: Session,
     *,
@@ -233,9 +401,9 @@ def build_island_registry_inspect_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
-    sync: bool = True,
+    sync: bool = False,
 ) -> dict[str, Any]:
-    """Admin inspect block: propagation schedule + persisted islands."""
+    """Admin inspect block: propagation schedule + persisted islands (B3: sync on publish, not inspect)."""
     orphans = classify_tenant_graph_orphans_v1(session, tenant_id=tenant_id)
     entity_count = count_active_org_entities_v1(session, tenant_id=tenant_id)
     propagation = evaluate_traversal_propagation_v1(
