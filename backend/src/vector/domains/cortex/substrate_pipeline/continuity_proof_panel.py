@@ -53,7 +53,7 @@ from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import (
 P2_2_STEP = "2.2_continuity_proof_panel"
 DEFAULT_TENANT_ID = uuid.UUID("c08ef32b-f89a-40f6-9566-e19b5329436f")
 
-STRICT_AA_PANEL_SCHEMA_VERSION_V1 = 2
+STRICT_AA_PANEL_SCHEMA_VERSION_V1 = 3
 
 AA_GATE_IDS_V1: Final[tuple[str, ...]] = (
     "AA1",
@@ -333,28 +333,28 @@ def evaluate_aa5_synthesis_started_v1(
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID | None,
 ) -> dict[str, Any]:
-    """AA5 — phase 08 started_at present (FG-7: receipt required for autonomous synthesis)."""
+    """AA5 — synthesis jobs_completed > 0 or lawful empty (C5; not merely started)."""
+    from vector.domains.cortex.synthesis.phase_c5_aa5_synthesis_jobs_completed_gate import (
+        evaluate_aa5_synthesis_jobs_completed_gate_v1,
+    )
+
     run = _resolve_pipeline_run_v1(
         session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id
     )
     started_at = None
     status = None
+    phase08: dict[str, Any] = {}
     if run is not None:
         row = get_phase_run_v1(session, pipeline_run_id=run.id, phase_id=PHASE_08_SYNTHESIS)
         if row is not None:
             started_at = row.started_at.isoformat() if row.started_at else None
             status = row.status
-    passed = started_at is not None
-    return _gate(
-        "AA5",
-        verdict="PASS" if passed else "FAIL",
-        criterion="phase_08.started_at IS NOT NULL",
-        evidence={
-            "pipeline_run_id": str(run.id) if run else None,
-            "phase_08_status": status,
-            "phase_08_started_at": started_at,
-        },
-        detail="synthesis_phase_started" if passed else "phase_08_never_started",
+        phase08 = _phase08_output_evidence_v1(session, pipeline_run_id=run.id)
+    return evaluate_aa5_synthesis_jobs_completed_gate_v1(
+        phase08,
+        phase_08_started_at=started_at,
+        phase_08_status=status,
+        pipeline_run_id=str(run.id) if run else None,
     )
 
 

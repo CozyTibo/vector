@@ -542,6 +542,14 @@ class Settings(BaseSettings):
             "scheduled scope fails (rollback: set false to swallow per-scope errors)."
         ),
     )
+    cortex_aa5_require_jobs_completed: bool = Field(
+        default=True,
+        validation_alias="CORTEX_AA5_REQUIRE_JOBS_COMPLETED",
+        description=(
+            "Phase C5: AA5 PASS only when phase_08 jobs_completed > 0 or lawful empty. "
+            "Rollback false: started-only synthesis surfaces as ADVISORY not FAIL."
+        ),
+    )
     cortex_synthesis_job_running_stale_seconds: int = Field(
         default=86_400,
         ge=60,

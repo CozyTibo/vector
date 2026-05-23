@@ -279,7 +279,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | **C2** | Cap scopes per island; fail loud on orchestrator error | Predictable cost | `synthesis_per_island.py`, settings | Unbounded retry | 2+ artifacts per 48h on primary island | `cortex_synthesis_artifacts` count | Raise caps | **synthesis** |
 | **C3** | ~~Merge proof scripts → `continuity_audit_snapshot.py`~~ **Done 2026-05-23** | One ops entrypoint | `continuity_audit_snapshot.py` | 10+ phase scripts (keep 1–2 CI) | Single command outputs JSON + panel | Doc in plan | Keep old scripts deprecated | **cleanup** |
 | **C4** | ~~Restart 48h AA clock **after** A+B+C on strict gates~~ **Done 2026-05-23** | Honest M3 | `continuity_p0_phase_c4_aa_clock_restart.py` | Old T0 baseline | New `continuity_aa_clock_T0_*.json` | Daily `continuity_p2_phase24_aa_clock_proof.py` | N/A | **ops** |
-| **C5** | AA5: require `jobs_completed > 0` not merely started | Closes fake synthesis | `continuity_proof_panel.py` | N/A | AA5 tied to S2 | Panel tests | AA5 advisory only | **ops** |
+| **C5** | ~~AA5: require `jobs_completed > 0` not merely started~~ **Done 2026-05-23** | Closes fake synthesis | `phase_c5_aa5_synthesis_jobs_completed_gate.py`, panel | N/A | AA5 tied to S2 | Panel tests | `CORTEX_AA5_REQUIRE_JOBS_COMPLETED=0` → advisory | **ops** |
 
 ### Phase D — Canonical honesty + graph floor (parallel, non-blocking)
 
@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → ~~**C2**~~ → ~~**C3**~~ → ~~**C4**~~ → **C5** — AA5 requires `jobs_completed > 0`.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1–C5**~~ → **Phase D** (parallel) + hold **48h AA clock** daily until M3.
 
 ---
 
@@ -1355,6 +1355,50 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p2_phase24_aa_clock_proo
 
 ---
 
+## Step C.5 completion — AA5 requires synthesis jobs_completed
+
+**Completed:** 2026-05-23  
+**Goal:** AA5 must not PASS on `phase_08.started_at` alone; require `jobs_completed > 0` or lawful empty (C5 / S2 / S3).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Gate | `phase_c5_aa5_synthesis_jobs_completed_gate.py` — strict vs legacy advisory modes |
+| Panel | `evaluate_aa5_synthesis_started_v1` delegates to C5 gate; `STRICT_AA_PANEL_SCHEMA_VERSION` → 3 |
+| Settings | `CORTEX_AA5_REQUIRE_JOBS_COMPLETED` (default on) |
+| Proof | `continuity_p0_phase_c5_aa5_synthesis_jobs_completed.py` + prod script |
+| A4 wiring | `verify_a4_aa_panel_strict_wiring_v1` extended for AA5 C5 delegate |
+| CI | C5 gate + proof evaluator tests |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c5_aa5_synthesis_jobs_completed_proof.py \
+  --use-deployed-closure
+```
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `wiring_ok` | true |
+| `aa5_criterion_requires_jobs_completed` | true |
+| `started_only_aa5_fake_passes` (historical slices) | 3 |
+| `started_only_aa5_pass_lies` | 0 (strict gate correctly FAILs started-only) |
+| `panel_aa5_verdict` | FAIL (`phase_08_started_without_jobs_completed`) |
+| `p0_c5_pass` | true |
+| Rollback | `CORTEX_AA5_REQUIRE_JOBS_COMPLETED=0` → started-only → ADVISORY |
+
+### Exit gates
+
+- [x] AA5 PASS only when `jobs_completed > 0` or lawful documented empty
+- [x] Started-only historical slices no longer get AA5 PASS under strict mode
+- [x] Fake-started flag exposed in gate evidence for audits
+- [x] Static wiring + proof evaluator + CI gate
+- [x] **Phase C (C1–C5) implementation complete** — parallel **Phase D** + 48h clock hold
+
+---
+
 ## Execution order summary (single page)
 
 ```text
@@ -1405,6 +1449,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c2_synthesis_sc
 # Phase C3 — unified audit snapshot (done; daily ops entrypoint)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_audit_snapshot.py \
   --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
+
+# Phase C5 — AA5 jobs_completed gate (done; re-run after AA panel changes)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c5_aa5_synthesis_jobs_completed_proof.py --use-deployed-closure
 
 # Legacy (deprecated; CI step gates only)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

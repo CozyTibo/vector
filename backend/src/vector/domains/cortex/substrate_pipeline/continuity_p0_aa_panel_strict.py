@@ -33,6 +33,15 @@ def verify_a4_aa_panel_strict_wiring_v1() -> dict[str, Any]:
             errors.append("aa6_mat_only_fallback_still_present")
     if "untreated_decreased" not in aa6_src and "progress_made_in_window" not in aa6_src:
         errors.append("aa6_missing_drainable_motion_signals")
+    from vector.domains.cortex.substrate_pipeline.continuity_proof_panel import (
+        evaluate_aa5_synthesis_started_v1,
+    )
+
+    aa5_src = inspect.getsource(evaluate_aa5_synthesis_started_v1)
+    if "evaluate_aa5_synthesis_jobs_completed_gate_v1" not in aa5_src:
+        errors.append("aa5_missing_c5_jobs_completed_gate")
+    if "evaluate_aa5_synthesis_jobs_completed_gate_v1" not in aa5_src:
+        errors.append("aa5_still_started_only_evaluator")
     return {"wiring_ok": not errors, "errors": errors}
 
 
