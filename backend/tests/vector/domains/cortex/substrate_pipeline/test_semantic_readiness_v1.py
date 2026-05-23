@@ -49,6 +49,17 @@ def test_semantic_readiness_empty_tenant(db_session: Session) -> None:
     assert g["primary_metric_key"] == "unique_auth_pairs"
     assert g["auth_edge_rows_deprecated_primary"] is True
     assert snap["retrieval"]["published_index_epoch"] is None
+    panel = snap["semantic_operator_panel"]
+    assert len(panel) == 6
+    keys = {m["key"] for m in panel}
+    assert keys == {
+        "unique_auth_pairs",
+        "promotion_rule_count",
+        "retrieval_org_link_pct",
+        "retrieval_execution_index_pct",
+        "synthesis_published_claims_7d",
+        "retrieval_freshness_minutes",
+    }
     text = format_semantic_readiness_text_v1(snap)
     assert "Unique auth pairs" in text
 

@@ -396,6 +396,59 @@ def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
     }
 
 
+def build_semantic_operator_panel_v1(
+    *,
+    graph: dict[str, Any],
+    retrieval: dict[str, Any],
+    synthesis: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Wave S5 step 23 — six operator metrics (phase plan §9)."""
+    return [
+        {
+            "key": "unique_auth_pairs",
+            "label": "Unique auth pairs",
+            "value": graph.get("unique_auth_pairs"),
+            "severity": graph.get("dup_factor_severity"),
+            "green_rule": "dup_factor ≤ 1.05; pairs ↑ week-over-week",
+        },
+        {
+            "key": "promotion_rule_count",
+            "label": "Promotion rules (with edges)",
+            "value": graph.get("promotion_rule_count"),
+            "severity": "ok" if int(graph.get("promotion_rule_count") or 0) >= PROMOTION_RULE_COUNT_GREEN_MIN else "bad",
+            "green_rule": f"≥ {PROMOTION_RULE_COUNT_GREEN_MIN}",
+        },
+        {
+            "key": "retrieval_org_link_pct",
+            "label": "Retrieval org_link %",
+            "value": retrieval.get("org_link_pct"),
+            "severity": retrieval.get("org_link_pct_severity"),
+            "green_rule": f"≤ {RETRIEVAL_ORG_LINK_PCT_GREEN_MAX}%",
+        },
+        {
+            "key": "retrieval_execution_index_pct",
+            "label": "Retrieval execution index %",
+            "value": retrieval.get("execution_index_pct"),
+            "severity": retrieval.get("execution_index_pct_severity"),
+            "green_rule": f"≥ {RETRIEVAL_EXECUTION_PCT_GREEN_MIN}%",
+        },
+        {
+            "key": "synthesis_published_claims_7d",
+            "label": "Published claims (7d)",
+            "value": synthesis.get("published_claims_7d"),
+            "severity": synthesis.get("published_claims_7d_severity"),
+            "green_rule": "≥ 1 useful artifact / 7d",
+        },
+        {
+            "key": "retrieval_freshness_minutes",
+            "label": "Retrieval freshness (min)",
+            "value": retrieval.get("freshness_minutes"),
+            "severity": retrieval.get("freshness_minutes_severity"),
+            "green_rule": f"< {_retrieval_freshness_green_minutes_v1()} when ingest active",
+        },
+    ]
+
+
 def build_semantic_readiness_v1(
     session: Session,
     *,
@@ -406,6 +459,11 @@ def build_semantic_readiness_v1(
     identity = _query_identity_continuity_v1(session, tenant_id=tenant_id)
     retrieval = _query_retrieval_product_v1(session, tenant_id=tenant_id)
     synthesis = _query_synthesis_truth_v1(session, tenant_id=tenant_id)
+    operator_panel = build_semantic_operator_panel_v1(
+        graph=graph,
+        retrieval=retrieval,
+        synthesis=synthesis,
+    )
     return {
         "surface_kind": "semantic_readiness",
         "schema_version": SEMANTIC_READINESS_SCHEMA_VERSION,
@@ -416,6 +474,7 @@ def build_semantic_readiness_v1(
         "identity_continuity": identity,
         "retrieval": retrieval,
         "synthesis": synthesis,
+        "semantic_operator_panel": operator_panel,
         "thresholds": {
             "dup_factor_green_max": DUP_FACTOR_GREEN_MAX,
             "promotion_rule_count_green_min": PROMOTION_RULE_COUNT_GREEN_MIN,

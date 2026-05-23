@@ -189,6 +189,14 @@ export type SemanticIdentityContinuity = {
   second_link_type_policy?: string;
 };
 
+export type SemanticOperatorMetric = {
+  key: string;
+  label: string;
+  value?: number | string | null;
+  severity?: "ok" | "warn" | "bad" | "unknown";
+  green_rule?: string | null;
+};
+
 export type SemanticReadiness = {
   surface_kind?: string;
   schema_version?: number;
@@ -198,6 +206,7 @@ export type SemanticReadiness = {
   identity_continuity?: SemanticIdentityContinuity | null;
   retrieval: SemanticRetrievalProduct;
   synthesis: SemanticSynthesisTruth;
+  semantic_operator_panel?: SemanticOperatorMetric[];
   thresholds?: Record<string, number>;
 };
 
@@ -215,6 +224,8 @@ export type OperatorPrimaryKpi = {
   execution_islands: OperatorPrimaryKpiIsland[];
   deferral_counts?: Record<string, number>;
   deferral_omission?: DeferralOmissionPosture | null;
+  semantic_primary_active?: boolean;
+  hide_from_overview?: boolean;
 };
 
 export type PipelineOverview = {

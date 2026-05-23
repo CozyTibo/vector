@@ -78,6 +78,14 @@
 | S4.4 Empty-claims publish gate | Done | `synthesis_empty_claims_gate_v1.py` |
 | S4.5 Useful artifact + admin 7d claims | Done | `synthesis_useful_artifact_v1.py`, semantic readiness card |
 
+## Wave S5 — Cleanup (COMPLETE)
+
+| Step | Status | Artifact |
+|------|--------|----------|
+| S5.1 DELETE coordinator + fake KPIs | Done | `wave_s5_cleanup_v1.py`, `prod_substrate_proof_queries.py` deprecation, `pipeline_admin_operator_kpi.py` semantic-primary |
+| S5.2 SIMPLIFY ops surface | Done | `cortex_continuity_p0_ci_matrix.md`, `phase_display_label_v1`, continuity overview candidate pairs, `continuity_proof_panel.py` sign-off split |
+| S5.3 Six-metric semantic panel | Done | `semantic_operator_panel`, admin API + overview UI, `wave_s5_cleanup_fizzer_baseline.json` |
+
 ---
 
 ## 0. The phase transition (read this once)
@@ -675,13 +683,13 @@ FROM cortex_retrieval_index_entries WHERE tenant_id = :tenant;
 
 **Rollback:** Gates only — do not re-enable silent empty completion.
 
-### Wave S5 — Cleanup (parallel, ongoing)
+### Wave S5 — Cleanup (COMPLETE)
 
 | Task | Deliverable |
 |------|-------------|
-| S5.1 | Delete coordinator paths |
-| S5.2 | Collapse proof scripts in docs/CI |
-| S5.3 | Remove fake KPIs from overview |
+| S5.1 | Delete coordinator paths + deprecate vanity KPIs/scripts |
+| S5.2 | Collapse proof scripts in docs/CI; split continuity vs semantic admin |
+| S5.3 | Six-metric semantic operator panel on overview |
 
 ### Dependency graph
 

@@ -34,6 +34,7 @@ export default function AdminCortexOverviewPage() {
     executionQ.data?.continuity_status ?? phasesQ.data?.continuity_status ?? undefined;
   const operatorKpi =
     executionQ.data?.operator_primary_kpi ?? phasesQ.data?.operator_primary_kpi ?? undefined;
+  const hideLegacyPrimaryKpi = operatorKpi?.hide_from_overview === true;
   const semanticReadiness = executionQ.data?.semantic_readiness ?? undefined;
   const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
   const attentionItems = phasesQ.data?.attention_items ?? [];
@@ -63,10 +64,12 @@ export default function AdminCortexOverviewPage() {
         loading={(executionQ.isPending && !continuity) || (phasesQ.isPending && !continuity)}
       />
 
-      <OperatorPrimaryKpiCard
-        kpi={operatorKpi}
-        loading={(executionQ.isPending && !operatorKpi) || (phasesQ.isPending && !operatorKpi)}
-      />
+      {!hideLegacyPrimaryKpi ? (
+        <OperatorPrimaryKpiCard
+          kpi={operatorKpi}
+          loading={(executionQ.isPending && !operatorKpi) || (phasesQ.isPending && !operatorKpi)}
+        />
+      ) : null}
 
       <DeferralOmissionCard
         omission={operatorKpi?.deferral_omission ?? undefined}

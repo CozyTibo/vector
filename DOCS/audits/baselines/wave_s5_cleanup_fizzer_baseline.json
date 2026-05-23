@@ -1,0 +1,31 @@
+{
+  "baseline_kind": "wave_s5_cleanup",
+  "schema_version": 1,
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "tenant_label": "Fizzer",
+  "captured_at_utc": null,
+  "purpose": "Wave S5 operator cleanup — semantic-primary panel, two-script ops, no unlock runbooks.",
+  "operator_entrypoints": {
+    "continuity": "cd backend && python scripts/continuity_audit_snapshot.py --tenant-id c08ef32b-f89a-40f6-9566-e19b5329436f --json",
+    "semantic": "cd backend && python scripts/graph_truth_audit_snapshot.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json"
+  },
+  "semantic_operator_panel_keys": [
+    "unique_auth_pairs",
+    "promotion_rule_count",
+    "retrieval_org_link_pct",
+    "retrieval_execution_index_pct",
+    "synthesis_published_claims_7d",
+    "retrieval_freshness_minutes"
+  ],
+  "acceptance": {
+    "coordinator_enqueue_deleted": true,
+    "admin_hide_legacy_primary_kpi": true,
+    "aa_panel_not_semantic_signoff": true,
+    "prod_substrate_proof_queries_deprecated_exit_code": 2
+  },
+  "ci_matrix_doc": "DOCS/audits/cortex_continuity_p0_ci_matrix.md",
+  "notes": [
+    "Do not use prod_substrate_proof_queries or archive/unlock scripts for routine health.",
+    "M3 / AA PASS is continuity-only; green semantic panel requires graph/retrieval/synthesis metrics."
+  ]
+}

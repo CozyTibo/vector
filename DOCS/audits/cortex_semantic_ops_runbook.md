@@ -206,6 +206,18 @@ python scripts/synthesis_useful_artifact_bootstrap.py \
 
 Baseline: [`baselines/synthesis_usefulness_fizzer_wave_s4_baseline.json`](baselines/synthesis_usefulness_fizzer_wave_s4_baseline.json)
 
+## Wave S5 — Cleanup (COMPLETE)
+
+| Step | Deliverable |
+|------|-------------|
+| S5.1 DELETE | `wave_s5_cleanup_v1.py`, deprecated `prod_substrate_proof_queries.py` (exit 2), semantic-primary KPI path, unlock archive recovery-only |
+| S5.2 SIMPLIFY | [`cortex_continuity_p0_ci_matrix.md`](cortex_continuity_p0_ci_matrix.md), phase 03 `COMPLETED_EMPTY` label, distinct candidate pairs on graph card, AA panel ≠ semantic sign-off |
+| S5.3 Semantic panel | Six-metric `semantic_operator_panel` on API + admin overview; legacy primary KPI hidden |
+
+**Operate from the Semantic readiness card only** (six metrics). Continuity admin tab / `continuity_audit_snapshot.py` stay on the runtime track.
+
+Baseline template: [`baselines/wave_s5_cleanup_fizzer_baseline.json`](baselines/wave_s5_cleanup_fizzer_baseline.json)
+
 ---
 
 ## Do not use for routine ops
