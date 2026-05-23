@@ -471,6 +471,18 @@ def run_dual_lane_convergence_v1(
         detail=manifest,
     )
 
+    from vector.domains.cortex.operational_runtime.graph_density_promotion import (
+        schedule_graph_density_promotion_on_convergence_worker_v1,
+    )
+
+    manifest["graph_density_promotion_schedule"] = (
+        schedule_graph_density_promotion_on_convergence_worker_v1(
+            session,
+            tenant_id=tenant_id,
+            convergence_reason=f"dual_lane:{reason}",
+        )
+    )
+
     canon_result: dict[str, Any] | None = None
     if schedule["canonical_lane_owed"]:
         canon_result = _run_canonical_lane_slice_v1(

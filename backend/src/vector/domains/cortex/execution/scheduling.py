@@ -208,6 +208,29 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+def verify_d3_graph_promotion_on_convergence_worker_v1() -> list[str]:
+    """D3: promotion inline on convergence worker + Celery beat sweep (not legacy sidecar)."""
+    errors: list[str] = []
+    errors.extend(verify_m9_dead_celery_modules_absent_v1())
+    errors.extend(verify_convergence_sweep_in_celery_beat_v1())
+    from vector.domains.cortex.execution import run_tenant_execution as rte_mod
+
+    rte_src = inspect.getsource(rte_mod.run_tenant_convergence_v1)
+    if "schedule_graph_density_promotion_on_convergence_worker_v1" not in rte_src:
+        errors.append("run_tenant_convergence_missing_d3_promotion_hook")
+    from vector.domains.cortex.execution import dual_lane_worker as dl_mod
+
+    dl_src = inspect.getsource(dl_mod.run_dual_lane_convergence_v1)
+    if "schedule_graph_density_promotion_on_convergence_worker_v1" not in dl_src:
+        errors.append("dual_lane_convergence_missing_d3_promotion_hook")
+    from vector.domains.cortex.operational_runtime import graph_density_promotion as promo_mod
+
+    promo_src = inspect.getsource(promo_mod.schedule_graph_density_pass_v1)
+    if "inline_execution_slice" not in promo_src:
+        errors.append("schedule_graph_density_pass_missing_inline_path")
+    return errors
+
+
 def verify_phase03_identity_projection_boundary_v1() -> list[str]:
     """Return error codes if phase 03 still enqueues identity audit replay jobs ."""
     errors: list[str] = []

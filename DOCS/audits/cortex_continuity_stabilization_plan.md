@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1–C5**~~ → ~~**D1**~~ → ~~**D2**~~ → **D3** (parallel) + hold **48h AA clock** daily until M3.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1–C5**~~ → ~~**D1**~~ → ~~**D2**~~ → ~~**D3**~~ → **D5** (parallel) + hold **48h AA clock** daily until M3.
 
 ---
 
@@ -1456,7 +1456,7 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d1_admin_operat
 - [x] Static wiring + proof evaluator + CI gate
 - [ ] Prod baseline `step_d1_admin_operator_primary_kpi` (run prod script after deploy)
 
-**Next step:** ~~**D2**~~ → **D3** — graph promotion worker on schedule.
+**Next step:** ~~**D2**~~ → ~~**D3**~~ → **D5** — delete legacy coordinator enqueue paths.
 
 ---
 
@@ -1517,13 +1517,70 @@ Requires a deploy that ran the D2 cap-align steps (or manual ECS env at 10/16/12
 
 ---
 
+## Step D.3 completion — graph promotion on convergence schedule
+
+**Completed:** 2026-05-23  
+**Goal:** Verify lawful edge promotion runs inline on the convergence worker schedule (not legacy Celery sidecar or manual-only); authoritative links grow when candidates exist (D3 / D-G4 graph floor).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Convergence hook | `schedule_graph_density_promotion_on_convergence_worker_v1` — backlog-threshold inline pass per worker slice |
+| Trigger | `PROMOTION_TRIGGER_CONVERGENCE_SLICE` on `schedule_graph_density_pass_v1` |
+| Worker wiring | `run_tenant_convergence_v1` + `run_dual_lane_convergence_v1` call D3 hook each slice |
+| Lease manifest | `graph_density_promotion_schedule` on lease `detail_json` for ops visibility |
+| Settings | `CORTEX_GRAPH_DENSITY_PROMOTION_ON_CONVERGENCE` (default on; rollback → manual/phase-03 only) |
+| Static verify | `verify_d3_graph_promotion_on_convergence_worker_v1` in `scheduling.py` |
+| Proof | `continuity_p0_phase_d3_graph_promotion_schedule.py` + prod script (48h auth-link SQL trend) |
+| CI | D3 wiring + proof evaluator tests |
+
+### Validate (local)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python -m pytest \
+  tests/vector/domains/cortex/operational_runtime/test_graph_density_promotion_convergence_schedule.py \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d3_graph_promotion_schedule.py -q
+```
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_d3_graph_promotion_schedule_proof.py \
+  --use-deployed-closure
+```
+
+Use `--no-drive` for wiring-only (no live promotion passes on prod tenant).
+
+| Check | Expected |
+|-------|----------|
+| `m9_legacy_promotion_celery_absent` | true |
+| `convergence_worker_promotion_hook` | true |
+| `inline_execution_path_only` | `inline_execution_slice` |
+| `auth_links_48h_trend_snapshot_present` | true |
+| `auth_links_increase_when_candidates_exist` | true when candidates > 0 |
+| Rollback | `CORTEX_GRAPH_DENSITY_PROMOTION_ON_CONVERGENCE=0` |
+
+### Exit gates
+
+- [x] Promotion inline on every convergence worker slice (when backlog > threshold)
+- [x] Legacy `app.tasks.cortex_graph_density_promotion` still absent (M9)
+- [x] Convergence Celery beat sweep remains authoritative scheduler
+- [x] 48h authoritative-link trend SQL in proof snapshot
+- [x] Static wiring + proof evaluator + CI gate
+- [ ] Prod baseline `step_d3_graph_promotion_on_convergence_schedule` (after deploy + prod proof)
+
+---
+
 ## Execution order summary (single page)
 
 ```text
 Week 0 (incident):  A1 → A2 → A3 → A4 → A6
 Week 1 (heart):     B1 → B2 → B3 → B4 → B5 → B6
 Week 2 (truth):     C1 → C2 → C5 → C3 → C4 (restart 48h clock)
-Parallel:           ~~D1~~, ~~D2~~, D3, D5
+Parallel:           ~~D1~~, ~~D2~~, ~~D3~~, D5
 Ongoing:            Daily: continuity_audit_snapshot.py (--json)
 Banned:             unlock_step*, trace-only baseline sign-off
 ```

@@ -182,6 +182,19 @@ def run_tenant_convergence_v1(
             session.flush()
 
         bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
+        graph_density_promotion_schedule: dict[str, Any] | None = None
+        if bundle_id is not None:
+            from vector.domains.cortex.operational_runtime.graph_density_promotion import (
+                schedule_graph_density_promotion_on_convergence_worker_v1,
+            )
+
+            graph_density_promotion_schedule = (
+                schedule_graph_density_promotion_on_convergence_worker_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    convergence_reason=reason,
+                )
+            )
         if bundle_id is None:
             complete_convergence_lease_v1(session, lease=lease, pipeline_run_id=pipeline_run_id)
             session.commit()
@@ -443,6 +456,7 @@ def run_tenant_convergence_v1(
                 "pipeline_run_id": str(pipeline_run_id),
                 "lease_status": lease.status,
                 "fsm_state": lease.fsm_state,
+                "graph_density_promotion_schedule": graph_density_promotion_schedule,
             }
 
     except Exception as exc:  # noqa: BLE001

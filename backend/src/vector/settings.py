@@ -676,6 +676,14 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_GRAPH_DENSITY_PROMOTION_SCHEDULE_COUNTDOWN_SECONDS",
         description="G-P085-PROMO-01: Celery countdown before async promotion pass.",
     )
+    cortex_graph_density_promotion_on_convergence_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_GRAPH_DENSITY_PROMOTION_ON_CONVERGENCE",
+        description=(
+            "Phase D3: run inline graph-density promotion on each convergence worker slice "
+            "when unpromoted candidates exceed backlog threshold. Rollback false: manual/admin only."
+        ),
+    )
     cortex_orphan_stitching_sample_limit: int = Field(
         default=100,
         ge=1,

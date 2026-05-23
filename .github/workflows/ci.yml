@@ -62,7 +62,9 @@ jobs:
             tests/vector/domains/cortex/pipeline/test_pipeline_admin_operator_kpi.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d1_admin_operator_primary_kpi.py \
             tests/vector/domains/cortex/ingestion/test_github_ingest_caps_code_defaults.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d2_github_caps_align.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d2_github_caps_align.py \
+            tests/vector/domains/cortex/operational_runtime/test_graph_density_promotion_convergence_schedule.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d3_graph_promotion_schedule.py
 
   frontend:
     runs-on: ubuntu-latest

@@ -54,7 +54,10 @@ CELERY_GRAPH_DENSITY_PROMOTION_TASK_NAME_V1: Final[str] = (
 
 PROMOTION_TRIGGER_AFTER_PHASE_04_V1: Final[str] = "after_phase_04"
 PROMOTION_TRIGGER_BACKLOG_THRESHOLD_V1: Final[str] = "backlog_threshold"
+PROMOTION_TRIGGER_CONVERGENCE_SLICE_V1: Final[str] = "convergence_slice"
 PROMOTION_TRIGGER_MANUAL_V1: Final[str] = "manual"
+
+DETAIL_KEY_GRAPH_DENSITY_PROMOTION_SCHEDULE_V1: Final[str] = "graph_density_promotion_schedule"
 
 PROMOTION_RECEIPT_CLASS_LAWFUL_V1: Final[str] = "L0"
 
@@ -89,6 +92,15 @@ def get_promotion_require_replay_receipt_v1() -> bool:
         from vector.settings import get_settings
 
         return bool(get_settings().cortex_graph_density_promotion_require_replay_receipt)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def is_graph_density_promotion_on_convergence_enabled_v1() -> bool:
+    try:
+        from vector.settings import get_settings
+
+        return bool(get_settings().cortex_graph_density_promotion_on_convergence_enabled)
     except Exception:  # noqa: BLE001
         return True
 
@@ -205,9 +217,12 @@ def evaluate_promotion_backlog_schedule_v1(
     if trig == PROMOTION_TRIGGER_AFTER_PHASE_04_V1:
         should = unpromoted > 0
         reason = "after_phase_04_with_candidates" if should else "after_phase_04_no_candidates"
-    elif unpromoted > threshold:
+    elif trig in (
+        PROMOTION_TRIGGER_BACKLOG_THRESHOLD_V1,
+        PROMOTION_TRIGGER_CONVERGENCE_SLICE_V1,
+    ) and unpromoted > threshold:
         should = True
-        reason = PROMOTION_TRIGGER_BACKLOG_THRESHOLD_V1
+        reason = trig or PROMOTION_TRIGGER_BACKLOG_THRESHOLD_V1
     else:
         should = False
         reason = "backlog_below_threshold"
@@ -400,6 +415,61 @@ def public_graph_density_promotion_run_payload_v1(schedule_out: dict[str, Any]) 
     return schedule_out
 
 
+def record_graph_density_promotion_schedule_on_lease_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    schedule_out: dict[str, Any],
+    convergence_reason: str,
+) -> dict[str, Any]:
+    """Persist last inline promotion schedule outcome on execution lease (D3 observability)."""
+    from datetime import UTC, datetime
+
+    from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
+
+    lease = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
+    if lease is None:
+        return {"persisted": False, "reason": "no_lease"}
+    detail = dict(lease.detail_json or {})
+    manifest = {
+        "updated_at": datetime.now(UTC).isoformat(),
+        "convergence_reason": convergence_reason,
+        "scheduled": bool(schedule_out.get("scheduled")),
+        "path": schedule_out.get("path"),
+        "schedule_reason": (schedule_out.get("evaluation") or {}).get("schedule_reason")
+        or schedule_out.get("reason"),
+        "promoted_count": int((schedule_out.get("pass") or {}).get("promoted_count") or 0),
+    }
+    detail[DETAIL_KEY_GRAPH_DENSITY_PROMOTION_SCHEDULE_V1] = manifest
+    lease.detail_json = detail
+    session.flush()
+    return manifest
+
+
+def schedule_graph_density_promotion_on_convergence_worker_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    convergence_reason: str = "convergence_slice",
+) -> dict[str, Any] | None:
+    """D3: inline promotion pass on each convergence worker slice when backlog exceeds threshold."""
+    if not is_graph_density_promotion_on_convergence_enabled_v1():
+        return {"scheduled": False, "reason": "convergence_promotion_disabled"}
+    out = schedule_graph_density_pass_v1(
+        tenant_id=tenant_id,
+        trigger=PROMOTION_TRIGGER_CONVERGENCE_SLICE_V1,
+        force=False,
+        session=session,
+    )
+    record_graph_density_promotion_schedule_on_lease_v1(
+        session,
+        tenant_id=tenant_id,
+        schedule_out=out,
+        convergence_reason=convergence_reason,
+    )
+    return out
+
+
 def schedule_graph_density_pass_v1(
     *,
     tenant_id: uuid.UUID,
@@ -459,8 +529,10 @@ def build_graph_density_promotion_catalog_v1() -> dict[str, Any]:
         "promotion_triggers": [
             PROMOTION_TRIGGER_AFTER_PHASE_04_V1,
             PROMOTION_TRIGGER_BACKLOG_THRESHOLD_V1,
+            PROMOTION_TRIGGER_CONVERGENCE_SLICE_V1,
             PROMOTION_TRIGGER_MANUAL_V1,
         ],
+        "convergence_worker_schedule_enabled": is_graph_density_promotion_on_convergence_enabled_v1(),
         "max_per_pass": get_promotion_max_per_pass_v1(),
         "backlog_threshold": get_promotion_backlog_threshold_v1(),
         "require_org_link_replay_receipt": get_promotion_require_replay_receipt_v1(),
