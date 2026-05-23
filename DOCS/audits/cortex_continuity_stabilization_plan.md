@@ -278,7 +278,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | **C1** | ~~Phase 08 FAIL if scopes=0 but entries exist in epoch~~ **Done 2026-05-23** | Stop COMPLETED_EMPTY lie | `phase08_empty_scope_truth_gate.py`, phase 08 runner, AA1 | N/A | `jobs_completed ≥ 1` or explicit FAIL | Phase receipt + AA1 | `CORTEX_PHASE08_FAIL_ON_EMPTY_SCOPE_WITH_ENTRIES=0` | **synthesis** |
 | **C2** | Cap scopes per island; fail loud on orchestrator error | Predictable cost | `synthesis_per_island.py`, settings | Unbounded retry | 2+ artifacts per 48h on primary island | `cortex_synthesis_artifacts` count | Raise caps | **synthesis** |
 | **C3** | ~~Merge proof scripts → `continuity_audit_snapshot.py`~~ **Done 2026-05-23** | One ops entrypoint | `continuity_audit_snapshot.py` | 10+ phase scripts (keep 1–2 CI) | Single command outputs JSON + panel | Doc in plan | Keep old scripts deprecated | **cleanup** |
-| **C4** | Restart 48h AA clock **after** A+B+C on strict gates | Honest M3 | `continuity_p2_aa_clock.py` | Old T0 baseline | New `continuity_aa_clock_T0_*.json` | Daily `continuity_p2_phase24_aa_clock_proof.py` | N/A | **ops** |
+| **C4** | ~~Restart 48h AA clock **after** A+B+C on strict gates~~ **Done 2026-05-23** | Honest M3 | `continuity_p0_phase_c4_aa_clock_restart.py` | Old T0 baseline | New `continuity_aa_clock_T0_*.json` | Daily `continuity_p2_phase24_aa_clock_proof.py` | N/A | **ops** |
 | **C5** | AA5: require `jobs_completed > 0` not merely started | Closes fake synthesis | `continuity_proof_panel.py` | N/A | AA5 tied to S2 | Panel tests | AA5 advisory only | **ops** |
 
 ### Phase D — Canonical honesty + graph floor (parallel, non-blocking)
@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → ~~**C2**~~ → ~~**C3**~~ → **C5** (then **C4** 48h clock restart).
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → ~~**C2**~~ → ~~**C3**~~ → ~~**C4**~~ → **C5** — AA5 requires `jobs_completed > 0`.
 
 ---
 
@@ -1308,6 +1308,53 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_audit_snapshot.py \
 
 ---
 
+## Step C.4 completion — restart 48h AA clock after A+B+C
+
+**Completed:** 2026-05-23  
+**Goal:** Supersede false-green pre-ABC `continuity_aa_clock_T0` and restart the forty-eight-hour M3 hold clock only after Phase A+B+C prod sign-off (C4 / honest M3).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| C4 restart module | `continuity_p0_phase_c4_aa_clock_restart.py` — ABC prerequisite gate, supersede prior T0, C4 T0 builder, daily hold progress |
+| Prod proof | `continuity_p0_phase_c4_aa_clock_restart_proof.py` — archives pre-C4 T0, writes new T0 + `step_c4_aa48_clock_restart` |
+| Daily hold | `continuity_p2_phase24_aa_clock_proof.py` — reads C4 `clock_restart_generation` ≥ 2, updates `hold_hours_elapsed` |
+| Prereqs | 15 steps: A1–A6, B1–B6, C1–C3 must be `prod` sign-off (`trace_only: false`) |
+| CI | `test_continuity_p0_phase_c4_aa_clock_restart.py` |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c4_aa_clock_restart_proof.py \
+  --use-deployed-closure
+# Daily until 48h elapsed + AA1–AA7 PASS:
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p2_phase24_aa_clock_proof.py \
+  --use-deployed-closure --baseline-date 2026-05-22
+```
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `abc_prerequisites_all_pass` | true (15/15 steps) |
+| `prior_t0_superseded` | true (archived `continuity_aa_clock_T0_2026-05-22_superseded_pre_c4.json`) |
+| `clock_restart_generation` | 2 (C4) |
+| `clock_started_at` | 2026-05-23T02:59:15Z (new epoch) |
+| `all_aa_gates_pass_at_restart` | false (advisory — honest snapshot: AA1/AA5/AA6 FAIL) |
+| `p0_c4_pass` | true |
+| Rollback | restore archived T0 JSON; do not delete `step_c4_aa48_clock_restart` record |
+
+### Exit gates
+
+- [x] Phase A+B+C prerequisite baseline steps all prod-signed
+- [x] Pre-C4 false-green T0 superseded and archived
+- [x] New T0 records `clock_restart_generation: 2` and fresh `clock_started_at`
+- [x] Daily hold script reads C4 T0 and reports `hold_hours_elapsed`
+- [x] Static wiring + proof evaluator + CI gate
+- [x] **Phase C clock restarted** — cleared for **C5** and parallel **Phase D**
+
+---
+
 ## Execution order summary (single page)
 
 ```text
@@ -1366,8 +1413,11 @@ python scripts/prod_substrate_proof_queries.py
 # Deploy truth
 CONTINUITY_DEPLOY_GIT_SHA=$(git rev-parse HEAD) python scripts/record_continuity_p0_deploy.py
 
-# 48h clock (only after C4 restart)
-python scripts/continuity_p2_phase24_aa_clock_proof.py
+# Phase C4 — restart 48h AA clock after A+B+C (done; run once after deploy)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c4_aa_clock_restart_proof.py --use-deployed-closure
+
+# Daily 48h hold progress (after C4 restart)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p2_phase24_aa_clock_proof.py --use-deployed-closure --baseline-date 2026-05-22
 ```
 
 ---

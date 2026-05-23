@@ -43,6 +43,10 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_baseline import (
     probe_prod_ecs_deploy_v1,
     save_continuity_p0_baseline_v1,
 )
+from vector.domains.cortex.substrate_pipeline.continuity_p0_phase_c4_aa_clock_restart import (
+    evaluate_aa_clock_hold_progress_v1,
+    load_aa_clock_t0_baseline_v1,
+)
 from vector.domains.cortex.substrate_pipeline.continuity_p2_aa_clock import (
     CONTINUITY_AA_HOLD_HOURS_V1,
     build_aa_clock_t0_baseline_v1,
@@ -74,7 +78,12 @@ def _git_sha(expected: str | None) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Phase 2.4 — start 48h AA M3 hold clock (T0)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Phase 2.4 — daily 48h AA hold check (use continuity_p0_phase_c4_aa_clock_restart_proof "
+            "for initial restart after A+B+C)"
+        )
+    )
     parser.add_argument("--tenant", default=TENANT_DEFAULT)
     parser.add_argument("--pipeline-run", default="ce7df86d-b229-4467-ad28-1109ed119d34")
     parser.add_argument("--closure-sha", default="")
@@ -123,13 +132,34 @@ def main() -> int:
     panel_text = format_continuity_proof_panel_text_v1(panel)
     print(panel_text)
 
-    t0_baseline = build_aa_clock_t0_baseline_v1(
-        panel=panel,
-        closure_git_sha=closure_sha,
-        tenant_id=tenant_id,
-        wedge_free_ack=args.wedge_free_ack,
-        clock_started_at=clock_started,
+    t0_path = continuity_aa_clock_baseline_path_v1(
+        repo_root=REPO_ROOT,
+        date_suffix=args.baseline_date,
     )
+    existing_t0 = load_aa_clock_t0_baseline_v1(t0_path)
+    if int(existing_t0.get("clock_restart_generation") or 0) >= 2:
+        t0_baseline = existing_t0
+        hold_progress = evaluate_aa_clock_hold_progress_v1(
+            t0_baseline=t0_baseline,
+            panel=panel,
+            now=clock_started,
+        )
+        t0_baseline = dict(t0_baseline)
+        t0_baseline["hold_hours_elapsed"] = hold_progress["hold_hours_elapsed"]
+        print(json.dumps({"hold_progress": hold_progress}, indent=2), file=sys.stderr)
+    else:
+        print(
+            "WARN: no C4 restart T0 — run continuity_p0_phase_c4_aa_clock_restart_proof.py first",
+            file=sys.stderr,
+        )
+        t0_baseline = build_aa_clock_t0_baseline_v1(
+            panel=panel,
+            closure_git_sha=closure_sha,
+            tenant_id=tenant_id,
+            wedge_free_ack=args.wedge_free_ack,
+            clock_started_at=clock_started,
+        )
+        hold_progress = None
 
     proof = evaluate_p2_4_aa_clock_proof_v1(
         closure_git_sha=closure_sha,
@@ -144,13 +174,15 @@ def main() -> int:
     if args.dry_run:
         return 0 if proof["p2_4_pass"] else 1
 
-    t0_path = continuity_aa_clock_baseline_path_v1(
-        repo_root=REPO_ROOT,
-        date_suffix=args.baseline_date,
-    )
-    t0_path.parent.mkdir(parents=True, exist_ok=True)
-    t0_path.write_text(json.dumps(t0_baseline, indent=2) + "\n", encoding="utf-8")
-    print(f"T0 baseline written: {t0_path}")
+    if int(t0_baseline.get("clock_restart_generation") or 0) < 2:
+        t0_path.parent.mkdir(parents=True, exist_ok=True)
+        t0_path.write_text(json.dumps(t0_baseline, indent=2) + "\n", encoding="utf-8")
+        print(f"T0 baseline written: {t0_path}")
+    else:
+        save_t0 = dict(t0_baseline)
+        t0_path.parent.mkdir(parents=True, exist_ok=True)
+        t0_path.write_text(json.dumps(save_t0, indent=2) + "\n", encoding="utf-8")
+        print(f"T0 baseline updated (hold progress): {t0_path}")
 
     baseline_path = continuity_p0_baseline_path_v1(
         repo_root=REPO_ROOT,

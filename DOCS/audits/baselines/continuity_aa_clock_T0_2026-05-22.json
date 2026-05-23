@@ -3,37 +3,37 @@
   "step": "2.4_aa48_clock",
   "metric_tier": "M3",
   "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
-  "pipeline_run_id": "ce7df86d-b229-4467-ad28-1109ed119d34",
-  "closure_git_sha": "73fa560fde70d4e8a48434132dda443c1602c34d",
-  "clock_started_at": "2026-05-22T23:55:28.204423+00:00",
-  "clock_deadline_at": "2026-05-24T23:55:28.204423+00:00",
+  "pipeline_run_id": "8ca6e618-7400-46f1-9295-9be6fb2e45a8",
+  "closure_git_sha": "f947a74c53ad01277616591c9e4fd9c30932523a",
+  "clock_started_at": "2026-05-23T02:59:15.286869+00:00",
+  "clock_deadline_at": "2026-05-25T02:59:15.286869+00:00",
   "hold_hours_required": 48,
   "hold_hours_elapsed": 0.0,
-  "wedge_free_ack_at_t0": true,
+  "wedge_free_ack_at_t0": false,
   "panel_step": "2.2_continuity_proof_panel",
-  "panel_evaluated_at": "2026-05-22T23:55:33.813126+00:00",
+  "panel_evaluated_at": "2026-05-23T02:59:21.165731+00:00",
   "gate_verdicts": {
-    "AA1": "PASS",
+    "AA1": "FAIL",
     "AA2": "PASS",
     "AA3": "PASS",
     "AA4": "PASS",
-    "AA5": "PASS",
-    "AA6": "PASS",
-    "AA7": "PASS"
+    "AA5": "FAIL",
+    "AA6": "FAIL",
+    "AA7": "ADVISORY"
   },
   "panel_summary": {
-    "pass_count": 7,
-    "fail_count": 0,
-    "advisory_count": 0,
+    "pass_count": 3,
+    "fail_count": 3,
+    "advisory_count": 1,
     "total_gates": 7,
-    "m3_autonomously_alive": true,
-    "metric_tier": "M3"
+    "m3_autonomously_alive": false,
+    "metric_tier": "below_M3"
   },
-  "m3_autonomously_alive_at_t0": true,
-  "aa_gates_pass_count": 7,
+  "m3_autonomously_alive_at_t0": false,
+  "aa_gates_pass_count": 3,
   "aa_gates_total": 7,
-  "track_m3_signoff_pending": true,
-  "track_m3_signoff_note": "Re-run continuity_p2_phase24_aa_clock_proof.py daily; M3 sign-off when AA1\u2013AA7 stay PASS for 48h without wedge scripts.",
+  "track_m3_signoff_pending": false,
+  "track_m3_signoff_note": "C4 clock epoch restarted after A+B+C proofs; AA gates not all PASS yet \u2014 fix panel before M3 sign-off.",
   "proof_panel": {
     "surface_kind": "continuity_proof_panel",
     "gate_order": [
@@ -45,5 +45,113 @@
       "AA6",
       "AA7"
     ]
-  }
+  },
+  "phase_c4_restart_schema_version": 2,
+  "clock_restart_generation": 2,
+  "clock_restart_step": "step_c4_aa48_clock_restart",
+  "prior_t0_superseded": true,
+  "prior_t0_clock_started_at": "2026-05-22T23:55:28.204423+00:00",
+  "prior_t0_m3_at_capture": true,
+  "prior_t0_closure_git_sha": "73fa560fde70d4e8a48434132dda443c1602c34d",
+  "abc_prerequisites": {
+    "all_prerequisites_pass": true,
+    "missing_steps": [],
+    "failed_steps": [],
+    "trace_only_steps": [],
+    "prerequisite_count": 15,
+    "checked": {
+      "step_a1_synthesis_job_reconcile": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_a2_ecs_deploy_align": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": null,
+        "trace_only": false
+      },
+      "step_a3_tcre_queued_drain": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": null,
+        "trace_only": false
+      },
+      "step_a4_aa_panel_strict": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_a5_trace_only_ban": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_a6_synthesis_terminal_transitions": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_b1_retrieval_publish_contract": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_b2_retrieval_epoch_scope_alignment": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_b3_retrieval_registry_epoch": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_b4_phase05_walks_persisted": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_b5_graph_hash_autonomous_chain": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_b6_post_ingestion_fresh_pipeline_run": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_c1_phase08_empty_scope_truth": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_c2_synthesis_per_island_scope_caps": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      },
+      "step_c3_continuity_audit_snapshot": {
+        "present": true,
+        "passed": true,
+        "signoff_grade": "prod",
+        "trace_only": false
+      }
+    }
+  },
+  "abc_prerequisites_all_pass": true,
+  "strict_aa_panel_at_restart": true
 }

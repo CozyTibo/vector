@@ -2345,8 +2345,8 @@
   "trace_only_policy": {
     "schema_version": 1,
     "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
-    "updated_at": "2026-05-23T02:53:48.047116+00:00",
-    "last_prod_signoff_step": "step_c3_continuity_audit_snapshot"
+    "updated_at": "2026-05-23T02:59:21.234545+00:00",
+    "last_prod_signoff_step": "step_c4_aa48_clock_restart"
   },
   "step_a5_trace_only_ban": {
     "validated_at": "2026-05-23T01:14:27.645370+00:00",
@@ -5238,6 +5238,85 @@
     "wiring_ok": true,
     "panel_fail_count": 3,
     "m3_autonomously_alive": false,
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "step_c4_aa48_clock_restart": {
+    "validated_at": "2026-05-23T02:59:21.234372+00:00",
+    "closure_git_sha": "f947a74c53ad01277616591c9e4fd9c30932523a",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_c4_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "abc_prerequisites_all_pass": true,
+      "abc_prerequisite_steps_complete": true,
+      "no_trace_only_prerequisite_signoffs": true,
+      "prior_t0_superseded_when_present": true,
+      "c4_clock_restart_generation": true,
+      "c4_restart_step_recorded": true,
+      "clock_started_at_recorded": true,
+      "clock_deadline_at_recorded": true,
+      "hold_hours_required_is_48": true,
+      "t0_schema_version_valid": true,
+      "prod_signoff_valid": true
+    },
+    "checks_advisory": {
+      "all_aa_gates_pass_at_restart": false,
+      "m3_autonomously_alive_at_t0": false,
+      "prior_t0_m3_at_capture": true,
+      "prior_t0_clock_started_at": "2026-05-22T23:55:28.204423+00:00",
+      "gate_verdicts_at_restart": {
+        "AA1": "FAIL",
+        "AA2": "PASS",
+        "AA3": "PASS",
+        "AA4": "PASS",
+        "AA5": "FAIL",
+        "AA6": "FAIL",
+        "AA7": "ADVISORY"
+      },
+      "hold_progress": {
+        "clock_started_at": "2026-05-23T02:59:15.286869+00:00",
+        "clock_deadline_at": "2026-05-25T02:59:15.286869+00:00",
+        "hold_hours_elapsed": 0.0,
+        "hold_hours_required": 48,
+        "hold_window_complete": false,
+        "all_aa_gates_pass_now": false,
+        "m3_signoff_ready": false,
+        "gate_verdicts_now": {
+          "AA1": "FAIL",
+          "AA2": "PASS",
+          "AA3": "PASS",
+          "AA4": "PASS",
+          "AA5": "FAIL",
+          "AA6": "FAIL",
+          "AA7": "ADVISORY"
+        },
+        "clock_restart_generation": 2
+      },
+      "p2_4_subproof": {
+        "ecs_deploy_matches_closure_sha": true,
+        "t0_baseline_schema_version": true,
+        "clock_started_at_recorded": true,
+        "clock_deadline_at_recorded": true,
+        "hold_hours_required_is_48": true,
+        "all_aa_gates_pass_at_t0": false,
+        "m3_autonomously_alive_at_t0": false,
+        "track_m3_signoff_pending": false,
+        "gate_verdicts_snapshot_complete": true,
+        "t0_gate_verdicts_all_pass": false
+      }
+    },
+    "wiring_ok": true,
+    "clock_started_at": "2026-05-23T02:59:15.286869+00:00",
+    "clock_deadline_at": "2026-05-25T02:59:15.286869+00:00",
+    "hold_hours_required": 48,
+    "prior_t0_superseded": true,
+    "prior_t0_clock_started_at": "2026-05-22T23:55:28.204423+00:00",
+    "abc_prerequisites_all_pass": true,
+    "all_aa_gates_pass_at_restart": false,
+    "t0_baseline_path": "DOCS/audits/baselines/continuity_aa_clock_T0_2026-05-22.json",
     "use_deployed_closure": true,
     "trace_only": false,
     "signoff_grade": "prod",

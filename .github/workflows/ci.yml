@@ -55,7 +55,8 @@ jobs:
             tests/vector/domains/cortex/synthesis/test_synthesis_per_island_scope_cap_gate.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c2_synthesis_scope_caps.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_audit_snapshot.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c3_audit_snapshot.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c3_audit_snapshot.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c4_aa_clock_restart.py
 
   frontend:
     runs-on: ubuntu-latest
