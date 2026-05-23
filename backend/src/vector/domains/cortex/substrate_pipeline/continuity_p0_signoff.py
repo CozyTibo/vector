@@ -21,6 +21,7 @@ P0_SIGNOFF_STEP = "0.6_p0_signoff"
 CONT_INV_08 = "CONT-INV-08"
 
 P0_D_CI_PATHS = (
+    ".github/workflows/ci.yml",
     ".github/workflows/deploy.yml",
     "backend/Dockerfile",
     "backend/worker.Dockerfile",
@@ -32,9 +33,12 @@ P0_D_CI_PATHS = (
 def verify_p0_d_ci_gates_v1(*, repo_root: Path) -> dict[str, Any]:
     """Static repo checks for P0-D (walk policy packaging in CI + images)."""
     checks: dict[str, bool] = {}
-    deploy_yml = repo_root / ".github/workflows/deploy.yml"
-    deploy_text = deploy_yml.read_text(encoding="utf-8") if deploy_yml.is_file() else ""
-    checks["deploy_workflow_walk_policy_test"] = "test_walk_policy_packaging" in deploy_text
+    workflow_text = ""
+    for rel in (".github/workflows/ci.yml", ".github/workflows/deploy.yml"):
+        path = repo_root / rel
+        if path.is_file():
+            workflow_text += path.read_text(encoding="utf-8")
+    checks["deploy_workflow_walk_policy_test"] = "test_walk_policy_packaging" in workflow_text
     checks["bundled_schema_present"] = (
         repo_root / "backend/src/vector/domains/cortex/traversal/schemas/octs-walk-policy-v1.schema.json"
     ).is_file()

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --quiet -r requirements.txt jsonschema
+
+      - name: Cortex continuity regression (unit, no DB)
+        run: |
+          cd backend
+          VECTOR_SETTINGS_SKIP_DOTENV=1 PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/substrate_pipeline/ \
+            --ignore=tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_recovery.py \
+            --ignore=tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase05_proof.py \
+            tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py \
+            tests/vector/domains/cortex/execution/test_single_tcre_execution_resume_boundary.py \
+            tests/vector/domains/cortex/execution/test_tcre_worker_no_retrieval_materialization_boundary.py \
+            tests/vector/domains/cortex/execution/test_dual_lane_worker.py \
+            tests/vector/domains/cortex/execution/test_dual_lane_lease.py \
+            tests/vector/domains/cortex/execution/test_execution_event_triggers.py \
+            tests/vector/domains/cortex/execution/test_execution_ingest_deferral_monitoring.py \
+            tests/vector/domains/cortex/operational_runtime/test_execution_island_registry.py \
+            tests/vector/domains/cortex/synthesis/test_synthesis_per_island.py \
+            tests/vector/domains/cortex/retrieval/test_retrieval_publish_contract.py \
+            tests/vector/domains/cortex/retrieval/test_retrieval_epoch_scope_alignment.py \
+            tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Typecheck and build
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: https://api.example.com
+        run: |
+          npm ci
+          npm run build
