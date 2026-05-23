@@ -45,7 +45,9 @@ jobs:
             tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_retrieval_registry_epoch.py \
             tests/vector/domains/cortex/substrate_pipeline/test_phase05_walks_persisted_gate.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase05_walks_persisted.py
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase05_walks_persisted.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_graph_hash_autonomous_chain.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_graph_hash_autonomous_chain.py
 
   frontend:
     runs-on: ubuntu-latest

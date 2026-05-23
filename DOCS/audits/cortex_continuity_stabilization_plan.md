@@ -966,7 +966,7 @@ Auto-runs tag realign from prior published epoch when Fizzer primary in-scope co
 - [x] Phase 07/08 expose `retrieval_entries_in_scope` for primary island
 - [x] B-G2: Fizzer primary island `d7e41b3c763d38e9` in-scope &gt; 0 on published epoch (prod proof)
 
-**Next step:** ~~**B3**~~ → ~~**B4**~~ → **B5** — graph-hash autonomous chain integration proof.
+**Next step:** ~~**B3**~~ → ~~**B4**~~ → ~~**B5**~~ → **B6** — synthesis island scope.
 
 ---
 
@@ -1028,7 +1028,7 @@ WHERE r.tenant_id = 'c08ef32b-f89a-40f6-9566-e19b5329436f';
 - [x] Inspect default is read-only (`sync=False`)
 - [x] B-G5: primary island registry epoch aligned with published epoch (prod proof)
 
-**Next step:** ~~**B4**~~ → **B5** — graph-hash trigger → walk → TCRE → 07 integration proof.
+**Next step:** ~~**B4**~~ → ~~**B5**~~ → **B6** — synthesis island scope.
 
 ---
 
@@ -1073,7 +1073,53 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** **B5** — autonomous graph-hash → walk → TCRE → 07 chain proof.
+**Next step:** ~~**B5**~~ → **B6** — synthesis island scope.
+
+---
+
+## Step B.5 completion — graph-hash autonomous chain (04→07)
+
+**Completed:** 2026-05-23  
+**Goal:** Prove graph-hash trigger → walks → sync TCRE → phase 07 on one pipeline run without unlock scripts (B-G5 orchestration / P2-B).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Chain runner | `graph_hash_autonomous_chain.py` — `run_graph_hash_autonomous_chain_v1`, SQL evidence finder, stale-hash seed |
+| Phase 06 | Sync TCRE with persisted phase receipt (same pattern as E2E harness) |
+| Settings | `CORTEX_GRAPH_HASH_AUTONOMOUS_CHAIN` (default on; rollback = disable) |
+| Proof | `continuity_p0_graph_hash_autonomous_chain.py` + `continuity_p0_phase_b5_graph_hash_autonomous_chain_proof.py` |
+| Tests | `test_graph_hash_autonomous_chain.py` (unit + optional integration), `test_continuity_p0_graph_hash_autonomous_chain.py` |
+| CI | `ci.yml` — B.5 chain + proof evaluator tests |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b5_graph_hash_autonomous_chain_proof.py \
+  --use-deployed-closure
+```
+
+Auto-drives `04→05→06(sync)→07` when no complete chain in SQL window. `--drive-chain` forces; `--include-upstream` adds 02–03; `--dry-run` probe only.
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `complete_chains_in_window` | 1 (post-drive) |
+| `chain_drive.chain_ok` | true |
+| `pipeline_run_id` | `221744c6-e595-4303-bdd4-17e87b46399e` |
+| `entries_materialized` | 1599 |
+| `wiring_ok` | true |
+| `p0_b5_pass` | true |
+| Rollback | `CORTEX_GRAPH_HASH_AUTONOMOUS_CHAIN=0` |
+
+### Exit gates
+
+- [x] Phase 04 invokes `trigger_graph_hash_walk_schedule_v1` (existing P2-B)
+- [x] Chain runner: 04 → 05 → sync TCRE (receipt) → 07 without unlock scripts
+- [x] Static wiring + proof evaluator + CI gate
+- [x] Prod SQL window evidence or auto-drive pass
+- [x] Cleared for **B6** (synthesis island scope)
 
 ---
 
@@ -1111,6 +1157,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a5_trace_only_b
 
 # Phase A6 — synthesis terminal transitions (done; re-run if running/queued drifts)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a6_synthesis_terminal_transitions_proof.py --use-deployed-closure
+
+# Phase B5 — graph-hash autonomous chain (done; re-run if chain evidence stale)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b5_graph_hash_autonomous_chain_proof.py --use-deployed-closure
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
