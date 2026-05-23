@@ -123,6 +123,28 @@ python scripts/revoke_duplicate_authoritative_links.py \
 
 Re-run graph truth snapshot and compare `dup_factor` to S0 baseline (target **≤ 1.05**).
 
+## Wave S2 — Identity continuity (COMPLETE)
+
+| Step | Deliverable |
+|------|-------------|
+| S2.1 | Fair promotion scheduling across GitHub/Slack/Notion/Linear/email rules |
+| S2.2 | Per-rule candidate caps + distinct endpoint-pair dedupe |
+| S2.3 | Anchor→entity boundary repair on phase 03 backfill |
+| S2.4 | Second `link_type` **deferred** (no prod evidence ≥100 edges); baseline + audit script |
+
+**Operator audit:**
+
+```bash
+cd backend
+python scripts/identity_continuity_audit_snapshot.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f \
+  --json
+```
+
+**Sign-off targets:** `promotion_rule_count ≥ 3`, `candidate_inflation_ratio < 3`, `anchors_missing_org_entity_pct` cut ≥50% from S0/S1 measurement.
+
+Baseline template: [`baselines/identity_continuity_fizzer_wave_s2_baseline.json`](baselines/identity_continuity_fizzer_wave_s2_baseline.json)
+
 ---
 
 ## Do not use for routine ops

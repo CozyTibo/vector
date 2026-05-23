@@ -50,6 +50,15 @@
 | S1.3 Phase 04 `unique_pairs_delta` | Done | `projection_export.py` phase 04 output |
 | S1.4 Stop promotion spin when Δ=0 | Done | `graph_density_promotion.py` promotable gating + receipts |
 
+## Wave S2 — Identity continuity (COMPLETE)
+
+| Step | Status | Artifact |
+|------|--------|----------|
+| S2.1 Fair promotion across prod rules | Done | `identity_continuity_promotion_v1.py`, `graph_density_promotion.py` |
+| S2.2 Candidate inflation caps + dedupe | Done | `identity_continuity_candidates_v1.py`, `anchor_continuity_candidates.py` |
+| S2.3 Anchor→entity boundary write | Done | `identity_anchor_boundary_v1.py`, `backfill.py` |
+| S2.4 Second link_type + baseline | Deferred | `identity_continuity_audit_snapshot.py`, wave S2 baseline JSON |
+
 ---
 
 ## 0. The phase transition (read this once)

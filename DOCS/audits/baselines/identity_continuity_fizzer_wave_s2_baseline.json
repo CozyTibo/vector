@@ -1,0 +1,29 @@
+{
+  "baseline_kind": "identity_continuity_wave_s2",
+  "schema_version": 1,
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "tenant_label": "Fizzer",
+  "captured_at_utc": null,
+  "purpose": "Wave S2 identity continuity sign-off — cross-system promotion rules, anchor boundary, candidate inflation.",
+  "acceptance_targets": {
+    "promotion_rule_count_min": 3,
+    "candidate_inflation_ratio_max": 3.0,
+    "anchors_missing_org_entity_pct_max": 50.0,
+    "second_link_type": "deferred — no new link_type without prod evidence (≥100 edges) per phase plan §4.4"
+  },
+  "post_s1_reference": {
+    "unique_auth_pairs": 2000,
+    "dup_factor_max": 1.05,
+    "promotion_rules_at_s0": 1
+  },
+  "repro_commands": {
+    "identity_continuity_audit": "cd backend && python scripts/identity_continuity_audit_snapshot.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json",
+    "graph_truth_audit": "cd backend && python scripts/graph_truth_audit_snapshot.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json"
+  },
+  "notes": [
+    "Fill captured_at_utc and measured fields after deploy by running identity_continuity_audit_snapshot.py --out this file.",
+    "Fair promotion scheduling (S2.1) rotates GitHub/Slack/Notion/Linear/email candidate rules each pass.",
+    "Candidate regen applies per-rule caps and distinct endpoint-pair dedupe (S2.2).",
+    "Phase 03 backfill runs anchor→entity boundary repair (S2.3)."
+  ]
+}
