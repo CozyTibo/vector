@@ -901,6 +901,22 @@ class Settings(BaseSettings):
             "entries but zero synthesis scopes/jobs were scheduled."
         ),
     )
+    cortex_synthesis_eligible_scopes_use_island_in_scope: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_ELIGIBLE_SCOPES_USE_ISLAND_IN_SCOPE",
+        description=(
+            "R3: admin/progression eligible scope counts use primary-island in-scope rows "
+            "on the published epoch (not global index row count)."
+        ),
+    )
+    cortex_execution_heartbeat_reset_cursor_to_phase05: bool = Field(
+        default=True,
+        validation_alias="CORTEX_EXECUTION_HEARTBEAT_RESET_CURSOR_TO_PHASE05",
+        description=(
+            "R4: after a full execution slice completes at phase 08, reset phase_cursor to "
+            "phase_05_traversal so the next slice re-runs walks→retrieval→synthesis."
+        ),
+    )
     cortex_execution_dual_lane_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_EXECUTION_DUAL_LANE",
@@ -950,6 +966,42 @@ class Settings(BaseSettings):
         description=(
             "P2-A: wall-time budget for execution lane (phases 03–08) per slice; "
             "0 = remainder after canonical budget."
+        ),
+    )
+    cortex_dual_lane_run_execution_on_topology_wait: bool = Field(
+        default=True,
+        validation_alias="CORTEX_DUAL_LANE_RUN_EXECUTION_ON_TOPOLOGY_WAIT",
+        description=(
+            "R1: when true, topology_wait/partial canonical outcomes do not skip "
+            "execution lane (phases 03–08) in the same slice."
+        ),
+    )
+    cortex_dual_lane_canonical_cap_when_execution_owed_seconds: int = Field(
+        default=90,
+        ge=30,
+        le=600,
+        validation_alias="CORTEX_DUAL_LANE_CANONICAL_CAP_WHEN_EXECUTION_OWED_SECONDS",
+        description=(
+            "R1: cap canonical lane wall time per slice when execution lane is owed "
+            "(cursor 03–08), so topology debt stays background."
+        ),
+    )
+    cortex_convergence_sweep_tcre_waiting_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_CONVERGENCE_SWEEP_TCRE_WAITING_ENABLED",
+        description=(
+            "R1: include WAITING/tcre_async tenants in convergence sweeper when "
+            "queued TCRE jobs are stale or terminal jobs need resume."
+        ),
+    )
+    cortex_canonical_deferral_retry_storm_cooldown_seconds: int = Field(
+        default=300,
+        ge=60,
+        le=3600,
+        validation_alias="CORTEX_CANONICAL_DEFERRAL_RETRY_STORM_COOLDOWN_SECONDS",
+        description=(
+            "R5: minimum seconds between canonical topology_wait retries when "
+            "progress_made is false (reduces deferral requeue storms)."
         ),
     )
     cortex_synthesis_forbidden_backoff_threshold: int = Field(

@@ -5,7 +5,7 @@ function stateTone(
   state: ContinuityStatus["state"],
 ): "ok" | "warn" | "bad" | "neutral" {
   if (state === "AUTONOMOUS") return "ok";
-  if (state === "WEDGE_DEPENDENT" || state === "DEGRADED") return "warn";
+  if (state === "OPERATOR_RECOVERY" || state === "DEGRADED") return "warn";
   return "bad";
 }
 

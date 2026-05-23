@@ -42,9 +42,9 @@ from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation impor
 CLEANUP_FREEZE_SCHEMA_VERSION: Final[int] = 1
 
 BANNED_WEDGE_SCRIPT_NAMES_V1: Final[tuple[str, ...]] = (
-    "unlock_step09_graph_octs_walk.py",
-    "unlock_step10_retrieval.py",
-    "unlock_step12_track_b_p3.py",
+    "archive/unlock/unlock_step09_graph_octs_walk.py",
+    "archive/unlock/unlock_step10_retrieval.py",
+    "archive/unlock/unlock_step12_track_b_p3.py",
 )
 
 WEDGE_SCRIPT_PATTERN_NAMES_V1: Final[tuple[str, ...]] = (
@@ -224,7 +224,8 @@ def assert_wedge_script_allowed_v1(
 ) -> None:
     """Block unlock_step09/10/12 during 48h hold unless explicit override env."""
     name = Path(script_path).name
-    if name not in BANNED_WEDGE_SCRIPT_NAMES_V1:
+    banned_names = {Path(p).name for p in BANNED_WEDGE_SCRIPT_NAMES_V1}
+    if name not in banned_names:
         return
     if os.environ.get("CORTEX_ALLOW_UNLOCK_WEDGE_SCRIPTS", "").lower() in ("1", "true", "yes"):
         return

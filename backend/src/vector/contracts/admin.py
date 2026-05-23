@@ -4521,7 +4521,7 @@ class AdminCortexContinuitySignal(BaseModel):
 class AdminCortexContinuityStatus(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
-    state: Literal["AUTONOMOUS", "DEGRADED", "WEDGE_DEPENDENT", "STALLED", "BROKEN"]
+    state: Literal["AUTONOMOUS", "DEGRADED", "OPERATOR_RECOVERY", "STALLED", "BROKEN"]
     state_label: str = ""
     execution_lane: Literal["HEALTHY", "DEGRADED", "BLOCKED", "WAITING", "UNKNOWN"] = "UNKNOWN"
     canonical_lane: Literal["HEALTHY", "DEGRADED", "BLOCKED", "WAITING", "UNKNOWN"] = "UNKNOWN"

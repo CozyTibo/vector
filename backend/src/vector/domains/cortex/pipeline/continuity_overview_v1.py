@@ -81,7 +81,7 @@ from vector.settings import Settings
 ContinuityState = Literal[
     "AUTONOMOUS",
     "DEGRADED",
-    "WEDGE_DEPENDENT",
+    "OPERATOR_RECOVERY",
     "STALLED",
     "BROKEN",
 ]
@@ -337,17 +337,29 @@ def build_continuity_status_v1(
     elif continuation_stalled:
         state = "STALLED"
     elif lease_status != LEASE_STATUS_RUNNING and progression_class == "idle" and last_synth:
-        recent_manual = session.scalar(
-            select(func.count())
-            .select_from(CortexSynthesisJob)
-            .where(
-                CortexSynthesisJob.tenant_id == tenant_id,
-                CortexSynthesisJob.status == "completed",
-                CortexSynthesisJob.created_at >= datetime.now(UTC) - timedelta(hours=48),
-            )
+        from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
+            PHASE_OUTCOME_COMPLETED_EMPTY,
         )
-        if int(recent_manual or 0) > 0:
-            state = "WEDGE_DEPENDENT"
+
+        p08 = session.scalar(
+            select(CortexSubstratePhaseRun)
+            .join(
+                CortexSubstratePipelineRun,
+                CortexSubstratePipelineRun.id == CortexSubstratePhaseRun.pipeline_run_id,
+            )
+            .where(
+                CortexSubstratePipelineRun.tenant_id == tenant_id,
+                CortexSubstratePhaseRun.phase_id == PHASE_08_SYNTHESIS,
+            )
+            .order_by(CortexSubstratePhaseRun.finished_at.desc().nullslast())
+            .limit(1)
+        )
+        if p08 is not None and str(p08.outcome or "") == PHASE_OUTCOME_COMPLETED_EMPTY:
+            state = "BROKEN"
+        elif detail.get("last_dual_lane_slice", {}).get("execution_lane_ran"):
+            state = "DEGRADED"
+        elif int(detail.get("operator_recovery_job_count") or 0) > 0:
+            state = "OPERATOR_RECOVERY"
     elif execution_lane in ("BLOCKED", "WAITING") or canonical_lane == "DEGRADED" or propagation_blocked:
         state = "DEGRADED"
     elif lease_status == LEASE_STATUS_RUNNING and not propagation_blocked:
@@ -657,21 +669,29 @@ def build_continuity_phase_cards_v1(
         .limit(1)
     )
     autonomous = lease_running and fsm == "SYNTHESIS"
-    wedge_only = synth_count > 0 and not lease_running
+    historical_only = synth_count > 0 and not lease_running
+    in_scope = int(synth_scope.get("retrieval_entries_in_scope") or 0)
     syn_status: PhaseStatus = "healthy" if synth_count > 0 else "waiting"
     if eligible_scopes > 0 and synth_count == 0:
         syn_status = "degraded"
+    if in_scope > 0 and synth_count == 0:
+        syn_status = "blocked"
     if fsm == "SYNTHESIS" and lease_running:
         syn_status = "running"
     syn_card = _phase_card(
         phase="synthesis",
         status=syn_status,
-        headline="Autonomous synthesis" if autonomous else ("Wedge-generated history" if wedge_only else "Awaiting scopes"),
+        headline=(
+            "Autonomous synthesis"
+            if autonomous
+            else ("Historical artifacts only" if historical_only else "Awaiting scopes")
+        ),
         continuity_advancing=autonomous or (synth_count > 0 and eligible_scopes > 0),
         signals=[
             _signal("eligible_scopes", "Eligible scopes", eligible_scopes),
+            _signal("in_scope_entries", "In-scope retrieval rows", in_scope),
             _signal("artifact_count", "Artifacts (tenant)", synth_count),
-            _signal("mode", "Mode", "autonomous" if autonomous else ("wedge" if wedge_only else "idle")),
+            _signal("mode", "Mode", "autonomous" if autonomous else ("historical" if historical_only else "idle")),
             _signal("last_artifact", "Last phase-08 artifact", _ago_label(_iso(last_synth)) or "—"),
         ],
         last_success_at=_iso(last_synth),

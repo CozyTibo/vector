@@ -367,6 +367,7 @@ def materialize_retrieval_index_for_largest_island_v1(
         new_published_epoch=str(finalized.get("published_index_epoch") or epoch_name),
         island_scope_id=island_scope_id,
         outside_island_scope_entity_count=outside_count,
+        force_realign=True,
     )
     stats["epoch_scope_reconcile"] = scope_reconcile
     stats["retrieval_entries_in_scope"] = int(

@@ -82,6 +82,43 @@ def pipeline_default_workloads_v1(*, pack: Mapping[str, Any] | None = None) -> l
     return ["pipeline_default"]
 
 
+def count_synthesis_eligible_scopes_in_published_epoch_for_primary_island_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    pack: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """R3: eligible scopes = in-scope island rows on published epoch × workloads."""
+    from vector.domains.cortex.retrieval.retrieval_epoch_scope_alignment import (
+        count_retrieval_entries_in_scope_v1,
+        resolve_primary_island_scope_id_v1,
+    )
+
+    published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
+    workloads = pipeline_default_workloads_v1(pack=pack)
+    scope_id, scope_meta = resolve_primary_island_scope_id_v1(session, tenant_id=tenant_id)
+    in_scope = (
+        count_retrieval_entries_in_scope_v1(
+            session,
+            tenant_id=tenant_id,
+            published_index_epoch=published or "",
+            island_scope_id=scope_id,
+        )
+        if published and scope_id
+        else 0
+    )
+    eligible = in_scope * len(workloads)
+    return {
+        "published_index_epoch": published,
+        "primary_island_scope_id": scope_id,
+        "island_meta": scope_meta,
+        "retrieval_entries_in_scope": in_scope,
+        "pipeline_default_workloads": workloads,
+        "eligible_scopes": eligible,
+        "scope_law": "published_epoch_primary_island_in_scope",
+    }
+
+
 def count_synthesis_eligible_scopes_v1(
     session: Session,
     *,
@@ -89,6 +126,15 @@ def count_synthesis_eligible_scopes_v1(
     pack: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Eligible scopes = published index rows × default pipeline workloads."""
+    try:
+        from vector.settings import get_settings
+
+        if bool(getattr(get_settings(), "cortex_synthesis_eligible_scopes_use_island_in_scope", True)):
+            return count_synthesis_eligible_scopes_in_published_epoch_for_primary_island_v1(
+                session, tenant_id=tenant_id, pack=pack
+            )
+    except Exception:  # noqa: BLE001
+        pass
     published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
     workloads = pipeline_default_workloads_v1(pack=pack)
     if published:

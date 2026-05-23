@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Final
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -225,10 +225,30 @@ def reconcile_primary_island_scope_on_epoch_change_v1(
         out["realign"] = {"realign_skipped": True, "reason": "feature_disabled"}
         return out
 
+    entries_on_new_epoch = 0
+    if new_epoch:
+        entries_on_new_epoch = int(
+            session.scalar(
+                select(func.count())
+                .select_from(CortexRetrievalIndexEntry)
+                .where(
+                    CortexRetrievalIndexEntry.tenant_id == tenant_id,
+                    CortexRetrievalIndexEntry.index_epoch == new_epoch,
+                )
+            )
+            or 0
+        )
+    out["entries_on_new_epoch"] = entries_on_new_epoch
     needs_realign = force_realign or (
-        out["epoch_changed"] and in_scope_after == 0 and in_scope_before > 0
+        in_scope_after == 0
+        and entries_on_new_epoch > 0
+        and (
+            (out["epoch_changed"] and in_scope_before > 0)
+            or (prior is not None and prior != new_epoch)
+            or entries_on_new_epoch > 0
+        )
     )
-    if in_scope_after == 0 and prior and (needs_realign or in_scope_before > 0):
+    if in_scope_after == 0 and (needs_realign or (prior and in_scope_before > 0)):
         realign = realign_island_scope_tags_from_prior_epoch_v1(
             session,
             tenant_id=tenant_id,

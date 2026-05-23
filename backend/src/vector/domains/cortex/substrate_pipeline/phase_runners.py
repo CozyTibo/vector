@@ -419,6 +419,31 @@ def run_phase_07_retrieval_v1(
             org_link_candidates=int(out.get("org_link_candidates") or 0),
         )
         out["retrieval_outcome"] = ret_class
+        entries_mat = int(out.get("entries_materialized") or out.get("entry_count") or 0)
+        in_scope = int(out.get("retrieval_entries_in_scope") or 0)
+        publish_ok = bool(out.get("ok")) and bool(published)
+        if entries_mat > 0 and not publish_ok:
+            fail_phase_with_receipt_v1(
+                session,
+                pipeline_run_id=pipeline_run_id,
+                phase_id=PHASE_07_RETRIEVAL,
+                tenant_id=tenant_id,
+                raw_output={**out, "failure_code": "retrieval_publish_failed"},
+                started_at=started_at,
+                error="retrieval_materialized_but_publish_failed",
+            )
+            raise RuntimeError("retrieval_materialized_but_publish_failed")
+        if publish_ok and entries_mat > 0 and in_scope <= 0:
+            fail_phase_with_receipt_v1(
+                session,
+                pipeline_run_id=pipeline_run_id,
+                phase_id=PHASE_07_RETRIEVAL,
+                tenant_id=tenant_id,
+                raw_output={**out, "failure_code": "retrieval_epoch_scope_empty"},
+                started_at=started_at,
+                error="retrieval_published_zero_in_scope_entries",
+            )
+            raise RuntimeError("retrieval_published_zero_in_scope_entries")
         if published and bool(out.get("ok")):
             from vector.domains.cortex.operational_runtime.execution_island_registry import (
                 record_retrieval_publish_on_island_registry_v1,

@@ -548,6 +548,7 @@ def materialize_retrieval_index_for_pipeline_v1(
         prior_published_epoch=prior_published_epoch,
         new_published_epoch=str(finalized.get("published_index_epoch") or epoch_name),
         island_scope_id=primary_scope_id,
+        force_realign=True,
     )
     stats["epoch_scope_reconcile"] = scope_reconcile
     stats["retrieval_entries_in_scope"] = int(

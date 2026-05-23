@@ -65,7 +65,7 @@ def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: 
     assert body["continuity_status"]["state"] in {
         "AUTONOMOUS",
         "DEGRADED",
-        "WEDGE_DEPENDENT",
+        "OPERATOR_RECOVERY",
         "STALLED",
         "BROKEN",
     }

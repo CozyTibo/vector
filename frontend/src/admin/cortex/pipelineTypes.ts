@@ -28,7 +28,7 @@ export type ContinuitySignal = {
 };
 
 export type ContinuityStatus = {
-  state: "AUTONOMOUS" | "DEGRADED" | "WEDGE_DEPENDENT" | "STALLED" | "BROKEN";
+  state: "AUTONOMOUS" | "DEGRADED" | "OPERATOR_RECOVERY" | "STALLED" | "BROKEN";
   state_label?: string;
   execution_lane: "HEALTHY" | "DEGRADED" | "BLOCKED" | "WAITING" | "UNKNOWN";
   canonical_lane: "HEALTHY" | "DEGRADED" | "BLOCKED" | "WAITING" | "UNKNOWN";

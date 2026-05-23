@@ -38,6 +38,8 @@ from vector.domains.cortex.execution.lease import (
 )
 from vector.domains.cortex.execution.phase_outcomes import (
     WORKER_OUTCOME_BLOCKED_RETRIEVAL,
+    WORKER_OUTCOME_CANONICAL_PARTIAL,
+    WORKER_OUTCOME_CANONICAL_TOPOLOGY_WAIT,
     WORKER_OUTCOME_TIME_BUDGET,
     WORKER_OUTCOME_WAITING_TCRE,
     is_waiting_async_phase06_v1,
@@ -74,12 +76,31 @@ from vector.domains.cortex.substrate_pipeline.phase_runners import (
     run_phase_08_synthesis_v1,
 )
 from vector.infrastructure.db.models.cortex_tenant_convergence_lease import CortexTenantConvergenceLease
-from vector.settings import Settings
+from vector.settings import Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
 DETAIL_KEY_LAST_DUAL_LANE_SLICE_V1: Final[str] = "last_dual_lane_slice"
 WORKER_OUTCOME_DUAL_LANE_SLICE_V1: Final[str] = "dual_lane_slice"
+
+
+def is_dual_lane_execution_on_topology_wait_enabled_v1(*, settings: Settings | None = None) -> bool:
+    cfg = settings or get_settings()
+    return bool(getattr(cfg, "cortex_dual_lane_run_execution_on_topology_wait", True))
+
+
+def resolve_canonical_lane_budget_for_slice_v1(
+    cfg: Settings,
+    *,
+    base_canonical_budget: int,
+    execution_lane_owed: bool,
+) -> int:
+    """Cap canonical drain when execution heartbeat (03–08) is owed (R1)."""
+    canon = max(30, int(base_canonical_budget))
+    if not execution_lane_owed:
+        return canon
+    cap = int(getattr(cfg, "cortex_dual_lane_canonical_cap_when_execution_owed_seconds", 90) or 90)
+    return max(30, min(canon, max(30, cap)))
 
 
 def resolve_dual_lane_budgets_v1(cfg: Settings) -> tuple[int, int, int]:
@@ -216,7 +237,15 @@ def _run_canonical_lane_slice_v1(
     ):
         delay = 0
         if outcome == CANONICAL_OUTCOME_TOPOLOGY_WAIT:
-            delay = max(30, int(cfg.cortex_canonical_topology_wait_cooldown_seconds))
+            base_delay = max(30, int(cfg.cortex_canonical_topology_wait_cooldown_seconds))
+            if not bool(summary.get("progress_made")):
+                storm_floor = max(
+                    base_delay,
+                    int(getattr(cfg, "cortex_canonical_deferral_retry_storm_cooldown_seconds", 300) or 300),
+                )
+                delay = storm_floor
+            else:
+                delay = base_delay
         elif not (bool(summary.get("progress_made")) or outcome == CANONICAL_OUTCOME_PARTIAL_PROGRESS):
             delay = 0
         schedule_convergence_retry_v1(
@@ -439,10 +468,14 @@ def run_dual_lane_convergence_v1(
     celery_task_id: str | None = None,
 ) -> dict[str, Any]:
     """P2-A worker path: canonical slice (budget A) then execution slice (budget B)."""
+    from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
+        maybe_reconcile_synthesis_jobs_on_materialize_v1,
+    )
+
+    maybe_reconcile_synthesis_jobs_on_materialize_v1(session, tenant_id=tenant_id)
+
     total_budget, canon_budget, exec_budget = resolve_dual_lane_budgets_v1(cfg)
     preserved_cursor = str(lease.phase_cursor or PHASE_02_CANONICAL)
-    canon_deadline = started + float(canon_budget)
-    exec_deadline = started + float(total_budget)
     exec_start = started
 
     schedule = evaluate_dual_lane_schedule_v1(
@@ -451,14 +484,27 @@ def run_dual_lane_convergence_v1(
         lease=lease,
         bundle_id=bundle_id,
     )
+    execution_owed = bool(schedule.get("execution_lane_owed"))
+    canon_budget_effective = resolve_canonical_lane_budget_for_slice_v1(
+        cfg,
+        base_canonical_budget=canon_budget,
+        execution_lane_owed=execution_owed,
+    )
+    canon_deadline = started + float(canon_budget_effective)
+    exec_deadline = started + float(total_budget)
+
     manifest: dict[str, Any] = {
         "dual_lane_mode": True,
         "total_budget_seconds": total_budget,
         "canonical_budget_seconds": canon_budget,
+        "canonical_budget_effective_seconds": canon_budget_effective,
         "execution_budget_seconds": exec_budget,
         "execution_phase_cursor_before": preserved_cursor,
         "canonical_lane_ran": False,
         "execution_lane_ran": False,
+        "execution_on_topology_wait_enabled": is_dual_lane_execution_on_topology_wait_enabled_v1(
+            settings=cfg
+        ),
         "schedule": schedule,
     }
 
@@ -500,9 +546,16 @@ def run_dual_lane_convergence_v1(
             canon_result.get("outcome") if canon_result else None
         )
         sync_dual_lane_fields_on_lease_v1(session, lease=lease)
-        if canon_result and canon_result.get("outcome") in (
-            "canonical_topology_wait",
-            "canonical_partial",
+        canon_outcome = str(canon_result.get("outcome") or "") if canon_result else ""
+        manifest["canonical_topology_nonblocking"] = canon_outcome in (
+            WORKER_OUTCOME_CANONICAL_TOPOLOGY_WAIT,
+            WORKER_OUTCOME_CANONICAL_PARTIAL,
+        )
+        if (
+            not is_dual_lane_execution_on_topology_wait_enabled_v1(settings=cfg)
+            and canon_outcome
+            in (WORKER_OUTCOME_CANONICAL_TOPOLOGY_WAIT, WORKER_OUTCOME_CANONICAL_PARTIAL)
+            and not schedule["execution_lane_owed"]
         ):
             manifest["execution_phase_cursor_after"] = lease.phase_cursor
             _persist_dual_lane_slice_manifest_v1(lease, manifest=manifest)
@@ -511,7 +564,7 @@ def run_dual_lane_convergence_v1(
             return {
                 "tenant_id": str(tenant_id),
                 "acquired": True,
-                "outcome": str(canon_result["outcome"]),
+                "outcome": canon_outcome,
                 "dual_lane": manifest,
                 "pipeline_run_id": str(pipeline_run_id),
                 "fsm_state": lease.fsm_state,
@@ -567,15 +620,25 @@ def run_dual_lane_convergence_v1(
                 "pipeline_run_id": str(pipeline_run_id),
             }
         if outcome == "converged_slice":
+            if bool(getattr(cfg, "cortex_execution_heartbeat_reset_cursor_to_phase05", True)):
+                _set_phase_cursor_fsm(
+                    session,
+                    lease=lease,
+                    phase=PHASE_05_TRAVERSAL,
+                    pipeline_run_id=pipeline_run_id,
+                )
+                manifest["heartbeat_cursor_reset_to"] = PHASE_05_TRAVERSAL
             complete_convergence_lease_v1(
                 session,
                 lease=lease,
                 pipeline_run_id=pipeline_run_id,
-                phase_cursor=None,
+                phase_cursor=lease.phase_cursor,
             )
             session.commit()
             if lease.status == LEASE_STATUS_DIRTY:
                 enqueue_tenant_convergence_v1(tenant_id, reason="epoch_behind")
+            else:
+                enqueue_tenant_convergence_v1(tenant_id, reason="heartbeat_continue")
             return {
                 "tenant_id": str(tenant_id),
                 "acquired": True,
