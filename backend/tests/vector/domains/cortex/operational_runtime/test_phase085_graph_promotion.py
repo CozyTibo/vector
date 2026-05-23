@@ -140,7 +140,11 @@ def test_evaluate_and_schedule_backlog(
     _seed_candidate(db_session, tenant_id=tenant.id)
     monkeypatch.setenv("CORTEX_GRAPH_DENSITY_PROMOTION_BACKLOG_THRESHOLD", "0")
 
-    eval_out = evaluate_promotion_backlog_schedule_v1(db_session, tenant_id=tenant.id)
+    eval_out = evaluate_promotion_backlog_schedule_v1(
+        db_session,
+        tenant_id=tenant.id,
+        trigger="backlog_threshold",
+    )
     assert eval_out["should_schedule"] is True
 
     sched = schedule_graph_density_pass_v1(

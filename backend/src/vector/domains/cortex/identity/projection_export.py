@@ -273,6 +273,10 @@ def run_graph_projection_export_for_pipeline_v1(
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
     """Single phase-04 transform: direct projection export (no org-link replay job)."""
+    from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
+        snapshot_authoritative_link_topology_v1,
+    )
+
     doc = build_org_graph_projection_export_document(db, tenant_id=tenant_id)
     stable = str(doc.get("stable_hash_sha256") or "").strip()
     if not stable:
@@ -283,11 +287,21 @@ def run_graph_projection_export_for_pipeline_v1(
     nodes = projection.get("nodes")
     edges = projection.get("edges")
     node_count = len(nodes) if isinstance(nodes, list) else 0
-    edge_count = len(edges) if isinstance(edges, list) else 0
+    projection_edge_count = len(edges) if isinstance(edges, list) else 0
+    topo = snapshot_authoritative_link_topology_v1(db, tenant_id=tenant_id)
+    auth_edge_rows = int(topo.get("auth_edge_rows") or 0)
+    unique_auth_pairs = int(topo.get("unique_auth_pairs") or 0)
     return {
         "graph_projection_stable_hash_sha256": stable,
         "node_count": node_count,
-        "edge_count": edge_count,
+        "edge_count": auth_edge_rows,
+        "projection_edge_count": projection_edge_count,
+        "auth_edge_rows": auth_edge_rows,
+        "unique_auth_pairs": unique_auth_pairs,
+        "unique_pairs_delta": 0,
+        "unique_auth_pairs_delta": 0,
+        "dup_factor": topo.get("dup_factor"),
+        "graph_truth_primary_metric_key": "unique_auth_pairs",
         "org_graph_projection_schema_version": doc.get("org_graph_projection_schema_version"),
         "engine_build_ref": doc.get("engine_build_ref"),
     }

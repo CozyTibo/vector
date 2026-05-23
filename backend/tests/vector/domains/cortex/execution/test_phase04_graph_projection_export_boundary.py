@@ -28,3 +28,6 @@ def test_graph_projection_export_pipeline_helper_uses_build_document() -> None:
     assert "graph_projection_stable_hash_sha256" in src
     assert "node_count" in src
     assert "edge_count" in src
+    assert "unique_auth_pairs" in src
+    assert "unique_pairs_delta" in src
+    assert "snapshot_authoritative_link_topology_v1" in src

@@ -39,6 +39,34 @@ class LinkLedgerInvariantError(ValueError):
     """Raised when a link row would violate P04-04 invariants (evidence/rule, topology, tenant)."""
 
 
+class AuthoritativeLinkDuplicatePairError(LinkLedgerInvariantError):
+    """Raised when insert would violate active authoritative endpoint uniqueness (Wave S1)."""
+
+
+def find_active_authoritative_org_link_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    link_type: str,
+    source_entity_id: uuid.UUID,
+    target_entity_id: uuid.UUID,
+) -> CortexOrgLink | None:
+    """Active authoritative row for this endpoint triple, if any."""
+    return db.scalars(
+        select(CortexOrgLink)
+        .where(
+            CortexOrgLink.tenant_id == tenant_id,
+            CortexOrgLink.link_type == link_type,
+            CortexOrgLink.source_entity_id == source_entity_id,
+            CortexOrgLink.target_entity_id == target_entity_id,
+            CortexOrgLink.link_authority == "authoritative",
+            CortexOrgLink.revoked_at.is_(None),
+        )
+        .order_by(CortexOrgLink.created_at.desc(), CortexOrgLink.id.asc())
+        .limit(1)
+    ).first()
+
+
 def material_has_evidence_or_rule(
     *,
     evidence_raw_record_ids: list[int] | None,
@@ -136,6 +164,16 @@ def append_authoritative_org_link(
     if dst is None or dst.tenant_id != tenant_id:
         msg = "target_entity_id not found for tenant"
         raise LinkLedgerInvariantError(msg)
+
+    existing = find_active_authoritative_org_link_v1(
+        db,
+        tenant_id=tenant_id,
+        link_type=link_type,
+        source_entity_id=source_entity_id,
+        target_entity_id=target_entity_id,
+    )
+    if existing is not None:
+        return existing
 
     try:
         assert_org_link_validity_half_open(valid_from, valid_to)

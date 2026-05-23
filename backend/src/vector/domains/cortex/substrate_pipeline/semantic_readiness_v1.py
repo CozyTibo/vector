@@ -63,29 +63,28 @@ def _dup_severity(dup_factor: float | None) -> str:
 
 
 def _query_graph_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
+    from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
+        snapshot_authoritative_link_topology_v1,
+    )
+
     tid = str(tenant_id)
-    row = session.execute(
-        text(
-            """
-            SELECT
-              (SELECT COUNT(*) FROM cortex_org_entities
-               WHERE tenant_id = :tenant AND tombstoned_at IS NULL
-                 AND lifecycle_state = 'active')::bigint AS active_entities,
-              (SELECT COUNT(*) FROM cortex_org_links
-               WHERE tenant_id = :tenant AND link_authority = 'authoritative'
-                 AND revoked_at IS NULL)::bigint AS auth_edge_rows,
-              (SELECT COUNT(DISTINCT (source_entity_id, target_entity_id))
-               FROM cortex_org_links
-               WHERE tenant_id = :tenant AND link_authority = 'authoritative'
-                 AND revoked_at IS NULL)::bigint AS unique_auth_pairs
-            """
-        ),
-        {"tenant": tid},
-    ).mappings().first()
-    active_entities = _to_int(row["active_entities"]) if row else 0
-    auth_edge_rows = _to_int(row["auth_edge_rows"]) if row else 0
-    unique_auth_pairs = _to_int(row["unique_auth_pairs"]) if row else 0
-    dup = _dup_factor(auth_edge_rows=auth_edge_rows, unique_auth_pairs=unique_auth_pairs)
+    topo = snapshot_authoritative_link_topology_v1(session, tenant_id=tenant_id)
+    active_entities = _to_int(
+        session.execute(
+            text(
+                """
+                SELECT COUNT(*)::bigint AS n FROM cortex_org_entities
+                WHERE tenant_id = :tenant AND tombstoned_at IS NULL AND lifecycle_state = 'active'
+                """
+            ),
+            {"tenant": tid},
+        ).scalar()
+    )
+    auth_edge_rows = _to_int(topo.get("auth_edge_rows"))
+    unique_auth_pairs = _to_int(topo.get("unique_auth_pairs"))
+    dup = topo.get("dup_factor")
+    if dup is not None:
+        dup = float(dup)
 
     incident = session.execute(
         text(

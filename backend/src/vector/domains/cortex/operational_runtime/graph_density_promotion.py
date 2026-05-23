@@ -124,6 +124,37 @@ def _promoted_candidate_exists_clause_v1() -> Any:
     )
 
 
+def _active_authoritative_pair_exists_for_candidate_v1() -> Any:
+    return exists(
+        select(1).where(
+            CortexOrgLink.tenant_id == CortexOrgLinkCandidate.tenant_id,
+            CortexOrgLink.source_entity_id == CortexOrgLinkCandidate.source_entity_id,
+            CortexOrgLink.target_entity_id == CortexOrgLinkCandidate.target_entity_id,
+            CortexOrgLink.link_type == CortexOrgLinkCandidate.link_type,
+            CortexOrgLink.link_authority == "authoritative",
+            CortexOrgLink.revoked_at.is_(None),
+        )
+    )
+
+
+def _promotable_candidate_filters_v1() -> tuple[Any, ...]:
+    return (
+        ~_promoted_candidate_exists_clause_v1(),
+        ~_active_authoritative_pair_exists_for_candidate_v1(),
+    )
+
+
+def count_promotable_link_candidates_v1(session: Session, *, tenant_id: uuid.UUID) -> int:
+    return int(
+        session.scalar(
+            select(func.count())
+            .select_from(CortexOrgLinkCandidate)
+            .where(CortexOrgLinkCandidate.tenant_id == tenant_id, *_promotable_candidate_filters_v1())
+        )
+        or 0
+    )
+
+
 def count_unpromoted_link_candidates_v1(session: Session, *, tenant_id: uuid.UUID) -> int:
     return int(
         session.scalar(
@@ -152,6 +183,27 @@ def list_unpromoted_link_candidates_v1(
                 CortexOrgLinkCandidate.tenant_id == tenant_id,
                 ~_promoted_candidate_exists_clause_v1(),
             )
+            .order_by(
+                CortexOrgLinkCandidate.created_at.asc(),
+                CortexOrgLinkCandidate.row_digest.asc(),
+            )
+            .limit(lim)
+        ).all()
+    )
+
+
+def list_promotable_link_candidates_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    limit: int,
+) -> list[CortexOrgLinkCandidate]:
+    """Candidates that can still add a new unique authoritative endpoint pair (Wave S1)."""
+    lim = max(1, min(int(limit), 500))
+    return list(
+        session.scalars(
+            select(CortexOrgLinkCandidate)
+            .where(CortexOrgLinkCandidate.tenant_id == tenant_id, *_promotable_candidate_filters_v1())
             .order_by(
                 CortexOrgLinkCandidate.created_at.asc(),
                 CortexOrgLinkCandidate.row_digest.asc(),
@@ -212,17 +264,30 @@ def evaluate_promotion_backlog_schedule_v1(
 ) -> dict[str, Any]:
     """Whether a density promotion pass should run (backlog threshold or phase-04 hook)."""
     unpromoted = count_unpromoted_link_candidates_v1(session, tenant_id=tenant_id)
+    promotable = count_promotable_link_candidates_v1(session, tenant_id=tenant_id)
     threshold = get_promotion_backlog_threshold_v1()
     trig = (trigger or "").strip()
     if trig == PROMOTION_TRIGGER_AFTER_PHASE_04_V1:
-        should = unpromoted > 0
-        reason = "after_phase_04_with_candidates" if should else "after_phase_04_no_candidates"
+        should = promotable > 0
+        reason = (
+            "after_phase_04_with_promotable_candidates"
+            if should
+            else "after_phase_04_no_promotable_candidates"
+        )
     elif trig in (
         PROMOTION_TRIGGER_BACKLOG_THRESHOLD_V1,
         PROMOTION_TRIGGER_CONVERGENCE_SLICE_V1,
-    ) and unpromoted > threshold:
-        should = True
-        reason = trig or PROMOTION_TRIGGER_BACKLOG_THRESHOLD_V1
+    ):
+        should = promotable > threshold
+        reason = (
+            trig
+            if should
+            else (
+                "no_promotable_candidates"
+                if promotable <= 0
+                else "promotable_below_threshold"
+            )
+        )
     else:
         should = False
         reason = "backlog_below_threshold"
@@ -230,6 +295,7 @@ def evaluate_promotion_backlog_schedule_v1(
         "tenant_id": str(tenant_id),
         "gate_id": GP085_PROMO01_GATE_ID_V1,
         "unpromoted_link_candidate_count": unpromoted,
+        "promotable_link_candidate_count": promotable,
         "backlog_threshold": threshold,
         "should_schedule": should,
         "schedule_reason": reason,
@@ -267,14 +333,34 @@ def _execute_bounded_lawful_promotions_v1(
     tenant_id: uuid.UUID,
     cap: int,
     trigger: str,
-) -> tuple[CortexOrgLinkPromotionPolicy, list[str], list[dict[str, str]]]:
+) -> tuple[CortexOrgLinkPromotionPolicy, list[str], list[dict[str, str]], dict[str, Any]]:
+    from vector.domains.cortex.identity.link_ledger import find_active_authoritative_org_link_v1
+    from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
+        snapshot_authoritative_link_topology_v1,
+    )
+
     policy = ensure_cesp_promotion_policy_v1(session, tenant_id=tenant_id)
-    candidates = list_unpromoted_link_candidates_v1(session, tenant_id=tenant_id, limit=cap)
+    topo_before = snapshot_authoritative_link_topology_v1(session, tenant_id=tenant_id)
+    candidates = list_promotable_link_candidates_v1(session, tenant_id=tenant_id, limit=cap)
     promoted_ids: list[str] = []
     skipped: list[dict[str, str]] = []
     for cand in candidates:
         try:
             assert_lawful_promotion_candidate_v1(cand)
+            if find_active_authoritative_org_link_v1(
+                session,
+                tenant_id=tenant_id,
+                link_type=cand.link_type,
+                source_entity_id=cand.source_entity_id,
+                target_entity_id=cand.target_entity_id,
+            ) is not None:
+                skipped.append(
+                    {
+                        "candidate_id": str(cand.id),
+                        "error": "active_pair_exists",
+                    }
+                )
+                continue
             link = promote_candidate_to_authoritative_link(
                 session,
                 tenant_id=tenant_id,
@@ -288,7 +374,19 @@ def _execute_bounded_lawful_promotions_v1(
             promoted_ids.append(str(link.id))
         except (PromotionInvariantError, GraphDensityPromotionError) as exc:
             skipped.append({"candidate_id": str(cand.id), "error": str(exc)})
-    return policy, promoted_ids, skipped
+    topo_after = snapshot_authoritative_link_topology_v1(session, tenant_id=tenant_id)
+    topology = {
+        "unique_auth_pairs_before": topo_before.get("unique_auth_pairs"),
+        "unique_auth_pairs_after": topo_after.get("unique_auth_pairs"),
+        "unique_auth_pairs_delta": int(topo_after.get("unique_auth_pairs") or 0)
+        - int(topo_before.get("unique_auth_pairs") or 0),
+        "auth_edge_rows_before": topo_before.get("auth_edge_rows"),
+        "auth_edge_rows_after": topo_after.get("auth_edge_rows"),
+        "dup_factor_after": topo_after.get("dup_factor"),
+        "promoted_new_count": len(promoted_ids),
+        "promoted_skipped_dup_count": len(skipped),
+    }
+    return policy, promoted_ids, skipped, topology
 
 
 def _finalize_lawful_promotion_replay_job_v1(
@@ -298,6 +396,7 @@ def _finalize_lawful_promotion_replay_job_v1(
     summary: dict[str, Any],
 ) -> None:
     job.summary_json = {**summary, "org_link_replay_schema_version": 2}
+    graph_truth = summary.get("graph_truth") if isinstance(summary.get("graph_truth"), dict) else {}
     _append_receipt(
         session,
         job_id=job.id,
@@ -305,6 +404,9 @@ def _finalize_lawful_promotion_replay_job_v1(
         detail_json={
             "lane": ORG_LINK_JOB_KIND_LAWFUL_EDGE_PROMOTION_V1,
             "promoted_count": summary.get("promoted_count"),
+            "promoted_new": graph_truth.get("promoted_new_count"),
+            "promoted_skipped_dup": graph_truth.get("promoted_skipped_dup_count"),
+            "unique_pairs_delta": graph_truth.get("unique_auth_pairs_delta"),
             "promotion_policy_ref": CESP_LAWFUL_PROMOTION_POLICY_REF_V1,
         },
     )
@@ -345,7 +447,7 @@ def run_graph_density_promotion_pass_v1(
         job.started_at = job.started_at or job.created_at
         session.flush()
 
-    policy, promoted_ids, skipped = _execute_bounded_lawful_promotions_v1(
+    policy, promoted_ids, skipped, topology = _execute_bounded_lawful_promotions_v1(
         session,
         tenant_id=tenant_id,
         cap=cap,
@@ -363,7 +465,9 @@ def run_graph_density_promotion_pass_v1(
         "skipped": skipped,
         "max_promotions": cap,
         "unpromoted_remaining": count_unpromoted_link_candidates_v1(session, tenant_id=tenant_id),
+        "promotable_remaining": count_promotable_link_candidates_v1(session, tenant_id=tenant_id),
         "graph_candidate_count": count_graph_candidate_count_v1(session, tenant_id=tenant_id),
+        "graph_truth": topology,
     }
     if pipeline_run_id is not None:
         summary["pipeline_run_id"] = str(pipeline_run_id)
