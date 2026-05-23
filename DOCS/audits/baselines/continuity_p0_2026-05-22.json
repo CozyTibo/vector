@@ -2207,5 +2207,62 @@
     "stale_seconds": 0,
     "dry_run": false,
     "trace_only": true
+  },
+  "step_a2_ecs_deploy_align": {
+    "validated_at": "2026-05-23T00:48:01.892449+00:00",
+    "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "p0_a2_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "api_image_matches_closure_sha": true,
+      "worker_image_matches_closure_sha": true,
+      "both_services_on_same_tag": true,
+      "static_wiring_ok": true,
+      "deploy_drive_ok": true
+    },
+    "checks_advisory": {
+      "api_image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+      "worker_image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+      "closure_git_sha_short": "2ab8776fafc8",
+      "wait_outcome": null,
+      "poll_count": null,
+      "deploy_exit_code": null
+    },
+    "wiring_ok": true,
+    "api_image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "worker_image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "deploy_matches_closure_sha": true,
+    "both_services_on_same_tag": true,
+    "wait_outcome": null,
+    "deploy_ran": false,
+    "realign_ran": true,
+    "use_deployed_closure": true,
+    "trace_only": false,
+    "realign_drive": {
+      "realigned": false,
+      "reason": "already_aligned",
+      "api_image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+      "worker_image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+      "snapshot_before": {
+        "recorded_at": "2026-05-23T00:48:00.220013+00:00",
+        "aws_region": "eu-west-1",
+        "ecs_cluster": "vector-prod",
+        "api": {
+          "service": "vector-backend-service",
+          "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend:180",
+          "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-backend:2ab8776fafc8861ef69571f1531da1fd4f880a04",
+          "image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04"
+        },
+        "worker": {
+          "service": "vector-worker-service",
+          "task_definition": "arn:aws:ecs:eu-west-1:884953290372:task-definition/vector-backend-worker:141",
+          "image": "884953290372.dkr.ecr.eu-west-1.amazonaws.com/vector-worker:2ab8776fafc8861ef69571f1531da1fd4f880a04",
+          "image_tag": "2ab8776fafc8861ef69571f1531da1fd4f880a04"
+        },
+        "verification": {
+          "both_services_on_same_tag": true
+        }
+      }
+    }
   }
 }

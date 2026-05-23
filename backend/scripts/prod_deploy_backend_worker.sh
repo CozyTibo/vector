@@ -23,10 +23,15 @@ echo "Deploying git SHA: $IMAGE_TAG"
 ECR_REGISTRY="$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com"
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-echo "==> Packaging tests (P0-A)"
+echo "==> Pre-deploy tests (P0-A + Phase A1)"
 cd backend
 python -m pip install --quiet -r requirements.txt jsonschema
+export VECTOR_SETTINGS_SKIP_DOTENV=1
 PYTHONPATH=src python -m pytest -q tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py
+PYTHONPATH=src python -m pytest -q \
+  tests/vector/domains/cortex/synthesis/test_phase_a1_synthesis_job_lifecycle.py \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_synthesis_job_lifecycle.py \
+  tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_ecs_deploy_align.py
 cd "$ROOT"
 
 echo "==> Build & push API image"
@@ -81,5 +86,16 @@ aws ecs wait services-stable \
   --cluster "$ECS_CLUSTER" \
   --services "$ECS_SERVICE" "$ECS_WORKER_SERVICE" \
   --region "$AWS_REGION"
+
+echo "==> Verify ECS image tags"
+cd backend
+PYTHONPATH=src python -c "
+from vector.domains.cortex.substrate_pipeline.continuity_p0_baseline import probe_prod_ecs_deploy_v1
+import json, sys
+d = probe_prod_ecs_deploy_v1(expected_sha='$IMAGE_TAG')
+print(json.dumps(d['verification'], indent=2))
+sys.exit(0 if d['verification']['deploy_matches_closure_sha'] else 1)
+"
+cd "$ROOT"
 
 echo "Deploy complete: $IMAGE_TAG"

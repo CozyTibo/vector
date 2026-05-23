@@ -48,15 +48,14 @@ def _tag_matches_deploy(tag: str, sha: str) -> bool:
     return tag == sha or tag.startswith(sha[:12])
 
 
-def probe_prod_ecs_deploy_v1(
+def snapshot_prod_ecs_deploy_v1(
     *,
-    expected_sha: str,
     aws_region: str = AWS_REGION_DEFAULT,
     ecs_cluster: str = ECS_CLUSTER_DEFAULT,
     api_service: str = ECS_API_SERVICE_DEFAULT,
     worker_service: str = ECS_WORKER_SERVICE_DEFAULT,
 ) -> dict[str, Any]:
-    """Describe prod API + worker ECS images and whether tags match ``expected_sha``."""
+    """Describe prod API + worker ECS images (no closure SHA comparison)."""
 
     def _service_image(service_name: str) -> tuple[str, str]:
         raw = subprocess.check_output(
@@ -99,15 +98,9 @@ def probe_prod_ecs_deploy_v1(
     worker_td, worker_image = _service_image(worker_service)
     api_tag = _image_tag(api_image)
     worker_tag = _image_tag(worker_image)
-    api_ok = _tag_matches_deploy(api_tag, expected_sha)
-    worker_ok = _tag_matches_deploy(worker_tag, expected_sha)
     same_tag = api_tag == worker_tag
-    closure_ok = api_ok and worker_ok and same_tag
-
     return {
         "recorded_at": datetime.now(UTC).isoformat(),
-        "git_sha_full": expected_sha,
-        "git_sha_short": expected_sha[:12],
         "aws_region": aws_region,
         "ecs_cluster": ecs_cluster,
         "api": {
@@ -122,6 +115,37 @@ def probe_prod_ecs_deploy_v1(
             "image": worker_image,
             "image_tag": worker_tag,
         },
+        "verification": {
+            "both_services_on_same_tag": same_tag,
+        },
+    }
+
+
+def probe_prod_ecs_deploy_v1(
+    *,
+    expected_sha: str,
+    aws_region: str = AWS_REGION_DEFAULT,
+    ecs_cluster: str = ECS_CLUSTER_DEFAULT,
+    api_service: str = ECS_API_SERVICE_DEFAULT,
+    worker_service: str = ECS_WORKER_SERVICE_DEFAULT,
+) -> dict[str, Any]:
+    """Describe prod API + worker ECS images and whether tags match ``expected_sha``."""
+    snap = snapshot_prod_ecs_deploy_v1(
+        aws_region=aws_region,
+        ecs_cluster=ecs_cluster,
+        api_service=api_service,
+        worker_service=worker_service,
+    )
+    api_tag = str(snap["api"]["image_tag"])
+    worker_tag = str(snap["worker"]["image_tag"])
+    api_ok = _tag_matches_deploy(api_tag, expected_sha)
+    worker_ok = _tag_matches_deploy(worker_tag, expected_sha)
+    same_tag = api_tag == worker_tag
+    closure_ok = api_ok and worker_ok and same_tag
+    return {
+        **snap,
+        "git_sha_full": expected_sha,
+        "git_sha_short": expected_sha[:12],
         "verification": {
             "api_image_matches_closure_sha": api_ok,
             "worker_image_matches_closure_sha": worker_ok,

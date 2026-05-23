@@ -2,6 +2,7 @@
 
 **Status:** Operational recovery plan — grounded in production reality, not architecture speculation  
 **Phase A step A.1:** **Done** (2026-05-23) — see [Step A.1 completion](#step-a1-completion--synthesis-job-lifecycle)  
+**Phase A step A.2:** **Done** (2026-05-23) — see [Step A.2 completion](#step-a2-completion--ecs-deploy-alignment)  
 **Supersedes for stabilization work:** optimistic Phase 1–3 completion narratives and open-ended “Phase 4 operational hardening” without recurrence gates  
 **Authoritative truth sources:**
 
@@ -249,7 +250,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | Step | Goal | Why | Subsystem | Remove / simplify | Success | Validate | Rollback | Type |
 |------|------|-----|-----------|-------------------|---------|----------|----------|------|
 | **A1** | ~~Purge/fix 1,043 `running` synthesis jobs~~ **Done 2026-05-23** | Restores trust in L7 job table | `synthesis_job_lifecycle.py`, `synthesis_orchestrator.py` | N/A (data + bugfix) | `running` < 10; terminal states consistent | Prod: 1043 reconciled; baseline `step_a1_synthesis_job_reconcile` | Low — backup job rows | **runtime** |
-| **A2** | Align ECS API + worker to **same SHA** | Worker must run epoch fix + deferral monitor | Deploy / ECS | N/A | `probe_prod_ecs_deploy_v1` both match | `deploy_matches_closure_sha: true` | Redeploy prior tag | **ops** |
+| **A2** | ~~Align ECS API + worker to **same SHA**~~ **Done 2026-05-23** | Worker must run epoch fix + deferral monitor | `continuity_p0_ecs_deploy_align.py`, `prod_deploy_backend_worker.sh` | N/A | `deploy_matches_closure_sha: true` | Prod: both on `2ab8776…`; baseline `step_a2_ecs_deploy_align` | Redeploy prior tag | **ops** |
 | **A3** | Drain stuck TCRE `queued` job | Unblocks 06→07 resume | `tcre_resume.py`, Celery task | N/A | 0 queued older than 1h | SQL + `resume_convergence_from_waiting_v1` trace | Re-queue job | **runtime** |
 | **A4** | Tighten AA1 + AA6 in proof panel | Stop false M3 confidence | `continuity_proof_panel.py` | Remove mat-only AA6 fallback | AA1 FAIL on empty 08; AA6 requires delta or drainable ↓ | Unit tests + panel JSON | Revert gate logic | **ops** |
 | **A5** | Ban `--trace-only` as prod sign-off | Baselines must mean something | All `continuity_p3_*_proof.py` | Document CI-only mode | Baseline updates require `trace_only: false` | Code review + baseline schema | N/A | **cleanup** |
@@ -619,9 +620,52 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 - [x] `running < 10` (SQL histogram)
 - [x] No jobs stuck `running` > 24h (all reconciled to `failed`)
 - [x] Orchestrator terminal transitions hardened (`finally` + idempotency supersede)
-- [ ] A-G5 CloudWatch terminal logs (after A2 deploy of this SHA)
+- [ ] A-G5 CloudWatch terminal logs (after deploy of A.1 closure SHA to ECS)
 
-**Next step:** **A2** — align ECS API + worker to the same image SHA so worker runs reconcile-on-materialize in prod.
+---
+
+## Step A.2 completion — ECS deploy alignment
+
+**Completed:** 2026-05-23  
+**Goal:** API and worker ECS services run the **same** ECR image tag; eliminate split-deploy false confidence.
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| ECS snapshot | `snapshot_prod_ecs_deploy_v1` — describe API/worker tags without closure compare |
+| ECS realign | `realign_ecs_worker_to_api_image_tag_v1` — ECS-only worker→API tag (no docker; fixes split deploy) |
+| Deploy script | `prod_deploy_backend_worker.sh` — A1/A2 tests + post-deploy SHA verify |
+| Proof | `continuity_p0_phase_a2_ecs_deploy_align_proof.py` + `continuity_p0_ecs_deploy_align.py` |
+| CI | `.github/workflows/deploy.yml` — A.2 pytest gate; existing post-deploy tag verify unchanged |
+
+### Prod proof (2026-05-23)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a2_ecs_deploy_align_proof.py \
+  --use-deployed-closure --realign-worker --probe-only
+```
+
+| Check | Result |
+|-------|--------|
+| `both_services_on_same_tag` | true |
+| `api_image_tag` | `2ab8776fafc8861ef69571f1531da1fd4f880a04` |
+| `worker_image_tag` | `2ab8776fafc8861ef69571f1531da1fd4f880a04` |
+| `deploy_matches_closure_sha` | true (closure = deployed tag) |
+| `p0_a2_pass` | true |
+
+Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.json) → `step_a2_ecs_deploy_align`.
+
+**Note:** Local commit `acbbac8` (A.1 code) is **not** on ECS until `main` is pushed and GitHub Actions deploy runs (or `prod_deploy_backend_worker.sh` with ECR push credentials). Split-deploy incident is **resolved** at `2ab8776`; A.1 worker hooks ship on next full deploy.
+
+### Exit gates (A-G2)
+
+- [x] API tag = worker tag
+- [x] `deploy_matches_closure_sha` for deployed closure
+- [x] `realign_ecs_worker_to_api_image_tag_v1` available for future drift
+
+**Next step:** **A3** — drain stuck TCRE `queued` job.
 
 ---
 
@@ -642,8 +686,11 @@ Banned:             unlock_step*, trace-only baseline sign-off
 
 ```bash
 # Phase A1 — synthesis job table (done; re-run if running drifts)
-cd backend
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a1_synthesis_job_reconcile_proof.py --stale-seconds 0
+
+# Phase A2 — ECS API+worker alignment (done; re-run after deploy or split-drift)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a2_ecs_deploy_align_proof.py --use-deployed-closure --probe-only
+# Full deploy (requires ECR push IAM): ../backend/scripts/prod_deploy_backend_worker.sh
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

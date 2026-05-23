@@ -121,6 +121,12 @@ jobs:
             tests/vector/domains/cortex/synthesis/test_phase_a1_synthesis_job_lifecycle.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_synthesis_job_lifecycle.py
 
+      - name: Verify Phase A2 ECS deploy alignment (step A.2)
+        run: |
+          cd backend
+          VECTOR_SETTINGS_SKIP_DOTENV=1 PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_ecs_deploy_align.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
