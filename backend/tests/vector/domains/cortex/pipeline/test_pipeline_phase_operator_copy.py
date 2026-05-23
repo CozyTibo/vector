@@ -3,6 +3,7 @@
 from vector.domains.cortex.pipeline.pipeline_phase_operator_copy import (
     humanize_blocker_line,
     humanize_phase_issues,
+    phase_display_label_v1,
     phase_status_label,
 )
 
@@ -16,6 +17,14 @@ def test_phase_status_label() -> None:
 def test_humanize_canonical_backlog() -> None:
     assert "canonical" in humanize_blocker_line("canonical_backlog_unmaterialized: 24").lower()
     assert "24" in humanize_blocker_line("canonical_backlog_unmaterialized: 24")
+
+
+def test_phase_display_label_completed_empty_verbatim() -> None:
+    assert (
+        phase_display_label_v1(status="healthy", substrate_phase_outcome="COMPLETED_EMPTY")
+        == "COMPLETED_EMPTY"
+    )
+    assert phase_display_label_v1(status="healthy", substrate_phase_outcome=None) == "Healthy"
 
 
 def test_humanize_phase_issues_waiting_backlog() -> None:

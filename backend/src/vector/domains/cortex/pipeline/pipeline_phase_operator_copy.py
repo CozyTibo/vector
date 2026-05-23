@@ -114,6 +114,18 @@ def phase_status_label(status: PhaseStatus) -> str:
     return _STATUS_LABEL.get(status, status.replace("_", " ").title())
 
 
+def phase_display_label_v1(
+    *,
+    status: PhaseStatus,
+    substrate_phase_outcome: str | None = None,
+) -> str:
+    """Wave S5: show substrate receipt outcomes verbatim (e.g. phase 03 COMPLETED_EMPTY)."""
+    outcome = (substrate_phase_outcome or "").strip().upper()
+    if outcome == "COMPLETED_EMPTY":
+        return "COMPLETED_EMPTY"
+    return phase_status_label(status)
+
+
 def phase_status_hint(status: PhaseStatus) -> str:
     return _STATUS_HINT.get(status, "")
 

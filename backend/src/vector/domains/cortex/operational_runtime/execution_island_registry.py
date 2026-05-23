@@ -421,6 +421,11 @@ def build_island_registry_inspect_v1(
         sync_result = sync_execution_island_registry_v1(session, tenant_id=tenant_id)
 
     islands = list_execution_island_registry_v1(session, tenant_id=tenant_id)
+    snapshot_at = None
+    for row in islands:
+        candidate = row.get("registry_snapshot_at")
+        if candidate and (snapshot_at is None or str(candidate) > str(snapshot_at)):
+            snapshot_at = candidate
     return {
         "surface_kind": "execution_island_registry",
         "registry_enabled": is_execution_island_registry_enabled_v1(),
@@ -428,5 +433,6 @@ def build_island_registry_inspect_v1(
         "traversal_propagation": propagation,
         "sync": sync_result,
         "island_count": len(islands),
+        "registry_snapshot_at": snapshot_at,
         "islands": islands,
     }

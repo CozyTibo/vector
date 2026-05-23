@@ -574,6 +574,16 @@ def build_continuity_proof_panel_v1(
             "m3_autonomously_alive": m3_alive,
             "metric_tier": "M3" if m3_alive else "below_M3",
             "aa_hold_active": aa_hold_active,
+            "intelligence_signoff_deferred": True,
+            "m3_alive_is_not_semantic_signoff": True,
+        },
+        "intelligence_signoff": {
+            "use_semantic_readiness_panel": True,
+            "message": (
+                "AA1–AA7 PASS measures runtime continuity only — not graph truth, retrieval mix, "
+                "or synthesis usefulness. Use the Semantic readiness admin card or "
+                "graph_truth_audit_snapshot.py for intelligence sign-off."
+            ),
         },
     }
 
@@ -582,6 +592,8 @@ def format_continuity_proof_panel_text_v1(panel: dict[str, Any]) -> str:
     """Human-readable AA1–AA7 panel for operator runbook."""
     lines = [
         "=== Cortex Continuity Proof Panel (AA1–AA7) ===",
+        "NOTE: M3/AA PASS is continuity/runtime only — NOT semantic intelligence sign-off.",
+        "      Use Semantic readiness admin card or graph_truth_audit_snapshot.py.",
         f"Tenant: {panel.get('tenant_id')}",
         f"Pipeline: {panel.get('pipeline_run_id') or '—'}",
         f"Evaluated: {panel.get('evaluated_at')}",

@@ -41,6 +41,7 @@ from vector.domains.cortex.ingestion.admin_overview import build_cortex_ingestio
 from vector.domains.cortex.operational_runtime.graph_density import (
     count_active_org_entities_v1,
     count_entities_with_promoted_edges_v1,
+    count_distinct_graph_candidate_pairs_v1,
     count_graph_candidate_count_v1,
     count_graph_promoted_edge_count_v1,
 )
@@ -52,7 +53,10 @@ from vector.domains.cortex.operational_runtime.substrate_traversal_scheduling im
     filter_eligible_traversal_components_v1,
     list_graph_connected_components_v1,
 )
-from vector.domains.cortex.pipeline.pipeline_phase_operator_copy import phase_status_label
+from vector.domains.cortex.pipeline.pipeline_phase_operator_copy import (
+    phase_display_label_v1,
+    phase_status_label,
+)
 from vector.domains.cortex.retrieval.retrieval_completeness_projection import (
     count_retrieval_indexed_in_published_epoch_v1,
 )
@@ -553,6 +557,31 @@ def build_continuity_status_v1(
     }
 
 
+def _latest_substrate_phase_outcome_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    phase_id: str,
+) -> str | None:
+    outcome = session.scalar(
+        select(CortexSubstratePhaseRun.outcome)
+        .join(
+            CortexSubstratePipelineRun,
+            CortexSubstratePipelineRun.id == CortexSubstratePhaseRun.pipeline_run_id,
+        )
+        .where(
+            CortexSubstratePipelineRun.tenant_id == tenant_id,
+            CortexSubstratePhaseRun.phase_id == phase_id,
+        )
+        .order_by(CortexSubstratePhaseRun.finished_at.desc().nullslast())
+        .limit(1)
+    )
+    if outcome is None:
+        return None
+    text = str(outcome).strip()
+    return text or None
+
+
 def _phase_card(
     *,
     phase: OperatorPhase,
@@ -563,11 +592,17 @@ def _phase_card(
     blockers: list[str] | None = None,
     last_success_at: str | None = None,
     backlog_count: int | None = None,
+    status_label_override: str | None = None,
+    substrate_phase_outcome: str | None = None,
 ) -> dict[str, Any]:
+    label = status_label_override or phase_display_label_v1(
+        status=status,
+        substrate_phase_outcome=substrate_phase_outcome,
+    )
     return {
         "phase": phase,
         "status": status,
-        "status_label": phase_status_label(status),
+        "status_label": label,
         "headline": headline,
         "continuity_advancing": continuity_advancing,
         "signals": signals,
@@ -715,11 +750,17 @@ def build_continuity_phase_cards_v1(
     id_status: PhaseStatus = "degraded" if open_ambiguity else "healthy"
     if fsm == "IDENTITY" and lease_running:
         id_status = "running"
+    from vector.domains.cortex.substrate_pipeline.constants import PHASE_03_IDENTITY
+
+    phase03_outcome = _latest_substrate_phase_outcome_v1(
+        session, tenant_id=tenant_id, phase_id=PHASE_03_IDENTITY
+    )
     id_card = _phase_card(
         phase="identity",
         status=id_status,
         headline="Replay conflicts" if open_ambiguity else "Handles stable",
         continuity_advancing=open_ambiguity == 0,
+        substrate_phase_outcome=phase03_outcome,
         signals=[
             _signal("active_handles", "Active org entities", entity_count),
             _signal("replay_conflicts", "Open ambiguities", open_ambiguity, severity="warn" if open_ambiguity else "ok"),
@@ -749,7 +790,10 @@ def build_continuity_phase_cards_v1(
             precomputed_eligible_components=eligible_local,
         )
     promoted = count_graph_promoted_edge_count_v1(session, tenant_id=tenant_id)
-    pending_candidates = count_graph_candidate_count_v1(session, tenant_id=tenant_id)
+    candidate_rows = count_graph_candidate_count_v1(session, tenant_id=tenant_id)
+    distinct_candidate_pairs = count_distinct_graph_candidate_pairs_v1(
+        session, tenant_id=tenant_id
+    )
     graph_status: PhaseStatus = "healthy"
     if propagation.get("blocked"):
         graph_status = "blocked"
@@ -764,7 +808,18 @@ def build_continuity_phase_cards_v1(
         continuity_advancing=not propagation.get("blocked") and eligible_islands > 0,
         signals=[
             _signal("promoted_edges", "Promoted edges", promoted),
-            _signal("pending_candidates", "Pending candidates", pending_candidates, severity="warn" if pending_candidates > 50 else "ok"),
+            _signal(
+                "distinct_candidate_pairs",
+                "Distinct candidate pairs",
+                distinct_candidate_pairs,
+                severity="warn" if distinct_candidate_pairs > 500 else "ok",
+            ),
+            _signal(
+                "candidate_rows_diagnostic",
+                "Candidate rows (diagnostic)",
+                candidate_rows,
+                severity="warn" if candidate_rows > distinct_candidate_pairs * 3 else "ok",
+            ),
             _signal("connected_islands", "Connected islands", islands),
             _signal("traversal_eligible", "Traversal-eligible islands", eligible_islands, severity="ok" if eligible_islands else "bad"),
             _signal("propagation_blocked", "Propagation blocked", propagation.get("blocked"), severity="bad" if propagation.get("blocked") else "ok"),

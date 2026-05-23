@@ -117,6 +117,24 @@ def count_graph_candidate_count_v1(session: Session, *, tenant_id: uuid.UUID) ->
     )
 
 
+def count_distinct_graph_candidate_pairs_v1(session: Session, *, tenant_id: uuid.UUID) -> int:
+    """Distinct endpoint pairs — primary candidate inflation signal (not raw row count)."""
+    return int(
+        session.scalar(
+            select(
+                func.count(
+                    func.distinct(
+                        CortexOrgLinkCandidate.source_entity_id,
+                        CortexOrgLinkCandidate.target_entity_id,
+                        CortexOrgLinkCandidate.link_type,
+                    )
+                )
+            ).where(CortexOrgLinkCandidate.tenant_id == tenant_id)
+        )
+        or 0
+    )
+
+
 def count_entities_with_promoted_edges_v1(session: Session, *, tenant_id: uuid.UUID) -> int:
     src = select(CortexOrgLink.source_entity_id.label("entity_id")).where(
         CortexOrgLink.tenant_id == tenant_id,

@@ -55,6 +55,7 @@ def test_format_panel_includes_all_aa_labels() -> None:
         assert gid in text
     assert "Summary:" in text
     assert "M3 autonomously alive: YES" in text
+    assert "NOT semantic intelligence sign-off" in text
 
 
 def test_build_panel_evaluates_all_gates() -> None:
@@ -99,6 +100,8 @@ def test_build_panel_evaluates_all_gates() -> None:
         panel = build_continuity_proof_panel_v1(session, tenant_id=tenant_id, wedge_free_ack=True)
     assert panel["surface_kind"] == "continuity_proof_panel"
     assert set(panel["gates"].keys()) == set(AA_GATE_IDS_V1)
+    assert panel["summary"]["m3_alive_is_not_semantic_signoff"] is True
+    assert panel["intelligence_signoff"]["use_semantic_readiness_panel"] is True
 
 
 def test_p2_2_proof_passes_when_panel_complete() -> None:
