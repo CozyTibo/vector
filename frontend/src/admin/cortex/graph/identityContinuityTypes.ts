@@ -8,6 +8,9 @@ export type IdentityContinuitySearchMatch = {
   entity_id?: string;
   projection_kind?: string;
   found: boolean;
+  error?: string;
+  anchor_hits?: number;
+  entity_ids?: string[];
 };
 
 export type IdentityContinuitySearchResult = {
@@ -33,16 +36,27 @@ export type IdentityContinuityCandidate = {
 
 export type IdentityContinuityEntityInspector = {
   surface_kind: "identity_continuity_entity_inspector";
+  inspector_schema_version?: number;
   tenant_id: string;
   entity: Record<string, unknown>;
   continuity_status: Record<string, unknown>;
   resolved_identities: Array<Record<string, unknown>>;
+  linked_handles: Array<Record<string, unknown>>;
   authoritative_links: Array<Record<string, unknown>>;
+  candidate_explorer_rows?: Array<Record<string, unknown>>;
   candidates: IdentityContinuityCandidate[];
   promotable_candidates: IdentityContinuityCandidate[];
   skipped_candidates: IdentityContinuityCandidate[];
+  unresolved_candidates: Array<Record<string, unknown>>;
   promotion_lineage: Array<Record<string, unknown>>;
+  candidate_lineage: Record<string, unknown>;
+  continuity_evidence?: Record<string, unknown>;
+  evidence_receipts: Array<Record<string, unknown>>;
+  generation_rejections: Array<Record<string, unknown>>;
+  generation_rejection_counts: Record<string, number>;
   open_ambiguities: Array<Record<string, unknown>>;
+  conflicting_identities: Array<Record<string, unknown>>;
+  duplicate_identities: Array<Record<string, unknown>>;
   evidence_summary: Record<string, unknown>;
 };
 
@@ -53,10 +67,12 @@ export type IdentitySearchParams = {
   email?: string;
   entity_id?: string;
   handle_id?: string;
+  canonical_entity_id?: string;
 };
 
 export type IdentityContinuityInspectorTenant = {
   surface_kind: "identity_continuity_inspector";
+  inspector_schema_version?: number;
   identity_continuity?: SemanticIdentityContinuity;
   unpromoted_candidates?: number;
 };

@@ -60,3 +60,45 @@ def test_identity_continuity_search_github_login(client: TestClient, db_session:
     body = res.json()
     assert body["surface_kind"] == "identity_continuity_search"
     assert isinstance(body["matches"], list)
+
+
+def test_identity_continuity_search_canonical_entity_id_invalid(
+    client: TestClient, db_session: Session
+) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    res = client.get(
+        f"/admin/tenants/{tid}/cortex/identity/continuity-inspector/search",
+        params={"canonical_entity_id": "not-a-uuid"},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert any(m.get("error") == "invalid_uuid" for m in body["matches"])
+
+
+def test_identity_continuity_entity_not_found(client: TestClient, db_session: Session) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    missing = uuid.uuid4()
+    res = client.get(f"/admin/tenants/{tid}/cortex/identity/continuity-inspector/entities/{missing}")
+    assert res.status_code == 404
+
+
+def test_identity_continuity_entity_evidence_not_found(client: TestClient, db_session: Session) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    missing = uuid.uuid4()
+    res = client.get(
+        f"/admin/tenants/{tid}/cortex/identity/continuity-inspector/entities/{missing}/evidence"
+    )
+    assert res.status_code == 404
+
+
+def test_identity_continuity_entity_candidates_not_found(client: TestClient, db_session: Session) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    missing = uuid.uuid4()
+    res = client.get(
+        f"/admin/tenants/{tid}/cortex/identity/continuity-inspector/entities/{missing}/candidates"
+    )
+    assert res.status_code == 404

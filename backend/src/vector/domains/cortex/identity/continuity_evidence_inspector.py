@@ -919,3 +919,174 @@ def build_continuity_evidence_inspection_for_tenant(
     )
     core["scenario_key"] = resolve_phase04_continuity_scenario_key()
     return core
+
+
+def _anchor_relates_to_entity_v1(
+    *,
+    tenant_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    anchor: CortexCanonicalIdentityAnchor,
+    raw: RawIngestionRecord | None,
+) -> bool:
+    if org_entity_id_for_anchor_row(tenant_id=tenant_id, anchor=anchor, raw=raw) == entity_id:
+        return True
+    for projection in extract_identity_primitives(anchor=anchor, raw=raw):
+        if org_entity_id_for_identity_primitive(tenant_id=tenant_id, projection=projection) == entity_id:
+            return True
+    return False
+
+
+def build_entity_continuity_evidence_inspection_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    anchor_scan_limit: int = 50_000,
+    receipt_limit: int = 48,
+) -> dict[str, Any]:
+    """Entity-scoped continuity evidence receipts and generation rejection reasons."""
+    lim = max(1, min(int(anchor_scan_limit), 100_000))
+    receipt_cap = max(1, min(int(receipt_limit), 200))
+
+    anchors = list(
+        db.scalars(
+            select(CortexCanonicalIdentityAnchor)
+            .where(CortexCanonicalIdentityAnchor.tenant_id == tenant_id)
+            .order_by(CortexCanonicalIdentityAnchor.canonical_entity_id.asc())
+            .limit(lim)
+        ).all()
+    )
+    raw_ids = {int(a.raw_record_id) for a in anchors}
+    raw_by_id: dict[int, RawIngestionRecord] = {}
+    if raw_ids:
+        for r in db.scalars(select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids))).all():
+            raw_by_id[int(r.id)] = r
+
+    mat_ids = {a.materialization_id for a in anchors if a.materialization_id is not None}
+    mat_by_id: dict[uuid.UUID, CortexCanonicalTransformMaterialization] = {}
+    if mat_ids:
+        for m in db.scalars(
+            select(CortexCanonicalTransformMaterialization).where(
+                CortexCanonicalTransformMaterialization.id.in_(mat_ids)
+            )
+        ).all():
+            mat_by_id[m.id] = m
+
+    buckets = _build_join_buckets(tenant_id=tenant_id, anchors=anchors, raw_by_id=raw_by_id)
+    (
+        by_slack,
+        by_github,
+        by_linear,
+        by_notion,
+        by_email_norm,
+        by_email_strict,
+        by_fixture,
+        by_link_subject,
+        by_stable_account,
+    ) = buckets
+
+    evidence_receipts: list[dict[str, Any]] = []
+    generation_rejections: list[dict[str, Any]] = []
+    rejection_counts: Counter[str] = Counter()
+
+    for a in anchors:
+        raw = raw_by_id.get(int(a.raw_record_id))
+        if not _anchor_relates_to_entity_v1(
+            tenant_id=tenant_id, entity_id=entity_id, anchor=a, raw=raw
+        ):
+            continue
+
+        raw_pl = _payload_dict(raw)
+        signals = continuity_identity_signals_for_anchor(anchor=a, raw=raw)
+        org_kind_anchor, mapping_rule_id = resolve_org_entity_kind_for_anchor(
+            canonical_object_kind=a.canonical_object_kind,
+            provider_login=provider_login_for_kind_resolution(a, raw),
+        )
+        canonical_unmapped = org_kind_anchor == "unknown_placeholder"
+
+        eligible, bucket_sizes = _eligible_rules_for_anchor(
+            tenant_id=tenant_id,
+            anchor=a,
+            raw=raw,
+            by_slack=by_slack,
+            by_github=by_github,
+            by_linear=by_linear,
+            by_notion=by_notion,
+            by_email_norm=by_email_norm,
+            by_email_strict=by_email_strict,
+            by_fixture=by_fixture,
+            by_link_subject=by_link_subject,
+            by_stable_account=by_stable_account,
+        )
+        primary = _primary_skip_reason(
+            raw=raw,
+            eligible_rules=eligible,
+            canonical_unmapped=canonical_unmapped,
+            signals=signals,
+        )
+        rejection_counts[primary] += 1
+        if primary != "continuity_eligible":
+            generation_rejections.append(
+                {
+                    "anchor_canonical_entity_id": str(a.canonical_entity_id),
+                    "anchor_raw_record_id": int(a.raw_record_id),
+                    "primary_skip_reason_code": primary,
+                    "eligible_rules": eligible,
+                    "continuity_signals": signals,
+                    "bucket_sizes_for_anchor": bucket_sizes,
+                }
+            )
+
+        if len(evidence_receipts) >= receipt_cap:
+            continue
+
+        mat = mat_by_id.get(a.materialization_id) if a.materialization_id else None
+        evidence_receipts.append(
+            {
+                "anchor_canonical_entity_id": str(a.canonical_entity_id),
+                "anchor_raw_record_id": int(a.raw_record_id),
+                "anchor_connector": a.connector,
+                "anchor_canonical_object_kind": a.canonical_object_kind,
+                "representative_org_entity_id": str(
+                    org_entity_id_for_anchor_row(tenant_id=tenant_id, anchor=a, raw=raw)
+                ),
+                "continuity_signals": signals,
+                "continuity_rules": {
+                    "eligible_rules": eligible,
+                    "bucket_sizes_for_this_anchor": bucket_sizes,
+                    "primary_skip_or_eligible": primary,
+                    "join_reason_catalog": CONTINUITY_JOIN_REASON_BY_RULE,
+                },
+                "identity_primitive_projections": [
+                    {
+                        "projection_kind": p.projection_kind,
+                        "org_entity_id": str(
+                            org_entity_id_for_identity_primitive(tenant_id=tenant_id, projection=p)
+                        ),
+                        "identity_material_preview": _trunc_preview(p.identity_material, max_chars=800),
+                    }
+                    for p in extract_identity_primitives(anchor=a, raw=raw)
+                ],
+                "raw_identity_fields": _raw_identity_fields_public(raw_pl),
+                "canonical": _canonical_public_slice(mat),
+            }
+        )
+
+    return {
+        "entity_id": str(entity_id),
+        "anchors_scanned": len(anchors),
+        "anchors_related_to_entity": sum(
+            1
+            for a in anchors
+            if _anchor_relates_to_entity_v1(
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                anchor=a,
+                raw=raw_by_id.get(int(a.raw_record_id)),
+            )
+        ),
+        "evidence_receipts": evidence_receipts,
+        "generation_rejections": generation_rejections[:receipt_cap],
+        "generation_rejection_counts": dict(rejection_counts),
+        "continuity_join_reason_catalog": CONTINUITY_JOIN_REASON_BY_RULE,
+    }

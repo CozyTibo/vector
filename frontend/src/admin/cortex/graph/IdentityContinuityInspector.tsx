@@ -27,6 +27,7 @@ const SEARCH_FIELDS: Array<{ key: keyof IdentitySearchParams; label: string; pla
   { key: "notion_user_id", label: "Notion user id", placeholder: "notion-user-id" },
   { key: "email", label: "Email", placeholder: "person@company.com" },
   { key: "entity_id", label: "Entity / handle id", placeholder: "uuid" },
+  { key: "canonical_entity_id", label: "Canonical entity id", placeholder: "uuid" },
 ];
 
 export function IdentityContinuityInspector({ data }: Props) {

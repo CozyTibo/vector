@@ -68,6 +68,8 @@ from vector.contracts.admin import (
     AdminCortexIdentityBackfillRunsListResponse,
     AdminCortexIdentityContinuityEvidenceInspectResponse,
     AdminCortexIdentityContinuityEntityInspectorResponse,
+    AdminCortexIdentityContinuityEntityCandidatesResponse,
+    AdminCortexIdentityContinuityEntityEvidenceResponse,
     AdminCortexIdentityContinuityHealthResponse,
     AdminCortexIdentityContinuitySearchResponse,
     AdminCortexIdentityContinuityRebuildRequest,
@@ -3951,6 +3953,54 @@ def build_admin_router() -> APIRouter:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         return AdminCortexIdentityContinuityEntityInspectorResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/continuity-inspector/entities/{entity_id}/evidence",
+        response_model=AdminCortexIdentityContinuityEntityEvidenceResponse,
+    )
+    def admin_cortex_identity_continuity_entity_evidence(
+        tenant_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityContinuityEntityEvidenceResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.identity_continuity_inspector_v1 import (
+            build_identity_continuity_entity_evidence_v1,
+        )
+
+        try:
+            raw = build_identity_continuity_entity_evidence_v1(
+                db, tenant_id=tenant_id, entity_id=entity_id
+            )
+        except ValueError as exc:
+            if str(exc) == "entity_not_found":
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexIdentityContinuityEntityEvidenceResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identity/continuity-inspector/entities/{entity_id}/candidates",
+        response_model=AdminCortexIdentityContinuityEntityCandidatesResponse,
+    )
+    def admin_cortex_identity_continuity_entity_candidates(
+        tenant_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexIdentityContinuityEntityCandidatesResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.identity_continuity_inspector_v1 import (
+            build_identity_continuity_entity_candidates_v1,
+        )
+
+        try:
+            raw = build_identity_continuity_entity_candidates_v1(
+                db, tenant_id=tenant_id, entity_id=entity_id
+            )
+        except ValueError as exc:
+            if str(exc) == "entity_not_found":
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminCortexIdentityContinuityEntityCandidatesResponse.model_validate(raw)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/readiness-economics",

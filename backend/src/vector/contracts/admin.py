@@ -4803,7 +4803,7 @@ class AdminCortexIdentityContinuityInspectorResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     surface_kind: str = "identity_continuity_inspector"
-    inspector_schema_version: int = 1
+    inspector_schema_version: int = 2
     tenant_id: uuid.UUID
     captured_at_utc: str | None = None
     identity_continuity: AdminCortexIdentityContinuityTruth | None = None
@@ -4824,19 +4824,53 @@ class AdminCortexIdentityContinuityEntityInspectorResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     surface_kind: str = "identity_continuity_entity_inspector"
-    inspector_schema_version: int = 1
+    inspector_schema_version: int = 2
     tenant_id: str
     entity: dict[str, Any] = Field(default_factory=dict)
     continuity_status: dict[str, Any] = Field(default_factory=dict)
     resolved_identities: list[dict[str, Any]] = Field(default_factory=list)
+    linked_handles: list[dict[str, Any]] = Field(default_factory=list)
     authoritative_links: list[dict[str, Any]] = Field(default_factory=list)
     candidate_explorer_rows: list[dict[str, Any]] = Field(default_factory=list)
     candidates: list[dict[str, Any]] = Field(default_factory=list)
     promotable_candidates: list[dict[str, Any]] = Field(default_factory=list)
     skipped_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    unresolved_candidates: list[dict[str, Any]] = Field(default_factory=list)
     promotion_lineage: list[dict[str, Any]] = Field(default_factory=list)
+    candidate_lineage: dict[str, Any] = Field(default_factory=dict)
+    continuity_evidence: dict[str, Any] = Field(default_factory=dict)
+    evidence_receipts: list[dict[str, Any]] = Field(default_factory=list)
+    generation_rejections: list[dict[str, Any]] = Field(default_factory=list)
+    generation_rejection_counts: dict[str, Any] = Field(default_factory=dict)
     open_ambiguities: list[dict[str, Any]] = Field(default_factory=list)
+    conflicting_identities: list[dict[str, Any]] = Field(default_factory=list)
+    duplicate_identities: list[dict[str, Any]] = Field(default_factory=list)
     evidence_summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexIdentityContinuityEntityEvidenceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "identity_continuity_entity_evidence"
+    tenant_id: str
+    entity_id: str
+    anchors_scanned: int = 0
+    anchors_related_to_entity: int = 0
+    evidence_receipts: list[dict[str, Any]] = Field(default_factory=list)
+    generation_rejections: list[dict[str, Any]] = Field(default_factory=list)
+    generation_rejection_counts: dict[str, Any] = Field(default_factory=dict)
+    continuity_join_reason_catalog: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexIdentityContinuityEntityCandidatesResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "identity_continuity_entity_candidates"
+    tenant_id: str
+    entity_id: str
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+    candidate_lineage: dict[str, Any] = Field(default_factory=dict)
+    promotion_lineage: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AdminCortexPipelineOverviewExecutionResponse(BaseModel):
