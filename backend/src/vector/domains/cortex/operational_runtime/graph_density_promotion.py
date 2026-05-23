@@ -198,18 +198,15 @@ def list_promotable_link_candidates_v1(
     tenant_id: uuid.UUID,
     limit: int,
 ) -> list[CortexOrgLinkCandidate]:
-    """Candidates that can still add a new unique authoritative endpoint pair (Wave S1)."""
-    lim = max(1, min(int(limit), 500))
-    return list(
-        session.scalars(
-            select(CortexOrgLinkCandidate)
-            .where(CortexOrgLinkCandidate.tenant_id == tenant_id, *_promotable_candidate_filters_v1())
-            .order_by(
-                CortexOrgLinkCandidate.created_at.asc(),
-                CortexOrgLinkCandidate.row_digest.asc(),
-            )
-            .limit(lim)
-        ).all()
+    """Candidates that can still add a new unique authoritative endpoint pair (Wave S1/S2)."""
+    from vector.domains.cortex.identity.identity_continuity_promotion_v1 import (
+        list_promotable_link_candidates_fair_by_rule_v1,
+    )
+
+    return list_promotable_link_candidates_fair_by_rule_v1(
+        session,
+        tenant_id=tenant_id,
+        limit=limit,
     )
 
 
