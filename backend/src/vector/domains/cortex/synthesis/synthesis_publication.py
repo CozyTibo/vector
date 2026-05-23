@@ -225,6 +225,20 @@ def evaluate_artifact_publish_eligibility_v1(
     if not barrier.get("can_publish"):
         blocked_reasons.append(str(barrier.get("reason") or "publish_barrier_blocked"))
 
+    from vector.domains.cortex.synthesis.synthesis_empty_claims_gate_v1 import (
+        is_synthesis_empty_claims_gate_enabled_v1,
+        validate_artifact_claims_for_publish_v1,
+    )
+
+    if is_synthesis_empty_claims_gate_enabled_v1():
+        claims_ok, claim_violations = validate_artifact_claims_for_publish_v1(
+            body_json=body,
+            artifact_kind=str(artifact.artifact_kind or ""),
+        )
+        if not claims_ok:
+            blocked_reasons.append("synthesis_empty_claims")
+            blocked_reasons.extend(claim_violations)
+
     eligible = len(blocked_reasons) == 0
     return {
         "artifact_id": str(artifact.id),
