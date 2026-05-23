@@ -5,10 +5,10 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from vector.domains.cortex.execution.convergence_dispatch import (
-    mark_dirty_and_enqueue_convergence_v1,
+from vector.domains.cortex.execution.execution_event_triggers import (
+    trigger_post_ingestion_execution_v1,
 )
-from vector.settings import Settings, get_settings
+from vector.settings import Settings
 
 
 def post_ingestion_refresh_celery_task_id(tenant_id: uuid.UUID | str) -> str:
@@ -26,10 +26,6 @@ def schedule_post_ingestion_substrate_refresh(
     settings: Settings | None = None,
     reason: str = "ingestion",
 ) -> dict[str, Any]:
-    """After incremental ingest: ``mark_dirty_and_enqueue_convergence_v1`` (compat alias)."""
-    return mark_dirty_and_enqueue_convergence_v1(
-        tenant_id=tenant_id,
-        settings=settings,
-        reason=reason,
-        telemetry_trigger=f"post_ingestion:{reason}",
-    )
+    """After incremental ingest: P2-B mark dirty + enqueue convergence (compat alias)."""
+    _ = settings
+    return trigger_post_ingestion_execution_v1(tenant_id=tenant_id, reason=reason)

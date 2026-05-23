@@ -93,6 +93,13 @@ jobs:
             tests/vector/domains/cortex/operational_runtime/test_execution_island_registry.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_island_registry.py
 
+      - name: Verify P2-B event triggers (step 3.2)
+        run: |
+          cd backend
+          PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/execution/test_execution_event_triggers.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_event_triggers.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

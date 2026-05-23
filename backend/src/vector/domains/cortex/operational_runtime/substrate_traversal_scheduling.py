@@ -47,6 +47,7 @@ CELERY_TRAVERSAL_SCHEDULE_TASK_NAME_V1: Final[str] = (
 
 TRAVERSAL_SCHEDULE_TRIGGER_AFTER_PHASE_05_V1: Final[str] = "after_phase_05"
 TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_G1_V1: Final[str] = "graph_density_g1"
+TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_HASH_CHANGED_V1: Final[str] = "graph_hash_changed"
 TRAVERSAL_SCHEDULE_TRIGGER_MANUAL_V1: Final[str] = "manual"
 
 WAITING_ON_TRAVERSAL_COMPLETION_V1: Final[str] = "TRAVERSAL_COMPLETION"
@@ -335,6 +336,9 @@ def evaluate_traversal_schedule_v1(
     elif trig == TRAVERSAL_SCHEDULE_TRIGGER_AFTER_PHASE_05_V1:
         should = entity_count > 0 and (linked > 0 or maturity in _GRAPH_MATURITY_SCHEDULE_ELIGIBLE_V1)
         reason = "after_phase_05_eligible" if should else "after_phase_05_not_eligible"
+    elif trig == TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_HASH_CHANGED_V1:
+        should = not blocked and entity_count > 0 and (linked > 0 or int(propagation.get("islands_eligible_count") or 0) > 0)
+        reason = "graph_hash_changed_eligible" if should else "graph_hash_changed_not_eligible"
     elif maturity in _GRAPH_MATURITY_SCHEDULE_ELIGIBLE_V1 and entity_count > 0:
         should = True
         reason = TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_G1_V1
@@ -477,6 +481,7 @@ def build_substrate_traversal_scheduling_catalog_v1() -> dict[str, Any]:
         "schedule_triggers": [
             TRAVERSAL_SCHEDULE_TRIGGER_AFTER_PHASE_05_V1,
             TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_G1_V1,
+            TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_HASH_CHANGED_V1,
             TRAVERSAL_SCHEDULE_TRIGGER_MANUAL_V1,
         ],
         "runtime_package": "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling",

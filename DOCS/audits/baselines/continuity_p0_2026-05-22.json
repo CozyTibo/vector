@@ -2087,5 +2087,31 @@
     ],
     "trace_only": true,
     "proof_only": false
+  },
+  "step_3_2_p2b_event_triggers": {
+    "validated_at": "2026-05-23T00:02:57.335080+00:00",
+    "closure_git_sha": "ac39f3c602b025cc3a97c2b217e51686aa0ee0ea",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p3_2_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "event_triggers_enabled": true,
+      "static_wiring_ok": true,
+      "graph_hash_trigger_in_catalog": true,
+      "ingest_trigger_wired": true,
+      "identity_trigger_wired": true,
+      "execution_inspect_exposes_event_triggers": true,
+      "graph_hash_change_detected_in_drive": true,
+      "graph_hash_walk_schedule_attempted": true
+    },
+    "checks_advisory": {
+      "walks_scheduled_on_hash_change": true,
+      "live_graph_hash": "61f00541cd30a51b6e7db6a911325537cc5b1f9f5b0f7ac44ccfa3f3b0484ff6",
+      "stored_graph_hash_after_drive": "61f00541cd30a51b6e7db6a911325537cc5b1f9f5b0f7ac44ccfa3f3b0484ff6"
+    },
+    "wiring_ok": true,
+    "graph_hash_changed": true,
+    "trace_only": true,
+    "wiring_only": false
   }
 }

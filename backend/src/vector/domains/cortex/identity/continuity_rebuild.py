@@ -145,11 +145,16 @@ def run_identity_substrate_projection_for_pipeline_v1(
         dry_run=False,
         anchor_limit=anchor_limit,
     )
-    graph_density_promotion = schedule_graph_density_promotion_after_identity_substrate_v1(
+    from vector.domains.cortex.execution.execution_event_triggers import (
+        trigger_identity_promotion_after_substrate_v1,
+    )
+
+    promotion_trigger = trigger_identity_promotion_after_substrate_v1(
         db,
         tenant_id=tenant_id,
         substrate=substrate,
     )
+    graph_density_promotion = promotion_trigger.get("promotion")
     audit = build_identity_substrate_projection_receipt_v1(
         db,
         tenant_id=tenant_id,

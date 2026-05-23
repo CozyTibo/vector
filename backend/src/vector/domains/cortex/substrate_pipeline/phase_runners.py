@@ -196,6 +196,16 @@ def run_phase_04_graph_v1(
             error=str(exc),
         )
         raise
+    from vector.domains.cortex.execution.execution_event_triggers import (
+        trigger_graph_hash_walk_schedule_v1,
+    )
+
+    out["event_trigger_graph_hash"] = trigger_graph_hash_walk_schedule_v1(
+        session,
+        tenant_id=tenant_id,
+        graph_projection_stable_hash=str(out.get("graph_projection_stable_hash_sha256") or "") or None,
+        pipeline_run_id=pipeline_run_id,
+    )
     return complete_phase_with_receipt_v1(
         session,
         pipeline_run_id=pipeline_run_id,

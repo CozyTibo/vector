@@ -772,6 +772,14 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_EXECUTION_ISLAND_REGISTRY_MAX_ENTITY_IDS",
         description="P2-C: cap entity UUIDs stored per island row in registry JSON.",
     )
+    cortex_execution_event_triggers_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_EXECUTION_EVENT_TRIGGERS",
+        description=(
+            "P2-B: event triggers for ingest dirty, identity promotion, "
+            "and graph-hash walk scheduling."
+        ),
+    )
     cortex_execution_canonical_lane_budget_seconds: int = Field(
         default=0,
         ge=0,

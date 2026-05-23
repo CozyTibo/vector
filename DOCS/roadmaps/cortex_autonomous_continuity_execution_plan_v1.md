@@ -624,7 +624,7 @@ Executed **2026-05-22** on Fizzer prod:
 | Step | Work | Done when |
 |------|------|-----------|
 | 3.1 | P2-C island registry | Registry persisted per eligible component | **Done** (see §Phase 3.1 completion) |
-| 3.2 | P2-B event triggers (hash-change walk schedule) |
+| 3.2 | P2-B event triggers (hash-change walk schedule) | **Done** (see §Phase 3.2 completion) |
 | 3.3 | P2-D per-island synthesis |
 | 3.4 | P2-E ingest caps + deferral release monitoring |
 
@@ -643,7 +643,23 @@ Executed **2026-05-22** on Fizzer prod:
 | CI gate | `deploy.yml` → `test_continuity_p3_island_registry.py`, `test_execution_island_registry.py` |
 | Prod script | `python backend/scripts/continuity_p3_phase31_island_registry_proof.py --trace-only` |
 
-**Next step (3.2):** P2-B event triggers (hash-change walk schedule).
+#### Phase 3.2 completion (P2-B event triggers)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Ingest | `schedule_post_ingestion_substrate_refresh` → `trigger_post_ingestion_execution_v1` (mark dirty + enqueue convergence) |
+| Identity | `run_identity_substrate_projection_for_pipeline_v1` → `trigger_identity_promotion_after_substrate_v1` |
+| Graph hash | `run_phase_04_graph_v1` → `trigger_graph_hash_walk_schedule_v1` on hash change; trigger `graph_hash_changed` in traversal catalog |
+| Lease state | `detail_json.last_graph_projection_stable_hash_sha256` + `event_triggers` manifest |
+| Admin inspect | `GET …/cortex/execution/state` → `event_triggers` block |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_3_2_p2b_event_triggers` (`p3_2_pass: true`) |
+| Code | `execution_event_triggers.py`, `continuity_p3_event_triggers.py` |
+| CI gate | `deploy.yml` → `test_execution_event_triggers.py`, `test_continuity_p3_event_triggers.py` |
+| Prod script | `python backend/scripts/continuity_p3_phase32_event_triggers_proof.py --trace-only` |
+
+**Next step (3.3):** P2-D per-island synthesis.
 
 ---
 
@@ -690,6 +706,8 @@ python scripts/continuity_p2_phase23_dual_lane_worker_proof.py --trace-only --pr
 python scripts/continuity_p2_phase24_aa_clock_proof.py --trace-only --wedge-free-ack
 # P2-C execution island registry (step 3.1):
 python scripts/continuity_p3_phase31_island_registry_proof.py --trace-only
+# P2-B event triggers (step 3.2):
+python scripts/continuity_p3_phase32_event_triggers_proof.py --trace-only
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json
