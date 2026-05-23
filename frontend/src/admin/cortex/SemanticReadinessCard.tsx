@@ -153,9 +153,19 @@ export function SemanticReadinessCard({
         </div>
         <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
           <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">
-            Synthesis artifacts with claims
+            Published claims (7d)
           </dt>
-          <dd className="mt-1 text-lg font-semibold tabular-nums">{s.artifacts_with_claims}</dd>
+          <div className="mt-1 flex items-baseline gap-2">
+            <dd className="text-lg font-semibold tabular-nums">{s.published_claims_7d ?? "—"}</dd>
+            {s.published_claims_7d_severity ? (
+              <StatusBadge tone={severityTone(s.published_claims_7d_severity)}>
+                {s.published_claims_7d_severity}
+              </StatusBadge>
+            ) : null}
+          </div>
+          {s.published_claims_7d_green_min != null ? (
+            <p className="mt-1 text-xs text-stone-500">Target ≥{s.published_claims_7d_green_min} useful artifact / 7d</p>
+          ) : null}
         </div>
       </dl>
 

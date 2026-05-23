@@ -172,6 +172,40 @@ python scripts/retrieval_island_semantic_backfill.py \
 
 Baseline: [`baselines/retrieval_semantics_fizzer_wave_s3_baseline.json`](baselines/retrieval_semantics_fizzer_wave_s3_baseline.json)
 
+## Wave S4 — Synthesis usefulness (COMPLETE)
+
+| Step | Deliverable |
+|------|-------------|
+| S4.1 | Fail-loud contract + retrieval semantic Q1 gate before phase 08 |
+| S4.2 | Epoch/scope alignment (`retrieval_entries_in_scope > 0`) |
+| S4.3 | Failed synthesis job reconcile script |
+| S4.4 | Empty-claims publish gate (`synthesis_empty_claims`) |
+| S4.5 | Useful artifact kinds + 7d claims metric on admin |
+
+**Reconcile stale jobs (S4.3):**
+
+```bash
+cd backend
+python scripts/synthesis_failed_jobs_reconcile.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f
+
+python scripts/synthesis_failed_jobs_reconcile.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f \
+  --apply \
+  --out ../DOCS/audits/baselines/synthesis_job_reconcile_receipt.json
+```
+
+**Useful artifact sign-off (S4.5):**
+
+```bash
+cd backend
+python scripts/synthesis_useful_artifact_bootstrap.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f \
+  --out ../DOCS/audits/baselines/synthesis_useful_artifact_snapshot.json
+```
+
+Baseline: [`baselines/synthesis_usefulness_fizzer_wave_s4_baseline.json`](baselines/synthesis_usefulness_fizzer_wave_s4_baseline.json)
+
 ---
 
 ## Do not use for routine ops

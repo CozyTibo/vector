@@ -69,7 +69,7 @@ SYNTHESIS_WORKLOAD_CLASS_METADATA_V1: Final[dict[str, dict[str, str]]] = {
     "execution_understanding": {
         "purpose": "Execution understanding from causal chain + chronology",
         "retrieval_plan_profile": "causal_chain + chronology_window",
-        "primary_artifact_kind": "execution_understanding",
+        "primary_artifact_kind": "execution_brief",
     },
     "operational_synthesis": {
         "purpose": "Operational synthesis from degradation + causal evidence",
@@ -104,7 +104,7 @@ SYNTHESIS_WORKLOAD_CLASS_METADATA_V1: Final[dict[str, dict[str, str]]] = {
     "pipeline_default": {
         "purpose": "Substrate pipeline default per tenant policy row",
         "retrieval_plan_profile": "policy-driven per index row",
-        "primary_artifact_kind": "per tenant default",
+        "primary_artifact_kind": "island_brief",
     },
 }
 

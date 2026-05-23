@@ -65,6 +65,8 @@ SYNTHESIS_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION_V1: Final[int] = 1
 
 SYNTHESIS_ARTIFACT_KINDS_V1: Final[frozenset[str]] = frozenset(
     {
+        "execution_brief",
+        "island_brief",
         "execution_understanding",
         "operational_synthesis",
         "execution_narrative",
@@ -147,15 +149,23 @@ def synthesis_intelligence_artifact_schema_path_v1() -> Path:
     )
 
 
-def resolve_synthesis_artifact_kind_v1(synthesis_workload_class: str) -> str:
+def resolve_synthesis_artifact_kind_v1(
+    synthesis_workload_class: str,
+    *,
+    island_scope_id: str | None = None,
+) -> str:
     """Map workload class to closed ``artifact_kind`` enum."""
     norm = normalize_synthesis_workload_class_v1(synthesis_workload_class)
+    if island_scope_id and norm in ("pipeline_default", "execution_understanding"):
+        return "island_brief" if norm == "pipeline_default" else "execution_brief"
     meta = SYNTHESIS_WORKLOAD_CLASS_METADATA_V1.get(norm, {})
     kind = str(meta.get("primary_artifact_kind") or "").strip()
+    if kind == "execution_understanding":
+        return "execution_brief"
     if kind in SYNTHESIS_ARTIFACT_KINDS_V1:
         return kind
     if norm == "pipeline_default":
-        return "degradation_brief"
+        return "island_brief"
     if norm == "replay_equivalence_synthesis":
         return "degradation_brief"
     return "degradation_brief"
@@ -329,7 +339,15 @@ def build_synthesis_intelligence_artifact_v1(
     artifact_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     aid = artifact_id or uuid.uuid4()
-    artifact_kind = resolve_synthesis_artifact_kind_v1(str(envelope["synthesis_workload_class"]))
+    island_scope = str(envelope.get("island_scope_id") or "").strip() or None
+    if not island_scope:
+        scope = envelope.get("retrieval_scope")
+        if isinstance(scope, dict):
+            island_scope = str(scope.get("island_scope_id") or "").strip() or None
+    artifact_kind = resolve_synthesis_artifact_kind_v1(
+        str(envelope["synthesis_workload_class"]),
+        island_scope_id=island_scope,
+    )
     policy_digest = str(
         envelope.get("_synthesis_policy_pack_digest")
         or envelope.get("synthesis_policy_pack_digest")

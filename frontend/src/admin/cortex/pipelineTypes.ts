@@ -167,6 +167,9 @@ export type SemanticSynthesisTruth = {
   artifacts_with_claims: number;
   artifacts_published: number;
   artifacts_total: number;
+  published_claims_7d?: number;
+  published_claims_7d_severity?: "ok" | "bad" | "unknown";
+  published_claims_7d_green_min?: number;
   jobs_by_status?: Array<{ status: string; count: number }>;
 };
 

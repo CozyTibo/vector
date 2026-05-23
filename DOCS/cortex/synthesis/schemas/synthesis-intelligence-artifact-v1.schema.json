@@ -31,6 +31,8 @@
     "artifact_kind": {
       "type": "string",
       "enum": [
+        "execution_brief",
+        "island_brief",
         "execution_understanding",
         "operational_synthesis",
         "execution_narrative",

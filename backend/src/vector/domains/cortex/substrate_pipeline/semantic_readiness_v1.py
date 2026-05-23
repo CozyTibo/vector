@@ -368,11 +368,30 @@ def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
         ),
         {"tenant": tid},
     ).mappings().first()
+    published_7d = session.execute(
+        text(
+            """
+            SELECT COUNT(*)::bigint AS n
+            FROM cortex_synthesis_artifacts
+            WHERE tenant_id = :tenant
+              AND published IS TRUE
+              AND published_at >= NOW() - INTERVAL '7 days'
+              AND COALESCE(jsonb_array_length(body_json->'claims'), 0) > 0
+            """
+        ),
+        {"tenant": tid},
+    ).scalar()
+    published_claims_7d = _to_int(published_7d)
     return {
         "jobs_by_status": jobs,
         "artifacts_total": _to_int(artifacts["total"]) if artifacts else 0,
         "artifacts_published": _to_int(artifacts["published"]) if artifacts else 0,
         "artifacts_with_claims": _to_int(artifacts["with_claims"]) if artifacts else 0,
+        "published_claims_7d": published_claims_7d,
+        "published_claims_7d_severity": (
+            "ok" if published_claims_7d >= 1 else ("bad" if _to_int(artifacts["published"]) else "unknown")
+        ),
+        "published_claims_7d_green_min": 1,
         "fail_loud_expected_when_retrieval_weak": True,
     }
 

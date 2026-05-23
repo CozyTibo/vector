@@ -68,6 +68,16 @@
 | S3.3 Island backfill script | Done | `scripts/retrieval_island_semantic_backfill.py` |
 | S3.4 Freshness metric on admin | Done | `semantic_readiness_v1.py`, Semantic readiness card |
 
+## Wave S4 — Synthesis usefulness (COMPLETE)
+
+| Step | Status | Artifact |
+|------|--------|----------|
+| S4.1 Fail-loud contract + Q1 retrieval semantic gate | Done | `synthesis_fail_loud_contract_v1.py`, `synthesis_retrieval_semantic_gate_v1.py` |
+| S4.2 Epoch/scope alignment for phase 08 | Done | `synthesis_epoch_scope_alignment_v1.py` |
+| S4.3 Failed job reconcile script | Done | `scripts/synthesis_failed_jobs_reconcile.py` |
+| S4.4 Empty-claims publish gate | Done | `synthesis_empty_claims_gate_v1.py` |
+| S4.5 Useful artifact + admin 7d claims | Done | `synthesis_useful_artifact_v1.py`, semantic readiness card |
+
 ---
 
 ## 0. The phase transition (read this once)

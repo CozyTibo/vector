@@ -4713,6 +4713,9 @@ class AdminCortexSemanticSynthesisTruth(BaseModel):
     artifacts_total: int = 0
     artifacts_published: int = 0
     artifacts_with_claims: int = 0
+    published_claims_7d: int = 0
+    published_claims_7d_severity: Literal["ok", "bad", "unknown"] = "unknown"
+    published_claims_7d_green_min: int = 1
     fail_loud_expected_when_retrieval_weak: bool = True
 
 
@@ -4744,6 +4747,83 @@ class AdminCortexSemanticReadinessResponse(BaseModel):
     retrieval: AdminCortexSemanticRetrievalProduct
     synthesis: AdminCortexSemanticSynthesisTruth
     thresholds: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCortexGraphTruthEdgeTypeRow(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    link_type: str
+    auth_edge_rows: int = 0
+    unique_pairs: int = 0
+    dup_factor: float | None = None
+    rule_count: int = 0
+    pct_of_auth_rows: float = 0.0
+    pct_of_unique_pairs: float = 0.0
+    is_topology_mirror: bool = False
+
+
+class AdminCortexGraphTruthInspectorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "graph_truth_inspector"
+    inspector_schema_version: int = 1
+    audit_schema_version: int = 1
+    tenant_id: uuid.UUID
+    captured_at_utc: str | None = None
+    product_substrate: str = "retrieval"
+    graph_truth: AdminCortexSemanticGraphTruth
+    identity_continuity: AdminCortexIdentityContinuityTruth | None = None
+    retrieval: AdminCortexSemanticRetrievalProduct
+    synthesis: AdminCortexSemanticSynthesisTruth
+    thresholds: dict[str, Any] = Field(default_factory=dict)
+    candidates: dict[str, Any] = Field(default_factory=dict)
+    unpromoted_candidates: int = 0
+    edge_type_distribution: list[AdminCortexGraphTruthEdgeTypeRow] = Field(default_factory=list)
+    inflation_signals: dict[str, Any] = Field(default_factory=dict)
+    continuity_signals: dict[str, Any] = Field(default_factory=dict)
+    product_laws: dict[str, Any] = Field(default_factory=dict)
+    repro_command: str | None = None
+    companion_command: str | None = None
+
+
+class AdminCortexIdentityContinuityInspectorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "identity_continuity_inspector"
+    inspector_schema_version: int = 1
+    tenant_id: uuid.UUID
+    captured_at_utc: str | None = None
+    identity_continuity: AdminCortexIdentityContinuityTruth | None = None
+    unpromoted_candidates: int = 0
+
+
+class AdminCortexIdentityContinuitySearchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "identity_continuity_search"
+    tenant_id: str
+    matches: list[dict[str, Any]] = Field(default_factory=list)
+    entity_ids: list[str] = Field(default_factory=list)
+    entities: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdminCortexIdentityContinuityEntityInspectorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "identity_continuity_entity_inspector"
+    inspector_schema_version: int = 1
+    tenant_id: str
+    entity: dict[str, Any] = Field(default_factory=dict)
+    continuity_status: dict[str, Any] = Field(default_factory=dict)
+    resolved_identities: list[dict[str, Any]] = Field(default_factory=list)
+    authoritative_links: list[dict[str, Any]] = Field(default_factory=list)
+    candidate_explorer_rows: list[dict[str, Any]] = Field(default_factory=list)
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+    promotable_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    skipped_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    promotion_lineage: list[dict[str, Any]] = Field(default_factory=list)
+    open_ambiguities: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class AdminCortexPipelineOverviewExecutionResponse(BaseModel):

@@ -88,7 +88,8 @@ def test_static_gates(verifier: Callable[[], dict[str, Any]]) -> None:
 
 def test_resolve_artifact_kind_from_workload() -> None:
     assert resolve_synthesis_artifact_kind_v1("degradation_brief") == "degradation_brief"
-    assert resolve_synthesis_artifact_kind_v1("pipeline_default") in SYNTHESIS_ARTIFACT_KINDS_V1
+    assert resolve_synthesis_artifact_kind_v1("pipeline_default") == "island_brief"
+    assert resolve_synthesis_artifact_kind_v1("execution_understanding") == "execution_brief"
 
 
 def test_publish_barrier_deferred_epoch() -> None:

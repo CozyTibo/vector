@@ -1,0 +1,24 @@
+{
+  "baseline_kind": "synthesis_usefulness_wave_s4",
+  "schema_version": 1,
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "tenant_label": "Fizzer",
+  "primary_island_scope_id": "d7e41b3c763d38e9",
+  "captured_at_utc": null,
+  "purpose": "Wave S4 synthesis usefulness — published execution/island brief with evidenced claims.",
+  "acceptance_targets": {
+    "retrieval_entries_in_scope_min": 1,
+    "published_claims_7d_min": 1,
+    "failed_running_jobs_max_after_reconcile": 0,
+    "useful_artifact_kinds": ["execution_brief", "island_brief"]
+  },
+  "repro_commands": {
+    "failed_jobs_reconcile": "cd backend && python scripts/synthesis_failed_jobs_reconcile.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "useful_artifact_snapshot": "cd backend && python scripts/synthesis_useful_artifact_bootstrap.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f"
+  },
+  "rollback": "CORTEX_SYNTHESIS_EMPTY_CLAIMS_GATE=0 and CORTEX_SYNTHESIS_EPOCH_SCOPE_GATE=0 are emergency-only.",
+  "notes": [
+    "Do not weaken phase08_empty_scope_truth_gate or publish empty claims for green dashboards.",
+    "Record primary_useful_artifact.artifact_id after first successful phase 08 on semantic retrieval epoch."
+  ]
+}
