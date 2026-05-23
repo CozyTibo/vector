@@ -364,7 +364,8 @@ def verify_gp085_econ01_static() -> dict[str, Any]:
     sched_src = inspect.getsource(orch.schedule_substrate_pipeline_v1)
     if "mark_dirty_and_enqueue_convergence_v1" not in sched_src:
         errors.append("orchestrator_missing_unified_convergence_dispatch")
-    if "run_cortex_substrate_pipeline_coordinator_task" in sched_src:
+    legacy_coordinator_task = "run_cortex_substrate_pipeline_coordinator_task"
+    if legacy_coordinator_task in sched_src:
         errors.append("orchestrator_still_enqueues_legacy_coordinator")
     if "evaluate_pipeline_concurrency_v1" not in sched_src:
         errors.append("orchestrator_missing_concurrency_check")

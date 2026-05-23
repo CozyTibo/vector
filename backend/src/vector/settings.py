@@ -322,7 +322,16 @@ class Settings(BaseSettings):
         default=False,
         validation_alias="CORTEX_ALLOW_LEGACY_ENQUEUE_NEXT_PIPELINE_PHASE",
         description=(
-            "When false, enqueue_next_pipeline_phase_v1 raises unless callers use execution enqueue."
+            "Deprecated (D5): legacy per-phase Celery chain removed. "
+            "enqueue_next_pipeline_phase_v1 always redirects to execution slice; flag retained for env compat."
+        ),
+    )
+    cortex_legacy_coordinator_enqueue_deleted: bool = Field(
+        default=True,
+        validation_alias="CORTEX_LEGACY_COORDINATOR_ENQUEUE_DELETED",
+        description=(
+            "Phase D5: substrate coordinator Celery enqueue paths deleted; schedule uses convergence only. "
+            "Rollback false only for emergency reintroduction (requires code restore)."
         ),
     )
     cortex_post_ingestion_substrate_refresh_enabled: bool = Field(
@@ -341,7 +350,7 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_DEBOUNCE_SECONDS",
         description=(
             "Seconds after the last sync completion (or scheduler tick) before substrate refresh runs. "
-            "Repeated syncs coalesce into one pending coordinator without resetting this window."
+            "Repeated syncs coalesce into one dirty obligation without resetting this window (legacy coordinator removed D5)."
         ),
     )
     cortex_post_ingestion_substrate_refresh_max_wait_seconds: int = Field(
@@ -350,9 +359,8 @@ class Settings(BaseSettings):
         le=7200,
         validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_MAX_WAIT_SECONDS",
         description=(
-            "Maximum seconds from the first post-ingestion schedule in a burst before the substrate "
-            "coordinator must run (countdown=0). Prevents perpetual debounce starvation during "
-            "continuous incremental ingestion."
+            "Maximum seconds from the first post-ingestion schedule in a burst before convergence "
+            "must run. Prevents perpetual debounce starvation during continuous incremental ingestion."
         ),
     )
     cortex_post_ingestion_canonical_batch_limit: int = Field(

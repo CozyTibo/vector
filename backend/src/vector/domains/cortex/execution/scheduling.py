@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import os
+from pathlib import Path
 from typing import Final
 
 from vector.settings import Settings
@@ -208,6 +209,67 @@ def verify_m9_dead_celery_modules_absent_v1() -> list[str]:
     return errors
 
 
+D5_FORBIDDEN_CELERY_MODULES_V1: Final[tuple[str, ...]] = (
+    "app.tasks.cortex_substrate_pipeline",
+    "vector.domains.cortex.substrate_pipeline.coordinator",
+    "vector.infrastructure.cortex_substrate_pipeline_schedule",
+)
+
+D5_FORBIDDEN_COORDINATOR_ENQUEUE_TOKENS_V1: Final[tuple[str, ...]] = (
+    "run_cortex_substrate_pipeline_coordinator_task",
+    "run_cortex_substrate_pipeline_phase_task",
+)
+
+D5_SOURCE_SCAN_SKIP_FILES_V1: Final[tuple[str, ...]] = (
+    "execution/scheduling.py",
+    "operational_runtime/substrate_runtime_economics.py",
+)
+
+
+def _scan_cortex_package_for_coordinator_enqueue_tokens_v1() -> list[str]:
+    """D5: no live coordinator / per-phase Celery enqueue symbols under domains/cortex."""
+    errors: list[str] = []
+    cortex_root = Path(__file__).resolve().parent.parent
+    for path in sorted(cortex_root.rglob("*.py")):
+        rel = path.relative_to(cortex_root).as_posix()
+        if rel.startswith("tests/") or "/tests/" in rel:
+            continue
+        if any(rel.endswith(skip) for skip in D5_SOURCE_SCAN_SKIP_FILES_V1):
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in D5_FORBIDDEN_COORDINATOR_ENQUEUE_TOKENS_V1:
+            if token in text:
+                errors.append(f"forbidden_coordinator_enqueue_token:{token}:{rel}")
+    return errors
+
+
+def verify_d5_legacy_coordinator_enqueue_paths_deleted_v1() -> list[str]:
+    """D5: legacy substrate coordinator + per-phase Celery enqueue paths must be absent."""
+    import importlib.util
+
+    errors: list[str] = []
+    errors.extend(verify_schedule_substrate_pipeline_uses_convergence_v1())
+    errors.extend(verify_no_legacy_phase_chain_v1())
+    errors.extend(verify_m9_dead_celery_modules_absent_v1())
+    errors.extend(_scan_cortex_package_for_coordinator_enqueue_tokens_v1())
+
+    for mod in D5_FORBIDDEN_CELERY_MODULES_V1:
+        if importlib.util.find_spec(mod) is not None:
+            errors.append(f"d5_forbidden_module_still_present:{mod}")
+
+    from vector.domains.cortex.substrate_pipeline import orchestrator as orch
+
+    if hasattr(orch, "chain_after_phase_v1"):
+        errors.append("chain_after_phase_v1_still_exported")
+
+    from app.celery_app import celery_app
+
+    if "app.tasks.cortex_substrate_pipeline" in str(celery_app.conf.imports or ()):
+        errors.append("celery_imports_still_include_cortex_substrate_pipeline")
+
+    return errors
+
+
 def verify_d3_graph_promotion_on_convergence_worker_v1() -> list[str]:
     """D3: promotion inline on convergence worker + Celery beat sweep (not legacy sidecar)."""
     errors: list[str] = []
@@ -253,7 +315,10 @@ def verify_phase03_identity_projection_boundary_v1() -> list[str]:
     if not callable(getattr(id_mod, "build_identity_substrate_projection_receipt_v1", None)):
         errors.append("missing_build_identity_substrate_projection_receipt_v1")
     proj = inspect.getsource(id_mod.run_identity_substrate_projection_for_pipeline_v1)
-    if "schedule_graph_density_promotion_after_identity_substrate_v1" not in proj:
+    if (
+        "schedule_graph_density_promotion_after_identity_substrate_v1" not in proj
+        and "trigger_identity_promotion_after_substrate_v1" not in proj
+    ):
         errors.append("phase03_missing_graph_density_promotion_hook")
     if not callable(getattr(id_mod, "schedule_graph_density_promotion_after_identity_substrate_v1", None)):
         errors.append("phase03_missing_graph_density_promotion_helper")
@@ -383,6 +448,21 @@ EXECUTION_HOT_PATH_FORBIDDEN_IMPORT_MARKERS_V1: Final[tuple[str, ...]] = (
     "cesp_certification",
 )
 
+EXECUTION_HOT_PATH_ALLOWED_OPERATIONAL_RUNTIME_IMPORTS_V1: Final[tuple[str, ...]] = (
+    "vector.domains.cortex.operational_runtime.graph_density_promotion",
+    "vector.domains.cortex.operational_runtime.execution_island_registry",
+)
+
+
+def _hot_path_operational_runtime_import_violations_v1(src: str) -> bool:
+    for line in src.splitlines():
+        if "operational_runtime" not in line or "import" not in line:
+            continue
+        if any(allowed in line for allowed in EXECUTION_HOT_PATH_ALLOWED_OPERATIONAL_RUNTIME_IMPORTS_V1):
+            continue
+        return True
+    return False
+
 
 def verify_execution_hot_path_no_cesp_imports_boundary_v1() -> list[str]:
     """Return error codes if execution/phase bodies import CESP doctrine ."""
@@ -393,6 +473,10 @@ def verify_execution_hot_path_no_cesp_imports_boundary_v1() -> list[str]:
         mod = importlib.import_module(mod_name)
         src = inspect.getsource(mod)
         for marker in EXECUTION_HOT_PATH_FORBIDDEN_IMPORT_MARKERS_V1:
+            if marker == "operational_runtime":
+                if _hot_path_operational_runtime_import_violations_v1(src):
+                    errors.append(f"{mod_name}_imports_{marker}")
+                continue
             if marker in src:
                 errors.append(f"{mod_name}_imports_{marker}")
 
@@ -509,7 +593,9 @@ def verify_unified_convergence_dispatch_v1() -> list[str]:
     if not hasattr(cd, "mark_dirty_and_enqueue_convergence_v1"):
         errors.append("missing_mark_dirty_and_enqueue_convergence_v1")
     pid_src = inspect.getsource(pid.schedule_post_ingestion_substrate_refresh)
-    if "mark_dirty_and_enqueue_convergence_v1" not in pid_src:
+    if "mark_dirty_and_enqueue_convergence_v1" not in pid_src and (
+        "trigger_post_ingestion_execution_v1" not in pid_src
+    ):
         errors.append("post_ingestion_dispatch_not_unified")
     orch_src = inspect.getsource(orch.schedule_substrate_pipeline_v1)
     if "mark_dirty_and_enqueue_convergence_v1" not in orch_src:

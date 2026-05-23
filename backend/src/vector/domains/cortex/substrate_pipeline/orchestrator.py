@@ -137,17 +137,16 @@ def enqueue_next_pipeline_phase_v1(
     batch_limit: int | None = None,
     graph_projection_stable_hash: str | None = None,
     identity_substrate_trigger: str = "substrate_pipeline",
-    allow_legacy_orchestrator_chain: bool = False,
 ) -> dict[str, Any]:
-    """Admin/recovery-only: enqueue execution slice at ``phase_id`` (M6 redirect, no phase Celery chain)."""
-    del bundle_id, batch_limit, graph_projection_stable_hash, identity_substrate_trigger, allow_legacy_orchestrator_chain
+    """Admin/recovery-only: enqueue execution slice at ``phase_id`` (sole motion path; D5/M6)."""
+    del bundle_id, batch_limit, graph_projection_stable_hash, identity_substrate_trigger
     from vector.domains.cortex.execution.enqueue import enqueue_execution_slice_at_phase_v1
 
     return enqueue_execution_slice_at_phase_v1(
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,
         phase_cursor=phase_id,
-        reason="legacy_enqueue_next_phase",
+        reason="admin_recovery_execution_slice",
     )
 
 
