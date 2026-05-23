@@ -2345,8 +2345,8 @@
   "trace_only_policy": {
     "schema_version": 1,
     "ci_only_env": "VECTOR_CONTINUITY_CI_ONLY_TRACE",
-    "updated_at": "2026-05-23T01:14:27.645382+00:00",
-    "last_prod_signoff_step": "step_a5_trace_only_ban"
+    "updated_at": "2026-05-23T01:24:08.282338+00:00",
+    "last_prod_signoff_step": "step_a6_synthesis_terminal_transitions"
   },
   "step_a5_trace_only_ban": {
     "validated_at": "2026-05-23T01:14:27.645370+00:00",
@@ -2373,6 +2373,54 @@
     "wiring_ok": true,
     "scripts_checked": 9,
     "phase_a_violations": [],
+    "trace_only": false,
+    "signoff_grade": "prod",
+    "trace_only_policy_version": 1
+  },
+  "step_a6_synthesis_terminal_transitions": {
+    "validated_at": "2026-05-23T01:24:08.282305+00:00",
+    "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_a6_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "histogram_present": true,
+      "running_below_threshold": true,
+      "no_stale_running_inflight": true,
+      "no_stale_queued_inflight": true,
+      "terminal_runtime_schema_version": true,
+      "prod_signoff_valid": true
+    },
+    "checks_advisory": {
+      "running_after": 0,
+      "queued_after": 0,
+      "stale_running_after": 0,
+      "stale_queued_after": 0,
+      "running_reconciled": 0,
+      "stale_queued_reconciled": 0,
+      "sql_recurrence_histogram": {
+        "completed": 1,
+        "failed": 1043,
+        "total": 1044,
+        "running": 0,
+        "queued": 0
+      }
+    },
+    "wiring_ok": true,
+    "histogram": {
+      "completed": 1,
+      "failed": 1043,
+      "total": 1044,
+      "running": 0,
+      "queued": 0
+    },
+    "running_after": 0,
+    "queued_after": 0,
+    "stale_running_after": 0,
+    "stale_queued_after": 0,
+    "dry_run": true,
+    "use_deployed_closure": true,
     "trace_only": false,
     "signoff_grade": "prod",
     "trace_only_policy_version": 1

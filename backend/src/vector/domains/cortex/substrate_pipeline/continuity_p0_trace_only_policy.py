@@ -19,6 +19,7 @@ PHASE_A_BASELINE_STEP_KEYS: tuple[str, ...] = (
     "step_a3_tcre_queued_drain",
     "step_a4_aa_panel_strict",
     "step_a5_trace_only_ban",
+    "step_a6_synthesis_terminal_transitions",
 )
 
 P3_BASELINE_STEP_KEYS: tuple[str, ...] = (

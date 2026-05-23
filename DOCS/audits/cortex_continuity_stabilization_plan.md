@@ -5,7 +5,8 @@
 **Phase A step A.2:** **Done** (2026-05-23) — see [Step A.2 completion](#step-a2-completion--ecs-deploy-alignment)  
 **Phase A step A.3:** **Done** (2026-05-23) — see [Step A.3 completion](#step-a3-completion--tcre-queued-drain)
 **Phase A step A.4:** **Done** (2026-05-23) — see [Step A.4 completion](#step-a4-completion--strict-aa-panel-gates)
-**Phase A step A.5:** **Done** (2026-05-23) — see [Step A.5 completion](#step-a5-completion--trace-only-ban)  
+**Phase A step A.5:** **Done** (2026-05-23) — see [Step A.5 completion](#step-a5-completion--trace-only-ban)
+**Phase A step A.6:** **Done** (2026-05-23) — see [Step A.6 completion](#step-a6-completion--synthesis-terminal-transitions)  
 **Supersedes for stabilization work:** optimistic Phase 1–3 completion narratives and open-ended “Phase 4 operational hardening” without recurrence gates  
 **Authoritative truth sources:**
 
@@ -257,7 +258,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | **A3** | ~~Drain stuck TCRE `queued` job~~ **Done 2026-05-23** | Unblocks 06→07 resume | `tcre_job_lifecycle.py`, `tcre_resume.py` | N/A | 0 queued older than 1h | Prod: 1 job drained; baseline `step_a3_tcre_queued_drain` | Re-queue job | **runtime** |
 | **A4** | ~~Tighten AA1 + AA6 in proof panel~~ **Done 2026-05-23** | Stop false M3 confidence | `continuity_proof_panel.py` | Mat-only AA6 fallback removed | AA1 FAIL on empty 08; AA6 requires delta/progress/untreated↓ | Unit tests + prod panel | Revert gate logic | **ops** |
 | **A5** | ~~Ban `--trace-only` as prod sign-off~~ **Done 2026-05-23** | Baselines must mean something | `continuity_p0_trace_only_policy.py` + P0/P3 proof scripts | CI-only via `VECTOR_CONTINUITY_CI_ONLY_TRACE=1` | Baseline writes require `trace_only: false` | A5 proof + unit tests | N/A | **cleanup** |
-| **A6** | Fix synthesis job terminal transitions | Prevent A1 recurrence | `synthesis_orchestrator.py` | Remove duplicate enqueue paths | 24h soak: running stable | CloudWatch + SQL cron | Revert orchestrator | **runtime** |
+| **A6** | ~~Fix synthesis job terminal transitions~~ **Done 2026-05-23** | Prevent A1 recurrence | `synthesis_job_lifecycle.py`, `synthesis_orchestrator.py` | Single `prepare_synthesis_job_row_for_execute_v1` path | `running`=0; no stale queued/running | Prod proof + unit tests | Revert orchestrator | **runtime** |
 
 ### Phase B — Recurrence stabilization (retrieval heartbeat)
 
@@ -623,7 +624,8 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 - [x] `running < 10` (SQL histogram)
 - [x] No jobs stuck `running` > 24h (all reconciled to `failed`)
 - [x] Orchestrator terminal transitions hardened (`finally` + idempotency supersede)
-- [ ] A-G5 CloudWatch terminal logs (after deploy of A.1 closure SHA to ECS)
+- [x] A-G5 SQL recurrence: synthesis job histogram stable (`running`/`queued` inflight) — **done (A.6 proof)**
+- [ ] A-G5 CloudWatch terminal logs (after deploy of A.1–A.6 closure SHA to ECS)
 
 ---
 
@@ -802,7 +804,60 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 - [x] P0/P3 continuity proof scripts use shared policy helpers
 - [x] Phase A baseline audit: zero `trace_only: true` violations
 
-**Next step:** **A6** — fix synthesis job terminal transitions (`synthesis_orchestrator.py`).
+**Next step:** ~~A6~~ → **Phase B** (retrieval heartbeat / publish contract).
+
+---
+
+## Step A.6 completion — synthesis terminal transitions
+
+**Completed:** 2026-05-23  
+**Goal:** Prevent recurrence of 1,043 stuck `running` jobs via hardened orchestrator terminal transitions and deduped enqueue.
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Lifecycle | `terminalize_synthesis_job_completed_v1`, `prepare_synthesis_job_row_for_execute_v1`, `supersede_duplicate_inflight_synthesis_jobs_v1` |
+| Queued stale | `reconcile_stale_queued_synthesis_jobs_v1` + `CORTEX_SYNTHESIS_JOB_QUEUED_STALE_SECONDS` (default 3600) |
+| Orchestrator | Single prepare path; symmetric completed/failed terminalizers; `ensure_synthesis_job_terminal_after_execute_v1` in `finally` |
+| Materialize | Pre-flight reconcile runs **running + queued** stale reconcile |
+| Proof | `continuity_p0_synthesis_terminal_transitions.py` + `continuity_p0_phase_a6_synthesis_terminal_transitions_proof.py` |
+| CI | `.github/workflows/deploy.yml` — A.6 pytest gate |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a6_synthesis_terminal_transitions_proof.py \
+  --use-deployed-closure --dry-run
+```
+
+| Metric | Result |
+|--------|--------|
+| `running` | 0 |
+| `queued` | 0 |
+| `stale_running` | 0 |
+| `stale_queued` | 0 |
+| `p0_a6_pass` | true |
+
+Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.json) → `step_a6_synthesis_terminal_transitions`.
+
+### SQL recurrence (operator)
+
+```sql
+SELECT status, COUNT(*) FROM cortex_synthesis_jobs
+WHERE tenant_id = 'c08ef32b-f89a-40f6-9566-e19b5329436f'
+GROUP BY 1;
+```
+
+### Exit gates
+
+- [x] Orchestrator uses single prepare enqueue (no inline create/idempotent fork)
+- [x] Success path uses `terminalize_synthesis_job_completed_v1`
+- [x] `finally` guarantees no orphan `running`
+- [x] Prod histogram: inflight stable
+
+**Phase A complete.** Next: **B1** — single publish contract for retrieval index epoch.
 
 ---
 
@@ -837,6 +892,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a4_aa_panel_str
 
 # Phase A5 — trace-only ban audit (done)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a5_trace_only_ban_proof.py --use-deployed-closure
+
+# Phase A6 — synthesis terminal transitions (done; re-run if running/queued drifts)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a6_synthesis_terminal_transitions_proof.py --use-deployed-closure
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

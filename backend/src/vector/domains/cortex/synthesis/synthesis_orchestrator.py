@@ -95,14 +95,13 @@ from vector.domains.cortex.synthesis.synthesis_job_envelope import (
     synthesis_policy_pack_digest_v1,
 )
 from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
-    ORPHAN_RUNNING_CODE_V1,
-    resolve_synthesis_job_before_execute_v1,
+    ensure_synthesis_job_terminal_after_execute_v1,
+    prepare_synthesis_job_row_for_execute_v1,
+    terminalize_synthesis_job_completed_v1,
     terminalize_synthesis_job_failed_v1,
 )
 from vector.domains.cortex.synthesis.synthesis_repository import (
-    create_synthesis_job_row_v1,
-    envelope_json_for_persistence_v1,
-    find_idempotent_synthesis_job_v1,
+    SynthesisRepositoryError,
     persist_synthesis_job_receipt_row_v1,
 )
 from vector.infrastructure.db.models.cortex_synthesis_job import CortexSynthesisJob
@@ -258,78 +257,56 @@ def execute_synthesis_job_envelope_v1(
                 job_id=job_id,
             )
     envelope_digest = compute_synthesis_job_envelope_digest_v1(envelope)
-    idem_key = envelope.get("idempotency_key")
-    if idem_key:
-        existing = find_idempotent_synthesis_job_v1(
-            session,
-            tenant_id=tenant_id,
-            idempotency_key=str(idem_key),
-            envelope_digest=envelope_digest,
-        )
-        if existing is not None and existing.receipt_digest:
-            existing_trace = list(existing.execution_trace_json or [])
-            receipt_body = dict(existing.receipt_json or {})
-            run = build_synthesis_job_run_result_v1(
-                existing,
-                execution_trace=existing_trace,
-                receipt=receipt_body,
-                synthesis_legality_class=str(
-                    existing.synthesis_legality_class
-                    or (receipt_body.get("receipt_body") or {}).get(
-                        "synthesis_legality_class",
-                        "synthesis_partial",
-                    ),
-                ),
-                synthesis_job_replay_identity=str(existing.synthesis_job_replay_identity or ""),
-                retrieval_ingress_digest=existing.retrieval_ingress_digest,
-                synthesis_legality_posture={},
-                idempotent_replay=True,
-            )
-            run["claims"] = list(receipt_body.get("claims") or [])
-            run["synthesis_citation_envelope"] = dict(
-                receipt_body.get("synthesis_citation_envelope") or {},
-            )
-            art = get_synthesis_artifact_by_job_id_v1(
-                session,
-                tenant_id=tenant_id,
-                job_id=existing.id,
-            )
-            if art is not None:
-                run["artifact_id"] = str(art.id)
-                run["artifact_digest"] = art.artifact_digest
-            return run
-
-    resolved_job_id = job_id
-    if resolved_job_id is None and idem_key:
-        resolved_job_id = resolve_synthesis_job_before_execute_v1(
-            session,
-            tenant_id=tenant_id,
-            idempotency_key=str(idem_key),
-            envelope_digest=envelope_digest,
-        )
-
-    if resolved_job_id is not None:
-        job = session.get(CortexSynthesisJob, resolved_job_id)
-        if job is None or job.tenant_id != tenant_id:
-            raise SynthesisOrchestratorError("synthesis_job_not_found")
-        if job.status not in {"queued", "running"}:
-            raise SynthesisOrchestratorError(
-                "synthesis_job_not_runnable",
-                detail={"status": job.status},
-            )
-        job.envelope_json = envelope_json_for_persistence_v1(envelope)
-        job.envelope_digest = envelope_digest
-    else:
-        job = create_synthesis_job_row_v1(
+    try:
+        prepared = prepare_synthesis_job_row_for_execute_v1(
             session,
             tenant_id=tenant_id,
             envelope=envelope,
             envelope_digest=envelope_digest,
+            job_id=job_id,
         )
+    except SynthesisRepositoryError as exc:
+        raise SynthesisOrchestratorError(
+            exc.args[0] if exc.args else "synthesis_repository_error",
+            http_status=getattr(exc, "http_status", 400),
+            detail=getattr(exc, "detail", None),
+        ) from exc
 
-    job.status = "running"
-    job.started_at = datetime.now(UTC)
-    session.flush()
+    if prepared.idempotent_completed_job is not None:
+        existing = prepared.idempotent_completed_job
+        existing_trace = list(existing.execution_trace_json or [])
+        receipt_body = dict(existing.receipt_json or {})
+        run = build_synthesis_job_run_result_v1(
+            existing,
+            execution_trace=existing_trace,
+            receipt=receipt_body,
+            synthesis_legality_class=str(
+                existing.synthesis_legality_class
+                or (receipt_body.get("receipt_body") or {}).get(
+                    "synthesis_legality_class",
+                    "synthesis_partial",
+                ),
+            ),
+            synthesis_job_replay_identity=str(existing.synthesis_job_replay_identity or ""),
+            retrieval_ingress_digest=existing.retrieval_ingress_digest,
+            synthesis_legality_posture={},
+            idempotent_replay=True,
+        )
+        run["claims"] = list(receipt_body.get("claims") or [])
+        run["synthesis_citation_envelope"] = dict(
+            receipt_body.get("synthesis_citation_envelope") or {},
+        )
+        art = get_synthesis_artifact_by_job_id_v1(
+            session,
+            tenant_id=tenant_id,
+            job_id=existing.id,
+        )
+        if art is not None:
+            run["artifact_id"] = str(art.id)
+            run["artifact_digest"] = art.artifact_digest
+        return run
+
+    job = prepared.job
     trace: list[dict[str, Any]] = []
     retrieval_ingress_digest: str | None = None
     retrieval_subqueries: list[dict[str, Any]] = []
@@ -695,8 +672,10 @@ def execute_synthesis_job_envelope_v1(
             receipt=receipt_out,
             execution_trace=trace,
         )
-        job.status = "completed"
-        job.completed_at = datetime.now(UTC)
+        terminalize_synthesis_job_completed_v1(
+            job,
+            execution_trace=trace,
+        )
         session.flush()
 
         run_result = build_synthesis_job_run_result_v1(
@@ -815,12 +794,7 @@ def execute_synthesis_job_envelope_v1(
             detail=getattr(exc, "detail", None),
         ) from exc
     finally:
-        if job.status == "running":
-            terminalize_synthesis_job_failed_v1(
-                job,
-                error_code=ORPHAN_RUNNING_CODE_V1,
-                execution_trace=trace,
-            )
+        if ensure_synthesis_job_terminal_after_execute_v1(job, execution_trace=trace):
             session.flush()
 
 

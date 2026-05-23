@@ -29,8 +29,10 @@ def verify_a1_synthesis_job_lifecycle_wiring_v1() -> dict[str, Any]:
     orch_src = inspect.getsource(execute_synthesis_job_envelope_v1)
     if "finally:" not in orch_src or "ORPHAN_RUNNING_CODE_V1" not in orch_src:
         errors.append("orchestrator_missing_orphan_running_finally")
-    if "resolve_synthesis_job_before_execute_v1" not in orch_src:
-        errors.append("orchestrator_missing_idempotency_resolve")
+    if "prepare_synthesis_job_row_for_execute_v1" not in orch_src:
+        errors.append("orchestrator_missing_prepare_enqueue")
+    if "terminalize_synthesis_job_completed_v1" not in orch_src:
+        errors.append("orchestrator_missing_completed_terminalizer")
     mat_src = inspect.getsource(materialize_synthesis_for_pipeline_v1)
     if "maybe_reconcile_synthesis_jobs_on_materialize_v1" not in mat_src:
         errors.append("materialize_missing_pre_reconcile")
