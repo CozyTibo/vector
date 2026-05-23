@@ -241,11 +241,20 @@ def materialize_synthesis_per_island_v1(
         islands = islands[: int(max_islands)]
 
     tenant_entity_count = count_active_org_entities_v1(session, tenant_id=tenant_id)
-    per_island_budget = _budget_scopes_per_island_v1(
+    from vector.domains.cortex.synthesis.synthesis_per_island_scope_cap_gate import (
+        enforce_all_scopes_failed_fail_loud_v1,
+        enforce_per_island_orchestrator_fail_loud_v1,
+        materialize_capped_island_scopes_v1,
+        resolve_per_island_scope_cap_budget_v1,
+    )
+
+    cap_budget = resolve_per_island_scope_cap_budget_v1(
         island_count=max(1, len(islands)),
         settings=cfg,
         max_scopes_override=max_scopes_per_island_override,
     )
+    per_island_budget = int(cap_budget["scopes_budget_per_island"])
+    per_island_cap_audit: list[dict[str, Any]] = []
 
     island_results: list[dict[str, Any]] = []
     job_results: list[dict[str, Any]] = []
@@ -264,15 +273,15 @@ def materialize_synthesis_per_island_v1(
             published_index_epoch=index_epoch,
             island_scope_id=scope_id,
         )
-        scopes = list(
-            iter_island_synthesis_scopes_v1(
-                session,
-                tenant_id=tenant_id,
-                published_index_epoch=index_epoch,
-                island_scope_id=scope_id,
-                max_scopes=per_island_budget,
-            )
+        cap_row = materialize_capped_island_scopes_v1(
+            session,
+            tenant_id=tenant_id,
+            published_index_epoch=index_epoch,
+            island_scope_id=scope_id,
+            scopes_budget=per_island_budget,
         )
+        per_island_cap_audit.append(cap_row)
+        scopes = list(cap_row["scopes"])
         scopes_scheduled += len(scopes)
         island_job_ids: list[str] = []
         island_artifacts: list[str] = []
@@ -299,6 +308,11 @@ def materialize_synthesis_per_island_v1(
                     job_ids.append(jid)
                     island_job_ids.append(jid)
             except Exception as exc:  # noqa: BLE001
+                enforce_per_island_orchestrator_fail_loud_v1(
+                    exc,
+                    island_scope_id=scope_id,
+                    retrieval_lookup_id=str(scope.get("retrieval_lookup_id") or ""),
+                )
                 jobs_failed += 1
                 island_failed += 1
                 job_results.append(
@@ -307,6 +321,7 @@ def materialize_synthesis_per_island_v1(
                         "sd_code": SD_PIPELINE_GAP_V1,
                         "envelope_digest": compute_synthesis_job_envelope_digest_v1(body),
                         "island_scope_id": scope_id,
+                        "orchestrator_fail_loud": False,
                     }
                 )
 
@@ -356,6 +371,15 @@ def materialize_synthesis_per_island_v1(
     synthesis_publication_epoch: str | None = None
     artifacts_published = 0
     scope_empty = scopes_scheduled == 0 and not islands
+    scopes_overflow = any(bool(row.get("scopes_capped")) for row in per_island_cap_audit)
+
+    enforce_all_scopes_failed_fail_loud_v1(
+        scopes_scheduled=scopes_scheduled,
+        jobs_completed=len(job_ids),
+        jobs_failed=jobs_failed,
+        per_island_scope_cap_audit=per_island_cap_audit,
+        per_island_scope_cap_budget=cap_budget,
+    )
 
     if scope_empty:
         sd_rollup = {**sd_rollup, SD_SCOPE_EMPTY_V1: 1}
@@ -401,6 +425,10 @@ def materialize_synthesis_per_island_v1(
         "island_results": island_results,
         "global_degradation_brief": global_brief,
         "scope_empty": scope_empty,
+        "scopes_overflow": scopes_overflow,
+        "per_island_scope_cap_audit": per_island_cap_audit,
+        "per_island_scope_cap_budget": cap_budget,
+        "orchestrator_fail_loud_enabled": True,
         "outside_island_scope_entity_count": global_brief.get("outside_island_scope_entity_count"),
     }
 

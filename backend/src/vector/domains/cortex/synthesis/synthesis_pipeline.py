@@ -488,6 +488,22 @@ def run_substrate_phase_08_synthesis_v1(
             input_epoch=published,
         )
     except Exception as exc:  # noqa: BLE001
+        from vector.domains.cortex.synthesis.synthesis_per_island_scope_cap_gate import (
+            SynthesisPerIslandMaterializeError,
+        )
+
+        if isinstance(exc, SynthesisPerIslandMaterializeError):
+            raw_output: dict[str, Any] = {"error_code": exc.code, **exc.detail}
+            fail_phase_with_receipt_v1(
+                session,
+                pipeline_run_id=prid,
+                phase_id=PHASE_08_SYNTHESIS,
+                tenant_id=tenant_id,
+                raw_output=raw_output,
+                started_at=started_at,
+                error=str(exc.code),
+            )
+            return raw_output
         fail_phase_with_receipt_v1(
             session,
             pipeline_run_id=prid,

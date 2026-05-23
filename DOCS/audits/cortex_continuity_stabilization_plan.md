@@ -1073,7 +1073,7 @@ Auto-runs schedule pass when no recent slice shows walks. `--drive-schedule` for
 - [x] Schedule pass enforces walks when `should_schedule`
 - [x] B-G4: ≥1 recent phase 05 slice with walks persisted/available
 
-**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → **C2** — cap scopes per island.
+**Next step:** ~~**B5**~~ → ~~**B6**~~ → ~~**C1**~~ → ~~**C2**~~ → **C5** — synthesis activation schedule.
 
 ---
 
@@ -1215,6 +1215,51 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c1_phase08_empt
 
 ---
 
+## Step C.2 completion — per-island scope caps + orchestrator fail-loud
+
+**Completed:** 2026-05-23  
+**Goal:** Cap synthesis scopes per execution island with auditable overflow; fail phase 08 loudly on `SynthesisOrchestratorError` and when every scheduled scope fails (C2 / truthful continuity).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Cap gate | `synthesis_per_island_scope_cap_gate.py` — budget resolve, capped materialize, artifact 48h stats |
+| Per-island materialize | `materialize_synthesis_per_island_v1` — `per_island_scope_cap_audit`, fail-loud enforcement |
+| Phase 08 runner | `run_substrate_phase_08_synthesis_v1` — `SynthesisPerIslandMaterializeError` → `fail_phase_with_receipt` |
+| Settings | `CORTEX_SYNTHESIS_PER_ISLAND_FAIL_LOUD_ON_ORCHESTRATOR_ERROR` (default on) |
+| Proof | `continuity_p0_phase_c2_synthesis_scope_caps.py` + `continuity_p0_phase_c2_synthesis_scope_caps_proof.py` |
+| CI | `ci.yml` — C.2 cap gate + proof evaluator unit tests |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c2_synthesis_scope_caps_proof.py \
+  --use-deployed-closure
+```
+
+| Metric | Result (2026-05-23) |
+|--------|---------------------|
+| `wiring_ok` | true |
+| `fail_loud_on_orchestrator_enabled` | true |
+| `per_island_scope_cap_law_exercised` | true (`max_scopes_on_capped_slice` ≥ 2, cap audit on phase 08 receipt) |
+| `artifacts_primary_island_48h` | 1 unpublished (velocity recovers when synthesis jobs complete) |
+| `phase08_drive` | auto-drive on latest completed phase 07 |
+| `p0_c2_pass` | true |
+| Rollback | `CORTEX_SYNTHESIS_PER_ISLAND_FAIL_LOUD_ON_ORCHESTRATOR_ERROR=0`; raise `CORTEX_SYNTHESIS_PER_ISLAND_MAX_SCOPES` |
+
+### Exit gates
+
+- [x] Per-island scope budget enforced with `per_island_scope_cap_audit` on materialize output
+- [x] Orchestrator errors fail loud (not silent `jobs_failed` only)
+- [x] All-scopes-failed surfaces `synthesis_per_island_all_scopes_failed` on phase 08
+- [x] Primary island cap law exercised (≥2 scopes scheduled under cap audit) or ≥2 artifacts in 48h
+- [x] Static wiring + proof evaluator + CI gate
+- [x] Cleared for **C5**
+
+---
+
 ## Execution order summary (single page)
 
 ```text
@@ -1258,6 +1303,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_b6_post_ingesti
 
 # Phase C1 — phase 08 empty scope truth (done; re-run if COMPLETED_EMPTY lies return)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c1_phase08_empty_scope_truth_proof.py --use-deployed-closure
+
+# Phase C2 — per-island scope caps + orchestrator fail-loud (done; re-run if artifact velocity drops)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_c2_synthesis_scope_caps_proof.py --use-deployed-closure
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

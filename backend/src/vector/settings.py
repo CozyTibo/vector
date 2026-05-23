@@ -534,6 +534,14 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_SYNTHESIS_PER_ISLAND_MAX_SCOPES",
         description="P2-D: max synthesis scopes executed per island per pipeline run.",
     )
+    cortex_synthesis_per_island_fail_loud_on_orchestrator_error: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_PER_ISLAND_FAIL_LOUD_ON_ORCHESTRATOR_ERROR",
+        description=(
+            "Phase C2: re-raise SynthesisOrchestratorError and fail phase 08 when every "
+            "scheduled scope fails (rollback: set false to swallow per-scope errors)."
+        ),
+    )
     cortex_synthesis_job_running_stale_seconds: int = Field(
         default=86_400,
         ge=60,
