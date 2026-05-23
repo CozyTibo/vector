@@ -108,8 +108,20 @@ def finalize_pipeline_retrieval_index_build_v1(
     index_epoch: str,
     pipeline_run_id: uuid.UUID | None = None,
     sync_island_registry: bool = True,
+    enforce_semantic_mix_gate: bool = True,
 ) -> dict[str, Any]:
     """Publish barrier after materialization; validate epoch alignment (R-REC-1)."""
+    mix_audit: dict[str, Any] | None = None
+    if enforce_semantic_mix_gate:
+        from vector.domains.cortex.retrieval.retrieval_semantic_mix_v1 import (
+            enforce_retrieval_semantic_mix_before_publish_v1,
+        )
+
+        mix_audit = enforce_retrieval_semantic_mix_before_publish_v1(
+            session,
+            tenant_id=tenant_id,
+            index_epoch=index_epoch,
+        )
     published = publish_retrieval_index_epoch_v1(
         session,
         tenant_id=tenant_id,
@@ -128,6 +140,7 @@ def finalize_pipeline_retrieval_index_build_v1(
         "published_index_epoch": get_published_index_epoch_v1(session, tenant_id=tenant_id),
         "index_epoch": index_epoch,
         "publish_contract_audit": audit,
+        "semantic_mix_audit": mix_audit,
         "ok": published.build_state == "PUBLISHED" and bool(audit.get("epochs_align")),
     }
     if sync_island_registry:

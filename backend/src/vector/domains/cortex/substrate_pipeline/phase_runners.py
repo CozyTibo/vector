@@ -372,11 +372,30 @@ def run_phase_07_retrieval_v1(
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_07_RETRIEVAL)
     started_at = utc_now_iso_v1()
     try:
-        out = materialize_retrieval_index_for_pipeline_v1(
-            session,
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-        )
+        try:
+            out = materialize_retrieval_index_for_pipeline_v1(
+                session,
+                tenant_id=tenant_id,
+                pipeline_run_id=pipeline_run_id,
+            )
+        except Exception as exc:
+            from vector.domains.cortex.retrieval.retrieval_semantic_mix_v1 import (
+                FAILURE_CODE_SEMANTIC_MIX_V1,
+                RetrievalSemanticMixError,
+            )
+
+            if isinstance(exc, RetrievalSemanticMixError) and exc.code == FAILURE_CODE_SEMANTIC_MIX_V1:
+                fail_phase_with_receipt_v1(
+                    session,
+                    pipeline_run_id=pipeline_run_id,
+                    phase_id=PHASE_07_RETRIEVAL,
+                    tenant_id=tenant_id,
+                    raw_output=dict(exc.detail or {}),
+                    started_at=started_at,
+                    error=FAILURE_CODE_SEMANTIC_MIX_V1,
+                )
+                raise
+            raise
         published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
         if published:
             out = {**out, "published_index_epoch": published}

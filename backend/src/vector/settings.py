@@ -869,6 +869,14 @@ class Settings(BaseSettings):
             "new epoch from the prior published epoch (lookup_id map)."
         ),
     )
+    cortex_retrieval_semantic_mix_gate_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_RETRIEVAL_SEMANTIC_MIX_GATE",
+        description=(
+            "Wave S3 L1: fail-loud when published epoch org_link share exceeds 30% or "
+            "execution index kinds fall below 60%."
+        ),
+    )
     cortex_retrieval_max_org_link_entries_per_epoch: int = Field(
         default=500,
         ge=0,
