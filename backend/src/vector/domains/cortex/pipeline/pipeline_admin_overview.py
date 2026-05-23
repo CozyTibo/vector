@@ -14,8 +14,8 @@ import uuid
 from typing import Any, Literal
 
 _LOGGER = logging.getLogger("app")
-_OVERVIEW_CACHE_TTL_SECONDS = 30.0
-_OVERVIEW_STALE_SERVE_SECONDS = 120.0
+_OVERVIEW_CACHE_TTL_SECONDS = 60.0
+_OVERVIEW_STALE_SERVE_SECONDS = 300.0
 _OVERVIEW_CACHE_LOCK = threading.Lock()
 _OVERVIEW_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _SLICE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -39,6 +39,8 @@ from vector.domains.cortex.ingestion.ingestion_schedule_forecast import (
 from vector.domains.cortex.execution.admin_commands import build_execution_inspect_v1
 from vector.domains.cortex.pipeline.continuity_overview_v1 import (
     build_continuity_overview_bundle_v1,
+    build_continuity_status_from_context_v1,
+    get_cached_continuity_overview_context_v1,
 )
 from vector.domains.cortex.pipeline.canonical_operator_metrics import (
     _canonical_operator_backlog_count,
@@ -137,8 +139,9 @@ def build_pipeline_overview_execution_v1(
     cache_key = f"{tenant_id}:execution"
 
     def _build() -> dict[str, Any]:
-        continuity_status, _, _, _ = _cached_continuity_bundle_v1(
-            session, settings, tenant_id=tenant_id
+        ctx = get_cached_continuity_overview_context_v1(session, settings, tenant_id=tenant_id)
+        continuity_status = build_continuity_status_from_context_v1(
+            session, settings, ctx, tenant_id=tenant_id
         )
         return {
             "surface_kind": "pipeline_overview_execution",

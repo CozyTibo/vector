@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
+import threading
+import time
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
+
+_GRAPH_TOPOLOGY_CACHE_TTL_SECONDS = 90.0
+_GRAPH_TOPOLOGY_CACHE_LOCK = threading.Lock()
+_GRAPH_TOPOLOGY_CACHE: dict[str, tuple[float, tuple[frozenset[uuid.UUID], ...], tuple[frozenset[uuid.UUID], ...], dict[str, Any]]] = {}
+_CONTEXT_CACHE_TTL_SECONDS = 45.0
+_CONTINUITY_CONTEXT_CACHE: dict[str, tuple[float, Any]] = {}
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -40,7 +49,8 @@ from vector.domains.cortex.operational_runtime.graph_orphan_continuity import (
 )
 from vector.domains.cortex.operational_runtime.substrate_traversal_scheduling import (
     evaluate_traversal_propagation_v1,
-    list_eligible_traversal_components_v1,
+    filter_eligible_traversal_components_v1,
+    list_graph_connected_components_v1,
 )
 from vector.domains.cortex.pipeline.pipeline_phase_operator_copy import phase_status_label
 from vector.domains.cortex.retrieval.retrieval_completeness_projection import (
@@ -97,6 +107,148 @@ OperatorPhase = Literal[
     "synthesis",
 ]
 AttentionPriority = Literal["P0", "P1", "P2"]
+
+@dataclass(frozen=True)
+class ContinuityOverviewContextV1:
+    """Single-pass inputs for continuity admin surfaces (avoids duplicate heavy queries)."""
+
+    inspect: dict[str, Any]
+    lease: dict[str, Any] | None
+    progression: dict[str, Any]
+    operator_metrics: dict[str, Any]
+    canonical_metrics: dict[str, Any]
+    propagation: dict[str, Any]
+    components: tuple[frozenset[uuid.UUID], ...]
+    eligible_components: tuple[frozenset[uuid.UUID], ...]
+    entity_count: int
+    linked_entity_count: int
+    deferral: dict[str, int]
+    bundle_id: str | None
+    synth_scope: dict[str, Any]
+
+
+def _cached_graph_topology_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entity_count: int,
+    linked_entity_count: int,
+) -> tuple[tuple[frozenset[uuid.UUID], ...], tuple[frozenset[uuid.UUID], ...], dict[str, Any]]:
+    """Cache connected-component scan (expensive on large tenants)."""
+    key = str(tenant_id)
+    now = time.monotonic()
+    with _GRAPH_TOPOLOGY_CACHE_LOCK:
+        cached = _GRAPH_TOPOLOGY_CACHE.get(key)
+        if cached is not None and now - cached[0] <= _GRAPH_TOPOLOGY_CACHE_TTL_SECONDS:
+            return cached[1], cached[2], cached[3]
+    components = tuple(list_graph_connected_components_v1(session, tenant_id=tenant_id))
+    eligible = tuple(filter_eligible_traversal_components_v1(components))
+    propagation = evaluate_traversal_propagation_v1(
+        session,
+        tenant_id=tenant_id,
+        linked_entity_count=linked_entity_count,
+        entity_count=entity_count,
+        orphan_disconnected_count=max(0, entity_count - linked_entity_count),
+        orphan_identity_unresolved_count=0,
+        precomputed_eligible_components=eligible,
+    )
+    with _GRAPH_TOPOLOGY_CACHE_LOCK:
+        _GRAPH_TOPOLOGY_CACHE[key] = (now, components, eligible, propagation)
+    return components, eligible, propagation
+
+
+def get_cached_continuity_overview_context_v1(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> ContinuityOverviewContextV1:
+    """Reuse continuity context across execution/phases slices within TTL."""
+    key = str(tenant_id)
+    now = time.monotonic()
+    with _GRAPH_TOPOLOGY_CACHE_LOCK:
+        cached = _CONTINUITY_CONTEXT_CACHE.get(key)
+        if cached is not None and now - cached[0] <= _CONTEXT_CACHE_TTL_SECONDS:
+            return cached[1]
+    ctx = build_continuity_overview_context_v1(session, settings, tenant_id=tenant_id)
+    with _GRAPH_TOPOLOGY_CACHE_LOCK:
+        _CONTINUITY_CONTEXT_CACHE[key] = (now, ctx)
+    return ctx
+
+
+def build_continuity_overview_context_v1(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> ContinuityOverviewContextV1:
+    """Build shared continuity context once per admin overview request."""
+    inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=5)
+    lease = inspect.get("lease") if isinstance(inspect.get("lease"), dict) else None
+    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+    bundle_id = operator_metrics.get("bundle_id")
+    deferral = dict(operator_metrics.get("deferral_counts") or {})
+    if not deferral and bundle_id:
+        deferral = count_deferrals(session, tenant_id=tenant_id, bundle_id=str(bundle_id))
+
+    synth_scope = count_synthesis_eligible_scopes_v1(session, tenant_id=tenant_id)
+    progression = build_substrate_progression_status_v1(
+        session,
+        tenant_id=tenant_id,
+        precomputed_synth_scope=synth_scope,
+    )
+
+    entity_count = count_active_org_entities_v1(session, tenant_id=tenant_id)
+    linked = count_entities_with_promoted_edges_v1(session, tenant_id=tenant_id)
+    components, eligible, propagation = _cached_graph_topology_v1(
+        session,
+        tenant_id=tenant_id,
+        entity_count=entity_count,
+        linked_entity_count=linked,
+    )
+
+    canonical_metrics = build_canonical_phase_summary_metrics_v1(
+        session,
+        tenant_id=tenant_id,
+        operator_metrics=operator_metrics,
+    )
+
+    return ContinuityOverviewContextV1(
+        inspect=inspect,
+        lease=lease,
+        progression=progression,
+        operator_metrics=operator_metrics,
+        canonical_metrics=canonical_metrics,
+        propagation=propagation,
+        components=components,
+        eligible_components=eligible,
+        entity_count=entity_count,
+        linked_entity_count=linked,
+        deferral=deferral,
+        bundle_id=str(bundle_id) if bundle_id else None,
+        synth_scope=synth_scope,
+    )
+
+
+def build_continuity_status_from_context_v1(
+    session: Session,
+    settings: Settings,
+    ctx: ContinuityOverviewContextV1,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    return build_continuity_status_v1(
+        session,
+        tenant_id=tenant_id,
+        settings=settings,
+        lease=ctx.lease,
+        progression=ctx.progression,
+        propagation=ctx.propagation,
+        canonical_metrics=ctx.canonical_metrics,
+        operator_metrics=ctx.operator_metrics,
+        deferral=ctx.deferral,
+    )
+
 
 _OPERATOR_PHASES: tuple[OperatorPhase, ...] = (
     "ingestion",
@@ -229,6 +381,8 @@ def build_continuity_status_v1(
     progression: dict[str, Any],
     propagation: dict[str, Any],
     canonical_metrics: dict[str, Any],
+    operator_metrics: dict[str, Any] | None = None,
+    deferral: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Top-level Cortex continuity status card."""
     lease_status = str((lease or {}).get("status") or "").strip().lower()
@@ -266,23 +420,29 @@ def build_continuity_status_v1(
     else:
         execution_lane = "DEGRADED"
 
-    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+    metrics = operator_metrics or snapshot_canonical_operator_metrics_v1(
+        session, tenant_id=tenant_id
+    )
     untreated = int(
         (canonical_metrics.get("forward_progress") or {}).get("untreated_estimate")
-        or operator_metrics.get("untreated_routable_estimate")
+        or metrics.get("untreated_routable_estimate")
         or 0
     )
-    drainable = int(operator_metrics.get("drainable_routable_estimate") or 0)
-    bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
-    deferral: dict[str, int] = {}
-    topology_wait = False
-    if bundle_id:
-        deferral = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
-        topology_wait = int(deferral.get("deferred_waiting_cooldown") or 0) > 0
-    retry_ready = int(deferral.get("deferred_retry_ready") or 0)
-    permanent = int(deferral.get("deferred_permanent_orphan") or 0)
-    defer_total = int(deferral.get("deferred_total") or 0)
+    drainable = int(metrics.get("drainable_routable_estimate") or 0)
+    deferral_counts: dict[str, int] = dict(deferral or metrics.get("deferral_counts") or {})
+    if not deferral_counts:
+        bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
+        if bundle_id:
+            deferral_counts = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
+    topology_wait = int(deferral_counts.get("deferred_waiting_cooldown") or 0) > 0
+    retry_ready = int(deferral_counts.get("deferred_retry_ready") or 0)
+    permanent = int(deferral_counts.get("deferred_permanent_orphan") or 0)
+    defer_total = int(deferral_counts.get("deferred_total") or 0)
     permanent_pct = int(round(100 * permanent / defer_total)) if defer_total else 0
+    omission_posture = evaluate_permanent_orphan_omission_posture_v1(
+        deferral_counts=deferral_counts
+    )
+    permanent_omission_ok = bool(omission_posture.get("is_bounded_omission_not_failure"))
 
     canonical_lane: LaneStatus = "HEALTHY"
     if fsm in ("CANONICAL", "CANONICAL_DRAINING") and lease_status == LEASE_STATUS_RUNNING:
@@ -427,6 +587,7 @@ def build_continuity_phase_cards_v1(
     tenant_id: uuid.UUID,
     lease: dict[str, Any] | None,
     progression: dict[str, Any],
+    ctx: ContinuityOverviewContextV1 | None = None,
 ) -> list[dict[str, Any]]:
     """Operational phase strip — indexed counts and receipts only."""
     fsm = str((lease or {}).get("fsm_state") or "").strip().upper()
@@ -478,12 +639,17 @@ def build_continuity_phase_cards_v1(
         last_success_at=_iso(latest_sync),
     )
 
-    can_metrics = build_canonical_phase_summary_metrics_v1(session, tenant_id=tenant_id)
-    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
-    bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
-    deferral: dict[str, int] = dict(operator_metrics.get("deferral_counts") or {})
-    if bundle_id and not deferral:
-        deferral = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
+    if ctx is not None:
+        can_metrics = ctx.canonical_metrics
+        operator_metrics = ctx.operator_metrics
+        deferral = ctx.deferral
+    else:
+        can_metrics = build_canonical_phase_summary_metrics_v1(session, tenant_id=tenant_id)
+        operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+        bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
+        deferral = dict(operator_metrics.get("deferral_counts") or {})
+        if bundle_id and not deferral:
+            deferral = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
     untreated = int((can_metrics.get("forward_progress") or {}).get("untreated_estimate") or 0)
     drainable = int(operator_metrics.get("drainable_routable_estimate") or 0)
     retry_ready = int(deferral.get("deferred_retry_ready") or 0)
@@ -561,22 +727,29 @@ def build_continuity_phase_cards_v1(
         ],
     )
 
-    linked = count_entities_with_promoted_edges_v1(session, tenant_id=tenant_id)
+    if ctx is not None:
+        linked = ctx.linked_entity_count
+        entity_count = ctx.entity_count
+        propagation = ctx.propagation
+        islands = len(ctx.components)
+        eligible_islands = len(ctx.eligible_components)
+    else:
+        linked = count_entities_with_promoted_edges_v1(session, tenant_id=tenant_id)
+        components_local = list_graph_connected_components_v1(session, tenant_id=tenant_id)
+        eligible_local = filter_eligible_traversal_components_v1(components_local)
+        islands = len(components_local)
+        eligible_islands = len(eligible_local)
+        propagation = evaluate_traversal_propagation_v1(
+            session,
+            tenant_id=tenant_id,
+            linked_entity_count=linked,
+            entity_count=entity_count,
+            orphan_disconnected_count=max(0, entity_count - linked),
+            orphan_identity_unresolved_count=0,
+            precomputed_eligible_components=eligible_local,
+        )
     promoted = count_graph_promoted_edge_count_v1(session, tenant_id=tenant_id)
     pending_candidates = count_graph_candidate_count_v1(session, tenant_id=tenant_id)
-    components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
-    islands = len(components)
-    eligible_islands = len(
-        list_eligible_traversal_components_v1(session, tenant_id=tenant_id)
-    )
-    propagation = evaluate_traversal_propagation_v1(
-        session,
-        tenant_id=tenant_id,
-        linked_entity_count=linked,
-        entity_count=entity_count,
-        orphan_disconnected_count=max(0, entity_count - linked),
-        orphan_identity_unresolved_count=0,
-    )
     graph_status: PhaseStatus = "healthy"
     if propagation.get("blocked"):
         graph_status = "blocked"
@@ -652,7 +825,11 @@ def build_continuity_phase_cards_v1(
         last_success_at=_iso(ret_published_at),
     )
 
-    synth_scope = count_synthesis_eligible_scopes_v1(session, tenant_id=tenant_id)
+    synth_scope = (
+        ctx.synth_scope
+        if ctx is not None
+        else count_synthesis_eligible_scopes_v1(session, tenant_id=tenant_id)
+    )
     eligible_scopes = int(synth_scope.get("eligible_scopes") or 0)
     synth_count = int(
         session.scalar(
@@ -849,43 +1026,23 @@ def build_continuity_overview_bundle_v1(
     tenant_id: uuid.UUID,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     """Returns (continuity_status, phases, attention_items, attention_lines)."""
-    inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=5)
-    lease = inspect.get("lease") if isinstance(inspect.get("lease"), dict) else None
-    progression = build_substrate_progression_status_v1(session, tenant_id=tenant_id)
-
-    entity_count = count_active_org_entities_v1(session, tenant_id=tenant_id)
-    linked = count_entities_with_promoted_edges_v1(session, tenant_id=tenant_id)
-    propagation = evaluate_traversal_propagation_v1(
-        session,
-        tenant_id=tenant_id,
-        linked_entity_count=linked,
-        entity_count=entity_count,
-        orphan_disconnected_count=max(0, entity_count - linked),
-        orphan_identity_unresolved_count=0,
-    )
-
-    can_metrics = build_canonical_phase_summary_metrics_v1(session, tenant_id=tenant_id)
-    continuity_status = build_continuity_status_v1(
-        session,
-        tenant_id=tenant_id,
-        settings=settings,
-        lease=lease,
-        progression=progression,
-        propagation=propagation,
-        canonical_metrics=can_metrics,
+    ctx = get_cached_continuity_overview_context_v1(session, settings, tenant_id=tenant_id)
+    continuity_status = build_continuity_status_from_context_v1(
+        session, settings, ctx, tenant_id=tenant_id
     )
     phases = build_continuity_phase_cards_v1(
         session,
         settings,
         tenant_id=tenant_id,
-        lease=lease,
-        progression=progression,
+        lease=ctx.lease,
+        progression=ctx.progression,
+        ctx=ctx,
     )
     attention_items = build_continuity_attention_items_v1(
         continuity_status=continuity_status,
         phases=phases,
-        lease=lease,
-        propagation=propagation,
+        lease=ctx.lease,
+        propagation=ctx.propagation,
     )
     return (
         continuity_status,

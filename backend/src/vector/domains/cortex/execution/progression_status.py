@@ -167,6 +167,7 @@ def build_substrate_progression_status_v1(
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID | None = None,
     include_legacy_continuation: bool = False,
+    precomputed_synth_scope: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Operator-facing snapshot — lease FSM is authoritative; pipeline run is mirror."""
     run = None
@@ -225,8 +226,10 @@ def build_substrate_progression_status_v1(
         }
 
     published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
-    synth_scope = count_synthesis_eligible_scopes_v1(session, tenant_id=tenant_id)
-    index_count = int(synth_scope.get("index_row_count") or 0)
+    synth_scope = precomputed_synth_scope or count_synthesis_eligible_scopes_v1(
+        session, tenant_id=tenant_id
+    )
+    index_count = int(synth_scope.get("index_row_count") or synth_scope.get("retrieval_entries_in_scope") or 0)
     eligible = int(synth_scope.get("eligible_scopes") or 0)
 
     progression_class = TENANT_PROGRESSION_CLASS_IDLE_V1

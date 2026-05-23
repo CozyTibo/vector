@@ -43,6 +43,7 @@ def build_canonical_phase_summary_metrics_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
+    operator_metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Lightweight canonical metrics for admin phase tab (no full control plane)."""
     mat_count = int(
@@ -74,9 +75,11 @@ def build_canonical_phase_summary_metrics_v1(
         .limit(1)
     )
     freshness = _verification_freshness(last_ver)
-    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
-    untreated_estimate = int(operator_metrics.get("untreated_routable_estimate") or 0)
-    drainable_estimate = int(operator_metrics.get("drainable_routable_estimate") or 0)
+    metrics = operator_metrics or snapshot_canonical_operator_metrics_v1(
+        session, tenant_id=tenant_id
+    )
+    untreated_estimate = int(metrics.get("untreated_routable_estimate") or 0)
+    drainable_estimate = int(metrics.get("drainable_routable_estimate") or 0)
 
     health = {
         "materialization_row_count": mat_count,
@@ -90,6 +93,6 @@ def build_canonical_phase_summary_metrics_v1(
             "untreated_estimate": untreated_estimate,
             "drainable_estimate": drainable_estimate,
         },
-        "operator_metrics": operator_metrics,
+        "operator_metrics": metrics,
         "failure_count": failure_count,
     }

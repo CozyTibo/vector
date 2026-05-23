@@ -110,6 +110,7 @@ export function usePipelineOverviewIngestion() {
 
 /** Prefetch all overview slices in parallel (layout warm-up). */
 export function usePrefetchPipelineOverviewSlices() {
+  usePipelineOverviewExecution();
   usePipelineOverviewPhases();
   usePipelineOverviewIngestion();
 }

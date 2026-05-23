@@ -12,6 +12,7 @@ import {
 } from "./cortex/OperationalPhaseStrip";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
 import {
+  usePipelineOverviewExecution,
   usePipelineOverviewIngestion,
   usePipelineOverviewPhases,
 } from "./cortex/usePipelineOverview";
@@ -21,14 +22,17 @@ import { StatusBadge } from "./ui/StatusBadge";
 export default function AdminCortexOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
 
+  const executionQ = usePipelineOverviewExecution();
   const phasesQ = usePipelineOverviewPhases();
   const ingestionQ = usePipelineOverviewIngestion();
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
-  const exec = phasesQ.data?.execution ?? null;
-  const continuity = phasesQ.data?.continuity_status ?? undefined;
-  const operatorKpi = phasesQ.data?.operator_primary_kpi ?? undefined;
+  const exec = executionQ.data?.execution ?? phasesQ.data?.execution ?? null;
+  const continuity =
+    executionQ.data?.continuity_status ?? phasesQ.data?.continuity_status ?? undefined;
+  const operatorKpi =
+    executionQ.data?.operator_primary_kpi ?? phasesQ.data?.operator_primary_kpi ?? undefined;
   const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
   const attentionItems = phasesQ.data?.attention_items ?? [];
   const sched = ingestionQ.data?.scheduler;
@@ -40,19 +44,21 @@ export default function AdminCortexOverviewPage() {
       ? "Scheduled polling: PAUSED (operator)"
       : "Scheduled polling: ON";
 
-  const phasesError = phasesQ.isError ? (phasesQ.error as Error).message : null;
+  const phasesError =
+    (phasesQ.isError ? (phasesQ.error as Error).message : null) ??
+    (executionQ.isError ? (executionQ.error as Error).message : null);
   const ingestionError = ingestionQ.isError ? (ingestionQ.error as Error).message : null;
 
   return (
     <div className="space-y-6">
       <ContinuityStatusCard
         status={continuity}
-        loading={phasesQ.isPending && !phasesQ.data}
+        loading={(executionQ.isPending && !continuity) || (phasesQ.isPending && !continuity)}
       />
 
       <OperatorPrimaryKpiCard
         kpi={operatorKpi}
-        loading={phasesQ.isPending && !phasesQ.data}
+        loading={(executionQ.isPending && !operatorKpi) || (phasesQ.isPending && !operatorKpi)}
       />
 
       <DeferralOmissionCard

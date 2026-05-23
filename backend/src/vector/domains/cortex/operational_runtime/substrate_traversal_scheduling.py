@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import uuid
+from collections.abc import Sequence
 from typing import Any, Final
 
 from sqlalchemy.orm import Session
@@ -127,6 +128,20 @@ def stable_component_scope_id_v1(component: frozenset[uuid.UUID]) -> str:
     return digest[:16]
 
 
+def filter_eligible_traversal_components_v1(
+    components: Sequence[frozenset[uuid.UUID]],
+    *,
+    min_entities: int | None = None,
+) -> list[frozenset[uuid.UUID]]:
+    """P3′ filter on precomputed components (avoids duplicate graph scans)."""
+    floor = min_entities if min_entities is not None else get_traversal_min_component_entities_v1()
+    return [
+        comp
+        for comp in components
+        if len(comp) >= floor and component_has_authoritative_edge_v1(comp)
+    ]
+
+
 def list_eligible_traversal_components_v1(
     session: Session,
     *,
@@ -134,13 +149,8 @@ def list_eligible_traversal_components_v1(
     min_entities: int | None = None,
 ) -> list[frozenset[uuid.UUID]]:
     """P3′: connected components with |V| ≥ min and at least one authoritative edge (|V|≥2)."""
-    floor = min_entities if min_entities is not None else get_traversal_min_component_entities_v1()
     components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
-    return [
-        comp
-        for comp in components
-        if len(comp) >= floor and component_has_authoritative_edge_v1(comp)
-    ]
+    return filter_eligible_traversal_components_v1(components, min_entities=min_entities)
 
 
 def evaluate_traversal_propagation_v1(
@@ -151,17 +161,21 @@ def evaluate_traversal_propagation_v1(
     entity_count: int,
     orphan_disconnected_count: int,
     orphan_identity_unresolved_count: int,
+    precomputed_eligible_components: Sequence[frozenset[uuid.UUID]] | None = None,
 ) -> dict[str, Any]:
     """Evaluate P3 global vs P3′ component traversal propagation law."""
     component_mode = is_component_traversal_schedule_enabled_v1()
     min_entities = get_traversal_min_component_entities_v1()
     eligible: list[frozenset[uuid.UUID]] = []
     if component_mode and entity_count > 0:
-        eligible = list_eligible_traversal_components_v1(
-            session,
-            tenant_id=tenant_id,
-            min_entities=min_entities,
-        )
+        if precomputed_eligible_components is not None:
+            eligible = list(precomputed_eligible_components)
+        else:
+            eligible = list_eligible_traversal_components_v1(
+                session,
+                tenant_id=tenant_id,
+                min_entities=min_entities,
+            )
 
     islands_eligible = len(eligible)
     mode = (
