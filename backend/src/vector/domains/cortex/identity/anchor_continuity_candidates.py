@@ -29,6 +29,10 @@ from vector.domains.cortex.identity.identity_primitive_projection import (
     org_entity_id_for_identity_primitive,
 )
 from vector.domains.cortex.identity.candidate_generation import regenerate_link_candidates
+from vector.domains.cortex.identity.identity_continuity_candidates_v1 import (
+    candidate_endpoint_pair_key_v1,
+    max_candidate_edges_for_rule_v1,
+)
 from vector.domains.cortex.identity.continuity_candidate_evidence_accumulation import (
     accumulate_candidate_pair_evidence,
     preview_top_pair_families,
@@ -120,10 +124,13 @@ def _emit_cross_entity_pairs_from_bucket(
     rows_out: list[dict[str, Any]],
     *,
     max_rows: int,
+    seen_endpoint_pairs: set[tuple[str, str, str]],
+    rule_edge_cap: int | None = None,
 ) -> tuple[int, bool]:
     """Emit cross-entity pairs; return ``(emitted_count, stopped_due_to_cap)``."""
     emitted = 0
     n = len(sorted_items)
+    link_type = "org.persona_belongs_to_handle"
     for i in range(n):
         for j in range(i + 1, n):
             e1, r1, _ = sorted_items[i]
@@ -132,11 +139,21 @@ def _emit_cross_entity_pairs_from_bucket(
                 continue
             if len(rows_out) >= max_rows:
                 return emitted, True
+            if rule_edge_cap is not None and emitted >= rule_edge_cap:
+                return emitted, True
             a_id, b_id = (e1, e2) if str(e1) < str(e2) else (e2, e1)
+            pair_key = candidate_endpoint_pair_key_v1(
+                source_entity_id=a_id,
+                target_entity_id=b_id,
+                link_type=link_type,
+            )
+            if pair_key in seen_endpoint_pairs:
+                continue
             ra, rb = (r1, r2) if str(e1) < str(e2) else (r2, r1)
+            seen_endpoint_pairs.add(pair_key)
             rows_out.append(
                 {
-                    "link_type": "org.persona_belongs_to_handle",
+                    "link_type": link_type,
                     "source_entity_id": str(a_id),
                     "target_entity_id": str(b_id),
                     "evidence_raw_record_ids": sorted({ra, rb}),
@@ -158,6 +175,8 @@ def _process_single_rule_buckets(
     *,
     max_rows: int,
     rule_metrics: dict[str, Any],
+    seen_endpoint_pairs: set[tuple[str, str, str]],
+    rule_edge_cap: int | None = None,
 ) -> bool:
     """Process all buckets for one rule. Returns True if global edge cap was hit."""
     bucket_list = sorted(bucket_map.items(), key=lambda kv: str(kv[0]))
@@ -169,8 +188,18 @@ def _process_single_rule_buckets(
         rule_metrics["eligible_cross_entity_pairs_across_buckets"] += elig_bucket
         rule_metrics["buckets_with_ge2_distinct_org_entity_rows"] += 1
         before = len(rows_out)
+        remaining_rule = None
+        if rule_edge_cap is not None:
+            remaining_rule = max(0, rule_edge_cap - int(rule_metrics.get("edges_emitted") or 0))
+            if remaining_rule == 0:
+                return len(rows_out) >= max_rows
         emitted_here, cap_hit = _emit_cross_entity_pairs_from_bucket(
-            sorted_items, rule_id, rows_out, max_rows=max_rows
+            sorted_items,
+            rule_id,
+            rows_out,
+            max_rows=max_rows,
+            seen_endpoint_pairs=seen_endpoint_pairs,
+            rule_edge_cap=remaining_rule,
         )
         rule_metrics["edges_emitted"] = rule_metrics.get("edges_emitted", 0) + emitted_here
         if cap_hit:
@@ -511,6 +540,7 @@ def build_anchor_continuity_candidate_rows(
                 by_stable_account[sak].append((eid, rid, a))
 
     rows_out: list[dict[str, Any]] = []
+    seen_endpoint_pairs: set[tuple[str, str, str]] = set()
 
     rule_kind_by_id = {str(e["rule_id"]): str(e.get("kind") or "") for e in _DEFAULT_MANIFEST.get("entries", [])}
     rule_phases: tuple[tuple[str, dict[Any, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]]], ...] = (
@@ -542,10 +572,12 @@ def build_anchor_continuity_candidate_rows(
         acc["per_rule"][rid] = {
             "rule_id": rid,
             "manifest_kind": rule_kind_by_id.get(rid),
+            "rule_edge_cap": max_candidate_edges_for_rule_v1(rid),
             "eligible_cross_entity_pairs_across_buckets": 0,
             "buckets_with_ge2_distinct_org_entity_rows": 0,
             "edges_emitted": 0,
             "edges_suppressed_due_to_global_cap": 0,
+            "edges_suppressed_duplicate_pair": 0,
             "eligible_cross_entity_pairs_in_buckets_skipped_after_cap": 0,
         }
         if len(rows_out) >= _MAX_CANDIDATE_ROWS:
@@ -557,6 +589,8 @@ def build_anchor_continuity_candidate_rows(
             rows_out,
             max_rows=_MAX_CANDIDATE_ROWS,
             rule_metrics=acc["per_rule"][rid],
+            seen_endpoint_pairs=seen_endpoint_pairs,
+            rule_edge_cap=max_candidate_edges_for_rule_v1(rid),
         )
         if trunc:
             acc["hit_global_candidate_edge_cap"] = True
@@ -569,6 +603,7 @@ def build_anchor_continuity_candidate_rows(
             acc["eligible_cross_entity_pairs_in_rules_never_started_after_cap"] += e_skip
 
     acc["edges_emitted_total"] = len(rows_out)
+    acc["distinct_endpoint_pairs_emitted"] = len(seen_endpoint_pairs)
     acc["hit_global_candidate_edge_cap"] = len(rows_out) >= _MAX_CANDIDATE_ROWS
     if acc["hit_global_candidate_edge_cap"]:
         acc["deterministic_notes"].append(
