@@ -22,6 +22,7 @@ def on_tcre_job_terminal_for_execution_v1(
     pipeline_run_id: uuid.UUID,
     tcre_job_id: uuid.UUID,
     tcre_job_status: str,
+    enqueue_convergence: bool = True,
 ) -> dict[str, Any]:
     """Re-enter execution worker at phase 07 after TCRE terminal status (no continuation enqueue)."""
     lease_resume = resume_convergence_from_waiting_v1(
@@ -31,7 +32,23 @@ def on_tcre_job_terminal_for_execution_v1(
         pipeline_run_id=pipeline_run_id,
     )
     session.flush()
-    hint = enqueue_tenant_convergence_v1(tenant_id, reason="tcre_complete")
+    hint: dict[str, Any] | None = None
+    if enqueue_convergence:
+        try:
+            hint = enqueue_tenant_convergence_v1(tenant_id, reason="tcre_complete")
+        except Exception as exc:  # noqa: BLE001
+            hint = {
+                "enqueued": False,
+                "tenant_id": str(tenant_id),
+                "reason": "tcre_complete",
+                "error": str(exc)[:500],
+            }
+            _LOGGER.warning(
+                "execution_tcre_resume_enqueue_failed tenant_id=%s job_id=%s error=%s",
+                tenant_id,
+                tcre_job_id,
+                exc,
+            )
     _LOGGER.info(
         "execution_tcre_resume tenant_id=%s pipeline_run_id=%s job_id=%s status=%s",
         tenant_id,

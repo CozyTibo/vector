@@ -203,6 +203,11 @@ def _persist_artifact(
 
 
 def execute_tcre_reconstruction_job_v1(db: Session, job: CortexTcreReconstructionJob) -> dict[str, Any]:
+    from vector.domains.cortex.execution.tcre_job_lifecycle import (
+        ORPHAN_RUNNING_CODE_V1,
+        terminalize_tcre_job_failed_v1,
+    )
+
     if job.status not in ("queued", "running"):
         return {"job_id": str(job.id), "status": job.status, "skipped": True}
     now = datetime.now(UTC)
@@ -324,17 +329,17 @@ def execute_tcre_reconstruction_job_v1(db: Session, job: CortexTcreReconstructio
         db.flush()
         return dict(job.summary_json)
     except OctsBindingError as exc:
-        job.status = "failed"
-        job.completed_at = datetime.now(UTC)
-        job.error_detail = str(exc)[:4000]
+        terminalize_tcre_job_failed_v1(job, error_code=str(exc)[:4000])
         db.flush()
         raise
     except Exception as exc:
-        job.status = "failed"
-        job.completed_at = datetime.now(UTC)
-        job.error_detail = str(exc)[:4000]
+        terminalize_tcre_job_failed_v1(job, error_code=str(exc)[:4000])
         db.flush()
         raise
+    finally:
+        if job.status == "running":
+            terminalize_tcre_job_failed_v1(job, error_code=ORPHAN_RUNNING_CODE_V1)
+            db.flush()
 
 
 def create_reconstruction_job_v1(

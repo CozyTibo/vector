@@ -3,6 +3,7 @@
 **Status:** Operational recovery plan — grounded in production reality, not architecture speculation  
 **Phase A step A.1:** **Done** (2026-05-23) — see [Step A.1 completion](#step-a1-completion--synthesis-job-lifecycle)  
 **Phase A step A.2:** **Done** (2026-05-23) — see [Step A.2 completion](#step-a2-completion--ecs-deploy-alignment)  
+**Phase A step A.3:** **Done** (2026-05-23) — see [Step A.3 completion](#step-a3-completion--tcre-queued-drain)  
 **Supersedes for stabilization work:** optimistic Phase 1–3 completion narratives and open-ended “Phase 4 operational hardening” without recurrence gates  
 **Authoritative truth sources:**
 
@@ -251,7 +252,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 |------|------|-----|-----------|-------------------|---------|----------|----------|------|
 | **A1** | ~~Purge/fix 1,043 `running` synthesis jobs~~ **Done 2026-05-23** | Restores trust in L7 job table | `synthesis_job_lifecycle.py`, `synthesis_orchestrator.py` | N/A (data + bugfix) | `running` < 10; terminal states consistent | Prod: 1043 reconciled; baseline `step_a1_synthesis_job_reconcile` | Low — backup job rows | **runtime** |
 | **A2** | ~~Align ECS API + worker to **same SHA**~~ **Done 2026-05-23** | Worker must run epoch fix + deferral monitor | `continuity_p0_ecs_deploy_align.py`, `prod_deploy_backend_worker.sh` | N/A | `deploy_matches_closure_sha: true` | Prod: both on `2ab8776…`; baseline `step_a2_ecs_deploy_align` | Redeploy prior tag | **ops** |
-| **A3** | Drain stuck TCRE `queued` job | Unblocks 06→07 resume | `tcre_resume.py`, Celery task | N/A | 0 queued older than 1h | SQL + `resume_convergence_from_waiting_v1` trace | Re-queue job | **runtime** |
+| **A3** | ~~Drain stuck TCRE `queued` job~~ **Done 2026-05-23** | Unblocks 06→07 resume | `tcre_job_lifecycle.py`, `tcre_resume.py` | N/A | 0 queued older than 1h | Prod: 1 job drained; baseline `step_a3_tcre_queued_drain` | Re-queue job | **runtime** |
 | **A4** | Tighten AA1 + AA6 in proof panel | Stop false M3 confidence | `continuity_proof_panel.py` | Remove mat-only AA6 fallback | AA1 FAIL on empty 08; AA6 requires delta or drainable ↓ | Unit tests + panel JSON | Revert gate logic | **ops** |
 | **A5** | Ban `--trace-only` as prod sign-off | Baselines must mean something | All `continuity_p3_*_proof.py` | Document CI-only mode | Baseline updates require `trace_only: false` | Code review + baseline schema | N/A | **cleanup** |
 | **A6** | Fix synthesis job terminal transitions | Prevent A1 recurrence | `synthesis_orchestrator.py` | Remove duplicate enqueue paths | 24h soak: running stable | CloudWatch + SQL cron | Revert orchestrator | **runtime** |
@@ -665,7 +666,48 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 - [x] `deploy_matches_closure_sha` for deployed closure
 - [x] `realign_ecs_worker_to_api_image_tag_v1` available for future drift
 
-**Next step:** **A3** — drain stuck TCRE `queued` job.
+---
+
+## Step A.3 completion — TCRE queued drain
+
+**Completed:** 2026-05-23  
+**Goal:** Clear stale `queued` TCRE jobs blocking phase 06→07 resume; record `resume_convergence_from_waiting_v1` trace.
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| Lifecycle | `tcre_job_lifecycle.py` — `drain_stale_queued_tcre_jobs_v1`, histogram + stale counts |
+| Resume | `tcre_resume.py` — best-effort Celery enqueue; `enqueue_convergence=False` for local prod proof |
+| Orchestrator | `execute_tcre_reconstruction_job_v1` — `finally` orphan `running` terminalization |
+| Settings | `CORTEX_TCRE_JOB_QUEUED_STALE_SECONDS` (default 3600, A-G3) |
+| Proof | `continuity_p0_phase_a3_tcre_queued_drain_proof.py` + `continuity_p0_tcre_job_drain.py` |
+| CI | `.github/workflows/deploy.yml` — A.3 pytest gate |
+
+### Prod proof (Fizzer)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a3_tcre_queued_drain_proof.py \
+  --use-deployed-closure --lease-only
+```
+
+| Metric | Before | After |
+|--------|--------|-------|
+| `queued` (stale >1h) | 1 | 0 |
+| `completed` | 2 | 3 |
+| Job `57440823-…` | `queued` | `completed` + lease resume `phase_07_retrieval` |
+| `p0_a3_pass` | — | true |
+
+Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.json) → `step_a3_tcre_queued_drain`.
+
+### Exit gates (A-G3)
+
+- [x] No `queued` TCRE jobs older than 1 hour after drain
+- [x] `resume_convergence_from_waiting_v1` trace on completed drain (`lease.phase_cursor = phase_07_retrieval`)
+- [x] P1-D static boundaries still pass
+
+**Next step:** **A4** — tighten AA1 + AA6 in `continuity_proof_panel.py`.
 
 ---
 
@@ -691,6 +733,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a1_synthesis_jo
 # Phase A2 — ECS API+worker alignment (done; re-run after deploy or split-drift)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a2_ecs_deploy_align_proof.py --use-deployed-closure --probe-only
 # Full deploy (requires ECR push IAM): ../backend/scripts/prod_deploy_backend_worker.sh
+
+# Phase A3 — TCRE queued drain (done; re-run if queued jobs age in)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a3_tcre_queued_drain_proof.py --use-deployed-closure --lease-only
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json

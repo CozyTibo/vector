@@ -2264,5 +2264,36 @@
         }
       }
     }
+  },
+  "step_a3_tcre_queued_drain": {
+    "validated_at": "2026-05-23T00:54:23.826400+00:00",
+    "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_a3_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "histogram_present": true,
+      "no_stale_queued_after_drain": true,
+      "queued_count_acceptable": true,
+      "drain_applied_or_trace": true,
+      "resume_trace_present": true,
+      "lease_resume_recorded": true
+    },
+    "checks_advisory": {
+      "stale_queued_before": 1,
+      "stale_queued_after": 0,
+      "jobs_drained": 1,
+      "queued_after": 0,
+      "completed_after": 3,
+      "lease_phase_cursor": "phase_08_synthesis"
+    },
+    "wiring_ok": true,
+    "stale_queued_before": 1,
+    "stale_queued_after": 0,
+    "jobs_drained": 1,
+    "queued_after": 0,
+    "dry_run": false,
+    "trace_only": false
   }
 }

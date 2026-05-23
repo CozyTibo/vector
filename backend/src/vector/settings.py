@@ -556,6 +556,15 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_SYNTHESIS_JOB_RECONCILE_ON_MATERIALIZE",
         description="Phase A1: reconcile stale running jobs before phase_08 materialization.",
     )
+    cortex_tcre_job_queued_stale_seconds: int = Field(
+        default=3600,
+        ge=60,
+        le=604_800,
+        validation_alias="CORTEX_TCRE_JOB_QUEUED_STALE_SECONDS",
+        description=(
+            "Phase A3: queued TCRE jobs older than this are drained inline (A-G3: none older than 1h)."
+        ),
+    )
     cortex_substrate_continuation_stall_seconds: int = Field(
         default=1800,
         ge=300,
