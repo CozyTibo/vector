@@ -1,0 +1,61 @@
+{
+  "baseline_kind": "semantic_readiness_wave_s0",
+  "schema_version": 1,
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "tenant_label": "Fizzer",
+  "captured_at_utc": "2026-05-23T12:06:32Z",
+  "code_closure_at_capture": "f749147",
+  "purpose": "Wave S0 truth baseline sign-off — measure semantic progress from here, not raw link inflation.",
+  "product_substrate": "retrieval",
+  "semantic_readiness": {
+    "graph_truth": {
+      "unique_auth_pairs": 2000,
+      "auth_edge_rows": 10400,
+      "dup_factor": 5.2,
+      "dup_factor_severity": "bad",
+      "promotion_rule_count": 1,
+      "promotion_rules_active": [
+        "p04.candidate.exact_notion_user_id_v1"
+      ],
+      "entities_in_auth_graph_pct": 3.5,
+      "active_entities": 7393,
+      "entities_isolated": 7134,
+      "connected_components_ge_2": 2,
+      "largest_component_size": 257
+    },
+    "retrieval": {
+      "published_index_epoch": "epoch-57147c1555c6",
+      "entry_count": 1599,
+      "org_link_pct": 98.4,
+      "execution_index_pct": 1.6,
+      "org_link_pct_severity": "bad",
+      "execution_index_pct_severity": "bad",
+      "freshness_minutes_at_capture": null
+    },
+    "synthesis": {
+      "artifacts_total": 1,
+      "artifacts_published": 0,
+      "artifacts_with_claims": 0,
+      "jobs_failed": 1043,
+      "jobs_completed": 1
+    }
+  },
+  "wave_s0_green_thresholds": {
+    "dup_factor_max": 1.05,
+    "promotion_rule_count_min": 3,
+    "retrieval_org_link_pct_max": 30,
+    "retrieval_execution_index_pct_min": 60,
+    "synthesis_artifacts_with_claims_min": 1
+  },
+  "repro": {
+    "graph_truth_audit": "cd backend && python scripts/graph_truth_audit_snapshot.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json",
+    "continuity_audit": "cd backend && python scripts/continuity_audit_snapshot.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json",
+    "admin_api": "GET /admin/tenants/{tenant_id}/cortex/pipeline/semantic-readiness",
+    "full_forensic_snapshot": "DOCS/audits/baselines/graph_truth_fizzer_2026-05-23.json"
+  },
+  "notes": [
+    "Runtime continuity improved by f749147; semantic usefulness did not.",
+    "Auth link row count is diagnostic only; unique_auth_pairs is the graph progress metric.",
+    "Retrieval is the product substrate; org_link mirror dominance is the primary semantic failure."
+  ]
+}
