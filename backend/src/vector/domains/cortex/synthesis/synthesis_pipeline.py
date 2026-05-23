@@ -63,27 +63,36 @@ def build_pipeline_synthesis_job_envelope_v1(
     retrieval_lookup_id: str,
     published_index_epoch: str,
     synthesis_intent: str = "inspect",
+    island_scope_id: str | None = None,
 ) -> dict[str, Any]:
-    idem = hash_reasoning_canonical_json_sha256_v1(
-        {
-            "pipeline_run_id": str(pipeline_run_id),
-            "workload": workload,
-            "retrieval_lookup_id": retrieval_lookup_id,
-            "published_index_epoch": published_index_epoch,
-        }
-    )[:64]
-    return {
+    idem_payload: dict[str, Any] = {
+        "pipeline_run_id": str(pipeline_run_id),
+        "workload": workload,
+        "retrieval_lookup_id": retrieval_lookup_id,
+        "published_index_epoch": published_index_epoch,
+    }
+    if island_scope_id:
+        idem_payload["island_scope_id"] = island_scope_id
+    idem = hash_reasoning_canonical_json_sha256_v1(idem_payload)[:64]
+    retrieval_scope: dict[str, Any] = {"retrieval_lookup_id": retrieval_lookup_id}
+    if island_scope_id:
+        retrieval_scope["island_scope_id"] = island_scope_id
+    envelope: dict[str, Any] = {
         "schema_version": SYNTHESIS_JOB_ENVELOPE_SCHEMA_VERSION_V1,
         "tenant_id": str(tenant_id),
         "synthesis_workload_class": workload,
         "synthesis_intent": synthesis_intent,
         "execution_partition": "authoritative",
-        "retrieval_scope": {"retrieval_lookup_id": retrieval_lookup_id},
+        "retrieval_scope": retrieval_scope,
         "retrieval_pins": {"index_epoch": published_index_epoch},
         "substrate_pipeline_run_id": str(pipeline_run_id),
         "synthesis_policy_pack_id": DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1,
         "idempotency_key": f"pipe08-{idem}",
     }
+    if island_scope_id:
+        envelope["island_scope_id"] = island_scope_id
+        envelope["synthesis_scope_law"] = "per_island_v1"
+    return envelope
 
 
 def iter_pipeline_synthesis_scopes_v1(
@@ -139,7 +148,20 @@ def materialize_synthesis_for_pipeline_v1(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Run bounded pipeline-default synthesis jobs and publish synthesis epoch."""
+    from vector.domains.cortex.synthesis.synthesis_per_island import (
+        is_per_island_synthesis_enabled_v1,
+        materialize_synthesis_per_island_v1,
+    )
+
     cfg = settings or get_settings()
+    if is_per_island_synthesis_enabled_v1():
+        return materialize_synthesis_per_island_v1(
+            session,
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            published_index_epoch=published_index_epoch,
+            settings=cfg,
+        )
     index_epoch = published_index_epoch or get_published_index_epoch_v1(session, tenant_id=tenant_id)
     if not index_epoch:
         return {

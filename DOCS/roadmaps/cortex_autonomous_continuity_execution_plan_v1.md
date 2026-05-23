@@ -625,7 +625,7 @@ Executed **2026-05-22** on Fizzer prod:
 |------|------|-----------|
 | 3.1 | P2-C island registry | Registry persisted per eligible component | **Done** (see §Phase 3.1 completion) |
 | 3.2 | P2-B event triggers (hash-change walk schedule) | **Done** (see §Phase 3.2 completion) |
-| 3.3 | P2-D per-island synthesis |
+| 3.3 | P2-D per-island synthesis | **Done** (see §Phase 3.3 completion) |
 | 3.4 | P2-E ingest caps + deferral release monitoring |
 
 #### Phase 3.1 completion (P2-C execution island registry)
@@ -659,7 +659,23 @@ Executed **2026-05-22** on Fizzer prod:
 | CI gate | `deploy.yml` → `test_execution_event_triggers.py`, `test_continuity_p3_event_triggers.py` |
 | Prod script | `python backend/scripts/continuity_p3_phase32_event_triggers_proof.py --trace-only` |
 
-**Next step (3.3):** P2-D per-island synthesis.
+#### Phase 3.3 completion (P2-D per-island synthesis)
+
+Executed **2026-05-22** on Fizzer prod:
+
+| Item | Value |
+|------|-------|
+| Mode | `materialize_synthesis_for_pipeline_v1` → `materialize_synthesis_per_island_v1` when `CORTEX_SYNTHESIS_PER_ISLAND` (default on) |
+| Per island | Retrieval entries filtered by `omission_summary.island_scope_id`; bounded scopes per island; registry `detail_json` records `last_synthesis_job_id` |
+| Global brief | `global_degradation_brief` — `outside_island_scope_entity_count`, per-island omission `outside_island_scope` |
+| Settings | `CORTEX_SYNTHESIS_PER_ISLAND`; `CORTEX_SYNTHESIS_PER_ISLAND_MAX_SCOPES` (default 8) |
+| Admin inspect | `GET …/cortex/execution/state` → `per_island_synthesis` block |
+| Baseline | [`continuity_p0_2026-05-22.json`](../audits/baselines/continuity_p0_2026-05-22.json) → `step_3_3_p2d_per_island_synthesis` (`p3_3_pass: true`) |
+| Code | `synthesis_per_island.py`, `continuity_p3_per_island_synthesis.py` |
+| CI gate | `deploy.yml` → `test_synthesis_per_island.py`, `test_continuity_p3_per_island_synthesis.py` |
+| Prod script | `python backend/scripts/continuity_p3_phase33_per_island_synthesis_proof.py --trace-only` (snapshot); `--max-islands 1 --max-scopes-per-island 2` for bounded drive |
+
+**Next step (3.4):** P2-E ingest caps + deferral release monitoring.
 
 ---
 
@@ -708,6 +724,8 @@ python scripts/continuity_p2_phase24_aa_clock_proof.py --trace-only --wedge-free
 python scripts/continuity_p3_phase31_island_registry_proof.py --trace-only
 # P2-B event triggers (step 3.2):
 python scripts/continuity_p3_phase32_event_triggers_proof.py --trace-only
+# P2-D per-island synthesis (step 3.3):
+python scripts/continuity_p3_phase33_per_island_synthesis_proof.py --trace-only
 # After pipeline recovery (step 0.3):
 python scripts/continuity_p0_recover_pipeline.py --strategy new_run --db-only
 python scripts/prod_substrate_proof_queries.py --out ../DOCS/audits/baselines/continuity_<date>.json

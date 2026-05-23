@@ -100,6 +100,13 @@ jobs:
             tests/vector/domains/cortex/execution/test_execution_event_triggers.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_event_triggers.py
 
+      - name: Verify P2-D per-island synthesis (step 3.3)
+        run: |
+          cd backend
+          PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/synthesis/test_synthesis_per_island.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p3_per_island_synthesis.py
+
       - name: Build and push backend image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

@@ -519,6 +519,21 @@ class Settings(BaseSettings):
             "(dev/small tenants). False reserves async chord enqueue (future)."
         ),
     )
+    cortex_synthesis_per_island_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_PER_ISLAND",
+        description=(
+            "P2-D: run phase_08 synthesis per execution island with a global degradation brief "
+            "instead of monolithic org-wide scopes."
+        ),
+    )
+    cortex_synthesis_per_island_max_scopes_per_island: int = Field(
+        default=8,
+        ge=1,
+        le=64,
+        validation_alias="CORTEX_SYNTHESIS_PER_ISLAND_MAX_SCOPES",
+        description="P2-D: max synthesis scopes executed per island per pipeline run.",
+    )
     cortex_substrate_continuation_stall_seconds: int = Field(
         default=1800,
         ge=300,

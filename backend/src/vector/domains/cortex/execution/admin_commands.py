@@ -87,6 +87,11 @@ def build_execution_inspect_v1(
         sync=False,
     )
     event_triggers = build_event_triggers_inspect_v1(session, tenant_id=tenant_id)
+    from vector.domains.cortex.synthesis.synthesis_per_island import (
+        build_per_island_synthesis_inspect_v1,
+    )
+
+    per_island_synthesis = build_per_island_synthesis_inspect_v1(session, tenant_id=tenant_id)
     return {
         "surface_kind": "execution_inspect",
         "tenant_id": str(tenant_id),
@@ -109,6 +114,7 @@ def build_execution_inspect_v1(
         "dual_lane": dual_lane,
         "island_registry": island_registry,
         "event_triggers": event_triggers,
+        "per_island_synthesis": per_island_synthesis,
         "progression": progression,
         "transitions": [
             {

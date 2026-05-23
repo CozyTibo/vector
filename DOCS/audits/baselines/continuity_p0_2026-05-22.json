@@ -2113,5 +2113,36 @@
     "graph_hash_changed": true,
     "trace_only": true,
     "wiring_only": false
+  },
+  "step_3_3_p2d_per_island_synthesis": {
+    "validated_at": "2026-05-23T00:07:10.080873+00:00",
+    "closure_git_sha": "ec3585958df3c2b0bd40d1811159b898076a7e80",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p3_3_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "per_island_synthesis_enabled": true,
+      "static_wiring_ok": true,
+      "panel_surface_kind": true,
+      "published_index_epoch_present": true,
+      "islands_at_least_one": true,
+      "outside_island_scope_documented": true,
+      "execution_inspect_exposes_per_island_synthesis": true,
+      "per_island_mode_in_drive": true,
+      "global_degradation_brief_present": true,
+      "island_results_recorded": true
+    },
+    "checks_advisory": {
+      "islands_synthesized_count": 0,
+      "jobs_completed": 0,
+      "scopes_scheduled": 2,
+      "largest_island_entity_count": 257
+    },
+    "wiring_ok": true,
+    "per_island_mode": true,
+    "global_degradation_brief_surface": "global_degradation_brief",
+    "islands_synthesized_count": 0,
+    "trace_only": true,
+    "snapshot_only": false
   }
 }
