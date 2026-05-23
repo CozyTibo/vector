@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canonical.forward_progress.candidate_selection import (
@@ -36,13 +37,13 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_STATUS_COMPLETED,
     PIPELINE_TRIGGER_POST_INGESTION,
 )
+from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
+    PHASE_OUTCOME_COMPLETED_EMPTY,
+)
 from vector.domains.cortex.substrate_pipeline.continuity_p0_recovery import (
     get_latest_pipeline_run_for_tenant_v1,
 )
 from vector.domains.cortex.substrate_pipeline.repository import get_phase_run_v1
-from vector.infrastructure.db.models.cortex_canonical_transform_materialization import (
-    CortexCanonicalTransformMaterialization,
-)
 from vector.infrastructure.db.models.cortex_substrate_pipeline_run import CortexSubstratePipelineRun
 from vector.infrastructure.db.models.cortex_substrate_pipeline_run import CortexSubstratePhaseRun
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import (
@@ -51,6 +52,8 @@ from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import (
 
 P2_2_STEP = "2.2_continuity_proof_panel"
 DEFAULT_TENANT_ID = uuid.UUID("c08ef32b-f89a-40f6-9566-e19b5329436f")
+
+STRICT_AA_PANEL_SCHEMA_VERSION_V1 = 2
 
 AA_GATE_IDS_V1: Final[tuple[str, ...]] = (
     "AA1",
@@ -113,18 +116,56 @@ def _resolve_pipeline_run_v1(
     )
 
 
+def _phase08_output_evidence_v1(
+    session: Session,
+    *,
+    pipeline_run_id: uuid.UUID,
+) -> dict[str, Any]:
+    row = get_phase_run_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_08_SYNTHESIS)
+    out = dict(row.output_json or {}) if row is not None else {}
+    receipt = out.get("substrate_phase_receipt") or {}
+    outcome = str(out.get("outcome") or "")
+    if isinstance(receipt, Mapping):
+        outcome = outcome or str(receipt.get("outcome") or "")
+    return {
+        "phase_08_status": row.status if row else None,
+        "phase_08_outcome": outcome,
+        "jobs_completed": int(out.get("jobs_completed") or 0),
+        "jobs_failed": int(out.get("jobs_failed") or 0),
+        "scope_empty": bool(out.get("scope_empty")),
+        "scopes_scheduled": int(out.get("scopes_scheduled") or 0),
+        "artifacts_published": int(out.get("artifacts_published") or 0),
+        "empty_scope_reason": str(out.get("empty_scope_reason") or out.get("error_code") or ""),
+        "per_island_mode": bool(out.get("per_island_mode")),
+    }
+
+
+def _lawful_empty_synthesis_v1(out: Mapping[str, Any]) -> bool:
+    """Lawful empty: documented scope_empty / COMPLETED_EMPTY — not fake-green completion."""
+    if not bool(out.get("scope_empty")):
+        return False
+    if int(out.get("jobs_completed") or 0) > 0:
+        return False
+    outcome = str(out.get("phase_08_outcome") or out.get("outcome") or "")
+    if outcome == PHASE_OUTCOME_COMPLETED_EMPTY:
+        return True
+    reason = str(out.get("empty_scope_reason") or "").strip()
+    return bool(reason)
+
+
 def evaluate_aa1_phase_chain_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID | None,
 ) -> dict[str, Any]:
-    """AA1 — phase cursor advances 05→06→07→08 without stall loop on same error."""
+    """AA1 — phase chain 05→06→07→08 completed; synthesis jobs_completed>0 or lawful empty."""
     run = _resolve_pipeline_run_v1(
         session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id
     )
     lease = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
     phases: dict[str, Any] = {}
+    phase08: dict[str, Any] = {}
     if run is not None:
         for pid in (PHASE_05_TRAVERSAL, PHASE_06_TCRE, PHASE_07_RETRIEVAL, PHASE_08_SYNTHESIS):
             row = get_phase_run_v1(session, pipeline_run_id=run.id, phase_id=pid)
@@ -133,11 +174,15 @@ def evaluate_aa1_phase_chain_v1(
                 "started_at": row.started_at.isoformat() if row and row.started_at else None,
                 "completed_at": row.completed_at.isoformat() if row and row.completed_at else None,
             }
+        phase08 = _phase08_output_evidence_v1(session, pipeline_run_id=run.id)
     p05_ok = phases.get(PHASE_05_TRAVERSAL, {}).get("status") == PHASE_STATUS_COMPLETED
     p06_ok = phases.get(PHASE_06_TCRE, {}).get("status") == PHASE_STATUS_COMPLETED
     p07_ok = phases.get(PHASE_07_RETRIEVAL, {}).get("status") == PHASE_STATUS_COMPLETED
-    p08_started = bool(phases.get(PHASE_08_SYNTHESIS, {}).get("started_at"))
-    chain_advanced = p05_ok and p06_ok and p07_ok and p08_started
+    p08_completed = phase08.get("phase_08_status") == PHASE_STATUS_COMPLETED
+    jobs_completed = int(phase08.get("jobs_completed") or 0)
+    lawful_empty = _lawful_empty_synthesis_v1(phase08)
+    synthesis_ok = jobs_completed > 0 or lawful_empty
+    chain_advanced = p05_ok and p06_ok and p07_ok and p08_completed and synthesis_ok
     stall_loop = False
     if lease is not None:
         stall_loop = (
@@ -146,18 +191,31 @@ def evaluate_aa1_phase_chain_v1(
             and bool(lease.last_error)
         )
     passed = chain_advanced and not stall_loop
+    detail = "chain_and_synthesis_ok"
+    if not p08_completed:
+        detail = "phase_08_not_completed"
+    elif not synthesis_ok:
+        detail = "phase_08_empty_without_lawful_documentation"
+    elif not (p05_ok and p06_ok and p07_ok):
+        detail = "phase_chain_incomplete"
     return _gate(
         "AA1",
         verdict="PASS" if passed else "FAIL",
-        criterion="Phase chain 05→06→07→08 without stall loop on same error",
+        criterion=(
+            "Phase chain 05→06→07→08 completed; phase_08 jobs_completed>0 "
+            "or lawful documented empty"
+        ),
         evidence={
             "pipeline_run_id": str(run.id) if run else None,
             "phases": phases,
+            "phase_08": phase08,
+            "jobs_completed": jobs_completed,
+            "lawful_empty": lawful_empty,
             "lease_status": lease.status if lease else None,
             "attempt_count": int(lease.attempt_count or 0) if lease else 0,
             "last_error_prefix": (lease.last_error or "")[:120] if lease else None,
         },
-        detail="chain_advanced" if chain_advanced else "phase_chain_incomplete",
+        detail=detail,
     )
 
 
@@ -292,54 +350,82 @@ def evaluate_aa6_forward_progress_v1(
     tenant_id: uuid.UUID,
     window_hours: int = 24,
 ) -> dict[str, Any]:
-    """AA6 — convergence_delta_succeeded > 0 in window OR drainable motion signal."""
+    """AA6 — convergence_delta_succeeded>0 OR canonical progress_made OR untreated_routable ↓."""
     now = datetime.now(UTC)
     since = now - timedelta(hours=max(1, int(window_hours)))
     bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id=tenant_id)
-    mats_24h = int(
-        session.scalar(
-            select(func.count())
-            .select_from(CortexCanonicalTransformMaterialization)
+    phase02_rows = list(
+        session.scalars(
+            select(CortexSubstratePhaseRun)
             .where(
-                CortexCanonicalTransformMaterialization.tenant_id == tenant_id,
-                CortexCanonicalTransformMaterialization.created_at >= since,
+                CortexSubstratePhaseRun.tenant_id == tenant_id,
+                CortexSubstratePhaseRun.phase_id == PHASE_02_CANONICAL,
+                CortexSubstratePhaseRun.status == PHASE_STATUS_COMPLETED,
+                CortexSubstratePhaseRun.completed_at >= since,
             )
-        )
-        or 0
+            .order_by(CortexSubstratePhaseRun.completed_at.asc())
+        ).all()
     )
     delta_succeeded = 0
-    phase02 = session.scalar(
-        select(CortexSubstratePhaseRun)
-        .where(
-            CortexSubstratePhaseRun.tenant_id == tenant_id,
-            CortexSubstratePhaseRun.phase_id == PHASE_02_CANONICAL,
-            CortexSubstratePhaseRun.completed_at >= since,
-        )
-        .order_by(CortexSubstratePhaseRun.completed_at.desc())
-        .limit(1)
-    )
-    if phase02 is not None and isinstance(phase02.output_json, dict):
-        summary = phase02.output_json.get("canonical_summary") or {}
-        if isinstance(summary, dict):
-            delta_succeeded = int(summary.get("total_succeeded") or 0)
-    untreated = 0
+    progress_made_in_window = False
+    untreated_first: int | None = None
+    untreated_last: int | None = None
+    for row in phase02_rows:
+        raw = dict(row.output_json or {})
+        summary = raw.get("canonical_summary") or {}
+        if not isinstance(summary, Mapping):
+            continue
+        slice_succeeded = int(summary.get("total_succeeded") or 0)
+        if slice_succeeded > delta_succeeded:
+            delta_succeeded = slice_succeeded
+        if bool(summary.get("progress_made")):
+            progress_made_in_window = True
+        est = summary.get("untreated_routable_estimate")
+        if est is not None:
+            val = int(est)
+            if untreated_first is None:
+                untreated_first = val
+            untreated_last = val
+    untreated_now = 0
     if bundle_id:
-        untreated = list_untreated_routable_count_estimate(
+        untreated_now = list_untreated_routable_count_estimate(
             session, tenant_id=tenant_id, bundle_id=bundle_id
         )
-    passed = delta_succeeded > 0 or mats_24h > 0
+    if untreated_first is None:
+        untreated_first = untreated_now
+    if untreated_last is None:
+        untreated_last = untreated_now
+    untreated_decreased = untreated_last < untreated_first
+    forward_signals: list[str] = []
+    if delta_succeeded > 0:
+        forward_signals.append("convergence_delta_succeeded")
+    if progress_made_in_window:
+        forward_signals.append("progress_made_in_window")
+    if untreated_decreased:
+        forward_signals.append("untreated_routable_decreased")
+    passed = bool(forward_signals)
+    mat_only_pass = delta_succeeded == 0 and not progress_made_in_window and not untreated_decreased
     return _gate(
         "AA6",
         verdict="PASS" if passed else "FAIL",
-        criterion=f"convergence_delta_succeeded>0 in {window_hours}h OR materializations in window",
+        criterion=(
+            f"convergence_delta_succeeded>0 or progress_made or untreated_routable↓ in {window_hours}h "
+            "(no mat-count-only pass)"
+        ),
         evidence={
             "window_hours": window_hours,
             "convergence_delta_succeeded": delta_succeeded,
-            "materializations_in_window": mats_24h,
-            "untreated_routable_estimate": untreated,
+            "progress_made_in_window": progress_made_in_window,
+            "untreated_routable_first_in_window": untreated_first,
+            "untreated_routable_last_in_window": untreated_last,
+            "untreated_routable_now": untreated_now,
+            "untreated_decreased": untreated_decreased,
+            "forward_progress_signals": forward_signals,
+            "mat_only_pass": mat_only_pass,
+            "canonical_phase02_slices_in_window": len(phase02_rows),
             "bundle_id": bundle_id,
         },
-        detail="forward_progress_motion" if passed else "no_canonical_motion_in_window",
+        detail="forward_progress_motion" if passed else "no_drainable_forward_progress",
     )
 
 
@@ -413,6 +499,7 @@ def build_continuity_proof_panel_v1(
     return {
         "surface_kind": "continuity_proof_panel",
         "step": P2_2_STEP,
+        "strict_aa_panel_schema_version": STRICT_AA_PANEL_SCHEMA_VERSION_V1,
         "tenant_id": str(tenant_id),
         "pipeline_run_id": str(run.id) if run else None,
         "evaluated_at": datetime.now(UTC).isoformat(),

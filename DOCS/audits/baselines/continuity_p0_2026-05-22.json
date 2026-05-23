@@ -2295,5 +2295,42 @@
     "queued_after": 0,
     "dry_run": false,
     "trace_only": false
+  },
+  "step_a4_aa_panel_strict": {
+    "validated_at": "2026-05-23T01:03:05.927903+00:00",
+    "closure_git_sha": "2ab8776fafc8861ef69571f1531da1fd4f880a04",
+    "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+    "p0_a4_pass": true,
+    "checks": {
+      "ecs_deploy_matches_closure_sha": true,
+      "static_wiring_ok": true,
+      "panel_strict_schema": true,
+      "aa1_gate_present": true,
+      "aa6_gate_present": true,
+      "aa1_has_synthesis_evidence": true,
+      "aa6_mat_only_pass_documented": true,
+      "aa6_forward_progress_signals_documented": true,
+      "panel_prints_aa1": true,
+      "panel_prints_aa6": true
+    },
+    "checks_advisory": {
+      "aa1_verdict": "FAIL",
+      "aa6_verdict": "FAIL",
+      "aa1_jobs_completed": 0,
+      "aa1_lawful_empty": false,
+      "aa6_delta_succeeded": 0,
+      "aa6_untreated_decreased": false,
+      "m3_autonomously_alive": false
+    },
+    "wiring_ok": true,
+    "strict_aa_panel_schema_version": 2,
+    "aa1_verdict": "FAIL",
+    "aa6_verdict": "FAIL",
+    "aa1_jobs_completed": 0,
+    "aa1_lawful_empty": false,
+    "aa6_forward_progress_signals": [],
+    "aa6_mat_only_pass": true,
+    "m3_autonomously_alive": false,
+    "trace_only": true
   }
 }

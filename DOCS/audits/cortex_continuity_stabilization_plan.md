@@ -3,7 +3,8 @@
 **Status:** Operational recovery plan — grounded in production reality, not architecture speculation  
 **Phase A step A.1:** **Done** (2026-05-23) — see [Step A.1 completion](#step-a1-completion--synthesis-job-lifecycle)  
 **Phase A step A.2:** **Done** (2026-05-23) — see [Step A.2 completion](#step-a2-completion--ecs-deploy-alignment)  
-**Phase A step A.3:** **Done** (2026-05-23) — see [Step A.3 completion](#step-a3-completion--tcre-queued-drain)  
+**Phase A step A.3:** **Done** (2026-05-23) — see [Step A.3 completion](#step-a3-completion--tcre-queued-drain)
+**Phase A step A.4:** **Done** (2026-05-23) — see [Step A.4 completion](#step-a4-completion--strict-aa-panel-gates)  
 **Supersedes for stabilization work:** optimistic Phase 1–3 completion narratives and open-ended “Phase 4 operational hardening” without recurrence gates  
 **Authoritative truth sources:**
 
@@ -253,7 +254,7 @@ Phases are **ordered by operational impact**, not architecture elegance.
 | **A1** | ~~Purge/fix 1,043 `running` synthesis jobs~~ **Done 2026-05-23** | Restores trust in L7 job table | `synthesis_job_lifecycle.py`, `synthesis_orchestrator.py` | N/A (data + bugfix) | `running` < 10; terminal states consistent | Prod: 1043 reconciled; baseline `step_a1_synthesis_job_reconcile` | Low — backup job rows | **runtime** |
 | **A2** | ~~Align ECS API + worker to **same SHA**~~ **Done 2026-05-23** | Worker must run epoch fix + deferral monitor | `continuity_p0_ecs_deploy_align.py`, `prod_deploy_backend_worker.sh` | N/A | `deploy_matches_closure_sha: true` | Prod: both on `2ab8776…`; baseline `step_a2_ecs_deploy_align` | Redeploy prior tag | **ops** |
 | **A3** | ~~Drain stuck TCRE `queued` job~~ **Done 2026-05-23** | Unblocks 06→07 resume | `tcre_job_lifecycle.py`, `tcre_resume.py` | N/A | 0 queued older than 1h | Prod: 1 job drained; baseline `step_a3_tcre_queued_drain` | Re-queue job | **runtime** |
-| **A4** | Tighten AA1 + AA6 in proof panel | Stop false M3 confidence | `continuity_proof_panel.py` | Remove mat-only AA6 fallback | AA1 FAIL on empty 08; AA6 requires delta or drainable ↓ | Unit tests + panel JSON | Revert gate logic | **ops** |
+| **A4** | ~~Tighten AA1 + AA6 in proof panel~~ **Done 2026-05-23** | Stop false M3 confidence | `continuity_proof_panel.py` | Mat-only AA6 fallback removed | AA1 FAIL on empty 08; AA6 requires delta/progress/untreated↓ | Unit tests + prod panel | Revert gate logic | **ops** |
 | **A5** | Ban `--trace-only` as prod sign-off | Baselines must mean something | All `continuity_p3_*_proof.py` | Document CI-only mode | Baseline updates require `trace_only: false` | Code review + baseline schema | N/A | **cleanup** |
 | **A6** | Fix synthesis job terminal transitions | Prevent A1 recurrence | `synthesis_orchestrator.py` | Remove duplicate enqueue paths | 24h soak: running stable | CloudWatch + SQL cron | Revert orchestrator | **runtime** |
 
@@ -494,7 +495,7 @@ Lawful synthesis means:
 | A-G1 | `SELECT status, COUNT(*) FROM cortex_synthesis_jobs WHERE tenant_id=… GROUP BY 1` → `running < 10` |
 | A-G2 | ECS probe: API tag = worker tag = deploy SHA |
 | A-G3 | TCRE: no `queued` jobs older than 1 hour |
-| A-G4 | Unit tests: AA1 fails on `COMPLETED_EMPTY` fixture; AA6 fails on mat-only fixture |
+| A-G4 | Unit tests: AA1 fails on `COMPLETED_EMPTY` fixture; AA6 fails on mat-only fixture — **done (A.4)** |
 | A-G5 | CloudWatch: synthesis task logs show terminal states within 30m |
 
 ### Phase B — Recurrence stabilization
@@ -707,7 +708,51 @@ Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.j
 - [x] `resume_convergence_from_waiting_v1` trace on completed drain (`lease.phase_cursor = phase_07_retrieval`)
 - [x] P1-D static boundaries still pass
 
-**Next step:** **A4** — tighten AA1 + AA6 in `continuity_proof_panel.py`.
+**Next step:** ~~A4~~ → **A5** (ban `--trace-only` prod sign-off).
+
+---
+
+## Step A.4 completion — strict AA panel gates
+
+**Completed:** 2026-05-23  
+**Goal:** Stop fake-green M3 confidence from weak AA1 (phase 08 “started”) and AA6 (mat-count-only pass).
+
+### What was implemented
+
+| Area | Change |
+|------|--------|
+| AA1 | Requires phases 05–07 **completed**, phase 08 **completed**, `jobs_completed > 0` or **lawful documented empty** (`scope_empty` + reason or `COMPLETED_EMPTY` outcome) |
+| AA6 | Pass only on `convergence_delta_succeeded > 0`, `progress_made_in_window`, or `untreated_routable` decrease in window — **no** `materializations_in_window` fallback |
+| Panel schema | `strict_aa_panel_schema_version: 2`; AA6 evidence includes `mat_only_pass`, `forward_progress_signals` |
+| Proof | `continuity_p0_aa_panel_strict.py` + `continuity_p0_phase_a4_aa_panel_strict_proof.py` |
+| CI | `.github/workflows/deploy.yml` — A.4 pytest gate |
+
+### Prod proof (Fizzer, strict gates — honest FAIL expected)
+
+```bash
+cd backend
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a4_aa_panel_strict_proof.py \
+  --use-deployed-closure --trace-only
+```
+
+| Gate / metric | Before (weak) | After (strict) |
+|---------------|---------------|----------------|
+| AA1 | PASS (08 started) | **FAIL** — `jobs_completed=0`, not lawful empty |
+| AA6 | PASS (mat fallback) | **FAIL** — `mat_only_pass=true`, no forward-progress signals |
+| `m3_autonomously_alive` | true (fake-green) | **false** (honest) |
+| `p0_a4_pass` | — | **true** (wiring + evidence shape) |
+
+Baseline: [`continuity_p0_2026-05-22.json`](baselines/continuity_p0_2026-05-22.json) → `step_a4_aa_panel_strict`.
+
+### Exit gates (A-G4)
+
+- [x] AA1 unit test fails on `COMPLETED_EMPTY` without lawful empty proof
+- [x] AA6 unit test fails when only mat-volume would have passed (no forward-progress signals)
+- [x] Prod panel records strict evidence; M3 clock no longer fake-green on AA1/AA6 alone
+
+**Note:** Strict AA1/AA6 ship on next ECS deploy of this closure SHA. Until then, prod panel run uses **local** gate logic via proof script (DB truth + local code).
+
+**Next step:** **A5** — ban `--trace-only` as production baseline sign-off.
 
 ---
 
@@ -736,6 +781,9 @@ VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a2_ecs_deploy_a
 
 # Phase A3 — TCRE queued drain (done; re-run if queued jobs age in)
 VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a3_tcre_queued_drain_proof.py --use-deployed-closure --lease-only
+
+# Phase A4 — strict AA1/AA6 panel gates (done; re-run after gate changes)
+VECTOR_SETTINGS_SKIP_DOTENV=1 python scripts/continuity_p0_phase_a4_aa_panel_strict_proof.py --use-deployed-closure --trace-only
 
 # Daily operator truth (after C3)
 python scripts/continuity_proof_panel.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
