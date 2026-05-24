@@ -39,6 +39,8 @@ def build_operator_primary_kpi_v1(
     *,
     tenant_id: uuid.UUID,
     settings: Settings | None = None,
+    overview_slice: bool = False,
+    precomputed_metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Top-level admin KPI block for pipeline overview slices."""
     settings = settings or get_settings()
@@ -47,6 +49,27 @@ def build_operator_primary_kpi_v1(
     )
 
     if is_semantic_primary_operator_kpi_enabled_v1():
+        metrics = precomputed_metrics or snapshot_canonical_operator_metrics_v1(
+            session, tenant_id=tenant_id
+        )
+        if overview_slice:
+            return {
+                "surface_kind": "operator_primary_kpi",
+                "schema_version": PHASE_D1_OPERATOR_KPI_SCHEMA_VERSION,
+                "semantic_primary_active": True,
+                "hide_from_overview": True,
+                "primary_metric_key": "unique_auth_pairs",
+                "primary_metric_value": None,
+                "diagnostic_only": True,
+                "deferral_counts": dict(metrics.get("deferral_counts") or {}),
+                "operator_kpi_primary": "semantic_readiness_panel",
+                "deferral_omission": build_deferral_omission_operator_block_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    deferral_counts=dict(metrics.get("deferral_counts") or {}),
+                ),
+            }
+
         from vector.domains.cortex.pipeline.pipeline_admin_semantic_readiness import (
             build_semantic_readiness_admin_v1,
         )
@@ -57,7 +80,9 @@ def build_operator_primary_kpi_v1(
         synthesis = dict(semantic.get("synthesis") or {})
         primary_key = "unique_auth_pairs"
         primary_value = int(graph.get("unique_auth_pairs") or 0)
-        metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+        metrics = precomputed_metrics or snapshot_canonical_operator_metrics_v1(
+            session, tenant_id=tenant_id
+        )
         registry_enabled = is_execution_island_registry_enabled_v1()
         islands_raw = list_execution_island_registry_v1(session, tenant_id=tenant_id)
         islands = [

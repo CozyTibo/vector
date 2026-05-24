@@ -788,7 +788,9 @@ def build_continuity_phase_cards_v1(
         blockers=[f"retry_ready:{retry_ready}"] if retry_ready else None,
     )
 
-    entity_count = count_active_org_entities_v1(session, tenant_id=tenant_id)
+    entity_count = ctx.entity_count if ctx is not None else count_active_org_entities_v1(
+        session, tenant_id=tenant_id
+    )
     open_ambiguity = int(
         session.scalar(
             select(func.count())
@@ -846,11 +848,16 @@ def build_continuity_phase_cards_v1(
             orphan_identity_unresolved_count=0,
             precomputed_eligible_components=eligible_local,
         )
-    promoted = count_graph_promoted_edge_count_v1(session, tenant_id=tenant_id)
-    candidate_rows = count_graph_candidate_count_v1(session, tenant_id=tenant_id)
-    distinct_candidate_pairs = count_distinct_graph_candidate_pairs_v1(
-        session, tenant_id=tenant_id
-    )
+    if ctx is not None and ctx.overview_lite:
+        promoted = count_graph_promoted_edge_count_v1(session, tenant_id=tenant_id)
+        candidate_rows = 0
+        distinct_candidate_pairs = 0
+    else:
+        promoted = count_graph_promoted_edge_count_v1(session, tenant_id=tenant_id)
+        candidate_rows = count_graph_candidate_count_v1(session, tenant_id=tenant_id)
+        distinct_candidate_pairs = count_distinct_graph_candidate_pairs_v1(
+            session, tenant_id=tenant_id
+        )
     graph_status: PhaseStatus = "healthy"
     if propagation.get("blocked"):
         graph_status = "blocked"
@@ -858,29 +865,49 @@ def build_continuity_phase_cards_v1(
         graph_status = "degraded"
     if fsm in ("GRAPH", "TRAVERSAL") and lease_running:
         graph_status = "running"
+    graph_signals = [
+        _signal("promoted_edges", "Promoted edges", promoted),
+    ]
+    if ctx is None or not ctx.overview_lite:
+        graph_signals.extend(
+            [
+                _signal(
+                    "distinct_candidate_pairs",
+                    "Distinct candidate pairs",
+                    distinct_candidate_pairs,
+                    severity="warn" if distinct_candidate_pairs > 500 else "ok",
+                ),
+                _signal(
+                    "candidate_rows_diagnostic",
+                    "Candidate rows (diagnostic)",
+                    candidate_rows,
+                    severity="warn" if candidate_rows > distinct_candidate_pairs * 3 else "ok",
+                ),
+            ]
+        )
+    graph_signals.extend(
+        [
+            _signal("connected_islands", "Connected islands", islands),
+            _signal(
+                "traversal_eligible",
+                "Traversal-eligible islands",
+                eligible_islands,
+                severity="ok" if eligible_islands else "bad",
+            ),
+            _signal(
+                "propagation_blocked",
+                "Propagation blocked",
+                propagation.get("blocked"),
+                severity="bad" if propagation.get("blocked") else "ok",
+            ),
+        ]
+    )
     graph_card = _phase_card(
         phase="graph",
         status=graph_status,
         headline="Propagation blocked" if propagation.get("blocked") else "Islands eligible for traversal",
         continuity_advancing=not propagation.get("blocked") and eligible_islands > 0,
-        signals=[
-            _signal("promoted_edges", "Promoted edges", promoted),
-            _signal(
-                "distinct_candidate_pairs",
-                "Distinct candidate pairs",
-                distinct_candidate_pairs,
-                severity="warn" if distinct_candidate_pairs > 500 else "ok",
-            ),
-            _signal(
-                "candidate_rows_diagnostic",
-                "Candidate rows (diagnostic)",
-                candidate_rows,
-                severity="warn" if candidate_rows > distinct_candidate_pairs * 3 else "ok",
-            ),
-            _signal("connected_islands", "Connected islands", islands),
-            _signal("traversal_eligible", "Traversal-eligible islands", eligible_islands, severity="ok" if eligible_islands else "bad"),
-            _signal("propagation_blocked", "Propagation blocked", propagation.get("blocked"), severity="bad" if propagation.get("blocked") else "ok"),
-        ],
+        signals=graph_signals,
         blockers=[str(propagation.get("block_reason") or "")] if propagation.get("blocked") else None,
     )
 

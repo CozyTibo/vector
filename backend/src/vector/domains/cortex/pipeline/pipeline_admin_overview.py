@@ -163,7 +163,11 @@ def build_pipeline_overview_execution_v1(
             "execution": _build_execution_snapshot_v1(session, tenant_id=tenant_id),
             "continuity_status": continuity_status,
             "operator_primary_kpi": build_operator_primary_kpi_v1(
-                session, tenant_id=tenant_id, settings=settings
+                session,
+                tenant_id=tenant_id,
+                settings=settings,
+                overview_slice=True,
+                precomputed_metrics=ctx.operator_metrics,
             ),
         }
 

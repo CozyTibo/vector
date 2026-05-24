@@ -71,7 +71,7 @@ export async function fetchPipelineExecutionSlice(tenantId: string): Promise<Pip
     continuity_status?: ContinuityStatus | null;
     operator_primary_kpi?: OperatorPrimaryKpi | null;
     semantic_readiness?: SemanticReadiness | null;
-  }>(tenantId, "/cortex/pipeline/overview/execution", 20_000);
+  }>(tenantId, "/cortex/pipeline/overview/execution", 30_000);
   if (body) {
     return {
       execution: body.execution,
@@ -101,7 +101,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
     continuity_status?: ContinuityStatus | null;
     execution?: PipelineOverview["execution"] | null;
     operator_primary_kpi?: OperatorPrimaryKpi | null;
-  }>(tenantId, "/cortex/pipeline/overview/phases", 25_000);
+  }>(tenantId, "/cortex/pipeline/overview/phases", 45_000);
   if (body) {
     return {
       phases: body.phases,
@@ -133,7 +133,7 @@ export async function fetchPipelineIngestionSlice(tenantId: string) {
     runnable_connectors: string[];
     recent_ingestion_runs: PipelineOverview["recent_ingestion_runs"];
     next_scheduled_ingestion?: PipelineOverview["next_scheduled_ingestion"];
-  }>(tenantId, "/cortex/pipeline/overview/ingestion", 15_000);
+  }>(tenantId, "/cortex/pipeline/overview/ingestion", 30_000);
   if (body) return body;
   const full = await fetchMonolithOverview(tenantId);
   return {

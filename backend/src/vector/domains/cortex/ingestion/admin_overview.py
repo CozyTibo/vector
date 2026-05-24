@@ -376,7 +376,11 @@ def _build_cortex_ingestion_admin_overview_uncached(
     conns = list(session.scalars(stmt).all())
     by_provider = _pick_connection_per_provider(conns)
     latest_runs = _latest_runs_by_connection(session, tenant_id)
-    ingested_by_connector = _raw_row_counts_by_connector(session, tenant_id)
+    ingested_by_connector = (
+        {}
+        if lite
+        else _raw_row_counts_by_connector(session, tenant_id)
+    )
 
     paused_redis = read_scheduler_paused_flag(settings)
     redis_ok = bool(settings.redis_url.strip())
