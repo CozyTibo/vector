@@ -180,10 +180,11 @@ def infer_processed_count_v1(phase_id: str, raw: dict[str, Any]) -> int:
             return int(summary.get("total_succeeded") or 0)
         return 0
     if phase_id == PHASE_03_IDENTITY:
-        after = raw.get("counts_after")
-        if isinstance(after, dict):
-            return int(after.get("org_link_edges") or after.get("edges") or 0)
-        return 0
+        from vector.domains.cortex.identity.identity_substrate_phase_helpers_v1 import (
+            infer_phase_03_processed_count_v1,
+        )
+
+        return infer_phase_03_processed_count_v1(raw)
     if phase_id == PHASE_04_GRAPH:
         return int(raw.get("node_count") or 0) + int(raw.get("edge_count") or 0)
     if phase_id == PHASE_05_TRAVERSAL:
