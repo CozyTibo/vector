@@ -44,6 +44,10 @@ from vector.domains.cortex.synthesis.synthesis_evidence_binding import (
     bind_synthesis_evidence_v1,
     normalize_retrieval_hits_v1,
 )
+from vector.domains.cortex.synthesis.synthesis_execution_grounding_v1 import (
+    SynthesisExecutionGroundingError,
+    enforce_execution_grounding_before_llm_v1,
+)
 from vector.domains.cortex.synthesis.synthesis_llm_router import (
     SynthesisLlmRouterError,
     execute_synthesis_llm_phase_v1,
@@ -411,6 +415,14 @@ def execute_synthesis_job_envelope_v1(
             )
         job.retrieval_ingress_digest = retrieval_ingress_digest
 
+        grounding_audit = enforce_execution_grounding_before_llm_v1(
+            session,
+            tenant_id=tenant_id,
+            envelope=envelope,
+            retrieval_hits=normalize_retrieval_hits_v1(retrieval_ingress_snapshot),
+        )
+        envelope["_execution_grounding_audit"] = grounding_audit
+
         # BIND
         t3 = time.perf_counter()
         binding = bind_synthesis_evidence_v1(
@@ -742,6 +754,7 @@ def execute_synthesis_job_envelope_v1(
         SynthesisBindingsError,
         SynthesisLineageError,
         SynthesisReplayEquivalenceError,
+        SynthesisExecutionGroundingError,
         SynthesisOrchestratorError,
     ) as exc:
         terminalize_synthesis_job_failed_v1(
@@ -780,6 +793,7 @@ def execute_synthesis_job_envelope_v1(
                 SynthesisArtifactMaterializationError,
                 SynthesisBindingsError,
                 SynthesisLineageError,
+                SynthesisExecutionGroundingError,
             ),
         ):
             raise SynthesisOrchestratorError(

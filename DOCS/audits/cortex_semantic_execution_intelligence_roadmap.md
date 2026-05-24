@@ -699,7 +699,7 @@ Fail-loud gates **work** — they prevent fake-green. There is nothing truthful 
 
 ### S4.3 — Minimal useful synthesis definition (v1) ✅
 
-**Status:** Shipped — `execution +execution_continuity_brief` product workload maps to `continuity_assessment`; useful claims require execution refs.
+**Status:** Shipped — `execution_continuity_brief` product workload maps to `continuity_assessment`; useful claims require execution refs.
 
 **Files:** `synthesis/synthesis_useful_artifact_v1.py`, `synthesis/synthesis_fail_loud_contract_v1.py`.
 
@@ -709,7 +709,9 @@ Fail-loud gates **work** — they prevent fake-green. There is nothing truthful 
 - **Minimum:** ≥ 1 claim with `evidence_refs` pointing to retrieval `materialization` or `causal_chain` rows
 - **Lawful empty:** only when island has zero execution index entries (explicit SD code)
 
-### S4.4 — Grounding laws (strict, no prompt engineering sprawl)
+### S4.4 — Grounding laws (strict, no prompt engineering sprawl) ✅
+
+**Status:** Shipped — org_link-only scope rejection + execution ref gate before LLM; rollback `CORTEX_SYNTHESIS_REQUIRE_EXECUTION_REFS=0`.
 
 **Files:** `synthesis/synthesis_orchestrator.py`, `synthesis/synthesis_retrieval_semantic_gate_v1.py`.
 

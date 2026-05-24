@@ -558,6 +558,14 @@ class Settings(BaseSettings):
             "Rollback false: started-only synthesis surfaces as ADVISORY not FAIL."
         ),
     )
+    cortex_synthesis_require_execution_refs: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SYNTHESIS_REQUIRE_EXECUTION_REFS",
+        description=(
+            "S4.4: require ≥1 materialization/causal_chain/walk ref in scope before LLM. "
+            "Rollback: set CORTEX_SYNTHESIS_REQUIRE_EXECUTION_REFS=0."
+        ),
+    )
     cortex_admin_primary_kpi_drainable: bool = Field(
         default=True,
         validation_alias="CORTEX_ADMIN_PRIMARY_KPI_DRAINABLE",
