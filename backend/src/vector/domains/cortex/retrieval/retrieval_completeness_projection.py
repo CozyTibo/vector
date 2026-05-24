@@ -240,11 +240,37 @@ def build_retrieval_overview_catalog_v1(
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
     """Admin overview card + drill-down (coverage strip, stage envelope, policy digest)."""
+    from vector.domains.cortex.retrieval.retrieval_semantic_mix_v1 import (
+        snapshot_retrieval_index_mix_v1,
+        validate_retrieval_semantic_mix_v1,
+    )
+    from vector.domains.cortex.retrieval.retrieval_index_materialization import (
+        get_published_index_epoch_v1,
+    )
+
     coverage = build_retrieval_coverage_catalog_v1(session, tenant_id=tenant_id)
     stage = project_retrieval_completeness_v1(session, tenant_id=tenant_id)
+    published_epoch = get_published_index_epoch_v1(session, tenant_id=tenant_id)
+    semantic_mix: dict[str, Any] | None = None
+    if published_epoch:
+        mix = snapshot_retrieval_index_mix_v1(
+            session, tenant_id=tenant_id, index_epoch=published_epoch
+        )
+        ok, violations = validate_retrieval_semantic_mix_v1(mix)
+        from vector.domains.cortex.retrieval.retrieval_semantic_mix_v1 import (
+            build_semantic_mix_receipt_v1,
+        )
+
+        semantic_mix = {
+            **build_semantic_mix_receipt_v1(mix, gate_pass=ok),
+            "index_kind_counts": mix.get("index_kind_counts"),
+            "violations": violations,
+        }
     return {
         **coverage,
         "stage_envelope": stage,
+        "published_index_epoch": published_epoch,
+        "semantic_mix": semantic_mix,
         "doctrine_anchors": [
             RETRIEVAL_COMPLETENESS_SPEC_REF_V1,
             RETRIEVAL_SUBSTRATE_OVERVIEW_SPEC_REF_V1,

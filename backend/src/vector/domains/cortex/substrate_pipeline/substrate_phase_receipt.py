@@ -163,6 +163,7 @@ def extract_phase_receipt_detail_v1(phase_id: str, raw: dict[str, Any]) -> dict[
             "entries_materialized": raw.get("entries_materialized") or raw.get("entry_count"),
             "build_state": raw.get("build_state"),
             "retrieval_outcome": raw.get("retrieval_outcome"),
+            "semantic_mix": raw.get("semantic_mix"),
         }
     if phase_id == PHASE_08_SYNTHESIS:
         return {

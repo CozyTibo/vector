@@ -143,6 +143,19 @@ def finalize_pipeline_retrieval_index_build_v1(
         "semantic_mix_audit": mix_audit,
         "ok": published.build_state == "PUBLISHED" and bool(audit.get("epochs_align")),
     }
+    if mix_audit is not None:
+        semantic_mix = mix_audit.get("semantic_mix")
+        if isinstance(semantic_mix, dict):
+            out["semantic_mix"] = semantic_mix
+        elif isinstance(mix_audit.get("mix"), dict):
+            from vector.domains.cortex.retrieval.retrieval_semantic_mix_v1 import (
+                build_semantic_mix_receipt_v1,
+            )
+
+            out["semantic_mix"] = build_semantic_mix_receipt_v1(
+                mix_audit["mix"],
+                gate_pass=bool(mix_audit.get("mix_ok")),
+            )
     if sync_island_registry:
         try:
             from vector.domains.cortex.operational_runtime.execution_island_registry import (

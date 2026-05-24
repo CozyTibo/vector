@@ -536,7 +536,7 @@ Plus companion `causal_chain` / `causal_edge` rows from TCRE.
 - Ensure island entity set maps to `metadata_json.canonical_entity_id` for mat binding.
 - Raise `CORTEX_RETRIEVAL_MAX_CANONICAL_MATS_PER_EPOCH` only if mix still fails after S3.1 (default 800 may suffice once deferrals drain from S2.2).
 
-### S3.4 — Retrieval composition law (operator doc + receipt)
+### S3.4 — Retrieval composition law (operator doc + receipt) ✅
 
 **Files:** `retrieval/retrieval_publish_contract.py`, phase 07 receipt JSON.
 

@@ -128,6 +128,22 @@ def validate_retrieval_semantic_mix_v1(mix: dict[str, Any]) -> tuple[bool, list[
     return len(violations) == 0, violations
 
 
+def build_semantic_mix_receipt_v1(
+    mix: dict[str, Any],
+    *,
+    gate_pass: bool,
+) -> dict[str, Any]:
+    """Operator receipt shape for published epoch mix (S3.4 composition law)."""
+    return {
+        "org_link_pct": mix.get("org_link_pct"),
+        "org_entity_pct": mix.get("org_entity_pct"),
+        "execution_index_pct": mix.get("execution_index_pct"),
+        "entry_count": int(mix.get("entry_count") or 0),
+        "index_epoch": mix.get("index_epoch"),
+        "gate_pass": bool(gate_pass),
+    }
+
+
 def enforce_retrieval_semantic_mix_before_publish_v1(
     session: Session,
     *,
@@ -142,6 +158,7 @@ def enforce_retrieval_semantic_mix_before_publish_v1(
         "mix_ok": ok,
         "violations": violations,
         "mix": mix,
+        "semantic_mix": build_semantic_mix_receipt_v1(mix, gate_pass=ok),
     }
     if not ok and is_retrieval_semantic_mix_gate_enabled_v1():
         raise RetrievalSemanticMixError(
