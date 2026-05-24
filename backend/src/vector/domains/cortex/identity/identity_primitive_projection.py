@@ -770,6 +770,17 @@ def org_entity_id_for_identity_primitive(
     return deterministic_org_entity_id(tenant_id=tenant_id, entity_kind=kind, fingerprint=fp)
 
 
+_IDENTITY_MATERIAL_METADATA_KEYS: Final[tuple[str, ...]] = (
+    "display_name",
+    "display_name_norm",
+    "email_norm",
+    "slack_user_id",
+    "github_login",
+    "notion_user_id",
+    "linear_user_id",
+)
+
+
 def identity_primitive_backfill_metadata(
     *,
     anchor: CortexCanonicalIdentityAnchor,
@@ -797,6 +808,11 @@ def identity_primitive_backfill_metadata(
         )[1],
         "provenance_label": f"identity_primitive:{projection.projection_kind}:{anchor.canonical_entity_id}",
     }
+    material = dict(projection.identity_material or {})
+    for key in _IDENTITY_MATERIAL_METADATA_KEYS:
+        val = material.get(key)
+        if val is not None and str(val).strip():
+            meta[key] = str(val).strip()
     if raw is not None:
         meta["source_resource_type"] = raw.resource_type
     if backfill_job_id:

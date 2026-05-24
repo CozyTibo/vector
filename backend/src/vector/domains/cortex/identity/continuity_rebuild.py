@@ -309,6 +309,61 @@ def _persist_standalone_audit_job(
     return jid
 
 
+REBUILD_IDENTITIES_CONFIRM_PHRASE: Final[str] = "REBUILD IDENTITIES FROM CANONICAL ANCHORS"
+
+
+def rebuild_identities_from_anchors_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    anchor_limit: int = 5_000,
+    restart_downstream: bool = True,
+) -> dict[str, Any]:
+    """Clear org identity substrate and rebuild handles + candidates from canonical anchors only."""
+    from vector.domains.cortex.execution.admin_commands import restart_execution_from_phase_v1
+    from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
+
+    counts_before = substrate_counts(db, tenant_id=tenant_id)
+    cleared_identity = clear_derived_outputs_from_phase_v1(
+        db,
+        tenant_id=tenant_id,
+        from_phase="IDENTITY",
+    )
+    substrate = run_identity_handles_and_candidates_refresh(
+        db,
+        tenant_id=tenant_id,
+        dry_run=False,
+        anchor_limit=anchor_limit,
+    )
+    counts_after = substrate_counts(db, tenant_id=tenant_id)
+
+    cleared_downstream: dict[str, Any] | None = None
+    restarted: dict[str, Any] | None = None
+    if restart_downstream:
+        cleared_downstream = clear_derived_outputs_from_phase_v1(
+            db,
+            tenant_id=tenant_id,
+            from_phase="GRAPH",
+        )
+        restarted = restart_execution_from_phase_v1(
+            db,
+            tenant_id=tenant_id,
+            from_phase="GRAPH",
+        )
+
+    return {
+        "surface_kind": "identity_rebuild_from_anchors_v1",
+        "tenant_id": str(tenant_id),
+        "counts_before": counts_before,
+        "counts_after": counts_after,
+        "cleared_identity": cleared_identity,
+        "substrate": substrate,
+        "cleared_downstream": cleared_downstream,
+        "restarted": restarted,
+        "anchor_limit_applied": anchor_limit,
+    }
+
+
 def run_identity_continuity_rebuild(
     db: Session,
     *,

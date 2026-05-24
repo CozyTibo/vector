@@ -151,6 +151,16 @@ def test_operator_action_phrases_exported(
     )
     assert rebuild.status_code == 200
 
+    identities = client.post(
+        f"/admin/tenants/{tid}/cortex/operator/actions",
+        json={
+            "action": "rebuild_identities",
+            "confirmation": "REBUILD IDENTITIES FROM CANONICAL ANCHORS",
+        },
+    )
+    assert identities.status_code == 200
+    assert identities.json()["action"] == "rebuild_identities"
+
     p0 = client.post(
         f"/admin/tenants/{tid}/cortex/operator/actions",
         json={"action": "p0_recover", "confirmation": CONTINUITY_P0_RECOVER_CONFIRM_PHRASE},

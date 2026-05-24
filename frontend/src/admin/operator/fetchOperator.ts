@@ -54,13 +54,14 @@ export async function fetchOperatorRuntime(
 export async function postOperatorAction(
   tenantId: string,
   body: OperatorActionRequest,
+  options?: { timeoutMs?: number },
 ): Promise<OperatorActionResponse> {
   try {
     return await adminJson<OperatorActionResponse>(`/admin/tenants/${tenantId}/cortex/operator/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
+    }, options);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("Confirmation phrase does not match")) {

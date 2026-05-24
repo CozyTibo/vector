@@ -150,6 +150,7 @@ OperatorActionKind = Literal[
     "flush_derived",
     "flush_all",
     "rebuild_retrieval_index",
+    "rebuild_identities",
     "p0_recover",
 ]
 

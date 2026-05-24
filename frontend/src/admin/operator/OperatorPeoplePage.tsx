@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { SectionSkeleton } from "../cortex/SectionSkeleton";
 import { DeployInfoFooter } from "./DeployInfoFooter";
+import { OperatorPeopleRebuildPanel } from "./OperatorPeopleRebuildPanel";
 import { useOperatorPeopleDirectory } from "./useOperatorPeople";
 
 function initials(name: string | null, email: string | null): string {
@@ -33,6 +34,8 @@ export default function OperatorPeoplePage() {
           Reconstructed identities across your connectors — browse the organization without searching by id.
         </p>
       </header>
+
+      <OperatorPeopleRebuildPanel />
 
       {directoryQ.isPending && !directoryQ.data ? (
         <SectionSkeleton variant="table" />

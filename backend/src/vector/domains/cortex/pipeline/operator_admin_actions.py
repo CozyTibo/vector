@@ -27,6 +27,10 @@ from vector.domains.cortex.retrieval.retrieval_index_materialization import (
 from vector.domains.cortex.retrieval.retrieval_operator_workflows import (
     RETRIEVAL_INDEX_REBUILD_CONFIRM_PHRASE_V1,
 )
+from vector.domains.cortex.identity.continuity_rebuild import (
+    REBUILD_IDENTITIES_CONFIRM_PHRASE,
+    rebuild_identities_from_anchors_v1,
+)
 from vector.domains.cortex.substrate_pipeline.continuity_p0_recovery import (
     RecoveryStrategyV1,
     recover_continuity_p0_pipeline_v1,
@@ -41,6 +45,7 @@ OperatorActionKind = Literal[
     "flush_derived",
     "flush_all",
     "rebuild_retrieval_index",
+    "rebuild_identities",
     "p0_recover",
 ]
 
@@ -181,6 +186,9 @@ def execute_operator_action_v1(
     elif action == "rebuild_retrieval_index":
         _require_confirmation(confirmation, RETRIEVAL_INDEX_REBUILD_CONFIRM_PHRASE_V1)
         result = bootstrap_retrieval_index_from_upstream_v1(session, tenant_id=tenant_id)
+    elif action == "rebuild_identities":
+        _require_confirmation(confirmation, REBUILD_IDENTITIES_CONFIRM_PHRASE)
+        result = rebuild_identities_from_anchors_v1(session, tenant_id=tenant_id)
     elif action == "p0_recover":
         _require_confirmation(confirmation, CONTINUITY_P0_RECOVER_CONFIRM_PHRASE)
         result = recover_continuity_p0_pipeline_v1(

@@ -17,9 +17,16 @@ from vector.domains.cortex.identity.identity_continuity_inspector_v1 import (
     _list_linked_handles_v1,
     _resolved_identity_from_entity,
 )
+from vector.domains.cortex.identity.identity_primitive_projection import (
+    _display_name,
+    _email_for_rule,
+    _notion_user_refs_deterministic,
+    github_login_strings_for_continuity,
+)
 from vector.domains.cortex.identity.link_explorer import list_org_link_explorer_rows
 from vector.domains.cortex.identity.org_entities import OrgEntityKind, get_org_entity, org_entity_public_dict
 from vector.domains.cortex.pipeline.operator_admin_inspect_chains import search_operator_retrieval_entries_v1
+from vector.infrastructure.db.models.cortex_canonical_identity_anchor import CortexCanonicalIdentityAnchor
 from vector.infrastructure.db.models.cortex_org_entity import CortexOrgEntity
 from vector.infrastructure.db.models.cortex_org_link import CortexOrgLink
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
@@ -75,7 +82,138 @@ def _meta(entity: dict[str, Any]) -> dict[str, Any]:
     return dict(entity.get("metadata_json") or {})
 
 
-def _pick_display_name(handles: list[dict[str, Any]], entity: dict[str, Any]) -> str | None:
+def _format_display_name(raw: str, *, from_norm: bool = False) -> str:
+    text = raw.strip()
+    if not text:
+        return text
+    if from_norm or text == text.lower():
+        return text.title()
+    return text
+
+
+def _extract_entity_labels_v1(
+    *,
+    meta: dict[str, Any],
+    raw: RawIngestionRecord | None,
+    prof: dict[str, Any],
+) -> dict[str, str | None]:
+    display_name: str | None = None
+    email: str | None = None
+
+    for key in ("display_name", "display_name_norm", "real_name", "name"):
+        val = meta.get(key)
+        if isinstance(val, str) and val.strip():
+            display_name = _format_display_name(val, from_norm=key == "display_name_norm")
+            break
+
+    github = meta.get("github_login")
+    if isinstance(github, str) and github.strip():
+        display_name = display_name or github.strip()
+
+    val = meta.get("email_norm") or meta.get("email")
+    if isinstance(val, str) and "@" in val:
+        email = val.strip().lower()
+
+    if raw is not None and (display_name is None or email is None):
+        payload = _payload_dict(raw)
+        if display_name is None:
+            dn = _display_name(payload)
+            if isinstance(dn, str) and dn.strip():
+                display_name = _format_display_name(dn, from_norm=True)
+            if display_name is None:
+                logins = github_login_strings_for_continuity(payload, prof)
+                if logins:
+                    display_name = logins[0]
+            notion_user_id = meta.get("notion_user_id")
+            if display_name is None and isinstance(notion_user_id, str) and notion_user_id.strip():
+                for nu in _notion_user_refs_deterministic(payload):
+                    if nu.get("notion_user_id") == notion_user_id.strip():
+                        nu_name = nu.get("display_name")
+                        if isinstance(nu_name, str) and nu_name.strip():
+                            display_name = nu_name.strip()
+                        if email is None:
+                            nu_email = nu.get("email_norm")
+                            if isinstance(nu_email, str) and "@" in nu_email:
+                                email = nu_email.strip().lower()
+                        break
+        if email is None:
+            em, _ = _email_for_rule(payload, prof)
+            if em:
+                email = em
+
+    if display_name is None:
+        slack = meta.get("slack_user_id")
+        if isinstance(slack, str) and slack.strip():
+            display_name = f"Slack {slack.strip()}"
+    if display_name is None and email and "@" in email:
+        display_name = email.split("@", 1)[0].replace(".", " ").title()
+
+    return {"display_name": display_name, "email": email}
+
+
+def _batch_entity_identity_labels_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entities_by_id: dict[uuid.UUID, dict[str, Any]],
+) -> dict[uuid.UUID, dict[str, str | None]]:
+    if not entities_by_id:
+        return {}
+
+    raw_ids: set[int] = set()
+    for entity in entities_by_id.values():
+        meta = _meta(entity)
+        raw_id = meta.get("source_anchor_raw_record_id")
+        if raw_id is None:
+            continue
+        try:
+            raw_ids.add(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+
+    raw_by_id: dict[int, RawIngestionRecord] = {}
+    if raw_ids:
+        for row in session.scalars(select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids))).all():
+            raw_by_id[int(row.id)] = row
+
+    prof_by_anchor: dict[tuple[int, str], dict[str, Any]] = {}
+    if raw_ids:
+        for anchor in session.scalars(
+            select(CortexCanonicalIdentityAnchor).where(
+                CortexCanonicalIdentityAnchor.tenant_id == tenant_id,
+                CortexCanonicalIdentityAnchor.raw_record_id.in_(raw_ids),
+            )
+        ).all():
+            prof_by_anchor[(int(anchor.raw_record_id), str(anchor.canonical_entity_id))] = dict(
+                anchor.provider_identity_json or {}
+            )
+
+    out: dict[uuid.UUID, dict[str, str | None]] = {}
+    for eid, entity in entities_by_id.items():
+        meta = _meta(entity)
+        raw: RawIngestionRecord | None = None
+        prof: dict[str, Any] = {}
+        raw_id = meta.get("source_anchor_raw_record_id")
+        if raw_id is not None:
+            try:
+                rid = int(raw_id)
+                raw = raw_by_id.get(rid)
+                canon = str(meta.get("canonical_entity_id") or "")
+                prof = prof_by_anchor.get((rid, canon), {})
+            except (TypeError, ValueError):
+                pass
+        out[eid] = _extract_entity_labels_v1(meta=meta, raw=raw, prof=prof)
+    return out
+
+
+def _pick_display_name(
+    handles: list[dict[str, Any]],
+    entity: dict[str, Any],
+    *,
+    labels: dict[str, str | None] | None = None,
+) -> str | None:
+    if labels and labels.get("display_name"):
+        return labels["display_name"]
     for handle in handles:
         for key in ("display_name", "display_name_norm"):
             val = handle.get(key)
@@ -98,7 +236,14 @@ def _pick_display_name(handles: list[dict[str, Any]], entity: dict[str, Any]) ->
     return None
 
 
-def _pick_email(handles: list[dict[str, Any]], entity: dict[str, Any]) -> str | None:
+def _pick_email(
+    handles: list[dict[str, Any]],
+    entity: dict[str, Any],
+    *,
+    labels: dict[str, str | None] | None = None,
+) -> str | None:
+    if labels and labels.get("email"):
+        return labels["email"]
     for handle in handles:
         val = handle.get("email_norm") or handle.get("email")
         if isinstance(val, str) and "@" in val:
@@ -128,11 +273,16 @@ def _systems_from_handles(handles: list[dict[str, Any]], entity: dict[str, Any])
     return sorted(systems)
 
 
-def _score_entity(entity: dict[str, Any], handles: list[dict[str, Any]]) -> int:
+def _score_entity(
+    entity: dict[str, Any],
+    handles: list[dict[str, Any]],
+    *,
+    labels: dict[str, str | None] | None = None,
+) -> int:
     score = 0
-    if _pick_display_name(handles, entity):
+    if _pick_display_name(handles, entity, labels=labels):
         score += 10
-    if _pick_email(handles, entity):
+    if _pick_email(handles, entity, labels=labels):
         score += 8
     score += len(handles)
     if entity.get("entity_kind") == OrgEntityKind.HUMAN_ACTOR.value:
@@ -211,6 +361,7 @@ def _person_row_from_cluster_light(
     cluster: set[uuid.UUID],
     entities_by_id: dict[uuid.UUID, dict[str, Any]],
     entity_ids_in_auth_graph: set[uuid.UUID],
+    labels_by_entity_id: dict[uuid.UUID, dict[str, str | None]],
 ) -> dict[str, Any]:
     entities = [entities_by_id[eid] for eid in cluster if eid in entities_by_id]
     if not entities:
@@ -227,18 +378,27 @@ def _person_row_from_cluster_light(
             "title": None,
         }
 
-    primary = max(entities, key=lambda ent: _score_entity(ent, []))
+    primary = max(
+        entities,
+        key=lambda ent: _score_entity(
+            ent,
+            [],
+            labels=labels_by_entity_id.get(uuid.UUID(str(ent["id"]))),
+        ),
+    )
     primary_id = uuid.UUID(str(primary["id"]))
-    display_name = _pick_display_name([], primary)
-    email = _pick_email([], primary)
+    primary_labels = labels_by_entity_id.get(primary_id) or {}
+    display_name = _pick_display_name([], primary, labels=primary_labels)
+    email = _pick_email([], primary, labels=primary_labels)
     if display_name is None or email is None:
         for ent in entities:
             if ent is primary:
                 continue
+            ent_labels = labels_by_entity_id.get(uuid.UUID(str(ent["id"]))) or {}
             if display_name is None:
-                display_name = _pick_display_name([], ent)
+                display_name = _pick_display_name([], ent, labels=ent_labels)
             if email is None:
-                email = _pick_email([], ent)
+                email = _pick_email([], ent, labels=ent_labels)
 
     systems = _systems_from_entities(entities)
     last_seen = None
@@ -308,11 +468,16 @@ def build_people_directory_v1(
     )
     entities_by_id = {row.id: org_entity_public_dict(row) for row in rows}
     entity_ids = set(entities_by_id.keys())
+    labels_by_entity_id = _batch_entity_identity_labels_v1(
+        session,
+        tenant_id=tenant_id,
+        entities_by_id=entities_by_id,
+    )
     clusters = _cluster_human_actors(session, tenant_id=tenant_id, entity_ids=entity_ids)
     auth_graph_ids = _entity_ids_in_auth_graph(session, tenant_id=tenant_id, entity_ids=entity_ids)
 
     people = [
-        _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids)
+        _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids, labels_by_entity_id)
         for cluster in clusters.values()
     ]
     people.sort(
@@ -459,9 +624,39 @@ def build_person_profile_v1(
 
     entity = org_entity_public_dict(row)
     linked_ids = _list_linked_entity_ids_v1(session, tenant_id=tenant_id, entity_id=entity_id, limit=64)
+    linked_entities_by_id: dict[uuid.UUID, dict[str, Any]] = {}
+    for eid in linked_ids:
+        linked_row = get_org_entity(session, tenant_id=tenant_id, org_entity_id=eid)
+        if linked_row is not None:
+            linked_entities_by_id[eid] = org_entity_public_dict(linked_row)
+    labels_by_entity_id = _batch_entity_identity_labels_v1(
+        session,
+        tenant_id=tenant_id,
+        entities_by_id=linked_entities_by_id,
+    )
     handles = _list_linked_handles_v1(session, tenant_id=tenant_id, entity_id=entity_id, limit=64)
-    display_name = _pick_display_name(handles, entity)
-    email = _pick_email(handles, entity)
+    for handle in handles:
+        hid = handle.get("handle_id")
+        if not hid:
+            continue
+        try:
+            handle_labels = labels_by_entity_id.get(uuid.UUID(str(hid))) or {}
+        except ValueError:
+            continue
+        if handle_labels.get("display_name") and not handle.get("display_name"):
+            handle["display_name"] = handle_labels["display_name"]
+        if handle_labels.get("email") and not handle.get("email_norm"):
+            handle["email_norm"] = handle_labels["email"]
+    entity_labels = labels_by_entity_id.get(entity_id) or {}
+    display_name = _pick_display_name(handles, entity, labels=entity_labels)
+    email = _pick_email(handles, entity, labels=entity_labels)
+    if display_name is None or email is None:
+        for eid in sorted(linked_ids, key=str):
+            lbl = labels_by_entity_id.get(eid) or {}
+            if display_name is None and lbl.get("display_name"):
+                display_name = lbl["display_name"]
+            if email is None and lbl.get("email"):
+                email = lbl["email"]
     systems = _systems_from_handles(handles, entity)
     accounts = _accounts_from_handles(handles)
 
@@ -490,11 +685,18 @@ def build_person_profile_v1(
             other_handles = _list_linked_handles_v1(
                 session, tenant_id=tenant_id, entity_id=uuid.UUID(oid), limit=8
             )
+            other_labels = labels_by_entity_id.get(uuid.UUID(oid))
+            if other_labels is None:
+                other_labels = _batch_entity_identity_labels_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    entities_by_id={uuid.UUID(oid): other_entity},
+                ).get(uuid.UUID(oid))
             related_people.append(
                 {
                     "person_id": oid,
-                    "display_name": _pick_display_name(other_handles, other_entity),
-                    "email": _pick_email(other_handles, other_entity),
+                    "display_name": _pick_display_name(other_handles, other_entity, labels=other_labels),
+                    "email": _pick_email(other_handles, other_entity, labels=other_labels),
                     "link_type": link.get("link_type"),
                     "rule_id": link.get("rule_id"),
                 }
