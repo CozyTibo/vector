@@ -697,6 +697,11 @@ def build_retrieval_tcre_binding_catalog_v1() -> dict[str, Any]:
         "observability": {
             "metric": "retrieval_tcre_bind_failures_total",
             "getter": "get_retrieval_tcre_bind_failures_total_v1",
+            "causal_edge_indexing": {
+                "shipped_in": "S2.4_S3.1",
+                "env_flag": "CORTEX_RETRIEVAL_INDEX_TCRE_CAUSAL_EDGES",
+                "default_enabled": True,
+            },
         },
     }
 

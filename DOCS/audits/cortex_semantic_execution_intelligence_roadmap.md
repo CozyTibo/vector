@@ -510,13 +510,15 @@ Plus companion `causal_chain` / `causal_edge` rows from TCRE.
 
 ## Implementation steps (PR-sized)
 
-### S3.1 — Index TCRE causal_edge rows
+### S3.1 — Index TCRE causal_edge rows ✅
+
+**Status:** Satisfied by **S2.4** (`materialize_retrieval_index_from_tcre_job_v1` indexes `by_tcre_causal_edge_id` → `index_kind=causal_edge`). Rollback: `CORTEX_RETRIEVAL_INDEX_TCRE_CAUSAL_EDGES=0`.
 
 **Files:** `retrieval/retrieval_tcre_binding.py` → `materialize_retrieval_index_from_tcre_job_v1`.
 
 **Work:** Loop `by_tcre_causal_edge_id`; write `index_kind=causal_edge` entries with stable `index_key`.
 
-*(If not done in S2.4, this is the highest-leverage single PR.)*
+*(Shipped in S2.4 — no duplicate implementation.)*
 
 ### S3.2 — Lower org_link cap + conditional skip
 
