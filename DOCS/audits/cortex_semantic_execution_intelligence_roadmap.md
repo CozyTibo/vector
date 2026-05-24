@@ -349,14 +349,9 @@ Promotion + candidate rules only emit `org.persona_belongs_to_handle`. Graph den
 
 **Status:** Shipped — [`DOCS/cortex/execution_continuity_minimal_set_v1.md`](../cortex/execution_continuity_minimal_set_v1.md) defines 5 artifact-backed classes and maps them to retrieval index kinds (`materialization`, `walk`, `causal_chain`, `causal_edge`).
 
-### S2.2 — Canonical materialization priority for execution-bearing kinds
+### S2.2 — Canonical materialization priority for execution-bearing kinds ✅
 
-**Files:** `canonical/forward_progress/drain_runtime.py`, `canonical/forward_progress/candidate_selection.py`.
-
-**Work:**
-- Priority boost in drain ordering for: `pull_request`, `deployment`, `timeline_mutation`, Slack `message` (identity-bearing).
-- Accept **permanent orphan omission** for low-value GitHub refs (reduce deferral churn blocking S2).
-- Target: untreated routable **stops growing**; mat count for PR/deploy rows increases.
+**Status:** Shipped — `execution_kind_priority_v1.py` boosts PR/deploy/timeline/message drain order; low-value GitHub refs fast-track to `permanent_orphan`. Revert via `CORTEX_CANONICAL_EXECUTION_KIND_PRIORITY=0`.
 
 ### S2.3 — TCRE scope binding to execution artifacts
 

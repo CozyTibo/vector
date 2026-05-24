@@ -9,6 +9,10 @@ from typing import Any
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.canonical.forward_progress.execution_kind_priority_v1 import (
+    canonical_execution_kind_priority_enabled_v1,
+    drain_priority_order_clause_v1,
+)
 from vector.domains.cortex.canonical.forward_progress.pass_fairness import resolve_fair_pass_cursor
 from vector.domains.cortex.canonical.forward_progress.pass_registry import pass_key_label
 from vector.domains.cortex.canonical.transform_runtime import stub_routing_pairs
@@ -111,7 +115,13 @@ def list_forward_progress_candidate_ids(
     """Select untreated routable raw ids: global FIFO order + deferral exclusion."""
     del pass_cooldowns, pass_stall_counts
     lim = max(1, fetch_limit)
-    meta: dict[str, object] = {"selection_mode": "deterministic_fifo_v1"}
+    meta: dict[str, object] = {
+        "selection_mode": (
+            "deterministic_execution_priority_v1"
+            if canonical_execution_kind_priority_enabled_v1()
+            else "deterministic_fifo_v1"
+        ),
+    }
     now = _now_utc()
 
     pass_key: str | None = None
@@ -154,9 +164,12 @@ def list_forward_progress_candidate_ids(
             ~cooldown_deferral_block,
             ~permanent_deferral_block,
         )
-        .order_by(*_deterministic_raw_order_columns())
-        .limit(lim + 1)
     )
+    priority = drain_priority_order_clause_v1()
+    order_cols: tuple[Any, ...] = _deterministic_raw_order_columns()
+    if priority is not None:
+        order_cols = (priority.asc(), *order_cols)
+    stmt = stmt.order_by(*order_cols).limit(lim + 1)
     rows = [int(x) for x in db.scalars(stmt).all()]
     more_remain = len(rows) > lim
     meta.setdefault("pass_key", pass_key)

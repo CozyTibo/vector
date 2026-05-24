@@ -27,6 +27,9 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
     DEFERRAL_REASON_TOPOLOGY_ORPHAN,
     PERMANENT_ORPHAN_DEFERRAL_RETRY_THRESHOLD,
 )
+from vector.domains.cortex.canonical.forward_progress.execution_kind_priority_v1 import (
+    permanent_orphan_threshold_for_resource_type_v1,
+)
 from vector.domains.cortex.canonical.materialization_topology_engine import classify_orphan_missing_ref
 from vector.domains.cortex.canonical.replay_topology import build_node_key_index
 from vector.infrastructure.db.models.cortex_canonical_materialization_deferral import (
@@ -158,7 +161,10 @@ def record_topology_deferrals_from_plan(
                     {"orphan_class": orphan_class, "source": "stage_plan"},
                     now=now,
                     queue=DEFERRAL_QUEUE_EXTERNAL_PARENT,
-                    permanent_orphan_threshold=orphan_threshold,
+                    permanent_orphan_threshold=permanent_orphan_threshold_for_resource_type_v1(
+                        str(raw.resource_type),
+                        default_threshold=orphan_threshold,
+                    ),
                 ),
             }
         )
@@ -193,7 +199,10 @@ def record_topology_deferrals_from_plan(
                     {"orphan_class": oc, "source": "quarantine", "missing_parent_ref": ref or None},
                     now=now,
                     queue=DEFERRAL_QUEUE_TOPOLOGY_ORPHAN,
-                    permanent_orphan_threshold=orphan_threshold,
+                    permanent_orphan_threshold=permanent_orphan_threshold_for_resource_type_v1(
+                        str(raw.resource_type),
+                        default_threshold=orphan_threshold,
+                    ),
                 ),
             }
         )
