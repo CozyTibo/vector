@@ -198,36 +198,21 @@ Phase 03 runs repeatedly with `COMPLETED_EMPTY` (mislabeled — candidates grow,
 - Fix missing email primitive extraction on GitHub PR author / Slack profile where deterministic.
 - Target: email rule promotions > 80 and growing.
 
-### S1.4 — Operator rebuild promotion parity
+### S1.4 — Operator rebuild promotion parity ✅
 
-**Files:** `identity/continuity_rebuild.py`.
+**Status:** Shipped — `run_identity_continuity_rebuild()` schedules graph density promotion after substrate refresh (pipeline parity).
 
-**Work:**
-- After `run_identity_handles_and_candidates_refresh()` in `run_identity_continuity_rebuild()`, call `schedule_graph_density_promotion_after_identity_substrate_v1()` (same as pipeline path).
+### S1.5 — Honest phase 03 receipts ✅
 
-### S1.5 — Honest phase 03 receipts
+**Status:** Shipped — `infer_processed_count_v1()` for phase 03 uses `entities_upserted + candidates_generated_count`.
 
-**Files:** `substrate_pipeline/phase_runner_receipt.py`, `substrate_pipeline/substrate_phase_receipt.py`.
+### S1.6 — Skip identity/graph spam when delta zero ✅
 
-**Work:**
-- `infer_processed_count_v1()` for phase 03 uses `candidates_generated_count` + `entities_upserted`, not missing `org_link_edges`.
-- Surface `COMPLETED_EMPTY` only when both are zero.
+**Status:** Shipped — phase 04 skipped when phase 03 is `COMPLETED_EMPTY` and `distinct_candidate_pairs_delta == 0`.
 
-### S1.6 — Skip identity/graph spam when delta zero
+### S1.7 — Promotion diversity observability ✅
 
-**Files:** `execution/dual_lane_worker.py`, `substrate_pipeline/phase_runners.py`.
-
-**Work:**
-- If phase 03 outcome is empty **and** candidate regen produced zero new distinct pairs, skip phase 04 in same slice (save budget for 05–08).
-- Gate on `unique_pairs_delta == 0` from graph truth metrics, not row count.
-
-### S1.7 — Promotion diversity observability
-
-**Files:** `identity/control_plane.py`, `substrate_pipeline/graph_truth_metrics_v1.py`, semantic readiness panel.
-
-**Work:**
-- Primary KPI: `promotable_by_rule_id` from `count_promotable_link_candidates_by_rule_v1()`.
-- Alert when Slack/GitHub promotable = 0 for 48h after S1.2 deploy.
+**Status:** Shipped — `promotable_by_rule_id` primary KPI with 48h Slack/GitHub zero alert in graph truth / semantic readiness / control plane.
 
 ## Delete / simplify (S1)
 

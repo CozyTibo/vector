@@ -315,6 +315,11 @@ def _continuity_substrate_debug(
         if candidate_row_totals is not None
         else _candidate_link_row_totals(session, tenant_id=tenant_id)
     )
+    from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
+        snapshot_promotion_diversity_observability_v1,
+    )
+
+    promotion_diversity = snapshot_promotion_diversity_observability_v1(session, tenant_id=tenant_id)
     human_pk = ("slack_user", "github_user", "linear_user", "email_display_identity", "email_identity")
     fixture_pk = ("cross_tool_cluster", "cross_tool_link_subject", "stable_account_identity")
     primitive_projection_counts = {pk: _count_primitive_lane_projection(session, tenant_id=tenant_id, projection_kind=pk) for pk in human_pk + fixture_pk}
@@ -350,6 +355,8 @@ def _continuity_substrate_debug(
         "candidate_links_by_rule_id": _candidate_rule_histogram(
             session, tenant_id=tenant_id, batch_id=latest_batch_id
         ),
+        "promotion_diversity": promotion_diversity,
+        "promotable_by_rule_id": promotion_diversity.get("promotable_by_rule_id") or [],
     }
 
 
