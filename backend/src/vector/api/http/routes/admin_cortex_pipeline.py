@@ -22,8 +22,12 @@ from vector.contracts.admin import (
     AdminCortexSemanticReadinessResponse,
     AdminCortexGraphTruthInspectorResponse,
     AdminCortexIdentityContinuityInspectorResponse,
+    AdminCortexIdentityContinuityDiagnosisResponse,
 )
 from vector.domains.cortex.ingestion.admin_overview import invalidate_cortex_ingestion_admin_caches_v1
+from vector.domains.cortex.identity.identity_continuity_diagnosis_v1 import (
+    build_identity_continuity_diagnosis_v1,
+)
 from vector.domains.cortex.identity.identity_continuity_inspector_v1 import (
     build_identity_continuity_inspector_v1,
 )
@@ -31,6 +35,7 @@ from vector.domains.cortex.pipeline.pipeline_admin_graph_truth_inspector import 
     build_graph_truth_inspector_admin_v1,
 )
 from vector.domains.cortex.pipeline.pipeline_admin_overview import (
+    build_pipeline_overview_bootstrap_v1,
     build_pipeline_overview_execution_v1,
     build_pipeline_overview_ingestion_v1,
     build_pipeline_overview_phases_v1,
@@ -132,6 +137,16 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
 
+    @pr.get("/overview/bootstrap", response_model=AdminCortexPipelineOverviewResponse)
+    def get_pipeline_overview_bootstrap(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexPipelineOverviewResponse:
+        _assert_tenant(db, tenant_id)
+        raw = build_pipeline_overview_bootstrap_v1(db, settings, tenant_id=tenant_id)
+        return AdminCortexPipelineOverviewResponse.model_validate(raw)
+
     @pr.get("/overview", response_model=AdminCortexPipelineOverviewResponse)
     def get_pipeline_overview(
         tenant_id: uuid.UUID,
@@ -205,6 +220,20 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         _assert_tenant(db, tenant_id)
         raw = build_identity_continuity_inspector_v1(db, tenant_id=tenant_id)
         return AdminCortexIdentityContinuityInspectorResponse.model_validate(raw)
+
+    @pr.get(
+        "/identity-continuity-diagnosis",
+        response_model=AdminCortexIdentityContinuityDiagnosisResponse,
+    )
+    def get_identity_continuity_diagnosis(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexIdentityContinuityDiagnosisResponse:
+        del settings
+        _assert_tenant(db, tenant_id)
+        raw = build_identity_continuity_diagnosis_v1(db, tenant_id=tenant_id)
+        return AdminCortexIdentityContinuityDiagnosisResponse.model_validate(raw)
 
     @pr.post("/run", response_model=AdminCortexPipelineRunResponse)
     def post_pipeline_run(

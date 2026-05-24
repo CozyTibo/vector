@@ -38,6 +38,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from vector.domains.cortex.substrate_pipeline.continuity_proof_panel import DEFAULT_TENANT_ID
+from vector.domains.cortex.identity.identity_continuity_diagnosis_v1 import (
+    build_identity_continuity_diagnosis_v1,
+)
 from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import (
     build_semantic_readiness_v1,
     format_semantic_readiness_text_v1,
@@ -57,8 +60,9 @@ def _db_url() -> str:
     return f"postgresql+psycopg://{user}:{password}@{host}:{port}/{dbname}"
 
 
-def build_identity_continuity_audit_snapshot_v1(session, *, tenant_id: uuid.UUID) -> dict:
+def build_identity_continuity_audit_snapshot_v1(session, *, tenant_id: uuid.UUID, include_diagnosis: bool = True) -> dict:
     core = build_semantic_readiness_v1(session, tenant_id=tenant_id)
+    diagnosis = build_identity_continuity_diagnosis_v1(session, tenant_id=tenant_id) if include_diagnosis else None
     return {
         "baseline_kind": "identity_continuity_wave_s2",
         "schema_version": 1,
@@ -67,6 +71,7 @@ def build_identity_continuity_audit_snapshot_v1(session, *, tenant_id: uuid.UUID
         "semantic_readiness": core,
         "identity_continuity": core.get("identity_continuity"),
         "graph_truth": core.get("graph_truth"),
+        "identity_continuity_diagnosis": diagnosis,
         "acceptance": {
             "promotion_rule_count_green_min": 3,
             "candidate_inflation_ratio_green_max": 3.0,
@@ -81,6 +86,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Identity continuity audit snapshot")
     parser.add_argument("--tenant", "--tenant-id", dest="tenant", default=os.environ.get("PROOF_TENANT_ID", TENANT_DEFAULT))
     parser.add_argument("--json", action="store_true", dest="as_json")
+    parser.add_argument("--diagnosis", action="store_true", help="Include read-only bucket diagnosis (default on)")
+    parser.add_argument("--no-diagnosis", action="store_true", help="Omit identity continuity diagnosis block")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--database-url", default="")
     args = parser.parse_args()
@@ -89,8 +96,13 @@ def main() -> int:
     db_url = args.database_url.strip() or _db_url()
     SessionLocal = sessionmaker(bind=create_engine(db_url))
 
+    include_diagnosis = not args.no_diagnosis
     with SessionLocal() as session:
-        snapshot = build_identity_continuity_audit_snapshot_v1(session, tenant_id=tenant_id)
+        snapshot = build_identity_continuity_audit_snapshot_v1(
+            session,
+            tenant_id=tenant_id,
+            include_diagnosis=include_diagnosis,
+        )
 
     text = format_semantic_readiness_text_v1(snapshot["semantic_readiness"])
     payload = json.dumps(snapshot, indent=2, default=str)

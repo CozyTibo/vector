@@ -118,6 +118,222 @@ def _eligible_pairs_total_for_buckets(
     return eligible, buckets_ge2
 
 
+def summarize_single_bucket_map_v1(
+    bucket_map: dict[Any, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]],
+) -> dict[str, int]:
+    """Read-only bucket stats for operator diagnosis (cross-entity buckets only)."""
+    total_buckets = len(bucket_map)
+    buckets_with_ge2 = 0
+    eligible = 0
+    distinct_in_ge2: set[uuid.UUID] = set()
+    for _k, items in bucket_map.items():
+        u = _dedupe_bucket_rows(items)
+        if len(u) < 2:
+            continue
+        entities = {t[0] for t in u}
+        if len(entities) < 2:
+            continue
+        buckets_with_ge2 += 1
+        distinct_in_ge2.update(entities)
+        eligible += _cross_entity_pair_count(u)
+    return {
+        "total_buckets": total_buckets,
+        "buckets_with_ge2_distinct_org_entities": buckets_with_ge2,
+        "singleton_buckets": total_buckets - buckets_with_ge2,
+        "eligible_cross_entity_pairs": eligible,
+        "distinct_org_entities_in_ge2_buckets": len(distinct_in_ge2),
+    }
+
+
+def summarize_rule_bucket_maps_v1(
+    rule_phases: tuple[tuple[str, dict[Any, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]]], ...],
+) -> dict[str, Any]:
+    """Per-rule and connector rollup bucket stats (read-only diagnosis)."""
+    per_rule: dict[str, Any] = {}
+    for rid, bmap in rule_phases:
+        per_rule[rid] = {"rule_id": rid, **summarize_single_bucket_map_v1(bmap)}
+
+    connector_groups: dict[str, tuple[str, ...]] = {
+        "slack": (RULE_SLACK_USER_ID,),
+        "github": (RULE_GITHUB_LOGIN,),
+        "notion": (RULE_NOTION_USER_ID,),
+        "email": (RULE_EMAIL_EXACT, RULE_EMAIL_NORM_CONTINUITY_EVIDENCE),
+        "linear": (RULE_LINEAR_USER_ID,),
+    }
+    by_connector: dict[str, Any] = {}
+    for connector, rule_ids in connector_groups.items():
+        totals = {
+            "total_buckets": 0,
+            "buckets_with_ge2_distinct_org_entities": 0,
+            "singleton_buckets": 0,
+            "eligible_cross_entity_pairs": 0,
+            "distinct_org_entities_in_ge2_buckets": 0,
+            "rule_ids": list(rule_ids),
+        }
+        for rid in rule_ids:
+            stats = per_rule.get(rid) or {}
+            for key in (
+                "total_buckets",
+                "buckets_with_ge2_distinct_org_entities",
+                "singleton_buckets",
+                "eligible_cross_entity_pairs",
+            ):
+                totals[key] += int(stats.get(key) or 0)
+            totals["distinct_org_entities_in_ge2_buckets"] = max(
+                totals["distinct_org_entities_in_ge2_buckets"],
+                int(stats.get("distinct_org_entities_in_ge2_buckets") or 0),
+            )
+        by_connector[connector] = totals
+
+    return {
+        "schema_version": "p04.anchor_continuity_bucket_diagnosis.v1",
+        "per_rule": per_rule,
+        "by_connector": by_connector,
+    }
+
+
+def _load_anchors_and_raw_for_continuity(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> tuple[list[CortexCanonicalIdentityAnchor], dict[int, RawIngestionRecord]]:
+    anchors = list(
+        db.scalars(
+            select(CortexCanonicalIdentityAnchor).where(CortexCanonicalIdentityAnchor.tenant_id == tenant_id),
+        ).all()
+    )
+    raw_ids = {int(a.raw_record_id) for a in anchors}
+    raw_by_id: dict[int, RawIngestionRecord] = {}
+    if raw_ids:
+        for r in db.scalars(select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids))).all():
+            raw_by_id[int(r.id)] = r
+    return anchors, raw_by_id
+
+
+def collect_anchor_continuity_rule_buckets_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> tuple[
+    tuple[tuple[str, dict[Any, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]]], ...],
+    list[CortexCanonicalIdentityAnchor],
+    dict[int, RawIngestionRecord],
+]:
+    """Build join-key bucket maps without emitting candidate rows (read-only diagnosis)."""
+    anchors, raw_by_id = _load_anchors_and_raw_for_continuity(db, tenant_id=tenant_id)
+
+    by_slack: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_github: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_email_strict: dict[tuple[str, str, str], list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_fixture: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_link_subject: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_stable_account: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_linear: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_notion: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+    by_email_norm: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
+
+    for a in anchors:
+        raw = raw_by_id.get(int(a.raw_record_id))
+        rid = int(a.raw_record_id)
+        prof = dict(a.provider_identity_json or {})
+        payload = _payload_dict(raw)
+        projections = extract_identity_primitives(anchor=a, raw=raw)
+
+        for proj in projections:
+            eid = org_entity_id_for_identity_primitive(tenant_id=tenant_id, projection=proj)
+            mat = proj.identity_material
+            pk = proj.projection_kind
+
+            if pk == "slack_user":
+                su = mat.get("slack_user_id")
+                if isinstance(su, str) and su.strip():
+                    by_slack[su.strip()].append((eid, rid, a))
+
+            if pk == "github_user":
+                gl = mat.get("github_login")
+                if isinstance(gl, str) and gl.strip():
+                    by_github[gl.strip().lower()].append((eid, rid, a))
+
+            if pk == "linear_user":
+                lu = mat.get("linear_user_id")
+                if isinstance(lu, str) and lu.strip():
+                    by_linear[lu.strip()].append((eid, rid, a))
+
+            if pk == "notion_user":
+                nid = mat.get("notion_user_id")
+                if isinstance(nid, str) and nid.strip():
+                    by_notion[nid.strip()].append((eid, rid, a))
+
+            if pk == "email_display_identity":
+                em = mat.get("email_norm")
+                dom = mat.get("email_domain")
+                dn = mat.get("display_name_norm")
+                if isinstance(em, str) and isinstance(dom, str) and isinstance(dn, str) and em and dom and dn:
+                    by_email_strict[(em, dom, dn)].append((eid, rid, a))
+
+            if pk in ("email_identity", "email_display_identity"):
+                emn = mat.get("email_norm")
+                if isinstance(emn, str) and emn.strip():
+                    by_email_norm[emn.strip().lower()].append((eid, rid, a))
+
+            if pk == "cross_tool_cluster":
+                ck = mat.get("cluster_key")
+                if isinstance(ck, str) and ck.strip():
+                    by_fixture[ck.strip()].append((eid, rid, a))
+
+            if pk == "cross_tool_link_subject":
+                ls = mat.get("link_subject")
+                if isinstance(ls, str) and ls.strip():
+                    by_link_subject[ls.strip()].append((eid, rid, a))
+
+            if pk == "stable_account_identity":
+                sk = mat.get("stable_account_key")
+                if isinstance(sk, str) and sk.strip():
+                    by_stable_account[sk.strip()].append((eid, rid, a))
+
+        if not projections:
+            if not legacy_org_handle_lane_eligible(
+                canonical_object_kind=a.canonical_object_kind,
+                raw=raw,
+            ):
+                continue
+            eid = org_entity_id_for_anchor_row(tenant_id=tenant_id, anchor=a, raw=raw)
+            su = _slack_user_id(payload, prof)
+            if su:
+                by_slack[su].append((eid, rid, a))
+            gl = _github_login(payload, prof)
+            if gl:
+                by_github[gl].append((eid, rid, a))
+            em, dom = _email_for_rule(payload, prof)
+            dn = _display_name(payload)
+            if em:
+                by_email_norm[em].append((eid, rid, a))
+            if em and dom and dn:
+                by_email_strict[(em, dom, dn)].append((eid, rid, a))
+            fc = _continuity_fixture_cluster(payload)
+            if fc:
+                by_fixture[fc].append((eid, rid, a))
+            ls = _fixture_link_subject(payload)
+            if ls:
+                by_link_subject[ls].append((eid, rid, a))
+            sak = _fixture_stable_account_key(payload)
+            if sak:
+                by_stable_account[sak].append((eid, rid, a))
+
+    rule_phases: tuple[tuple[str, dict[Any, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]]], ...] = (
+        (RULE_SLACK_USER_ID, by_slack),
+        (RULE_GITHUB_LOGIN, by_github),
+        (RULE_LINEAR_USER_ID, by_linear),
+        (RULE_NOTION_USER_ID, by_notion),
+        (RULE_EMAIL_EXACT, by_email_strict),
+        (RULE_EMAIL_NORM_CONTINUITY_EVIDENCE, by_email_norm),
+        (RULE_CONTINUITY_FIXTURE_CLUSTER, by_fixture),
+        (RULE_FIXTURE_LINK_SUBJECT, by_link_subject),
+        (RULE_FIXTURE_STABLE_ACCOUNT_KEY, by_stable_account),
+    )
+    return rule_phases, anchors, raw_by_id
+
+
 def _emit_cross_entity_pairs_from_bucket(
     sorted_items: list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]],
     rule_id: str,
@@ -429,131 +645,12 @@ def build_anchor_continuity_candidate_rows(
     When ``accounting_out`` is provided, it is **replaced** with deterministic overflow / per-rule
     bookkeeping (does **not** affect ``candidate_set_sha256`` — row projection unchanged).
     """
-    anchors = list(
-        db.scalars(
-            select(CortexCanonicalIdentityAnchor).where(CortexCanonicalIdentityAnchor.tenant_id == tenant_id),
-        ).all()
-    )
-    raw_ids = {int(a.raw_record_id) for a in anchors}
-    raw_by_id: dict[int, RawIngestionRecord] = {}
-    if raw_ids:
-        for r in db.scalars(select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids))).all():
-            raw_by_id[int(r.id)] = r
-
-    by_slack: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_github: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_email_strict: dict[tuple[str, str, str], list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_fixture: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_link_subject: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_stable_account: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_linear: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_notion: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-    by_email_norm: dict[str, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]] = defaultdict(list)
-
-    for a in anchors:
-        raw = raw_by_id.get(int(a.raw_record_id))
-        rid = int(a.raw_record_id)
-        prof = dict(a.provider_identity_json or {})
-        payload = _payload_dict(raw)
-        projections = extract_identity_primitives(anchor=a, raw=raw)
-
-        for proj in projections:
-            eid = org_entity_id_for_identity_primitive(tenant_id=tenant_id, projection=proj)
-            mat = proj.identity_material
-            pk = proj.projection_kind
-
-            if pk == "slack_user":
-                su = mat.get("slack_user_id")
-                if isinstance(su, str) and su.strip():
-                    by_slack[su.strip()].append((eid, rid, a))
-
-            if pk == "github_user":
-                gl = mat.get("github_login")
-                if isinstance(gl, str) and gl.strip():
-                    by_github[gl.strip().lower()].append((eid, rid, a))
-
-            if pk == "linear_user":
-                lu = mat.get("linear_user_id")
-                if isinstance(lu, str) and lu.strip():
-                    by_linear[lu.strip()].append((eid, rid, a))
-
-            if pk == "notion_user":
-                nid = mat.get("notion_user_id")
-                if isinstance(nid, str) and nid.strip():
-                    by_notion[nid.strip()].append((eid, rid, a))
-
-            if pk == "email_display_identity":
-                em = mat.get("email_norm")
-                dom = mat.get("email_domain")
-                dn = mat.get("display_name_norm")
-                if isinstance(em, str) and isinstance(dom, str) and isinstance(dn, str) and em and dom and dn:
-                    by_email_strict[(em, dom, dn)].append((eid, rid, a))
-
-            if pk in ("email_identity", "email_display_identity"):
-                emn = mat.get("email_norm")
-                if isinstance(emn, str) and emn.strip():
-                    by_email_norm[emn.strip().lower()].append((eid, rid, a))
-
-            if pk == "cross_tool_cluster":
-                ck = mat.get("cluster_key")
-                if isinstance(ck, str) and ck.strip():
-                    by_fixture[ck.strip()].append((eid, rid, a))
-
-            if pk == "cross_tool_link_subject":
-                ls = mat.get("link_subject")
-                if isinstance(ls, str) and ls.strip():
-                    by_link_subject[ls.strip()].append((eid, rid, a))
-
-            if pk == "stable_account_identity":
-                sk = mat.get("stable_account_key")
-                if isinstance(sk, str) and sk.strip():
-                    by_stable_account[sk.strip()].append((eid, rid, a))
-
-        # Back-compat: if extractor missed connector-native keys still present on raw, bucket once per anchor.
-        if not projections:
-            if not legacy_org_handle_lane_eligible(
-                canonical_object_kind=a.canonical_object_kind,
-                raw=raw,
-            ):
-                continue
-            eid = org_entity_id_for_anchor_row(tenant_id=tenant_id, anchor=a, raw=raw)
-            su = _slack_user_id(payload, prof)
-            if su:
-                by_slack[su].append((eid, rid, a))
-            gl = _github_login(payload, prof)
-            if gl:
-                by_github[gl].append((eid, rid, a))
-            em, dom = _email_for_rule(payload, prof)
-            dn = _display_name(payload)
-            if em:
-                by_email_norm[em].append((eid, rid, a))
-            if em and dom and dn:
-                by_email_strict[(em, dom, dn)].append((eid, rid, a))
-            fc = _continuity_fixture_cluster(payload)
-            if fc:
-                by_fixture[fc].append((eid, rid, a))
-            ls = _fixture_link_subject(payload)
-            if ls:
-                by_link_subject[ls].append((eid, rid, a))
-            sak = _fixture_stable_account_key(payload)
-            if sak:
-                by_stable_account[sak].append((eid, rid, a))
+    rule_phases, anchors, _raw_by_id = collect_anchor_continuity_rule_buckets_v1(db, tenant_id=tenant_id)
 
     rows_out: list[dict[str, Any]] = []
     seen_endpoint_pairs: set[tuple[str, str, str]] = set()
 
     rule_kind_by_id = {str(e["rule_id"]): str(e.get("kind") or "") for e in _DEFAULT_MANIFEST.get("entries", [])}
-    rule_phases: tuple[tuple[str, dict[Any, list[tuple[uuid.UUID, int, CortexCanonicalIdentityAnchor]]]], ...] = (
-        (RULE_SLACK_USER_ID, by_slack),
-        (RULE_GITHUB_LOGIN, by_github),
-        (RULE_LINEAR_USER_ID, by_linear),
-        (RULE_NOTION_USER_ID, by_notion),
-        (RULE_EMAIL_EXACT, by_email_strict),
-        (RULE_EMAIL_NORM_CONTINUITY_EVIDENCE, by_email_norm),
-        (RULE_CONTINUITY_FIXTURE_CLUSTER, by_fixture),
-        (RULE_FIXTURE_LINK_SUBJECT, by_link_subject),
-        (RULE_FIXTURE_STABLE_ACCOUNT_KEY, by_stable_account),
-    )
 
     acc: dict[str, Any] = {
         "schema_version": "p04.anchor_candidate_generation_accounting.v1",

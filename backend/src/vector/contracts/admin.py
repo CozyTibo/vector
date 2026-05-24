@@ -4810,6 +4810,22 @@ class AdminCortexIdentityContinuityInspectorResponse(BaseModel):
     unpromoted_candidates: int = 0
 
 
+class AdminCortexIdentityContinuityDiagnosisResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    surface_kind: str = "identity_continuity_diagnosis"
+    diagnosis_schema_version: int = 1
+    tenant_id: str
+    captured_at_utc: str | None = None
+    anchor_count: int = 0
+    anchor_counts_by_connector: dict[str, int] = Field(default_factory=dict)
+    bucket_diagnosis: dict[str, Any] = Field(default_factory=dict)
+    anchor_samples_by_connector: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    latest_candidate_batch: dict[str, Any] | None = None
+    receipt_links: dict[str, Any] = Field(default_factory=dict)
+    repro_command: str | None = None
+
+
 class AdminCortexIdentityContinuitySearchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
