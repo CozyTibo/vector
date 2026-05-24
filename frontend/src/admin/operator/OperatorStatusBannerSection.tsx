@@ -49,7 +49,7 @@ export function OperatorStatusBannerSection({ banner, tenantId }: Props) {
       ) : null}
       <div className="mt-3">
         <Link
-          to={`/admin/tenants/${tenantId}/cortex/graph`}
+          to={`/admin/tenants/${tenantId}/cortex/inspect`}
           className="text-xs font-medium text-indigo-300 no-underline hover:underline"
         >
           Open execution detail →

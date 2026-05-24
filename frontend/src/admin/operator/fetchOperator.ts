@@ -3,6 +3,9 @@ import { adminFetch, adminJson } from "../../lib/adminFetch";
 import type {
   OperatorActionRequest,
   OperatorActionResponse,
+  OperatorEdgeProvenance,
+  OperatorGraphSnapshot,
+  OperatorIslandsList,
   OperatorOverview,
   OperatorRuntime,
 } from "./operatorTypes";
@@ -61,4 +64,35 @@ export async function postOperatorAction(
     }
     throw e;
   }
+}
+
+export async function fetchOperatorGraphSnapshot(tenantId: string): Promise<OperatorGraphSnapshot> {
+  const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/snapshots/graph`);
+  await assertOperatorV2Response(res, "operator graph snapshot");
+  return res.json();
+}
+
+export async function fetchOperatorEdgeProvenance(
+  tenantId: string,
+  query: Record<string, string>,
+): Promise<OperatorEdgeProvenance> {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value.trim()) search.set(key, value.trim());
+  }
+  const qs = search.toString();
+  const res = await adminFetch(
+    `/admin/tenants/${tenantId}/cortex/operator/inspect/edges${qs ? `?${qs}` : ""}`,
+  );
+  if (res.status === 400) {
+    throw new Error("edge_query_required");
+  }
+  await assertOperatorV2Response(res, "operator edge provenance");
+  return res.json();
+}
+
+export async function fetchOperatorIslandsList(tenantId: string): Promise<OperatorIslandsList> {
+  const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/inspect/islands`);
+  await assertOperatorV2Response(res, "operator islands");
+  return res.json();
 }

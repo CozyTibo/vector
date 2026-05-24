@@ -18,7 +18,7 @@ export const identityContinuitySearchQueryKey = (tenantId: string, params: Ident
 export const identityContinuityEntityQueryKey = (tenantId: string, entityId: string) =>
   ["admin-cortex-identity-continuity-entity", tenantId, entityId] as const;
 
-export function useIdentityContinuityInspectorTenant() {
+export function useIdentityContinuityInspectorTenant(enabled = true) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   return useQuery({
     queryKey: identityContinuityInspectorQueryKey(tenantId),
@@ -26,7 +26,7 @@ export function useIdentityContinuityInspectorTenant() {
       adminJson<IdentityContinuityInspectorTenant>(
         `/admin/tenants/${tenantId}/cortex/pipeline/identity-continuity-inspector`,
       ),
-    enabled: Boolean(tenantId),
+    enabled: Boolean(tenantId) && enabled,
     staleTime: 60_000,
   });
 }

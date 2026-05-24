@@ -220,7 +220,7 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
             raw = build_semantic_readiness_admin_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexSemanticReadinessResponse.model_validate(raw)
 
-    @pr.get("/graph-truth-inspector", response_model=AdminCortexGraphTruthInspectorResponse)
+    @pr.get("/graph-truth-inspector", response_model=AdminCortexGraphTruthInspectorResponse, deprecated=True)
     def get_graph_truth_inspector(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -239,6 +239,7 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
     @pr.get(
         "/identity-continuity-inspector",
         response_model=AdminCortexIdentityContinuityInspectorResponse,
+        deprecated=True,
     )
     def get_identity_continuity_inspector(
         tenant_id: uuid.UUID,

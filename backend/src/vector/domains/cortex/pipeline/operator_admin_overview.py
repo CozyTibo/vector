@@ -426,7 +426,7 @@ def _build_continuity_facts_v1(
     return [
         {"key": "ingestion", "text": ingestion_text, "inspect_lens": "ingestion"},
         {"key": "execution", "text": execution_text, "inspect_lens": "runtime"},
-        {"key": "graph", "text": graph_text, "inspect_lens": "identity"},
+        {"key": "graph", "text": graph_text, "inspect_lens": "graph"},
         {"key": "retrieval", "text": retrieval_text, "inspect_lens": "retrieval"},
         {"key": "synthesis", "text": synthesis_text, "inspect_lens": "queues"},
     ]

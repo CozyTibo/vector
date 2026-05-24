@@ -143,3 +143,30 @@ export type OperatorActionResponse = {
   tenant_id: string;
   result: Record<string, unknown>;
 };
+
+export type OperatorGraphSnapshot = {
+  surface_kind: "operator_graph_snapshot_v1";
+  tenant_id: string;
+  available: boolean;
+  captured_at_utc: string | null;
+  stale: boolean;
+  stale_after_minutes: number;
+  graph_summary: Record<string, unknown> | null;
+  identity_summary: Record<string, unknown> | null;
+  prose_summary: string;
+};
+
+export type OperatorEdgeProvenance = {
+  surface_kind: "operator_edge_provenance_v1";
+  tenant_id: string;
+  query: Record<string, unknown>;
+  edges: Record<string, unknown>[];
+  total: number;
+};
+
+export type OperatorIslandsList = {
+  surface_kind: "operator_islands_list_v1";
+  tenant_id: string;
+  island_count: number;
+  islands: Record<string, unknown>[];
+};

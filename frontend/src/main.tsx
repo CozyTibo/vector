@@ -6,11 +6,17 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AdminLayout from "./admin/AdminLayout.tsx";
 import AdminCortexCanonicalHealthPage from "./admin/AdminCortexCanonicalHealthPage.tsx";
 import AdminCortexCanonicalLayout from "./admin/AdminCortexCanonicalLayout.tsx";
-import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
-import AdminCortexIdentityPage from "./admin/AdminCortexIdentityPage.tsx";
-import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
+import AdminCortexGraphGateway from "./admin/operator/inspect/AdminCortexGraphGateway.tsx";
+import AdminCortexIdentityGateway from "./admin/operator/inspect/AdminCortexIdentityGateway.tsx";
+import AdminCortexInspectGateway from "./admin/operator/inspect/AdminCortexInspectGateway.tsx";
+import InspectorHubPage from "./admin/operator/inspect/InspectorHubPage.tsx";
+import OperatorGraphInspectPage from "./admin/operator/inspect/OperatorGraphInspectPage.tsx";
+import OperatorIdentityEntityInspectPage from "./admin/operator/inspect/OperatorIdentityEntityInspectPage.tsx";
+import OperatorIdentityInspectPage from "./admin/operator/inspect/OperatorIdentityInspectPage.tsx";
+import OperatorIslandsInspectPage from "./admin/operator/inspect/OperatorIslandsInspectPage.tsx";
 import AdminCortexOverviewGateway from "./admin/operator/AdminCortexOverviewGateway.tsx";
 import AdminCortexRuntimeGateway from "./admin/operator/AdminCortexRuntimeGateway.tsx";
+import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
 import AdminCortexReconstructionPage from "./admin/AdminCortexReconstructionPage.tsx";
 import AdminCortexRetrievalPage from "./admin/AdminCortexRetrievalPage.tsx";
@@ -96,8 +102,15 @@ createRoot(document.getElementById("root")!).render(
                   <Route index element={<AdminCortexCanonicalHealthPage />} />
                   <Route path="health" element={<Navigate to=".." replace />} />
                 </Route>
-                <Route path="identity" element={<AdminCortexIdentityPage />} />
-                <Route path="graph" element={<AdminCortexGraphPage />} />
+                <Route path="identity" element={<AdminCortexIdentityGateway />} />
+                <Route path="graph" element={<AdminCortexGraphGateway />} />
+                <Route path="inspect" element={<AdminCortexInspectGateway />}>
+                  <Route index element={<InspectorHubPage />} />
+                  <Route path="identity" element={<OperatorIdentityInspectPage />} />
+                  <Route path="identity/e/:entityId" element={<OperatorIdentityEntityInspectPage />} />
+                  <Route path="graph" element={<OperatorGraphInspectPage />} />
+                  <Route path="islands" element={<OperatorIslandsInspectPage />} />
+                </Route>
                 <Route path="reconstruction" element={<AdminCortexReconstructionPage />} />
                 <Route path="reconstruction/jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
                 <Route path="retrieval" element={<AdminCortexRetrievalPage />} />

@@ -18,10 +18,9 @@ const CORTEX_SECTIONS: Array<{ key: string; label: string }> = [
 const CORTEX_V2_SECTIONS: Array<{ key: string; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "runtime", label: "Runtime" },
+  { key: "inspect", label: "Inspect" },
   { key: "ingestion", label: "Ingestion" },
   { key: "canonical", label: "Canonical" },
-  { key: "identity", label: "Identity" },
-  { key: "graph", label: "Graph" },
   { key: "reconstruction", label: "Reconstruction" },
   { key: "retrieval", label: "Retrieval" },
   { key: "synthesis", label: "Synthesis" },

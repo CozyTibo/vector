@@ -182,3 +182,56 @@ class OperatorActionResponse(BaseModel):
     action: OperatorActionKind
     tenant_id: str
     result: dict[str, Any] = Field(default_factory=dict)
+
+
+class OperatorGraphSnapshotResponse(BaseModel):
+    surface_kind: Literal["operator_graph_snapshot_v1"] = "operator_graph_snapshot_v1"
+    tenant_id: str
+    available: bool = False
+    captured_at_utc: datetime | None = None
+    stale: bool = False
+    stale_after_minutes: int = 15
+    graph_summary: dict[str, Any] | None = None
+    identity_summary: dict[str, Any] | None = None
+    prose_summary: str = ""
+
+
+class OperatorEdgeProvenanceRow(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    link_id: str | None = None
+    link_type: str | None = None
+    source_entity_id: str | None = None
+    target_entity_id: str | None = None
+    rule_id: str | None = None
+    link_authority: str | None = None
+    promoted_from_candidate_id: str | None = None
+    promotion_batch_id: Any | None = None
+    created_at: str | None = None
+    revoked_at: str | None = None
+    evidence_raw_record_ids: list[int] = Field(default_factory=list)
+
+
+class OperatorEdgeProvenanceResponse(BaseModel):
+    surface_kind: Literal["operator_edge_provenance_v1"] = "operator_edge_provenance_v1"
+    tenant_id: str
+    query: dict[str, Any] = Field(default_factory=dict)
+    edges: list[dict[str, Any]]
+    total: int
+
+
+class OperatorIslandRow(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    island_scope_id: str
+    entity_count: int = 0
+    authoritative_edge_count: int = 0
+    last_walk_at: str | None = None
+    last_retrieval_epoch: str | None = None
+
+
+class OperatorIslandsListResponse(BaseModel):
+    surface_kind: Literal["operator_islands_list_v1"] = "operator_islands_list_v1"
+    tenant_id: str
+    island_count: int
+    islands: list[dict[str, Any]]

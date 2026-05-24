@@ -13,6 +13,8 @@ import {
 
 type Props = {
   data?: GraphTruthInspectorPayload;
+  lean?: boolean;
+  onSelectEntity?: (entityId: string) => void;
 };
 
 function severityTone(sev: string | undefined): "ok" | "warn" | "bad" {
@@ -30,9 +32,9 @@ const SEARCH_FIELDS: Array<{ key: keyof IdentitySearchParams; label: string; pla
   { key: "canonical_entity_id", label: "Canonical entity id", placeholder: "uuid" },
 ];
 
-export function IdentityContinuityInspector({ data }: Props) {
-  const tenantQ = useIdentityContinuityInspectorTenant();
-  const ic = tenantQ.data?.identity_continuity ?? data?.identity_continuity;
+export function IdentityContinuityInspector({ data, lean = false, onSelectEntity }: Props) {
+  const tenantQ = useIdentityContinuityInspectorTenant(!lean);
+  const ic = lean ? undefined : tenantQ.data?.identity_continuity ?? data?.identity_continuity;
   const anchor = ic?.anchor_boundary ?? {};
 
   const [draft, setDraft] = useState<IdentitySearchParams>({});
@@ -106,7 +108,13 @@ export function IdentityContinuityInspector({ data }: Props) {
                         <button
                           type="button"
                           className="font-mono text-xs text-indigo-700 underline"
-                          onClick={() => setSelectedEntityId(match.entity_id!)}
+                          onClick={() => {
+                            if (onSelectEntity) {
+                              onSelectEntity(match.entity_id!);
+                            } else {
+                              setSelectedEntityId(match.entity_id!);
+                            }
+                          }}
                         >
                           {match.entity_id}
                         </button>
@@ -128,7 +136,7 @@ export function IdentityContinuityInspector({ data }: Props) {
         </section>
       ) : null}
 
-      {selectedEntityId ? (
+      {selectedEntityId && !onSelectEntity ? (
         entityQ.isPending && !entityQ.data ? (
           <SectionSkeleton variant="cards" />
         ) : entityQ.isError ? (
@@ -138,6 +146,8 @@ export function IdentityContinuityInspector({ data }: Props) {
         ) : null
       ) : null}
 
+      {!lean ? (
+        <>
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label="Anchors" value={anchor.anchor_count?.toLocaleString() ?? "—"} />
         <Metric
@@ -180,6 +190,8 @@ export function IdentityContinuityInspector({ data }: Props) {
             </table>
           </div>
         </section>
+      ) : null}
+        </>
       ) : null}
     </div>
   );

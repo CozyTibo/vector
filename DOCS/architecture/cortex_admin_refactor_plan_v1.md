@@ -1068,23 +1068,36 @@ Frontend:
 
 ---
 
-## Phase R3 — Inspector hub + identity/graph (1.5 weeks)
+## Phase R3 — Inspector hub + identity/graph (1.5 weeks) ✅ **Complete (2026-05-24)**
 
 Backend:
 
-- Snapshot reader endpoints
-- Edge provenance lookup
-- Islands list from registry (no component scan)
+- ✅ `GET /operator/snapshots/graph` — materialized graph summary reader (`build_operator_graph_snapshot_v1`)
+- ✅ `GET /operator/inspect/edges` — on-demand edge provenance (`lookup_edge_provenance_v1`)
+- ✅ `GET /operator/inspect/islands` — registry list without component scan
+- ✅ Legacy `graph-truth-inspector` and `identity-continuity-inspector` marked `@deprecated`
 
 Frontend:
 
-- Inspector hub + identity lens (wire existing search/entity)
-- Graph snapshot summary (prose + tables)
-- Delete `AdminCortexGraphPage`, `AdminCortexIdentityPage`
+- ✅ Inspector hub (zero fetch) + identity/graph/islands lenses under `/cortex/inspect`
+- ✅ Identity search + entity card wired to existing continuity-inspector routes
+- ✅ Graph snapshot prose + edge lookup on submit
+- ✅ Legacy graph/identity tabs redirect to inspect when `VITE_CORTEX_ADMIN_V2=true`
 
-**Deletes:** graph-truth-inspector route, Graph page auto-fetch storm.
+**Deliverables:**
 
-**Operator value:** **See real entities and edge rules** — core product requirement.
+| Area | Path / note |
+|------|-------------|
+| Inspect builders | `backend/src/vector/domains/cortex/pipeline/operator_admin_inspect.py` |
+| Routes | `/operator/snapshots/graph`, `/operator/inspect/edges`, `/operator/inspect/islands` |
+| Contracts | `OperatorGraphSnapshotResponse`, `OperatorEdgeProvenanceResponse`, `OperatorIslandsListResponse` |
+| Frontend | `frontend/src/admin/operator/inspect/*` |
+| Gateways | `AdminCortexGraphGateway`, `AdminCortexIdentityGateway`, `AdminCortexInspectGateway` |
+| Tests | `test_admin_cortex_operator_r3.py` |
+
+**Deletes (v2 path):** graph-truth auto-fetch storm; graph/identity phase pages replaced by inspect lenses.
+
+**Operator value:** See real entities and edge rules — core continuity evidence without SQL.
 
 ---
 
@@ -1190,4 +1203,4 @@ R0 guardrails
 
 ---
 
-**End of refactor plan.** R0–R2 complete; next step: R3 Inspector hub (enable flags in staging first).
+**End of refactor plan.** R0–R3 complete; next step: R4 Queues tab (enable flags in staging first).
