@@ -178,24 +178,24 @@ function QueueHintsSection({
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <p className="text-sm font-medium text-stone-900">Queue hints</p>
-      <p className="mt-1 text-xs text-stone-600">Counts only — detail lists arrive on Queues tab (R4).</p>
+      <p className="mt-1 text-xs text-stone-600">Counts with links to the Queues tab for full lists.</p>
       <ul className="mt-3 space-y-2 text-sm">
         <li>
           Retry-ready deferrals: {counts.deferral_retry_ready}{" "}
-          <Link to={`/admin/tenants/${tenantId}/cortex/canonical`} className="text-indigo-700">
-            canonical →
+          <Link to={`/admin/tenants/${tenantId}/cortex/queues?tab=deferrals`} className="text-indigo-700">
+            queues →
           </Link>
         </li>
         <li>
           TCRE queued: {counts.tcre_queued}{" "}
-          <Link to={`/admin/tenants/${tenantId}/cortex/reconstruction`} className="text-indigo-700">
-            reconstruction →
+          <Link to={`/admin/tenants/${tenantId}/cortex/queues?tab=tcre_queued`} className="text-indigo-700">
+            queues →
           </Link>
         </li>
         <li>
           Synthesis failed: {counts.synthesis_failed}{" "}
-          <Link to={`/admin/tenants/${tenantId}/cortex/synthesis`} className="text-indigo-700">
-            synthesis →
+          <Link to={`/admin/tenants/${tenantId}/cortex/queues?tab=synthesis_failed`} className="text-indigo-700">
+            queues →
           </Link>
         </li>
       </ul>

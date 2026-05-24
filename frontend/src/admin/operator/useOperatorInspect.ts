@@ -15,12 +15,30 @@ const inspectQueryOpts = {
   retry: 0,
 } as const;
 
+function graphSnapshotPollInterval(data: Awaited<ReturnType<typeof fetchOperatorGraphSnapshot>> | undefined) {
+  const status = data?.component_snapshot?.job_status;
+  if (status === "pending" || status === "running") return 2_000;
+  return false;
+}
+
 export function useOperatorGraphSnapshot() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   return useQuery({
     queryKey: operatorKeys.graphSnapshot(tenantId),
     queryFn: () => fetchOperatorGraphSnapshot(tenantId),
     enabled: Boolean(tenantId) && isCortexAdminV2Enabled(),
+    ...inspectQueryOpts,
+  });
+}
+
+/** Graph snapshot with polling while async component scan is in flight (R4). */
+export function useOperatorGraphSnapshotPolling() {
+  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  return useQuery({
+    queryKey: operatorKeys.graphSnapshot(tenantId),
+    queryFn: () => fetchOperatorGraphSnapshot(tenantId),
+    enabled: Boolean(tenantId) && isCortexAdminV2Enabled(),
+    refetchInterval: (query) => graphSnapshotPollInterval(query.state.data),
     ...inspectQueryOpts,
   });
 }

@@ -4,9 +4,12 @@ import type {
   OperatorActionRequest,
   OperatorActionResponse,
   OperatorEdgeProvenance,
+  OperatorGraphComponentRefresh,
   OperatorGraphSnapshot,
   OperatorIslandsList,
   OperatorOverview,
+  OperatorQueueTab,
+  OperatorQueues,
   OperatorRuntime,
 } from "./operatorTypes";
 
@@ -94,5 +97,29 @@ export async function fetchOperatorEdgeProvenance(
 export async function fetchOperatorIslandsList(tenantId: string): Promise<OperatorIslandsList> {
   const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/inspect/islands`);
   await assertOperatorV2Response(res, "operator islands");
+  return res.json();
+}
+
+export async function postOperatorGraphSnapshotRefresh(
+  tenantId: string,
+): Promise<OperatorGraphComponentRefresh> {
+  const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/snapshots/graph/refresh`, {
+    method: "POST",
+  });
+  await assertOperatorV2Response(res, "operator graph refresh");
+  return res.json();
+}
+
+export async function fetchOperatorQueues(
+  tenantId: string,
+  params: { tab?: OperatorQueueTab; limit?: number; offset?: number } = {},
+): Promise<OperatorQueues> {
+  const search = new URLSearchParams();
+  if (params.tab) search.set("tab", params.tab);
+  if (params.limit != null) search.set("limit", String(params.limit));
+  if (params.offset != null) search.set("offset", String(params.offset));
+  const qs = search.toString();
+  const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/queues${qs ? `?${qs}` : ""}`);
+  await assertOperatorV2Response(res, "operator queues");
   return res.json();
 }

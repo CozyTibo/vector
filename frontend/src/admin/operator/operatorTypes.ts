@@ -153,7 +153,51 @@ export type OperatorGraphSnapshot = {
   stale_after_minutes: number;
   graph_summary: Record<string, unknown> | null;
   identity_summary: Record<string, unknown> | null;
+  component_snapshot: OperatorGraphComponentSnapshot;
   prose_summary: string;
+};
+
+export type OperatorGraphComponentSnapshot = {
+  available: boolean;
+  captured_at_utc: string | null;
+  component_count: number | null;
+  component_sizes_top_20: number[];
+  largest_component_size: number | null;
+  job_status: "idle" | "pending" | "running" | "complete" | "failed";
+  error_detail: string | null;
+};
+
+export type OperatorGraphComponentRefresh = {
+  surface_kind: "operator_graph_component_refresh_v1";
+  tenant_id: string;
+  enqueued: boolean;
+  job_status: string;
+  hint?: string | null;
+};
+
+export type OperatorQueueTab =
+  | "synthesis_failed"
+  | "tcre_queued"
+  | "deferrals"
+  | "ingestion_failed";
+
+export type OperatorQueueItem = Record<string, unknown>;
+
+export type OperatorQueues = {
+  surface_kind: "operator_queues_v1";
+  tenant_id: string;
+  tab: OperatorQueueTab;
+  items: OperatorQueueItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  counts: {
+    synthesis_failed: number;
+    tcre_queued: number;
+    deferrals: number;
+    ingestion_failed: number;
+  };
+  generated_at_utc: string;
 };
 
 export type OperatorEdgeProvenance = {

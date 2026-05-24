@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import copy
+import threading
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -17,7 +20,19 @@ from vector.domains.cortex.operational_runtime.execution_island_registry import 
     list_execution_island_registry_v1,
 )
 from vector.domains.cortex.pipeline.admin_continuity_snapshot import read_admin_continuity_snapshot_v1
+from vector.domains.cortex.pipeline.admin_graph_component_snapshot import (
+    read_admin_graph_component_snapshot_v1,
+)
 from vector.infrastructure.db.models.cortex_org_link import CortexOrgLink
+
+_GRAPH_SNAPSHOT_CACHE_TTL_SECONDS = 30.0
+_GRAPH_SNAPSHOT_CACHE_LOCK = threading.Lock()
+_GRAPH_SNAPSHOT_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def invalidate_operator_graph_snapshot_cache_v1(tenant_id: uuid.UUID) -> None:
+    with _GRAPH_SNAPSHOT_CACHE_LOCK:
+        _GRAPH_SNAPSHOT_CACHE.pop(str(tenant_id), None)
 
 _GRAPH_SNAPSHOT_STALE_MINUTES = 15
 
@@ -28,6 +43,26 @@ def build_operator_graph_snapshot_v1(
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
     """Read materialized graph summary from continuity snapshot (no live component scan)."""
+    cache_key = str(tenant_id)
+    now = time.monotonic()
+    with _GRAPH_SNAPSHOT_CACHE_LOCK:
+        cached = _GRAPH_SNAPSHOT_CACHE.get(cache_key)
+        if cached is not None:
+            ts, payload = cached
+            if now - ts <= _GRAPH_SNAPSHOT_CACHE_TTL_SECONDS:
+                return copy.deepcopy(payload)
+
+    payload = _build_operator_graph_snapshot_uncached_v1(session, tenant_id=tenant_id)
+    with _GRAPH_SNAPSHOT_CACHE_LOCK:
+        _GRAPH_SNAPSHOT_CACHE[cache_key] = (time.monotonic(), copy.deepcopy(payload))
+    return payload
+
+
+def _build_operator_graph_snapshot_uncached_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
     snapshot = read_admin_continuity_snapshot_v1(session, tenant_id=tenant_id)
     captured_at = snapshot.get("captured_at_utc")
     stale = False
@@ -37,7 +72,11 @@ def build_operator_graph_snapshot_v1(
         )
     graph_summary = snapshot.get("graph_summary") if snapshot.get("available") else None
     identity_summary = snapshot.get("identity_summary") if snapshot.get("available") else None
-    prose = _graph_snapshot_prose_v1(graph_summary if isinstance(graph_summary, dict) else None)
+    component_snapshot = read_admin_graph_component_snapshot_v1(session, tenant_id=tenant_id)
+    prose = _graph_snapshot_prose_v1(
+        graph_summary if isinstance(graph_summary, dict) else None,
+        component_snapshot=component_snapshot,
+    )
     return {
         "surface_kind": "operator_graph_snapshot_v1",
         "tenant_id": str(tenant_id),
@@ -47,11 +86,16 @@ def build_operator_graph_snapshot_v1(
         "stale_after_minutes": _GRAPH_SNAPSHOT_STALE_MINUTES,
         "graph_summary": graph_summary,
         "identity_summary": identity_summary,
+        "component_snapshot": component_snapshot,
         "prose_summary": prose,
     }
 
 
-def _graph_snapshot_prose_v1(graph: dict[str, Any] | None) -> str:
+def _graph_snapshot_prose_v1(
+    graph: dict[str, Any] | None,
+    *,
+    component_snapshot: dict[str, Any] | None = None,
+) -> str:
     if not graph:
         return "Graph continuity snapshot not yet materialized for this tenant."
     total = int(graph.get("entities_total") or 0)
@@ -68,6 +112,11 @@ def _graph_snapshot_prose_v1(graph: dict[str, Any] | None) -> str:
     github = graph.get("promotable_github")
     if slack is not None or github is not None:
         bits.append(f"Promotable Slack/GitHub: {slack or 0}/{github or 0}.")
+    if component_snapshot and component_snapshot.get("available"):
+        cc = component_snapshot.get("component_count")
+        largest = component_snapshot.get("largest_component_size")
+        if cc is not None:
+            bits.append(f"{cc} connected components (largest {largest or 0}).")
     return " ".join(bits)
 
 

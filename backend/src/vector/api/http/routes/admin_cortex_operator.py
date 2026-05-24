@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -15,10 +15,15 @@ from vector.contracts.operator_admin import (
     OperatorActionRequest,
     OperatorActionResponse,
     OperatorEdgeProvenanceResponse,
+    OperatorGraphComponentRefreshResponse,
     OperatorGraphSnapshotResponse,
     OperatorIslandsListResponse,
     OperatorOverviewResponse,
+    OperatorQueuesResponse,
     OperatorRuntimeResponse,
+)
+from vector.domains.cortex.pipeline.admin_graph_component_snapshot import (
+    enqueue_graph_component_snapshot_refresh_v1,
 )
 from vector.domains.cortex.pipeline.operator_admin_actions import execute_operator_action_v1
 from vector.domains.cortex.pipeline.operator_admin_inspect import (
@@ -27,6 +32,7 @@ from vector.domains.cortex.pipeline.operator_admin_inspect import (
     lookup_edge_provenance_v1,
 )
 from vector.domains.cortex.pipeline.operator_admin_overview import build_operator_overview_v1
+from vector.domains.cortex.pipeline.operator_admin_queues import build_operator_queues_v1
 from vector.domains.cortex.pipeline.operator_admin_runtime import build_operator_runtime_v1
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 from vector.infrastructure.build_info import build_deploy_info_payload
@@ -138,6 +144,43 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         with admin_request_timing(endpoint="operator.snapshots.graph", tenant_id=tenant_id):
             raw = build_operator_graph_snapshot_v1(db, tenant_id=tenant_id)
         return OperatorGraphSnapshotResponse.model_validate(raw)
+
+    @op.post("/snapshots/graph/refresh", response_model=OperatorGraphComponentRefreshResponse)
+    def post_operator_graph_snapshot_refresh(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> OperatorGraphComponentRefreshResponse:
+        _require_operator_v2(settings)
+        _assert_tenant(db, tenant_id)
+        with admin_request_timing(endpoint="operator.snapshots.graph.refresh", tenant_id=tenant_id):
+            raw = enqueue_graph_component_snapshot_refresh_v1(db, tenant_id=tenant_id)
+        db.commit()
+        return OperatorGraphComponentRefreshResponse.model_validate(raw)
+
+    @op.get("/queues", response_model=OperatorQueuesResponse)
+    def get_operator_queues(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        tab: Annotated[
+            Literal["synthesis_failed", "tcre_queued", "deferrals", "ingestion_failed"],
+            Query(),
+        ] = "synthesis_failed",
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> OperatorQueuesResponse:
+        _require_operator_v2(settings)
+        _assert_tenant(db, tenant_id)
+        with admin_request_timing(endpoint="operator.queues", tenant_id=tenant_id):
+            raw = build_operator_queues_v1(
+                db,
+                tenant_id=tenant_id,
+                tab=tab,
+                limit=limit,
+                offset=offset,
+            )
+        return OperatorQueuesResponse.model_validate(raw)
 
     @op.get("/inspect/edges", response_model=OperatorEdgeProvenanceResponse)
     def get_operator_edge_provenance(

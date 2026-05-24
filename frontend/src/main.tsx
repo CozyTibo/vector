@@ -15,6 +15,7 @@ import OperatorIdentityEntityInspectPage from "./admin/operator/inspect/Operator
 import OperatorIdentityInspectPage from "./admin/operator/inspect/OperatorIdentityInspectPage.tsx";
 import OperatorIslandsInspectPage from "./admin/operator/inspect/OperatorIslandsInspectPage.tsx";
 import AdminCortexOverviewGateway from "./admin/operator/AdminCortexOverviewGateway.tsx";
+import AdminCortexQueuesGateway from "./admin/operator/AdminCortexQueuesGateway.tsx";
 import AdminCortexRuntimeGateway from "./admin/operator/AdminCortexRuntimeGateway.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
@@ -97,6 +98,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route index element={<Navigate to="overview" replace />} />
                 <Route path="overview" element={<AdminCortexOverviewGateway />} />
                 <Route path="runtime" element={<AdminCortexRuntimeGateway />} />
+                <Route path="queues" element={<AdminCortexQueuesGateway />} />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
                 <Route path="canonical" element={<AdminCortexCanonicalLayout />}>
                   <Route index element={<AdminCortexCanonicalHealthPage />} />

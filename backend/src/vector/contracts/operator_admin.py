@@ -193,7 +193,38 @@ class OperatorGraphSnapshotResponse(BaseModel):
     stale_after_minutes: int = 15
     graph_summary: dict[str, Any] | None = None
     identity_summary: dict[str, Any] | None = None
+    component_snapshot: dict[str, Any] = Field(default_factory=dict)
     prose_summary: str = ""
+
+
+class OperatorGraphComponentRefreshResponse(BaseModel):
+    surface_kind: Literal["operator_graph_component_refresh_v1"] = "operator_graph_component_refresh_v1"
+    tenant_id: str
+    enqueued: bool
+    job_status: str
+    hint: str | None = None
+
+
+OperatorQueueTab = Literal["synthesis_failed", "tcre_queued", "deferrals", "ingestion_failed"]
+
+
+class OperatorQueueCounts(BaseModel):
+    synthesis_failed: int = 0
+    tcre_queued: int = 0
+    deferrals: int = 0
+    ingestion_failed: int = 0
+
+
+class OperatorQueuesResponse(BaseModel):
+    surface_kind: Literal["operator_queues_v1"] = "operator_queues_v1"
+    tenant_id: str
+    tab: OperatorQueueTab
+    items: list[dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
+    counts: OperatorQueueCounts
+    generated_at_utc: datetime
 
 
 class OperatorEdgeProvenanceRow(BaseModel):

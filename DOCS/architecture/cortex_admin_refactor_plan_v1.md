@@ -1101,18 +1101,18 @@ Frontend:
 
 ---
 
-## Phase R4 — Queues tab + async components (1 week)
+## Phase R4 — Queues tab + async components (1 week) ✅ **Complete (2026-05-24)**
 
 Backend:
 
-- `GET /operator/queues` with paginated failed synthesis, TCRE, deferrals
-- `POST /snapshots/graph/refresh` async job
-- `cortex_admin_graph_component_snapshot` table
+- ✅ `GET /operator/queues` with paginated failed synthesis, TCRE, deferrals, ingestion failed
+- ✅ `POST /snapshots/graph/refresh` async Celery job (`refresh_graph_component_snapshot_task`)
+- ✅ `cortex_admin_graph_component_snapshot` table + reader/writer
 
 Frontend:
 
-- `OperatorQueuesPage`
-- Island lens with async refresh button
+- ✅ `OperatorQueuesPage` + Queues tab in cortex nav
+- ✅ Graph + Islands lenses with async component refresh + polling
 
 **Deletes:** phase explorer as default UX (move to advanced/inspect optional).
 
@@ -1203,4 +1203,4 @@ R0 guardrails
 
 ---
 
-**End of refactor plan.** R0–R3 complete; next step: R4 Queues tab (enable flags in staging first).
+**End of refactor plan.** R0–R4 complete; next step: R5 retrieval/synthesis inspect (enable flags in staging first).

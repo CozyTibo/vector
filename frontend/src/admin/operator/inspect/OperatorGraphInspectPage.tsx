@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { SectionSkeleton } from "../../cortex/SectionSkeleton";
 import { DeployInfoFooter } from "../DeployInfoFooter";
+import { GraphComponentRefreshSection } from "../GraphComponentRefreshSection";
 import { useOperatorEdgeProvenance, useOperatorGraphSnapshot } from "../useOperatorInspect";
 
 function fmtTime(iso: string | null | undefined): string {
@@ -70,6 +71,8 @@ export default function OperatorGraphInspectPage() {
           ) : null}
         </section>
       ) : null}
+
+      <GraphComponentRefreshSection tenantId={tenantId} />
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-stone-900">Edge provenance lookup</h2>
