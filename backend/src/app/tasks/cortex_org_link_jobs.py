@@ -83,8 +83,17 @@ def run_org_link_replay_job_task(
         return {"tenant_id": tenant_id, "job_id": str(jid), "status": status_out}
 
     jk = job_kind
-    if jk not in ("authoritative_replay", "candidate_regen", "graph_projection_export", "identity_continuity_rebuild"):
-        msg = "job_kind must be authoritative_replay, candidate_regen, graph_projection_export, or identity_continuity_rebuild"
+    if jk not in (
+        "authoritative_replay",
+        "candidate_regen",
+        "graph_projection_export",
+        "identity_continuity_rebuild",
+        "identity_rebuild_from_anchors",
+    ):
+        msg = (
+            "job_kind must be authoritative_replay, candidate_regen, "
+            "graph_projection_export, identity_continuity_rebuild, or identity_rebuild_from_anchors"
+        )
         raise ValueError(msg)
     _LOGGER.info(
         "org_link_replay_job_start tenant_id=%s job_kind=%s dry_run=%s",

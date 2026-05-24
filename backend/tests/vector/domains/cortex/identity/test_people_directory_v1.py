@@ -97,7 +97,54 @@ def test_cluster_unions_entities_with_same_email() -> None:
 
 def test_entity_needs_raw_enrichment() -> None:
     assert _entity_needs_raw_enrichment({"display_name": None, "email": "a@b.com"}) is True
-    assert _entity_needs_raw_enrichment({"display_name": "Ada", "email": None}) is False
+    assert _entity_needs_raw_enrichment({"display_name": "Ada", "email": None}) is True
+    assert _entity_needs_raw_enrichment({"display_name": "Ada", "email": "a@b.com"}) is False
+
+
+def test_cluster_unions_github_handles_with_same_raw_email() -> None:
+    tid = uuid.uuid4()
+    e1, e2 = uuid.uuid4(), uuid.uuid4()
+    entities = {
+        e1: {
+            "id": str(e1),
+            "entity_kind": "human_actor",
+            "metadata_json": {
+                "github_login": "maximilien",
+                "projection_kind": "github_user",
+                "source_anchor_raw_record_id": 1,
+            },
+        },
+        e2: {
+            "id": str(e2),
+            "entity_kind": "human_actor",
+            "metadata_json": {
+                "github_login": "maximilien",
+                "projection_kind": "email_identity",
+                "source_anchor_raw_record_id": 2,
+            },
+        },
+    }
+    labels = {
+        e1: {"display_name": "Maximilien", "email": "max@example.com"},
+        e2: {"display_name": "Maximilien", "email": "max@example.com"},
+    }
+
+    class _FakeSession:
+        def scalars(self, *_args, **_kwargs):
+            return _EmptyScalars()
+
+    class _EmptyScalars:
+        def all(self):
+            return []
+
+    clusters = _cluster_human_actors(
+        _FakeSession(),
+        tenant_id=tid,
+        entity_ids={e1, e2},
+        entities_by_id=entities,
+        labels_by_entity_id=labels,
+    )
+    assert len(clusters) == 1
 
 
 def test_extract_entity_labels_from_metadata_github_login() -> None:

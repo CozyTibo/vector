@@ -177,6 +177,17 @@ export function formatActionFeedback(data: OperatorActionResponse): ActionFeedba
   }
 
   if (action === "rebuild_identities") {
+    const enqueued = result.enqueued === true;
+    if (enqueued) {
+      return {
+        tone: "ok",
+        title: "Identity rebuild queued",
+        detail:
+          typeof result.hint === "string"
+            ? result.hint
+            : "Anchor rescan runs in the background. Watch Runtime for downstream progress.",
+      };
+    }
     const before = asRecord(result.counts_before);
     const after = asRecord(result.counts_after);
     const substrate = asRecord(result.substrate);

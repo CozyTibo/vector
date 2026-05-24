@@ -255,7 +255,7 @@ def _extract_entity_labels_v1(
 
 
 def _entity_needs_raw_enrichment(labels: dict[str, str | None]) -> bool:
-    return not labels.get("display_name")
+    return not labels.get("display_name") or not labels.get("email")
 
 
 def _metadata_labels_for_entities(
@@ -265,6 +265,51 @@ def _metadata_labels_for_entities(
         eid: _extract_entity_labels_v1(meta=_meta(entity), raw=None, prof={})
         for eid, entity in entities_by_id.items()
     }
+
+
+def _enrich_directory_labels_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entities_by_id: dict[uuid.UUID, dict[str, Any]],
+    seed_labels: dict[uuid.UUID, dict[str, str | None]],
+) -> dict[uuid.UUID, dict[str, str | None]]:
+    """Resolve display names and emails from raw anchors before clustering (chunked)."""
+    labels = dict(seed_labels)
+    max_rounds = max(1, (len(entities_by_id) // _MAX_RAW_LABEL_FETCH) + 1)
+    for _ in range(max_rounds):
+        needs_enrichment = [
+            eid
+            for eid in entities_by_id
+            if _entity_needs_raw_enrichment(labels.get(eid) or {})
+        ]
+        if not needs_enrichment:
+            break
+        chunk_entities = {
+            eid: entities_by_id[eid]
+            for eid in needs_enrichment[:_MAX_RAW_LABEL_FETCH]
+            if eid in entities_by_id
+        }
+        if not chunk_entities:
+            break
+        before = {eid: dict(labels.get(eid) or {}) for eid in chunk_entities}
+        labels = {
+            **labels,
+            **_batch_entity_identity_labels_v1(
+                session,
+                tenant_id=tenant_id,
+                entities_by_id=chunk_entities,
+                seed_labels=labels,
+            ),
+        }
+        progressed = any(
+            (labels.get(eid) or {}).get("email") != before.get(eid, {}).get("email")
+            or (labels.get(eid) or {}).get("display_name") != before.get(eid, {}).get("display_name")
+            for eid in chunk_entities
+        )
+        if not progressed:
+            break
+    return labels
 
 
 def _batch_entity_identity_labels_v1(
@@ -621,26 +666,12 @@ def build_people_directory_v1(
     )
     entities_by_id = {row.id: org_entity_public_dict(row) for row in rows}
     entity_ids = set(entities_by_id.keys())
-    metadata_labels = _metadata_labels_for_entities(entities_by_id)
-    missing_email_ids = [
-        eid for eid in entity_ids if not (metadata_labels.get(eid) or {}).get("email")
-    ]
-    if missing_email_ids:
-        probe_entities = {
-            eid: entities_by_id[eid]
-            for eid in missing_email_ids[:_MAX_RAW_LABEL_FETCH]
-            if eid in entities_by_id
-        }
-        if probe_entities:
-            metadata_labels = {
-                **metadata_labels,
-                **_batch_entity_identity_labels_v1(
-                    session,
-                    tenant_id=tenant_id,
-                    entities_by_id=probe_entities,
-                    seed_labels=metadata_labels,
-                ),
-            }
+    metadata_labels = _enrich_directory_labels_v1(
+        session,
+        tenant_id=tenant_id,
+        entities_by_id=entities_by_id,
+        seed_labels=_metadata_labels_for_entities(entities_by_id),
+    )
     clusters = _cluster_human_actors(
         session,
         tenant_id=tenant_id,

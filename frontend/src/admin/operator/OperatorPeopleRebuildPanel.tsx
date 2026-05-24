@@ -80,7 +80,7 @@ export function OperatorPeopleRebuildPanel() {
           <p className="text-sm font-medium text-stone-900">Rebuild identities</p>
           <p className="mt-1 text-xs text-stone-600">
             Clears org handles and link candidates, then rescans existing canonical anchors to reconstruct people.
-            Raw ingestion and canonical materialization are untouched. Graph and downstream phases restart afterward.
+            Raw ingestion and canonical materialization are untouched. Graph and downstream phases restart in the background.
           </p>
         </div>
         <button

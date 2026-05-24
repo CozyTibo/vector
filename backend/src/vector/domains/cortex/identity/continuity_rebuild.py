@@ -312,23 +312,17 @@ def _persist_standalone_audit_job(
 REBUILD_IDENTITIES_CONFIRM_PHRASE: Final[str] = "REBUILD IDENTITIES FROM CANONICAL ANCHORS"
 
 
-def rebuild_identities_from_anchors_v1(
+def _run_rebuild_identities_substrate_v1(
     db: Session,
     *,
     tenant_id: uuid.UUID,
-    anchor_limit: int = 5_000,
-    restart_downstream: bool = True,
+    anchor_limit: int,
+    restart_downstream: bool,
 ) -> dict[str, Any]:
-    """Clear org identity substrate and rebuild handles + candidates from canonical anchors only."""
+    """Backfill handles/candidates from anchors and optionally restart graph downstream."""
     from vector.domains.cortex.execution.admin_commands import restart_execution_from_phase_v1
     from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
 
-    counts_before = substrate_counts(db, tenant_id=tenant_id)
-    cleared_identity = clear_derived_outputs_from_phase_v1(
-        db,
-        tenant_id=tenant_id,
-        from_phase="IDENTITY",
-    )
     substrate = run_identity_handles_and_candidates_refresh(
         db,
         tenant_id=tenant_id,
@@ -352,15 +346,109 @@ def rebuild_identities_from_anchors_v1(
         )
 
     return {
-        "surface_kind": "identity_rebuild_from_anchors_v1",
-        "tenant_id": str(tenant_id),
-        "counts_before": counts_before,
         "counts_after": counts_after,
-        "cleared_identity": cleared_identity,
         "substrate": substrate,
         "cleared_downstream": cleared_downstream,
         "restarted": restarted,
         "anchor_limit_applied": anchor_limit,
+    }
+
+
+def rebuild_identities_from_anchors_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    anchor_limit: int = 5_000,
+    restart_downstream: bool = True,
+) -> dict[str, Any]:
+    """Clear org identity substrate and rebuild handles + candidates from canonical anchors only."""
+    from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
+
+    counts_before = substrate_counts(db, tenant_id=tenant_id)
+    cleared_identity = clear_derived_outputs_from_phase_v1(
+        db,
+        tenant_id=tenant_id,
+        from_phase="IDENTITY",
+    )
+    downstream = _run_rebuild_identities_substrate_v1(
+        db,
+        tenant_id=tenant_id,
+        anchor_limit=anchor_limit,
+        restart_downstream=restart_downstream,
+    )
+
+    return {
+        "surface_kind": "identity_rebuild_from_anchors_v1",
+        "tenant_id": str(tenant_id),
+        "counts_before": counts_before,
+        "counts_after": downstream["counts_after"],
+        "cleared_identity": cleared_identity,
+        "substrate": downstream["substrate"],
+        "cleared_downstream": downstream["cleared_downstream"],
+        "restarted": downstream["restarted"],
+        "anchor_limit_applied": anchor_limit,
+    }
+
+
+def enqueue_rebuild_identities_from_anchors_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    anchor_limit: int = 5_000,
+    restart_downstream: bool = True,
+) -> dict[str, Any]:
+    """Clear identity synchronously, then enqueue anchor rescan + optional graph restart (async)."""
+    from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
+    from vector.domains.cortex.identity.org_link_replay_runtime import (
+        create_queued_org_link_replay_job,
+    )
+    from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
+
+    counts_before = substrate_counts(db, tenant_id=tenant_id)
+    cleared_identity = clear_derived_outputs_from_phase_v1(
+        db,
+        tenant_id=tenant_id,
+        from_phase="IDENTITY",
+    )
+    scope_json: dict[str, Any] = {
+        "anchor_limit": anchor_limit,
+        "restart_downstream": restart_downstream,
+        "identity_already_cleared": True,
+    }
+    job = create_queued_org_link_replay_job(
+        db,
+        tenant_id=tenant_id,
+        job_kind="identity_rebuild_from_anchors",
+        scope_json=scope_json,
+        engine_build_ref=CONTINUITY_REBUILD_ENGINE_BUILD_REF,
+    )
+    try:
+        async_result = run_org_link_replay_job_task.delay(
+            str(tenant_id),
+            "identity_rebuild_from_anchors",
+            None,
+            False,
+            scope_json,
+            str(job.id),
+        )
+    except Exception as exc:
+        msg = f"celery_enqueue_failed:{exc}"
+        raise RuntimeError(msg) from exc
+    job.celery_task_id = str(async_result.id)
+    db.flush()
+    worker_path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{async_result.id}"
+    return {
+        "surface_kind": "identity_rebuild_from_anchors_enqueue_v1",
+        "tenant_id": str(tenant_id),
+        "enqueued": True,
+        "job_id": str(job.id),
+        "celery_task_id": str(async_result.id),
+        "worker_task_status_path": worker_path,
+        "counts_before": counts_before,
+        "cleared_identity": cleared_identity,
+        "anchor_limit_applied": anchor_limit,
+        "restart_downstream": restart_downstream,
+        "hint": "Identity substrate cleared; anchor rescan runs in the background. Watch Runtime for downstream progress.",
     }
 
 

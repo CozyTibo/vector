@@ -29,6 +29,7 @@ OrgLinkJobKind = Literal[
     "candidate_regen",
     "graph_projection_export",
     "identity_continuity_rebuild",
+    "identity_rebuild_from_anchors",
     "lawful_edge_promotion",
 ]
 _LINK_DRIFT_CLASSES: Final[frozenset[str]] = frozenset({f"L{i}" for i in range(8)})
@@ -166,14 +167,18 @@ def _validate_org_link_replay_job_params(
         "candidate_regen",
         "graph_projection_export",
         "identity_continuity_rebuild",
+        "identity_rebuild_from_anchors",
         "lawful_edge_promotion",
     ):
         msg = (
             "job_kind must be authoritative_replay, candidate_regen, "
-            "graph_projection_export, identity_continuity_rebuild, or lawful_edge_promotion"
+            "graph_projection_export, identity_continuity_rebuild, identity_rebuild_from_anchors, "
+            "or lawful_edge_promotion"
         )
         raise OrgLinkReplayError(msg)
     if job_kind == "identity_continuity_rebuild":
+        return
+    if job_kind == "identity_rebuild_from_anchors":
         return
     if job_kind == "candidate_regen" and not dry_run:
         rv = (pinned_rule_version or "").strip()
@@ -257,6 +262,51 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
                     "bundle_id": bundle_id,
                     "candidate_set_sha256": sj.get("candidate_set_sha256"),
                     "anchor_evidence_input_sha256": sj.get("anchor_evidence_input_sha256"),
+                },
+            )
+        elif job_kind == "identity_rebuild_from_anchors":
+            from vector.domains.cortex.identity.continuity_rebuild import (
+                _run_rebuild_identities_substrate_v1,
+                substrate_counts,
+            )
+            from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
+
+            scope = dict(job.scope_json or {})
+            alim = int(scope.get("anchor_limit") or 5000)
+            restart_downstream = bool(scope.get("restart_downstream", True))
+            counts_before = substrate_counts(db, tenant_id=job.tenant_id)
+            cleared_identity: dict[str, Any] | None = None
+            if not scope.get("identity_already_cleared"):
+                cleared_identity = clear_derived_outputs_from_phase_v1(
+                    db,
+                    tenant_id=job.tenant_id,
+                    from_phase="IDENTITY",
+                )
+            downstream = _run_rebuild_identities_substrate_v1(
+                db,
+                tenant_id=job.tenant_id,
+                anchor_limit=alim,
+                restart_downstream=restart_downstream,
+            )
+            job.summary_json = {
+                "surface_kind": "identity_rebuild_from_anchors_v1",
+                "tenant_id": str(job.tenant_id),
+                "counts_before": counts_before,
+                "counts_after": downstream["counts_after"],
+                "cleared_identity": cleared_identity,
+                "substrate": downstream["substrate"],
+                "cleared_downstream": downstream["cleared_downstream"],
+                "restarted": downstream["restarted"],
+                "anchor_limit_applied": alim,
+            }
+            _append_receipt(
+                db,
+                job_id=job.id,
+                receipt_class="L0",
+                detail_json={
+                    "lane": "identity_rebuild_from_anchors",
+                    "anchor_limit_applied": alim,
+                    "restart_downstream": restart_downstream,
                 },
             )
         elif job_kind == "authoritative_replay":
