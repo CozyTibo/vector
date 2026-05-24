@@ -4,30 +4,25 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AdminLayout from "./admin/AdminLayout.tsx";
-import AdminCortexCanonicalHealthPage from "./admin/AdminCortexCanonicalHealthPage.tsx";
 import AdminCortexCanonicalLayout from "./admin/AdminCortexCanonicalLayout.tsx";
-import AdminCortexGraphGateway from "./admin/operator/inspect/AdminCortexGraphGateway.tsx";
-import AdminCortexIdentityGateway from "./admin/operator/inspect/AdminCortexIdentityGateway.tsx";
-import AdminCortexInspectGateway from "./admin/operator/inspect/AdminCortexInspectGateway.tsx";
+import AdminCortexInspectLayout from "./admin/operator/inspect/AdminCortexInspectLayout.tsx";
 import InspectorHubPage from "./admin/operator/inspect/InspectorHubPage.tsx";
 import OperatorGraphInspectPage from "./admin/operator/inspect/OperatorGraphInspectPage.tsx";
 import OperatorIdentityEntityInspectPage from "./admin/operator/inspect/OperatorIdentityEntityInspectPage.tsx";
 import OperatorIdentityInspectPage from "./admin/operator/inspect/OperatorIdentityInspectPage.tsx";
-import AdminCortexReconstructionGateway from "./admin/operator/inspect/AdminCortexReconstructionGateway.tsx";
-import AdminCortexRetrievalGateway from "./admin/operator/inspect/AdminCortexRetrievalGateway.tsx";
-import AdminCortexSynthesisGateway from "./admin/operator/inspect/AdminCortexSynthesisGateway.tsx";
 import OperatorExecutionInspectPage from "./admin/operator/inspect/OperatorExecutionInspectPage.tsx";
 import OperatorRetrievalInspectPage from "./admin/operator/inspect/OperatorRetrievalInspectPage.tsx";
 import OperatorRetrievalLineageInspectPage from "./admin/operator/inspect/OperatorRetrievalLineageInspectPage.tsx";
 import OperatorSynthesisInspectPage from "./admin/operator/inspect/OperatorSynthesisInspectPage.tsx";
-import AdminCortexOverviewGateway from "./admin/operator/AdminCortexOverviewGateway.tsx";
-import AdminCortexQueuesGateway from "./admin/operator/AdminCortexQueuesGateway.tsx";
-import AdminCortexRuntimeGateway from "./admin/operator/AdminCortexRuntimeGateway.tsx";
+import OperatorIslandsInspectPage from "./admin/operator/inspect/OperatorIslandsInspectPage.tsx";
+import OperatorOverviewPage from "./admin/operator/OperatorOverviewPage.tsx";
+import OperatorRuntimePage from "./admin/operator/OperatorRuntimePage.tsx";
+import OperatorQueuesPage from "./admin/operator/OperatorQueuesPage.tsx";
+import OperatorCanonicalPage from "./admin/operator/OperatorCanonicalPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
 import AdminCortexSettingsPage from "./admin/AdminCortexSettingsPage.tsx";
 import AdminCortexSynthesisJobDetailPage from "./admin/AdminCortexSynthesisJobDetailPage.tsx";
-import OperatorIslandsInspectPage from "./admin/operator/inspect/OperatorIslandsInspectPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
 import AdminTenantOnboardingPage from "./admin/AdminTenantOnboardingPage.tsx";
@@ -60,6 +55,10 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function LegacyCortexRedirect({ to }: { to: string }) {
+  return <Navigate to={to} replace />;
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -100,17 +99,15 @@ createRoot(document.getElementById("root")!).render(
               <Route path="cortex-ingestion" element={<Navigate to="../cortex/ingestion" replace />} />
               <Route path="cortex" element={<AdminTenantCortexLayout />}>
                 <Route index element={<Navigate to="overview" replace />} />
-                <Route path="overview" element={<AdminCortexOverviewGateway />} />
-                <Route path="runtime" element={<AdminCortexRuntimeGateway />} />
-                <Route path="queues" element={<AdminCortexQueuesGateway />} />
+                <Route path="overview" element={<OperatorOverviewPage />} />
+                <Route path="runtime" element={<OperatorRuntimePage />} />
+                <Route path="queues" element={<OperatorQueuesPage />} />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
                 <Route path="canonical" element={<AdminCortexCanonicalLayout />}>
-                  <Route index element={<AdminCortexCanonicalHealthPage />} />
+                  <Route index element={<OperatorCanonicalPage />} />
                   <Route path="health" element={<Navigate to=".." replace />} />
                 </Route>
-                <Route path="identity" element={<AdminCortexIdentityGateway />} />
-                <Route path="graph" element={<AdminCortexGraphGateway />} />
-                <Route path="inspect" element={<AdminCortexInspectGateway />}>
+                <Route path="inspect" element={<AdminCortexInspectLayout />}>
                   <Route index element={<InspectorHubPage />} />
                   <Route path="identity" element={<OperatorIdentityInspectPage />} />
                   <Route path="identity/e/:entityId" element={<OperatorIdentityEntityInspectPage />} />
@@ -121,26 +118,24 @@ createRoot(document.getElementById("root")!).render(
                   <Route path="synthesis" element={<OperatorSynthesisInspectPage />} />
                   <Route path="execution" element={<OperatorExecutionInspectPage />} />
                 </Route>
-                <Route path="reconstruction" element={<AdminCortexReconstructionGateway />} />
-                <Route path="reconstruction/jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
-                <Route path="retrieval" element={<AdminCortexRetrievalGateway />} />
-                <Route path="retrieval/index" element={<Navigate to=".." replace />} />
-                <Route path="synthesis" element={<AdminCortexSynthesisGateway />} />
-                <Route path="synthesis/jobs/:jobId" element={<AdminCortexSynthesisJobDetailPage />} />
                 <Route path="settings" element={<AdminCortexSettingsPage />} />
-                <Route path="entity-resolution" element={<Navigate to="../identity" replace />} />
-                <Route path="identity-certification" element={<Navigate to="../identity" replace />} />
-                <Route path="identity/*" element={<Navigate to="../identity" replace />} />
-                <Route path="traversal" element={<Navigate to="../graph" replace />} />
-                <Route path="traversal/*" element={<Navigate to="../../graph" replace />} />
+                <Route path="identity" element={<LegacyCortexRedirect to="../inspect/identity" />} />
+                <Route path="graph" element={<LegacyCortexRedirect to="../inspect/graph" />} />
+                <Route path="reconstruction" element={<LegacyCortexRedirect to="../inspect/execution" />} />
+                <Route path="reconstruction/jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
+                <Route path="retrieval" element={<LegacyCortexRedirect to="../inspect/retrieval" />} />
+                <Route path="synthesis" element={<LegacyCortexRedirect to="../inspect/synthesis" />} />
+                <Route path="synthesis/jobs/:jobId" element={<AdminCortexSynthesisJobDetailPage />} />
+                <Route path="entity-resolution" element={<Navigate to="../inspect/identity" replace />} />
+                <Route path="identity-certification" element={<Navigate to="../inspect/identity" replace />} />
+                <Route path="identity/*" element={<Navigate to="../inspect/identity" replace />} />
+                <Route path="traversal" element={<Navigate to="../inspect/graph" replace />} />
+                <Route path="traversal/*" element={<Navigate to="../../inspect/graph" replace />} />
                 <Route path="memory" element={<Navigate to="../overview" replace />} />
-                <Route path="reasoning" element={<Navigate to="../reconstruction" replace />} />
-                <Route path="reasoning/*" element={<Navigate to="../../reconstruction" replace />} />
+                <Route path="reasoning" element={<Navigate to="../inspect/execution" replace />} />
+                <Route path="reasoning/*" element={<Navigate to="../../inspect/execution" replace />} />
                 <Route path="verification" element={<Navigate to="../overview" replace />} />
                 <Route path="settings-debug" element={<Navigate to="../settings" replace />} />
-                <Route path="canonical/*" element={<Navigate to=".." replace />} />
-                <Route path="retrieval/*" element={<Navigate to=".." replace />} />
-                <Route path="synthesis/*" element={<Navigate to=".." replace />} />
               </Route>
               <Route path="connections" element={<RedirectTenantToIntegrations />} />
               <Route path="slack-onboarding" element={<RedirectTenantToWorkspace />} />

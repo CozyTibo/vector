@@ -1,7 +1,18 @@
 import { titleConnector } from "../cortexAdminTypes";
 import type { CortexConnectorId, CortexRecentRuns } from "../cortexAdminTypes";
-import type { IngestionRunTriggerKind, PipelineRecentIngestionRun } from "./pipelineTypes";
 import { StatusBadge } from "../ui/StatusBadge";
+
+export type IngestionRunTriggerKind = "scheduled" | "manual" | "replay";
+
+type PipelineRecentIngestionRun = {
+  run_id: string;
+  connector: string;
+  status: string;
+  started_at: string;
+  finished_at?: string | null;
+  raw_rows_written: number | null;
+  trigger_kind?: IngestionRunTriggerKind;
+};
 
 function formatExactTime(iso: string): string {
   const d = new Date(iso);

@@ -1,27 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { SectionSkeleton } from "../SectionSkeleton";
-import { StatusBadge } from "../../ui/StatusBadge";
 import { IdentityEntityCard } from "./IdentityEntityCard";
-import type { GraphTruthInspectorPayload } from "./graphInspectorTypes";
 import type { IdentitySearchParams } from "./identityContinuityTypes";
 import {
   useIdentityContinuityEntity,
-  useIdentityContinuityInspectorTenant,
   useIdentityContinuitySearch,
 } from "./useIdentityContinuityInspector";
 
 type Props = {
-  data?: GraphTruthInspectorPayload;
-  lean?: boolean;
   onSelectEntity?: (entityId: string) => void;
 };
-
-function severityTone(sev: string | undefined): "ok" | "warn" | "bad" {
-  if (sev === "ok") return "ok";
-  if (sev === "bad") return "bad";
-  return "warn";
-}
 
 const SEARCH_FIELDS: Array<{ key: keyof IdentitySearchParams; label: string; placeholder: string }> = [
   { key: "slack_user_id", label: "Slack user id", placeholder: "U01234567" },
@@ -32,11 +21,7 @@ const SEARCH_FIELDS: Array<{ key: keyof IdentitySearchParams; label: string; pla
   { key: "canonical_entity_id", label: "Canonical entity id", placeholder: "uuid" },
 ];
 
-export function IdentityContinuityInspector({ data, lean = false, onSelectEntity }: Props) {
-  const tenantQ = useIdentityContinuityInspectorTenant(!lean);
-  const ic = lean ? undefined : tenantQ.data?.identity_continuity ?? data?.identity_continuity;
-  const anchor = ic?.anchor_boundary ?? {};
-
+export function IdentityContinuityInspector({ onSelectEntity }: Props) {
   const [draft, setDraft] = useState<IdentitySearchParams>({});
   const [submitted, setSubmitted] = useState<IdentitySearchParams>({});
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
@@ -145,64 +130,6 @@ export function IdentityContinuityInspector({ data, lean = false, onSelectEntity
           <IdentityEntityCard data={entityQ.data} />
         ) : null
       ) : null}
-
-      {!lean ? (
-        <>
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Anchors" value={anchor.anchor_count?.toLocaleString() ?? "—"} />
-        <Metric
-          label="Anchors missing entity"
-          value={
-            <span className="flex items-center gap-2">
-              {ic?.anchors_missing_org_entity_pct ?? "—"}%
-              <StatusBadge tone={severityTone(ic?.anchors_missing_severity)}>
-                {ic?.anchors_missing_severity ?? "unknown"}
-              </StatusBadge>
-            </span>
-          }
-        />
-        <Metric label="Candidate rows" value={ic?.candidate_rows?.toLocaleString() ?? "—"} />
-        <Metric
-          label="Unpromoted"
-          value={(tenantQ.data?.unpromoted_candidates ?? data?.unpromoted_candidates ?? 0).toLocaleString()}
-        />
-      </section>
-
-      {(ic?.promotable_by_rule_id ?? []).length > 0 ? (
-        <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-stone-900">Promotable candidates by rule (tenant)</h3>
-          <div className="mt-3 overflow-x-auto rounded-lg border border-stone-200">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b bg-stone-50 text-xs uppercase text-stone-500">
-                <tr>
-                  <th className="px-3 py-2">rule_id</th>
-                  <th className="px-3 py-2">promotable count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ic!.promotable_by_rule_id!.map((row: { rule_id: string; promotable_count: number }) => (
-                  <tr key={row.rule_id} className="border-b border-stone-100">
-                    <td className="px-3 py-2 font-mono text-xs">{row.rule_id}</td>
-                    <td className="px-3 py-2 tabular-nums">{row.promotable_count.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-        </>
-      ) : null}
     </div>
   );
 }
-
-function Metric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-      <p className="text-xs uppercase text-stone-500">{label}</p>
-      <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-

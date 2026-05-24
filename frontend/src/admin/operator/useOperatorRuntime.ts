@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 
 import { fetchOperatorRuntime } from "./fetchOperator";
-import { isCortexAdminV2Enabled } from "./featureFlags";
 import { invalidateOperatorOverviewKey, invalidateOperatorRuntimePrefix, operatorKeys } from "./operatorKeys";
 import type { OperatorRuntime } from "./operatorTypes";
 
@@ -14,7 +13,7 @@ const runtimeQueryOpts = {
 
 export function useOperatorRuntime(transitionLimit = 50) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const enabled = Boolean(tenantId) && isCortexAdminV2Enabled();
+  const enabled = Boolean(tenantId);
   return useQuery({
     queryKey: operatorKeys.runtime(tenantId, transitionLimit),
     queryFn: () =>

@@ -1141,13 +1141,13 @@ Frontend:
 
 ---
 
-## Phase R6 — Backend deletion (1 week)
+## Phase R6 — Backend deletion (1 week) ✅ **Complete (2026-05-24)**
 
-- Remove bootstrap, monolith, slices, semantic public route, graph-truth-inspector
-- Remove `pipeline_admin_overview.py`, operator KPI, continuity bundle HTTP path
-- Hide/delete operational-runtime tenant routes
-- Hide retrieval/synthesis catalog routes
-- Remove legacy redirects after 30-day window
+- ✅ Removed pipeline bootstrap/monolith/slices, semantic-readiness HTTP, graph-truth-inspector, phase summaries, legacy overview aliases, `POST /pipeline/run`
+- ✅ Deleted `pipeline_admin_overview.py`, operator KPI module, graph-truth inspector builders, `pipeline_phase_views.py`, operational-runtime HTTP module (~100 routes)
+- ✅ Slimmed retrieval to health/query/lineage/walks; synthesis to jobs/debugger/retry/health
+- ✅ Continuity proofs rewired to `operator_admin_overview` + `canonical_operator_metrics`
+- ✅ Regression tests: `test_admin_cortex_operator_r6.py` (404 on removed paths)
 
 **Deletes the most complexity** (~150 route handlers).
 
@@ -1155,12 +1155,15 @@ Frontend:
 
 ---
 
-## Phase R7 — Frontend cleanup + contracts (3–4 days)
+## Phase R7 — Frontend cleanup + contracts (3–4 days) ✅ **Complete (2026-05-24)**
 
-- Delete old pages, hooks, cards (Section 9 list)
-- New `operator_admin.py` contracts only on wire
-- Update integration tests: overview + runtime + one inspect path
-- Remove `admin.py` contract fields for deleted surfaces
+- ✅ Deleted legacy pipeline pages, gateways, slice hooks, phase shells, graph-truth inspector UI
+- ✅ Operator nav is the sole cortex admin surface (overview, runtime, queues, inspect, ingestion, canonical, settings)
+- ✅ Ingestion + settings use operator overview; canonical uses control-plane GET
+- ✅ Removed dead `AdminCortexPipelineOverview*` contracts from `admin.py`
+- ✅ Static regression: `test_admin_cortex_operator_r7_frontend.py`
+
+**Rollback:** git revert (pure cleanup).
 
 ---
 
@@ -1207,4 +1210,4 @@ R0 guardrails
 
 ---
 
-**End of refactor plan.** R0–R5 complete; next step: R6 backend deletion (enable flags in staging first).
+**End of refactor plan.** R0–R7 complete — cortex operator admin refactor shipped.

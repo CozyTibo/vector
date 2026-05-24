@@ -12,7 +12,7 @@ import {
   RETRIEVAL_INDEX_REBUILD_CONFIRM_PHRASE,
 } from "../adminConstants";
 import { StatusBadge } from "../ui/StatusBadge";
-import { START_PHASE_OPTIONS } from "../cortex/pipelineTypes";
+import { START_PHASE_OPTIONS } from "./actionConstants";
 import { postOperatorAction } from "./fetchOperator";
 import type { OperatorActionKind, OperatorActionRequest } from "./operatorTypes";
 import { invalidateOperatorCaches } from "./useOperatorRuntime";

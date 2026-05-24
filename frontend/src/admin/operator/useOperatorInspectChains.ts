@@ -8,7 +8,6 @@ import {
   fetchOperatorRetrievalLineage,
   fetchOperatorSynthesisJobs,
 } from "./fetchOperator";
-import { isCortexAdminV2Enabled } from "./featureFlags";
 import { operatorKeys } from "./operatorKeys";
 
 const inspectQueryOpts = {
@@ -22,7 +21,7 @@ export function useOperatorRetrievalEpochs(limit = 5) {
   return useQuery({
     queryKey: operatorKeys.retrievalEpochs(tenantId),
     queryFn: () => fetchOperatorRetrievalEpochs(tenantId, limit),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled(),
+    enabled: Boolean(tenantId),
     ...inspectQueryOpts,
   });
 }
@@ -33,7 +32,7 @@ export function useOperatorRetrievalEntries(query: Record<string, string>, enabl
   return useQuery({
     queryKey: operatorKeys.retrievalEntries(tenantId, query),
     queryFn: () => fetchOperatorRetrievalEntries(tenantId, query),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled() && enabled && hasQuery,
+    enabled: Boolean(tenantId) && enabled && hasQuery,
     ...inspectQueryOpts,
   });
 }
@@ -43,7 +42,7 @@ export function useOperatorRetrievalLineage(kind: string, ref: string, enabled: 
   return useQuery({
     queryKey: operatorKeys.retrievalLineage(tenantId, kind, ref),
     queryFn: () => fetchOperatorRetrievalLineage(tenantId, kind, ref),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled() && enabled && Boolean(kind && ref),
+    enabled: Boolean(tenantId) && enabled && Boolean(kind && ref),
     ...inspectQueryOpts,
   });
 }
@@ -53,7 +52,7 @@ export function useOperatorSynthesisJobs(query: Record<string, string>, enabled:
   return useQuery({
     queryKey: operatorKeys.synthesisJobs(tenantId, query),
     queryFn: () => fetchOperatorSynthesisJobs(tenantId, query),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled() && enabled,
+    enabled: Boolean(tenantId) && enabled,
     ...inspectQueryOpts,
   });
 }
@@ -64,7 +63,7 @@ export function useOperatorExecutionThread(query: Record<string, string>, enable
   return useQuery({
     queryKey: operatorKeys.executionThread(tenantId, query),
     queryFn: () => fetchOperatorExecutionThread(tenantId, query),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled() && enabled && hasQuery,
+    enabled: Boolean(tenantId) && enabled && hasQuery,
     ...inspectQueryOpts,
   });
 }

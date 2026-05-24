@@ -1,7 +1,7 @@
-/** Feature flags for cortex operator admin v2 rollout (R0 dark launch). */
+/** R7: legacy pipeline admin UI removed; operator surfaces are always active in the frontend. */
 
 export function isCortexAdminV2Enabled(): boolean {
-  return import.meta.env.VITE_CORTEX_ADMIN_V2 === "true";
+  return true;
 }
 
 export function frontendGitSha(): string | null {

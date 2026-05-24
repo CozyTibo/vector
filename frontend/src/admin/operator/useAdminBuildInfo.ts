@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { adminFetch } from "../../lib/adminFetch";
-import { isCortexAdminV2Enabled } from "./featureFlags";
 
 export type AdminBuildInfo = {
   surface_kind: "admin_build_info";
@@ -31,7 +30,7 @@ export function useAdminBuildInfo() {
 }
 
 export function useOperatorOverviewProbe(tenantId: string) {
-  const enabled = Boolean(tenantId) && isCortexAdminV2Enabled();
+  const enabled = Boolean(tenantId);
   return useQuery({
     queryKey: ["cortex-operator-overview-probe", tenantId],
     enabled,

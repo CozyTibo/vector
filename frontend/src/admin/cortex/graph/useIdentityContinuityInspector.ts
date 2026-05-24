@@ -4,32 +4,15 @@ import { useParams } from "react-router-dom";
 import { adminJson } from "../../../lib/adminFetch";
 import type {
   IdentityContinuityEntityInspector,
-  IdentityContinuityInspectorTenant,
   IdentityContinuitySearchResult,
   IdentitySearchParams,
 } from "./identityContinuityTypes";
-
-export const identityContinuityInspectorQueryKey = (tenantId: string) =>
-  ["admin-cortex-identity-continuity-inspector", tenantId] as const;
 
 export const identityContinuitySearchQueryKey = (tenantId: string, params: IdentitySearchParams) =>
   ["admin-cortex-identity-continuity-search", tenantId, params] as const;
 
 export const identityContinuityEntityQueryKey = (tenantId: string, entityId: string) =>
   ["admin-cortex-identity-continuity-entity", tenantId, entityId] as const;
-
-export function useIdentityContinuityInspectorTenant(enabled = true) {
-  const { tenantId = "" } = useParams<{ tenantId: string }>();
-  return useQuery({
-    queryKey: identityContinuityInspectorQueryKey(tenantId),
-    queryFn: () =>
-      adminJson<IdentityContinuityInspectorTenant>(
-        `/admin/tenants/${tenantId}/cortex/pipeline/identity-continuity-inspector`,
-      ),
-    enabled: Boolean(tenantId) && enabled,
-    staleTime: 60_000,
-  });
-}
 
 export function useIdentityContinuitySearch(params: IdentitySearchParams, enabled: boolean) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();

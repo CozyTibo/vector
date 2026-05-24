@@ -1,7 +1,3 @@
-import type {
-  SemanticIdentityContinuity,
-} from "../pipelineTypes";
-
 export type IdentityContinuitySearchMatch = {
   search_key: string;
   value: string;
@@ -68,11 +64,4 @@ export type IdentitySearchParams = {
   entity_id?: string;
   handle_id?: string;
   canonical_entity_id?: string;
-};
-
-export type IdentityContinuityInspectorTenant = {
-  surface_kind: "identity_continuity_inspector";
-  inspector_schema_version?: number;
-  identity_continuity?: SemanticIdentityContinuity;
-  unpromoted_candidates?: number;
 };

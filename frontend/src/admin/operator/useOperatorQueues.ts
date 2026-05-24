@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { fetchOperatorQueues } from "./fetchOperator";
-import { isCortexAdminV2Enabled } from "./featureFlags";
 import { operatorKeys } from "./operatorKeys";
 import type { OperatorQueueTab } from "./operatorTypes";
 
@@ -26,7 +25,7 @@ export function useOperatorQueues(limit = 50) {
   const query = useQuery({
     queryKey: [...operatorKeys.queues(tenantId, tab), offset, limit],
     queryFn: () => fetchOperatorQueues(tenantId, { tab, limit, offset }),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled(),
+    enabled: Boolean(tenantId),
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: 0,

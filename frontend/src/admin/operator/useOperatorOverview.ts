@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 
 import { fetchOperatorOverview } from "./fetchOperator";
 import { invalidateOperatorOverviewKey, operatorKeys } from "./operatorKeys";
-import { isCortexAdminV2Enabled } from "./featureFlags";
 import type { OperatorOverview } from "./operatorTypes";
 
 const overviewQueryOpts = {
@@ -14,7 +13,7 @@ const overviewQueryOpts = {
 
 export function useOperatorOverview() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const enabled = Boolean(tenantId) && isCortexAdminV2Enabled();
+  const enabled = Boolean(tenantId);
   return useQuery({
     queryKey: operatorKeys.overview(tenantId),
     queryFn: () => fetchOperatorOverview(tenantId),

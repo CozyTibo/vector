@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
-import { isCortexAdminV2Enabled } from "./operator/featureFlags";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
 
 type DebuggerPayload = {
@@ -11,9 +10,7 @@ type DebuggerPayload = {
 
 export default function AdminCortexSynthesisJobDetailPage() {
   const { tenantId = "", jobId = "" } = useParams<{ tenantId: string; jobId: string }>();
-  const backTo = isCortexAdminV2Enabled()
-    ? `/admin/tenants/${tenantId}/cortex/inspect/synthesis`
-    : `/admin/tenants/${tenantId}/cortex/synthesis`;
+  const backTo = `/admin/tenants/${tenantId}/cortex/inspect/synthesis`;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["synthesis-job-debugger", tenantId, jobId],

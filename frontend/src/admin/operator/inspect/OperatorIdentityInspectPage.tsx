@@ -17,7 +17,6 @@ export default function OperatorIdentityInspectPage() {
       </header>
 
       <IdentityContinuityInspector
-        lean
         onSelectEntity={(entityId) =>
           navigate(`/admin/tenants/${tenantId}/cortex/inspect/identity/e/${entityId}`)
         }

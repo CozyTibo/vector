@@ -6,7 +6,6 @@ import {
   fetchOperatorGraphSnapshot,
   fetchOperatorIslandsList,
 } from "./fetchOperator";
-import { isCortexAdminV2Enabled } from "./featureFlags";
 import { operatorKeys } from "./operatorKeys";
 
 const inspectQueryOpts = {
@@ -26,7 +25,7 @@ export function useOperatorGraphSnapshot() {
   return useQuery({
     queryKey: operatorKeys.graphSnapshot(tenantId),
     queryFn: () => fetchOperatorGraphSnapshot(tenantId),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled(),
+    enabled: Boolean(tenantId),
     ...inspectQueryOpts,
   });
 }
@@ -37,7 +36,7 @@ export function useOperatorGraphSnapshotPolling() {
   return useQuery({
     queryKey: operatorKeys.graphSnapshot(tenantId),
     queryFn: () => fetchOperatorGraphSnapshot(tenantId),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled(),
+    enabled: Boolean(tenantId),
     refetchInterval: (query) => graphSnapshotPollInterval(query.state.data),
     ...inspectQueryOpts,
   });
@@ -49,7 +48,7 @@ export function useOperatorEdgeProvenance(query: Record<string, string>, enabled
   return useQuery({
     queryKey: operatorKeys.edgeProvenance(tenantId, query),
     queryFn: () => fetchOperatorEdgeProvenance(tenantId, query),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled() && enabled && hasQuery,
+    enabled: Boolean(tenantId) && enabled && hasQuery,
     ...inspectQueryOpts,
   });
 }
@@ -59,7 +58,7 @@ export function useOperatorIslandsList() {
   return useQuery({
     queryKey: operatorKeys.islands(tenantId),
     queryFn: () => fetchOperatorIslandsList(tenantId),
-    enabled: Boolean(tenantId) && isCortexAdminV2Enabled(),
+    enabled: Boolean(tenantId),
     ...inspectQueryOpts,
   });
 }
