@@ -227,7 +227,7 @@ These are the only `CORTEX_*` vars operators need for prod sign-off (S5.2). Defa
 
 ---
 
-## Wave S5 — Cleanup (in progress)
+## Wave S5 — Cleanup (COMPLETE)
 
 | Step | Deliverable |
 |------|-------------|

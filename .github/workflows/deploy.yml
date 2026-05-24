@@ -316,6 +316,26 @@ jobs:
           test "$api_tag" = "$IMAGE_TAG"
           test "$worker_tag" = "$IMAGE_TAG"
 
+      - name: Verify prod ECS deploy alignment (S5.6 probe)
+        run: |
+          set -euo pipefail
+          cd backend
+          VECTOR_SETTINGS_SKIP_DOTENV=1 PYTHONPATH=src python - <<'PY'
+          import json
+          import os
+          import sys
+
+          from vector.domains.cortex.substrate_pipeline.continuity_p0_baseline import (
+              probe_prod_ecs_deploy_v1,
+          )
+
+          expected = os.environ["IMAGE_TAG"]
+          result = probe_prod_ecs_deploy_v1(expected_sha=expected)
+          print(json.dumps(result.get("verification", {}), indent=2))
+          if not result["verification"]["deploy_matches_closure_sha"]:
+              sys.exit(1)
+          PY
+
       - name: Upload frontend to S3
         run: |
           aws s3 sync frontend/dist "s3://$S3_FRONTEND_BUCKET" \

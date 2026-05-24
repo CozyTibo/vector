@@ -805,7 +805,9 @@ ORDER BY completed_at DESC LIMIT 3;
 
 ---
 
-# Phase S5 — Runtime / admin simplification
+# Phase S5 — Runtime / admin simplification ✅
+
+**Status:** COMPLETE (S5.1–S5.6 shipped)
 
 ## Objective
 
@@ -853,7 +855,9 @@ Complexity tax consumes the team that should be building S1–S4. Fake-green sur
 | 50+ cortex env vars | Document **10 operator vars** in runbook |
 | Island registry sync on every inspect | Sync on retrieval publish only |
 
-### S5.3 — KEEP list
+### S5.3 — KEEP list ✅
+
+**Status:** Shipped — `wave_s5_keep_contract_v1.py` verifies dual-lane, audit scripts, semantic mix gate, fail-loud synthesis, and admin inspectors remain.
 
 | Item | Why |
 |------|-----|
@@ -864,7 +868,9 @@ Complexity tax consumes the team that should be building S1–S4. Fake-green sur
 | Fail-loud synthesis gates | Honest blocker |
 | Identity + graph truth inspectors | Debug surfaces (enhance in S1/S3) |
 
-### S5.4 — Unified operational truth model
+### S5.4 — Unified operational truth model ✅
+
+**Status:** Shipped — two tracks (`continuity_audit_snapshot.py` + `graph_truth_audit_snapshot.py`), two admin panels, cross-check rule M3/AA PASS ≠ semantic green.
 
 **Two scripts, two panels:**
 
@@ -875,7 +881,9 @@ Complexity tax consumes the team that should be building S1–S4. Fake-green sur
 
 **Rule:** M3/AA PASS ≠ semantic green. Both must be checked.
 
-### S5.5 — Execution reality inspection surfaces
+### S5.5 — Execution reality inspection surfaces ✅
+
+**Status:** Shipped — four surfaces consolidated under Pipeline → Semantic readiness (`execution_reality_inspection_v1`).
 
 Consolidate under **Pipeline → Semantic readiness** (not new pages):
 
@@ -884,7 +892,9 @@ Consolidate under **Pipeline → Semantic readiness** (not new pages):
 3. **Retrieval mix** — epoch composition chart (S3)
 4. **Graph truth** — unique pairs, isolation % (existing)
 
-### S5.6 — Deploy alignment
+### S5.6 — Deploy alignment ✅
+
+**Status:** Shipped — deploy workflow gates on `probe_prod_ecs_deploy_v1` after ECS stable; `VECTOR_GIT_SHA` on API/worker task defs.
 
 **Files:** deploy pipeline, `probe_prod_ecs_deploy_v1`.
 
