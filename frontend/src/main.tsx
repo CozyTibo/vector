@@ -9,7 +9,7 @@ import AdminCortexCanonicalLayout from "./admin/AdminCortexCanonicalLayout.tsx";
 import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
 import AdminCortexIdentityPage from "./admin/AdminCortexIdentityPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
-import AdminCortexOverviewPage from "./admin/AdminCortexOverviewPage.tsx";
+import AdminCortexOverviewGateway from "./admin/operator/AdminCortexOverviewGateway.tsx";
 import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
 import AdminCortexReconstructionPage from "./admin/AdminCortexReconstructionPage.tsx";
 import AdminCortexRetrievalPage from "./admin/AdminCortexRetrievalPage.tsx";
@@ -88,7 +88,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="cortex-ingestion" element={<Navigate to="../cortex/ingestion" replace />} />
               <Route path="cortex" element={<AdminTenantCortexLayout />}>
                 <Route index element={<Navigate to="overview" replace />} />
-                <Route path="overview" element={<AdminCortexOverviewPage />} />
+                <Route path="overview" element={<AdminCortexOverviewGateway />} />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
                 <Route path="canonical" element={<AdminCortexCanonicalLayout />}>
                   <Route index element={<AdminCortexCanonicalHealthPage />} />

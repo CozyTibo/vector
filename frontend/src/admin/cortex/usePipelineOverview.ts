@@ -8,6 +8,7 @@ import type {
   PipelineOverview,
 } from "./pipelineTypes";
 import type { PipelineExecutionSlice, PipelineOverviewBootstrap } from "./fetchPipelineOverviewSlice";
+import { isCortexAdminV2Enabled } from "../operator/featureFlags";
 import {
   fetchPipelineExecutionSlice,
   fetchPipelineIngestionSlice,
@@ -76,7 +77,7 @@ export function usePipelineOverviewBootstrap() {
   return useQuery({
     queryKey: pipelineOverviewBootstrapQueryKey(tenantId),
     queryFn: () => fetchPipelineOverviewBootstrap(tenantId),
-    enabled: Boolean(tenantId),
+    enabled: Boolean(tenantId) && !isCortexAdminV2Enabled(),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     retry: 0,
@@ -125,7 +126,7 @@ export function usePipelineOverviewIngestion() {
       const data = await fetchPipelineIngestionSlice(tenantId);
       return { tenant_id: tenantId, ...data };
     },
-    enabled: Boolean(tenantId),
+    enabled: Boolean(tenantId) && !isCortexAdminV2Enabled(),
     ...sliceQueryOpts,
   });
 }
@@ -136,16 +137,24 @@ export function usePipelineSemanticReadiness() {
   return useQuery({
     queryKey: pipelineSemanticReadinessQueryKey(tenantId),
     queryFn: () => fetchSemanticReadinessSlice(tenantId),
-    enabled: Boolean(tenantId),
+    enabled: Boolean(tenantId) && !isCortexAdminV2Enabled(),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     retry: 0,
   });
 }
 
-/** Warm overview bootstrap once per cortex layout mount. */
+/** Warm overview bootstrap once per cortex layout mount (legacy path only). */
 export function usePrefetchPipelineOverviewBootstrap() {
-  usePipelineOverviewBootstrap();
+  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  useQuery({
+    queryKey: pipelineOverviewBootstrapQueryKey(tenantId),
+    queryFn: () => fetchPipelineOverviewBootstrap(tenantId),
+    enabled: Boolean(tenantId) && !isCortexAdminV2Enabled(),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 0,
+  });
 }
 
 /** Invalidate overview caches after pipeline mutations. */

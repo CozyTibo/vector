@@ -13,13 +13,21 @@ import {
   pipelineOverviewSliceQueryKeys,
   usePipelineOverviewIngestion,
 } from "./cortex/usePipelineOverview";
-import { StatusBadge } from "./ui/StatusBadge";
 import { DeployInfoFooter } from "./operator/DeployInfoFooter";
+import { isCortexAdminV2Enabled } from "./operator/featureFlags";
+import { invalidateOperatorOverviewCaches, useOperatorOverviewScheduler } from "./operator/useOperatorOverview";
+import { StatusBadge } from "./ui/StatusBadge";
 
 export default function AdminCortexSettingsPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const qc = useQueryClient();
-  const ingestionQ = usePipelineOverviewIngestion();
+  const v2 = isCortexAdminV2Enabled();
+  const legacyIngestionQ = usePipelineOverviewIngestion();
+  const operatorSchedQ = useOperatorOverviewScheduler();
+
+  const sched = v2 ? operatorSchedQ.scheduler : legacyIngestionQ.data?.scheduler;
+  const schedPending = v2 ? operatorSchedQ.isPending && !sched : legacyIngestionQ.isPending && !sched;
+  const schedError = v2 ? operatorSchedQ.error : legacyIngestionQ.error;
 
   const pauseMut = useMutation({
     mutationFn: async (paused: boolean) => {
@@ -35,17 +43,19 @@ export default function AdminCortexSettingsPage() {
       return res.json();
     },
     onSuccess: () => {
-      for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
-        void qc.invalidateQueries({ queryKey: key });
+      if (v2) {
+        invalidateOperatorOverviewCaches(qc, tenantId);
+      } else {
+        for (const key of pipelineOverviewSliceQueryKeys(tenantId)) {
+          void qc.invalidateQueries({ queryKey: key });
+        }
+        void qc.invalidateQueries({ queryKey: pipelineOverviewIngestionQueryKey(tenantId) });
       }
-      void qc.invalidateQueries({ queryKey: pipelineOverviewIngestionQueryKey(tenantId) });
       void qc.invalidateQueries({ queryKey: ["admin-cortex-ingestion", tenantId] });
     },
   });
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
-
-  const sched = ingestionQ.data?.scheduler;
 
   return (
     <div className="space-y-6">
@@ -56,12 +66,12 @@ export default function AdminCortexSettingsPage() {
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-stone-900">Scheduled ingestion</h2>
-        {ingestionQ.isPending && !sched ? (
+        {schedPending ? (
           <div className="mt-4">
             <SectionSkeleton variant="actions" />
           </div>
-        ) : ingestionQ.isError ? (
-          <p className="mt-3 text-sm text-red-700">{(ingestionQ.error as Error).message}</p>
+        ) : schedError ? (
+          <p className="mt-3 text-sm text-red-700">{(schedError as Error).message}</p>
         ) : sched ? (
           <>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -75,7 +85,8 @@ export default function AdminCortexSettingsPage() {
             <p className="mt-2 text-xs text-stone-600">
               {sched.operator_mode_label ?? "Scheduler"}
               {" · "}
-              beat {sched.beat_interval_seconds}s · gap {sched.min_gap_seconds}s
+              beat {(sched as { beat_interval_seconds?: number }).beat_interval_seconds ?? "—"}s · gap{" "}
+              {(sched as { min_gap_seconds?: number }).min_gap_seconds ?? "—"}s
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <button

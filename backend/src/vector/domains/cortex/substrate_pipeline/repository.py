@@ -207,6 +207,14 @@ def complete_phase_v1(
     phase.completed_at = datetime.now(UTC)
     phase.error_detail = None
     session.flush()
+    from vector.domains.cortex.pipeline.admin_continuity_snapshot import (
+        notify_admin_snapshot_after_terminal_phase_v1,
+    )
+
+    notify_admin_snapshot_after_terminal_phase_v1(
+        tenant_id=phase.tenant_id,
+        phase_id=phase_id,
+    )
     return phase
 
 
@@ -233,6 +241,14 @@ def fail_phase_v1(
         run.error_detail = error[:4000]
         run.completed_at = datetime.now(UTC)
     session.flush()
+    from vector.domains.cortex.pipeline.admin_continuity_snapshot import (
+        notify_admin_snapshot_after_terminal_phase_v1,
+    )
+
+    notify_admin_snapshot_after_terminal_phase_v1(
+        tenant_id=phase.tenant_id,
+        phase_id=phase_id,
+    )
     return phase
 
 

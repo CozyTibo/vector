@@ -73,6 +73,8 @@ class OperatorSchedulerState(BaseModel):
     env_scheduler_enabled: bool = False
     paused_via_redis: bool = False
     operator_mode_label: str | None = None
+    beat_interval_seconds: int = 1800
+    min_gap_seconds: int = 120
 
 
 class OperatorOverviewResponse(BaseModel):
@@ -87,6 +89,7 @@ class OperatorOverviewResponse(BaseModel):
     queue_counts: OperatorQueueCounts
     continuity_snapshot: OperatorContinuitySnapshotRead
     scheduler: OperatorSchedulerState
+    runnable_connectors: list[str] = Field(default_factory=list)
     query_groups_used: int = Field(
         description="Bounded query groups executed (target cap 8 for operator overview)."
     )

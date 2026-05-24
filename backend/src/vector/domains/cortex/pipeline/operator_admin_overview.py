@@ -22,6 +22,7 @@ from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_STATUS_COMPLETED,
     PHASE_STATUS_FAILED,
 )
+from vector.domains.cortex.pipeline.admin_continuity_snapshot import read_admin_continuity_snapshot_v1
 from vector.domains.cortex.substrate_pipeline.pipeline_receipts import build_phase_execution_receipt_v1
 from vector.infrastructure.cortex_scheduler_pause import read_scheduler_paused_flag
 from vector.infrastructure.db.models.cortex_execution_transition_log import CortexExecutionTransitionLog
@@ -109,13 +110,19 @@ def _build_operator_overview_uncached_v1(
     queue_counts = _operator_queue_counts_v1(session, tenant_id=tenant_id)
     query_groups += 1
 
-    # 7 — materialized continuity snapshot (R1 table; empty placeholder in R0)
-    continuity_snapshot = _read_operator_continuity_snapshot_v1(session, tenant_id=tenant_id)
+    # 7 — materialized continuity snapshot (R1 table)
+    continuity_snapshot = read_admin_continuity_snapshot_v1(session, tenant_id=tenant_id)
     query_groups += 1
 
     # 8 — scheduler pause (Redis; not a DB query)
-    scheduler = _operator_scheduler_state_v1(settings)
+    global_scheduler = ingestion_overview.get("global_scheduler")
+    scheduler = _operator_scheduler_state_v1(
+        settings,
+        global_scheduler=global_scheduler if isinstance(global_scheduler, dict) else None,
+    )
     query_groups += 1
+
+    runnable_connectors = _runnable_connectors_from_ingestion_v1(ingestion_overview)
 
     status_banner = _build_status_banner_v1(lease=lease, last_transition=last_transition)
     continuity_facts = _build_continuity_facts_v1(
@@ -141,6 +148,7 @@ def _build_operator_overview_uncached_v1(
         "queue_counts": queue_counts,
         "continuity_snapshot": continuity_snapshot,
         "scheduler": scheduler,
+        "runnable_connectors": runnable_connectors,
         "query_groups_used": query_groups,
     }
 
@@ -262,62 +270,44 @@ def _operator_queue_counts_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
     }
 
 
-def _read_operator_continuity_snapshot_v1(
-    session: Session,
+def _runnable_connectors_from_ingestion_v1(ingestion_overview: dict[str, Any]) -> list[str]:
+    return [
+        str(row["connector"])
+        for row in ingestion_overview.get("connectors") or []
+        if isinstance(row, dict)
+        and row.get("cortex_routed")
+        and row.get("connection_status") == "active"
+    ]
+
+
+def _operator_scheduler_state_v1(
+    settings: Settings,
     *,
-    tenant_id: uuid.UUID,
+    global_scheduler: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Read materialized snapshot when R1 table exists; otherwise return empty placeholder."""
-    try:
-        row = session.execute(
-            text(
-                """
-                SELECT captured_at_utc, graph_summary_json, retrieval_summary_json, synthesis_summary_json
-                FROM cortex_admin_continuity_snapshot
-                WHERE tenant_id = :tenant_id
-                LIMIT 1
-                """
-            ),
-            {"tenant_id": str(tenant_id)},
-        ).mappings().first()
-    except Exception:
-        _LOGGER.debug(
-            "continuity snapshot table unavailable tenant_id=%s",
-            tenant_id,
-            exc_info=True,
-        )
-        row = None
-    if row is None:
-        return {
-            "available": False,
-            "captured_at_utc": None,
-            "graph_summary": None,
-            "retrieval_summary": None,
-            "synthesis_summary": None,
-        }
-    return {
-        "available": True,
-        "captured_at_utc": row.get("captured_at_utc"),
-        "graph_summary": row.get("graph_summary_json"),
-        "retrieval_summary": row.get("retrieval_summary_json"),
-        "synthesis_summary": row.get("synthesis_summary_json"),
-    }
-
-
-def _operator_scheduler_state_v1(settings: Settings) -> dict[str, Any]:
     paused = read_scheduler_paused_flag(settings)
     env_on = settings.cortex_ingestion_scheduler_enabled
-    label = "Active"
-    if not env_on and paused:
-        label = "Off (env) + paused (operator)"
-    elif not env_on:
-        label = "Off (env)"
-    elif paused:
-        label = "Paused (operator)"
+    gs = global_scheduler or {}
+    label = str(gs.get("operator_mode_label") or "")
+    if not label:
+        if not env_on and paused:
+            label = "Off (env) + paused (operator)"
+        elif not env_on:
+            label = "Off (env)"
+        elif paused:
+            label = "Paused (operator)"
+        else:
+            label = "Active"
     return {
-        "env_scheduler_enabled": env_on,
-        "paused_via_redis": paused,
+        "env_scheduler_enabled": bool(gs.get("env_scheduler_enabled", env_on)),
+        "paused_via_redis": bool(gs.get("paused_via_redis", paused)),
         "operator_mode_label": label,
+        "beat_interval_seconds": int(
+            gs.get("beat_interval_seconds") or settings.cortex_ingestion_scheduler_interval_seconds
+        ),
+        "min_gap_seconds": int(
+            gs.get("min_gap_seconds") or settings.cortex_ingestion_min_gap_seconds
+        ),
     }
 
 

@@ -138,7 +138,11 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
 
-    @pr.get("/overview/bootstrap", response_model=AdminCortexPipelineOverviewResponse)
+    @pr.get(
+        "/overview/bootstrap",
+        response_model=AdminCortexPipelineOverviewResponse,
+        deprecated=True,
+    )
     def get_pipeline_overview_bootstrap(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -149,7 +153,11 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
             raw = build_pipeline_overview_bootstrap_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewResponse.model_validate(raw)
 
-    @pr.get("/overview", response_model=AdminCortexPipelineOverviewResponse)
+    @pr.get(
+        "/overview",
+        response_model=AdminCortexPipelineOverviewResponse,
+        deprecated=True,
+    )
     def get_pipeline_overview(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -159,7 +167,11 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         raw = build_pipeline_overview_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewResponse.model_validate(raw)
 
-    @pr.get("/overview/execution", response_model=AdminCortexPipelineOverviewExecutionResponse)
+    @pr.get(
+        "/overview/execution",
+        response_model=AdminCortexPipelineOverviewExecutionResponse,
+        deprecated=True,
+    )
     def get_pipeline_overview_execution(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -169,7 +181,11 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         raw = build_pipeline_overview_execution_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewExecutionResponse.model_validate(raw)
 
-    @pr.get("/overview/phases", response_model=AdminCortexPipelineOverviewPhasesResponse)
+    @pr.get(
+        "/overview/phases",
+        response_model=AdminCortexPipelineOverviewPhasesResponse,
+        deprecated=True,
+    )
     def get_pipeline_overview_phases(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -179,7 +195,11 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         raw = build_pipeline_overview_phases_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewPhasesResponse.model_validate(raw)
 
-    @pr.get("/overview/ingestion", response_model=AdminCortexPipelineOverviewIngestionResponse)
+    @pr.get(
+        "/overview/ingestion",
+        response_model=AdminCortexPipelineOverviewIngestionResponse,
+        deprecated=True,
+    )
     def get_pipeline_overview_ingestion(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],

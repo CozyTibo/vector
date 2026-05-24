@@ -1,6 +1,7 @@
 """ORM models — import side effects register metadata."""
 
 from vector.infrastructure.db.models.calls_connection_detail import CallsConnectionDetail
+from vector.infrastructure.db.models.cortex_admin_continuity_snapshot import CortexAdminContinuitySnapshot
 from vector.infrastructure.db.models.cortex_canonical_identity_anchor import CortexCanonicalIdentityAnchor
 from vector.infrastructure.db.models.cortex_bundle_equivalence_declaration import (
     CortexBundleEquivalenceDeclaration,
@@ -130,6 +131,7 @@ from vector.infrastructure.db.models.user import User
 
 __all__ = [
     "ConnectorSyncState",
+    "CortexAdminContinuitySnapshot",
     "CortexBundleEquivalenceDeclaration",
     "CortexCanonicalIdentityAnchor",
     "CortexOrgAmbiguityRecord",

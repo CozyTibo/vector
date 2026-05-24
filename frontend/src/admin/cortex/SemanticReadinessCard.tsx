@@ -48,8 +48,7 @@ export function SemanticReadinessCard({
         <div>
           <h2 className="text-lg font-semibold text-stone-900">Semantic readiness</h2>
           <p className="mt-1 text-sm text-stone-600">
-            Operate from these six metrics — graph supports retrieval; retrieval grounds synthesis.
-            Runtime AA / M3 continuity is a separate track.
+            Semantic track — pair with continuity overview (runtime track). M3/AA PASS ≠ semantic green.
           </p>
         </div>
         <StatusBadge tone={severityTone(g.dup_factor_severity)}>
@@ -57,7 +56,30 @@ export function SemanticReadinessCard({
         </StatusBadge>
       </div>
 
-      {panel ? (
+      {crossCheck?.rule_active ? (
+        <motion.div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {crossCheck.operator_message ??
+            "Runtime AA/M3 PASS does not imply semantic green — check graph truth and retrieval mix."}
+        </motion.div>
+      ) : null}
+
+      {inspection ? (
+        <details className="mt-4 rounded-lg border border-emerald-200 bg-white p-3 text-sm" open>
+          <summary className="cursor-pointer font-medium text-emerald-950">
+            Execution reality inspection
+          </summary>
+          <div className="mt-3 grid gap-4 lg:grid-cols-2">
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Identity continuity
+              </h4>
+              <p className="mt-1 text-stone-800">
+                Distinct pairs{" "}
+                {inspection.identity_continuity?.distinct_candidate_pairs?.toLocaleString() ?? "—"} ·
+                inflation {String(inspection.identity_continuity?.candidate_inflation_ratio ?? "—")}
+              </p>
+            </div>
+            <motion.div>
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
           {panel.map((metric) => (
             <div

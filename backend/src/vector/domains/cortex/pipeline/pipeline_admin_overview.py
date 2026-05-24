@@ -23,6 +23,9 @@ _SLICE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
     """Drop cached pipeline overview so operator actions refresh immediately."""
+    from vector.domains.cortex.pipeline.operator_admin_overview import (
+        invalidate_operator_overview_cache_v1,
+    )
     from vector.domains.cortex.pipeline.continuity_overview_v1 import (
         invalidate_continuity_overview_context_cache_v1,
     )
@@ -42,6 +45,7 @@ def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
         _OVERVIEW_CACHE.pop(key, None)
         for suffix in ("execution", "phases", "ingestion", "continuity_bundle", "bootstrap"):
             _SLICE_CACHE.pop(f"{key}:{suffix}", None)
+    invalidate_operator_overview_cache_v1(tenant_id)
 
 from sqlalchemy.orm import Session
 
@@ -65,6 +69,9 @@ from vector.domains.cortex.pipeline.pipeline_admin_operator_kpi import (
 )
 from vector.domains.cortex.pipeline.pipeline_admin_semantic_readiness import (
     build_semantic_readiness_admin_v1,
+)
+from vector.domains.cortex.substrate_pipeline.operational_truth_model_v1 import (
+    build_operational_truth_cross_check_v1,
 )
 from vector.settings import Settings
 
@@ -399,6 +406,14 @@ def _build_pipeline_overview_v1_uncached(
     )
     execution = _build_execution_snapshot_v1(session, tenant_id=tenant_id)
     ingestion_panel = _build_ingestion_panel_v1(session, settings, tenant_id=tenant_id)
+    semantic_readiness = build_semantic_readiness_admin_v1(session, settings, tenant_id=tenant_id)
+    semantic_readiness = {
+        **semantic_readiness,
+        "operational_truth_cross_check": build_operational_truth_cross_check_v1(
+            continuity_status=continuity_status,
+            semantic_readiness=semantic_readiness,
+        ),
+    }
 
     return {
         "surface_kind": "pipeline_overview",
@@ -408,9 +423,7 @@ def _build_pipeline_overview_v1_uncached(
         "operator_primary_kpi": build_operator_primary_kpi_v1(
             session, tenant_id=tenant_id, settings=settings
         ),
-        "semantic_readiness": build_semantic_readiness_admin_v1(
-            session, settings, tenant_id=tenant_id
-        ),
+        "semantic_readiness": semantic_readiness,
         "phases": phases,
         "attention": attention,
         "attention_items": attention_items,

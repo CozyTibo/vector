@@ -1000,28 +1000,38 @@ Reuse where possible:
 
 ---
 
-## Phase R1 — Overview swap + delete slice fanout (1 week)
+## Phase R1 — Overview swap + delete slice fanout (1 week) ✅ **Complete (2026-05-24)**
 
 **Highest immediate value.**
 
 Backend:
 
-- Implement `GET /operator/overview` (8-query cap)
-- Implement `cortex_admin_continuity_snapshot` table + writer task (basic)
-- Mark bootstrap/phases/execution/ingestion routes `@deprecated`
+- ✅ Implement `GET /operator/overview` (8-query cap) — extended with `runnable_connectors`, scheduler intervals
+- ✅ Implement `cortex_admin_continuity_snapshot` table + writer task (basic)
+- ✅ Mark bootstrap/phases/execution/ingestion routes `@deprecated`
 
 Frontend:
 
-- New `OperatorOverviewPage` behind flag
-- Remove layout prefetch bootstrap
-- Remove semantic-readiness fetch from overview
-- Delete slice hooks usage from layout/settings
+- ✅ New `OperatorOverviewPage` behind flag (`AdminCortexOverviewGateway`)
+- ✅ Remove layout prefetch bootstrap when v2 enabled
+- ✅ Remove semantic-readiness fetch from overview (v2 path)
+- ✅ Settings uses operator overview scheduler when v2 (no ingestion slice)
 
-**Deletes:** frontend bootstrap path, semantic on overview, settings ingestion slice.
+**Deliverables:**
 
-**Rollback:** flag toggles old Overview.
+| Area | Path / note |
+|------|-------------|
+| Snapshot table | migration `20260525_0094`, model `CortexAdminContinuitySnapshot` |
+| Snapshot writer | `admin_continuity_snapshot.py`, Celery `refresh_admin_continuity_snapshot_task` + 10m sweep |
+| Post-phase hook | `repository.complete_phase_v1` / `fail_phase_v1` → enqueue refresh (phases 03–08) |
+| Overview UI | `frontend/src/admin/operator/OperatorOverviewPage.tsx` + sections |
+| Gateway | `AdminCortexOverviewGateway.tsx` toggles legacy vs v2 |
 
-**Success metric:** Overview p95 < 500ms Fizzer; zero bootstrap 500s.
+**Deletes (v2 path):** frontend bootstrap path, semantic on overview, settings ingestion slice.
+
+**Rollback:** `VITE_CORTEX_ADMIN_V2=0` + `CORTEX_ADMIN_V2=0` restores legacy Overview.
+
+**Success metric:** Overview p95 < 500ms Fizzer; zero bootstrap 500s (validate in staging).
 
 ---
 
@@ -1167,4 +1177,4 @@ R0 guardrails
 
 ---
 
-**End of refactor plan.** R0 complete; next step: R1 Overview swap (enable flags in staging, validate p95).
+**End of refactor plan.** R0–R1 complete; next step: R2 Runtime tab (enable flags in staging first).
