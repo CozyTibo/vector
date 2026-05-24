@@ -357,7 +357,7 @@ Promotion + candidate rules only emit `org.persona_belongs_to_handle`. Graph den
 
 **Status:** Shipped — `execution_artifact_tcre_scope_v1.py` filters TCRE mats to execution kinds + walk start intersection; phase 06 enables strict binding when walk present.
 
-### S2.4 — Index TCRE causal edges in retrieval (prerequisite for S3)
+### S2.4 — Index TCRE causal edges in retrieval (prerequisite for S3) ✅
 
 **Files:** `retrieval/retrieval_tcre_binding.py`.
 

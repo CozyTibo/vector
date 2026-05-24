@@ -6,6 +6,7 @@ Normative: ``DOCS/cortex/retrieval/phase-07-retrieval-runtime-architecture.md`` 
 
 from __future__ import annotations
 
+import os
 import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
@@ -46,6 +47,18 @@ RETRIEVAL_TCRE_BINDING_SPEC_REF_V1: Final[str] = (
 RET_TCRE01_RULE_ID_V1: Final[str] = "RET-TCRE-01"
 
 RET_TCRE02_RULE_ID_V1: Final[str] = "RET-TCRE-02"
+
+DEFAULT_MAX_TCRE_CAUSAL_EDGES_PER_EPOCH_V1: Final[int] = 500
+
+
+def retrieval_index_tcre_causal_edges_enabled_v1() -> bool:
+    """When false, skip writing ``index_kind=causal_edge`` rows (S2.4 rollback)."""
+    raw = os.environ.get("CORTEX_RETRIEVAL_INDEX_TCRE_CAUSAL_EDGES", "1")
+    return raw.strip().lower() not in ("0", "false", "no", "off")
+
+
+def max_tcre_causal_edges_per_epoch_v1(*, max_materializations: int) -> int:
+    return max(1, min(int(max_materializations), DEFAULT_MAX_TCRE_CAUSAL_EDGES_PER_EPOCH_V1))
 
 _TCRE_ARTIFACT_CHRONOLOGY_V1: Final[str] = "chronology_receipt"
 _TCRE_ARTIFACT_EDGE_V1: Final[str] = "causal_edge"
@@ -505,10 +518,43 @@ def materialize_retrieval_index_from_tcre_job_v1(
         materialized.append(row.retrieval_lookup_id)
         entry["index_materialized"] = True
         mat_count += 1
+
+    edge_count = 0
+    if retrieval_index_tcre_causal_edges_enabled_v1():
+        max_edges = max_tcre_causal_edges_per_epoch_v1(max_materializations=max_materializations)
+        for eid, entry in sorted((lookup_map.get("by_tcre_causal_edge_id") or {}).items()):
+            if edge_count >= max_edges:
+                break
+            causal_edge_index = map_tcre_causal_legality_to_index_v1(
+                str(entry.get("causal_legality_class") or "causal_replay_equivalent")
+            )
+            row = materialize_retrieval_index_entry_v1(
+                session,
+                tenant_id=tenant_id,
+                replay_identity=replay_identity,
+                index_epoch=index_epoch,
+                index_kind="causal_edge",
+                index_key=f"causal_edge:{eid}",
+                chronology_legality_class=chron_index,
+                causal_legality_class=causal_edge_index,
+                artifact_ref={
+                    "tcre_causal_edge_id": eid,
+                    "tcre_reconstruction_job_id": str(job.id),
+                    "tcre_policy_bundle_digest": str(job.tcre_policy_bundle_digest),
+                },
+                omission_summary={},
+                auto_publish=auto_publish,
+            )
+            materialized.append(row.retrieval_lookup_id)
+            entry["index_materialized"] = True
+            edge_count += 1
+
     return {
         "materialized_lookup_ids": materialized,
         "lookup_map": lookup_map,
         "index_epoch": index_epoch,
+        "causal_edges_materialized": edge_count,
+        "causal_edge_indexing_enabled": retrieval_index_tcre_causal_edges_enabled_v1(),
     }
 
 

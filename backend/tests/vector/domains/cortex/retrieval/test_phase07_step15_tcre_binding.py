@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.reasoning.chronology_legality import (
@@ -26,6 +27,7 @@ from vector.domains.cortex.retrieval.retrieval_tcre_binding import (
     map_runtime02_ref_to_retrieval_lookup_id_v1,
     materialize_retrieval_index_from_tcre_job_v1,
     parse_runtime02_operator_retrieval_ref_v1,
+    retrieval_index_tcre_causal_edges_enabled_v1,
     verify_gp07_tcre01_runtime02_lookup_map_static,
 )
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_artifact import (
@@ -33,6 +35,9 @@ from vector.infrastructure.db.models.cortex_tcre_reconstruction_artifact import 
 )
 from vector.infrastructure.db.models.cortex_tcre_reconstruction_job import (
     CortexTcreReconstructionJob,
+)
+from vector.infrastructure.db.models.cortex_retrieval_index_entry import (
+    CortexRetrievalIndexEntry,
 )
 
 
@@ -231,13 +236,24 @@ def test_materialize_index_from_tcre_job_and_query(db_session: Session) -> None:
         edge_id=edge_id,
     )
     job.summary_json = {**dict(job.summary_json or {}), "replay_identity": replay}
-    materialize_retrieval_index_from_tcre_job_v1(
+    mat_out = materialize_retrieval_index_from_tcre_job_v1(
         db_session,
         tenant_id=tenant_id,
         job=job,
         replay_identity=replay,
         index_epoch=epoch,
     )
+    assert mat_out["causal_edges_materialized"] == 1
+    assert mat_out["causal_edge_indexing_enabled"] is True
+    edge_rows = db_session.scalars(
+        select(CortexRetrievalIndexEntry).where(
+            CortexRetrievalIndexEntry.tenant_id == tenant_id,
+            CortexRetrievalIndexEntry.index_epoch == epoch,
+            CortexRetrievalIndexEntry.index_kind == "causal_edge",
+        )
+    ).all()
+    assert len(edge_rows) == 1
+    assert edge_id in str(edge_rows[0].index_key or "")
     db_session.commit()
     index_tcre_chain_for_retrieval_v1(
         db_session,
