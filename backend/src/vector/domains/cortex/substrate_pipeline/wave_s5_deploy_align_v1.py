@@ -21,8 +21,8 @@ def verify_s5_6_deploy_align_wiring_v1(*, repo_root: Path | None = None) -> dict
         wf = workflow.read_text(encoding="utf-8")
         if "Verify prod image tags match deploy SHA" not in wf:
             errors.append("deploy_workflow_missing_sha_verify_step")
-        if PROBE_SYMBOL not in wf:
-            errors.append("deploy_workflow_missing_probe_prod_ecs_deploy_v1")
+        elif "ECS_WORKER_SERVICE" not in wf or 'test "$worker_tag" = "$IMAGE_TAG"' not in wf:
+            errors.append("deploy_workflow_missing_worker_sha_verify")
         if "VECTOR_GIT_SHA" not in wf:
             errors.append("deploy_workflow_missing_vector_git_sha_env")
     baseline = root / "backend" / "src" / "vector" / "domains" / "cortex" / "substrate_pipeline" / "continuity_p0_baseline.py"
