@@ -32,15 +32,16 @@ sys.path.insert(0, str(REPO_ROOT / "backend" / "src"))
 
 print = functools.partial(print, flush=True)  # noqa: A001
 
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
+    reconcile_all_stale_synthesis_jobs_v1,
     reconcile_stale_queued_synthesis_jobs_v1,
     reconcile_stale_synthesis_jobs_v1,
+    snapshot_synthesis_hygiene_v1,
     snapshot_synthesis_job_status_histogram_v1,
 )
-from vector.infrastructure.db.models.cortex_synthesis_job import CortexSynthesisJob
 from vector.settings import get_settings
 
 
@@ -58,40 +59,27 @@ def main() -> int:
     Session = sessionmaker(bind=engine)
     with Session() as session:
         before = snapshot_synthesis_job_status_histogram_v1(session, tenant_id=tenant_id)
-        running = reconcile_stale_synthesis_jobs_v1(
+        reconcile_out = reconcile_all_stale_synthesis_jobs_v1(
             session,
             tenant_id=tenant_id,
-            stale_after_seconds=int(settings.cortex_synthesis_job_running_stale_seconds),
             dry_run=dry_run,
-        )
-        queued = reconcile_stale_queued_synthesis_jobs_v1(
-            session,
-            tenant_id=tenant_id,
-            stale_after_seconds=int(settings.cortex_synthesis_job_queued_stale_seconds),
-            dry_run=dry_run,
+            settings=settings,
         )
         if not dry_run:
             session.commit()
         after = snapshot_synthesis_job_status_histogram_v1(session, tenant_id=tenant_id)
-        failed_total = int(
-            session.scalar(
-                select(func.count())
-                .select_from(CortexSynthesisJob)
-                .where(
-                    CortexSynthesisJob.tenant_id == tenant_id,
-                    CortexSynthesisJob.status == "failed",
-                )
-            )
-            or 0
-        )
+        hygiene = snapshot_synthesis_hygiene_v1(session, tenant_id=tenant_id)
+        failed_total = int(hygiene.get("failed_job_rows") or 0)
 
     receipt = {
         "tenant_id": str(tenant_id),
         "dry_run": dry_run,
         "jobs_before": before,
         "jobs_after": after,
-        "running_reconcile": running,
-        "queued_reconcile": queued,
+        "reconcile": reconcile_out,
+        "running_reconcile": reconcile_out.get("running_reconcile"),
+        "queued_reconcile": reconcile_out.get("queued_reconcile"),
+        "hygiene": hygiene,
         "failed_job_rows": failed_total,
     }
     print(json.dumps(receipt, indent=2))

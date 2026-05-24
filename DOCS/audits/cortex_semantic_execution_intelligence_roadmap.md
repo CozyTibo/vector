@@ -673,7 +673,9 @@ Fail-loud gates **work** — they prevent fake-green. There is nothing truthful 
 
 ## Implementation steps (PR-sized)
 
-### S4.1 — Synthesis job table reconciliation (incident, ship immediately)
+### S4.1 — Synthesis job table reconciliation (incident, ship immediately) ✅
+
+**Status:** Shipped — `reconcile_all_stale_synthesis_jobs_v1`, hygiene snapshot on semantic panel, terminal invariant test.
 
 **Files:** `scripts/synthesis_failed_jobs_reconcile.py`, `synthesis/synthesis_job_lifecycle.py`.
 

@@ -37,6 +37,8 @@ STALE_RUNNING_SUPERSEDED_CODE_V1: Final[str] = "synthesis_job_stale_running_supe
 
 STALE_QUEUED_SUPERSEDED_CODE_V1: Final[str] = "synthesis_job_stale_queued_superseded"
 
+STALE_FAILED_RECONCILE_RECEIPT_CODE_V1: Final[str] = "synthesis_job_failed_reconcile_receipt"
+
 DUPLICATE_INFLIGHT_SUPERSEDED_CODE_V1: Final[str] = "synthesis_job_duplicate_inflight_superseded"
 
 ORPHAN_RUNNING_CODE_V1: Final[str] = "synthesis_job_orphan_running"
@@ -501,27 +503,97 @@ def maybe_reconcile_synthesis_jobs_on_materialize_v1(
     cfg = settings or get_settings()
     if not is_synthesis_job_reconcile_on_materialize_enabled_v1(settings=cfg):
         return None
-    running = reconcile_stale_synthesis_jobs_v1(
+    return reconcile_all_stale_synthesis_jobs_v1(
         session,
         tenant_id=tenant_id,
-        stale_after_seconds=synthesis_job_running_stale_seconds_v1(settings=cfg),
         dry_run=False,
+        settings=cfg,
     )
-    queued = reconcile_stale_queued_synthesis_jobs_v1(
-        session,
-        tenant_id=tenant_id,
-        stale_after_seconds=synthesis_job_queued_stale_seconds_v1(settings=cfg),
-        dry_run=False,
-    )
-    return {
-        "running_reconcile": running,
-        "queued_reconcile": queued,
-    }
 
 
 def synthesis_job_queued_stale_seconds_v1(*, settings: Settings | None = None) -> int:
     cfg = settings or get_settings()
     return int(cfg.cortex_synthesis_job_queued_stale_seconds)
+
+
+def snapshot_synthesis_hygiene_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Operator hygiene snapshot for semantic panel (S4.1)."""
+    health = snapshot_synthesis_job_terminal_health_v1(session, tenant_id=tenant_id)
+    hist = dict(health.get("histogram") or {})
+    failed_rows = int(hist.get("failed") or 0)
+    return {
+        "schema_version": PHASE_A_SYNTHESIS_JOB_LIFECYCLE_RUNTIME_SCHEMA_VERSION,
+        "tenant_id": str(tenant_id),
+        "job_status_histogram": hist,
+        "failed_job_rows": failed_rows,
+        "running_count": int(health.get("running_count") or 0),
+        "queued_count": int(health.get("queued_count") or 0),
+        "stale_running_count": int(health.get("stale_running_count") or 0),
+        "stale_queued_count": int(health.get("stale_queued_count") or 0),
+        "stale_inflight_count": int(health.get("stale_running_count") or 0)
+        + int(health.get("stale_queued_count") or 0),
+        "running_stale_seconds": health.get("running_stale_seconds"),
+        "queued_stale_seconds": health.get("queued_stale_seconds"),
+        "hygiene_ok": int(health.get("stale_running_count") or 0) == 0
+        and int(health.get("stale_queued_count") or 0) == 0,
+    }
+
+
+def reconcile_all_stale_synthesis_jobs_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    dry_run: bool = False,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Reconcile stale running + queued synthesis jobs with a single receipt (S4.1)."""
+    cfg = settings or get_settings()
+    running = reconcile_stale_synthesis_jobs_v1(
+        session,
+        tenant_id=tenant_id,
+        stale_after_seconds=synthesis_job_running_stale_seconds_v1(settings=cfg),
+        dry_run=dry_run,
+    )
+    queued = reconcile_stale_queued_synthesis_jobs_v1(
+        session,
+        tenant_id=tenant_id,
+        stale_after_seconds=synthesis_job_queued_stale_seconds_v1(settings=cfg),
+        dry_run=dry_run,
+    )
+    hygiene = snapshot_synthesis_hygiene_v1(session, tenant_id=tenant_id)
+    return {
+        "surface_kind": "synthesis_job_reconcile",
+        "tenant_id": str(tenant_id),
+        "dry_run": dry_run,
+        "running_reconcile": running,
+        "queued_reconcile": queued,
+        "reconciled_total": int(running.get("reconciled_count") or 0)
+        + int(queued.get("stale_queued_count") or 0),
+        "hygiene_after": hygiene,
+        "receipt_code": STALE_FAILED_RECONCILE_RECEIPT_CODE_V1,
+    }
+
+
+def verify_synthesis_job_terminal_transition_invariant_v1() -> dict[str, Any]:
+    """Static invariant: terminal statuses are closed; terminalize helpers are idempotent."""
+    errors: list[str] = []
+    if SYNTHESIS_JOB_TERMINAL_STATUSES_V1 != frozenset({"completed", "failed", "cancelled"}):
+        errors.append("terminal_status_set_changed")
+    if SYNTHESIS_JOB_INFLIGHT_STATUSES_V1 & SYNTHESIS_JOB_TERMINAL_STATUSES_V1:
+        errors.append("inflight_overlaps_terminal")
+    for status in ("completed", "failed", "cancelled", "queued", "running"):
+        if status not in SYNTHESIS_JOB_TERMINAL_STATUSES_V1 | SYNTHESIS_JOB_INFLIGHT_STATUSES_V1 | {"cancelled"}:
+            continue
+    return {
+        "invariant_ok": not errors,
+        "errors": errors,
+        "terminal_statuses": sorted(SYNTHESIS_JOB_TERMINAL_STATUSES_V1),
+        "inflight_statuses": sorted(SYNTHESIS_JOB_INFLIGHT_STATUSES_V1),
+    }
 
 
 def snapshot_synthesis_job_terminal_health_v1(

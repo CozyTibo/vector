@@ -370,6 +370,8 @@ def _query_identity_continuity_v1(session: Session, *, tenant_id: uuid.UUID) -> 
 
 
 def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
+    from vector.domains.cortex.synthesis.synthesis_job_lifecycle import snapshot_synthesis_hygiene_v1
+
     tid = str(tenant_id)
     jobs = [
         {"status": str(r["status"]), "count": _to_int(r["n"])}
@@ -413,6 +415,9 @@ def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
         {"tenant": tid},
     ).scalar()
     published_claims_7d = _to_int(published_7d)
+    hygiene = snapshot_synthesis_hygiene_v1(session, tenant_id=tenant_id)
+    stale_inflight = int(hygiene.get("stale_inflight_count") or 0)
+    failed_jobs = int(hygiene.get("failed_job_rows") or 0)
     return {
         "jobs_by_status": jobs,
         "artifacts_total": _to_int(artifacts["total"]) if artifacts else 0,
@@ -424,6 +429,10 @@ def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
         ),
         "published_claims_7d_green_min": 1,
         "fail_loud_expected_when_retrieval_weak": True,
+        "hygiene": hygiene,
+        "synthesis_hygiene_stale_inflight": stale_inflight,
+        "synthesis_hygiene_stale_inflight_severity": "ok" if stale_inflight == 0 else "bad",
+        "synthesis_hygiene_failed_jobs": failed_jobs,
     }
 
 
@@ -462,6 +471,13 @@ def build_semantic_operator_panel_v1(
             "value": retrieval.get("execution_index_pct"),
             "severity": retrieval.get("execution_index_pct_severity"),
             "green_rule": f"≥ {RETRIEVAL_EXECUTION_PCT_GREEN_MIN}%",
+        },
+        {
+            "key": "synthesis_hygiene_stale_inflight",
+            "label": "Synthesis stale inflight jobs",
+            "value": synthesis.get("synthesis_hygiene_stale_inflight"),
+            "severity": synthesis.get("synthesis_hygiene_stale_inflight_severity"),
+            "green_rule": "0 stale running/queued",
         },
         {
             "key": "synthesis_published_claims_7d",
