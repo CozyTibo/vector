@@ -151,7 +151,7 @@ export function formatActionFeedback(data: OperatorActionResponse): ActionFeedba
 
   if (action === "restart_execution") {
     const restarted = asRecord(result.restarted) ?? asRecord(result);
-    const reran = executionRestarted(execution);
+    const reran = restarted?.reran === true || restarted?.restarted === true;
     return {
       tone: reran ? "ok" : "warn",
       title: reran ? "Execution restarted" : "Execution restart did not run",
@@ -211,9 +211,10 @@ export function formatActionFeedback(data: OperatorActionResponse): ActionFeedba
     };
   }
 
+  const actionLabel = String(action).replace(/_/g, " ");
   return {
     tone: "ok",
-    title: `${action.replace(/_/g, " ")} completed`,
+    title: `${actionLabel} completed`,
     detail: null,
   };
 }
