@@ -1,4 +1,4 @@
-"""Operator admin v2 routes (dark launch behind CORTEX_ADMIN_V2)."""
+"""Operator admin HTTP routes."""
 
 from __future__ import annotations
 
@@ -68,12 +68,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
 
-    def _require_operator_v2(settings: Settings) -> None:
-        if not settings.cortex_admin_v2:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="operator_admin_v2_disabled",
-            )
 
     @op.get("/overview", response_model=OperatorOverviewResponse)
     def get_operator_overview(
@@ -81,7 +75,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> OperatorOverviewResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.overview", tenant_id=tenant_id):
             raw = build_operator_overview_v1(db, settings, tenant_id=tenant_id)
@@ -91,12 +84,10 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_runtime(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         transition_limit: Annotated[int, Query(ge=1, le=200)] = 50,
         transition_offset: Annotated[int, Query(ge=0)] = 0,
         pipeline_run_id: Annotated[uuid.UUID | None, Query()] = None,
     ) -> OperatorRuntimeResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.runtime", tenant_id=tenant_id):
             raw = build_operator_runtime_v1(
@@ -115,7 +106,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> OperatorActionResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         try:
             raw = execute_operator_action_v1(
@@ -153,9 +143,7 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_graph_snapshot(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> OperatorGraphSnapshotResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.snapshots.graph", tenant_id=tenant_id):
             raw = build_operator_graph_snapshot_v1(db, tenant_id=tenant_id)
@@ -165,9 +153,7 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def post_operator_graph_snapshot_refresh(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> OperatorGraphComponentRefreshResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.snapshots.graph.refresh", tenant_id=tenant_id):
             raw = enqueue_graph_component_snapshot_refresh_v1(db, tenant_id=tenant_id)
@@ -178,7 +164,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_queues(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         tab: Annotated[
             Literal["synthesis_failed", "tcre_queued", "deferrals", "ingestion_failed"],
             Query(),
@@ -186,7 +171,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> OperatorQueuesResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.queues", tenant_id=tenant_id):
             raw = build_operator_queues_v1(
@@ -202,7 +186,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_edge_provenance(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         source: Annotated[uuid.UUID | None, Query()] = None,
         target: Annotated[uuid.UUID | None, Query()] = None,
         link_id: Annotated[uuid.UUID | None, Query()] = None,
@@ -210,7 +193,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         rule_id: Annotated[str | None, Query()] = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
     ) -> OperatorEdgeProvenanceResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         try:
             raw = lookup_edge_provenance_v1(
@@ -231,9 +213,7 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_islands_list(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> OperatorIslandsListResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.inspect.islands", tenant_id=tenant_id):
             raw = build_operator_islands_list_v1(db, tenant_id=tenant_id)
@@ -243,10 +223,8 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_retrieval_epochs(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         limit: Annotated[int, Query(ge=1, le=20)] = 5,
     ) -> OperatorRetrievalEpochsResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.inspect.retrieval.epochs", tenant_id=tenant_id):
             raw = build_operator_retrieval_epochs_v1(db, tenant_id=tenant_id, limit=limit)
@@ -256,7 +234,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_retrieval_entries(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         entity_id: Annotated[str | None, Query()] = None,
         scope_ref: Annotated[str | None, Query()] = None,
         index_kind: Annotated[str | None, Query()] = None,
@@ -265,7 +242,6 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> OperatorRetrievalEntriesResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         try:
             raw = search_operator_retrieval_entries_v1(
@@ -289,10 +265,8 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         artifact_kind: str,
         artifact_ref: str,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         max_lineage_hops: Annotated[int, Query(ge=1, le=256)] = 64,
     ) -> OperatorRetrievalLineageResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         try:
             validate_retrieval_ingress_artifact_kind_v1(artifact_kind)
@@ -312,13 +286,11 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_synthesis_jobs(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         status: Annotated[str | None, Query()] = None,
         q: Annotated[str | None, Query()] = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> OperatorSynthesisJobsResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         with admin_request_timing(endpoint="operator.inspect.synthesis.jobs", tenant_id=tenant_id):
             raw = search_operator_synthesis_jobs_v1(
@@ -335,14 +307,12 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
     def get_operator_execution_thread(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        settings: Annotated[Settings, Depends(settings_dep)],
         walk_id: Annotated[uuid.UUID | None, Query()] = None,
         tcre_job_id: Annotated[uuid.UUID | None, Query()] = None,
         scope_ref: Annotated[str | None, Query()] = None,
         replay_identity: Annotated[str | None, Query()] = None,
         limit: Annotated[int, Query(ge=1, le=100)] = 25,
     ) -> OperatorExecutionThreadResponse:
-        _require_operator_v2(settings)
         _assert_tenant(db, tenant_id)
         try:
             raw = search_operator_execution_thread_v1(

@@ -32,24 +32,10 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_operator_retrieval_epochs_disabled_by_default(
-    client: TestClient,
-    db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "false")
-    tid = _tenant(db_session)
-    db_session.commit()
-    res = client.get(f"/admin/tenants/{tid}/cortex/operator/inspect/retrieval/epochs")
-    assert res.status_code == 404
-
-
 def test_operator_retrieval_epochs_when_flag_enabled(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/inspect/retrieval/epochs")
@@ -62,9 +48,7 @@ def test_operator_retrieval_epochs_when_flag_enabled(
 def test_operator_retrieval_entries_requires_query(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/inspect/retrieval/entries")
@@ -74,9 +58,7 @@ def test_operator_retrieval_entries_requires_query(
 def test_operator_synthesis_jobs_when_flag_enabled(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(
@@ -93,9 +75,7 @@ def test_operator_synthesis_jobs_when_flag_enabled(
 def test_operator_execution_thread_requires_query(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/inspect/execution/thread")
@@ -105,9 +85,7 @@ def test_operator_execution_thread_requires_query(
 def test_operator_retrieval_lineage_org_link(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(

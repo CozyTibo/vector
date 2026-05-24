@@ -32,24 +32,10 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_operator_graph_snapshot_disabled_by_default(
-    client: TestClient,
-    db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "false")
-    tid = _tenant(db_session)
-    db_session.commit()
-    res = client.get(f"/admin/tenants/{tid}/cortex/operator/snapshots/graph")
-    assert res.status_code == 404
-
-
 def test_operator_graph_snapshot_when_flag_enabled(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/snapshots/graph")
@@ -63,9 +49,7 @@ def test_operator_graph_snapshot_when_flag_enabled(
 def test_operator_edge_provenance_requires_query(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/inspect/edges")
@@ -75,9 +59,7 @@ def test_operator_edge_provenance_requires_query(
 def test_operator_islands_list_when_flag_enabled(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/inspect/islands")

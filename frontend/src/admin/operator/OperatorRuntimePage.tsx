@@ -212,15 +212,7 @@ export default function OperatorRuntimePage() {
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
   if (runtimeQ.isError) {
-    const msg = (runtimeQ.error as Error).message;
-    if (msg === "operator_admin_v2_disabled") {
-      return (
-        <section className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-950">
-          Operator v2 is enabled in the UI but disabled on the API (CORTEX_ADMIN_V2).
-        </section>
-      );
-    }
-    return <p className="text-sm text-red-700">{msg}</p>;
+    return <p className="text-sm text-red-700">{(runtimeQ.error as Error).message}</p>;
   }
 
   const data = runtimeQ.data;

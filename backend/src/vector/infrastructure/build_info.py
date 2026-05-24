@@ -24,6 +24,5 @@ def build_deploy_info_payload(*, settings: Settings) -> dict[str, Any]:
         "surface_kind": "admin_build_info",
         "git_sha": git_sha,
         "git_sha_short": git_sha[:7] if git_sha else None,
-        "cortex_admin_v2_enabled": bool(settings.cortex_admin_v2),
         "env": settings.env,
     }

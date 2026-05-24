@@ -32,25 +32,10 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_operator_overview_disabled_by_default(
+def test_operator_overview(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "false")
-    tid = _tenant(db_session)
-    db_session.commit()
-    res = client.get(f"/admin/tenants/{tid}/cortex/operator/overview")
-    assert res.status_code == 404
-    assert res.json()["detail"] == "operator_admin_v2_disabled"
-
-
-def test_operator_overview_when_flag_enabled(
-    client: TestClient,
-    db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/overview")
@@ -66,14 +51,11 @@ def test_operator_overview_when_flag_enabled(
 
 def test_admin_build_info_endpoint(
     client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("VECTOR_GIT_SHA", "abc123def4567890abcdef1234567890abcd")
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     res = client.get("/admin/build-info")
     assert res.status_code == 200
     body = res.json()
     assert body["surface_kind"] == "admin_build_info"
     assert body["git_sha"] == "abc123def4567890abcdef1234567890abcd"
     assert body["git_sha_short"] == "abc123d"
-    assert body["cortex_admin_v2_enabled"] is True

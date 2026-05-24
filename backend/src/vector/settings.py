@@ -285,14 +285,6 @@ class Settings(BaseSettings):
             "Default is false — set true in production when Beat + cortex_live workers are ready."
         ),
     )
-    cortex_admin_v2: bool = Field(
-        default=False,
-        validation_alias="CORTEX_ADMIN_V2",
-        description=(
-            "Operator admin v2 dark launch (R0+). When false, GET …/cortex/operator/overview returns 404. "
-            "Frontend uses VITE_CORTEX_ADMIN_V2 separately."
-        ),
-    )
     vector_git_sha: str = Field(
         default="",
         validation_alias="VECTOR_GIT_SHA",

@@ -100,7 +100,6 @@ class AdminBuildInfoResponse(BaseModel):
     surface_kind: Literal["admin_build_info"] = "admin_build_info"
     git_sha: str | None = None
     git_sha_short: str | None = None
-    cortex_admin_v2_enabled: bool = False
     env: str = "development"
 
 

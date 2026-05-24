@@ -1,8 +1,4 @@
-/** R7: legacy pipeline admin UI removed; operator surfaces are always active in the frontend. */
-
-export function isCortexAdminV2Enabled(): boolean {
-  return true;
-}
+/** Frontend build identity for deploy footer. */
 
 export function frontendGitSha(): string | null {
   const sha = import.meta.env.VITE_GIT_SHA?.trim();

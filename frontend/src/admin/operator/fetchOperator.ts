@@ -18,13 +18,7 @@ import type {
   OperatorExecutionThread,
 } from "./operatorTypes";
 
-async function assertOperatorV2Response(res: Response, label: string): Promise<void> {
-  if (res.status === 404) {
-    const body = await res.json().catch(() => ({}));
-    if (body.detail === "operator_admin_v2_disabled") {
-      throw new Error("operator_admin_v2_disabled");
-    }
-  }
+async function assertOk(res: Response, label: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`${label} ${res.status}`);
   }
@@ -32,7 +26,7 @@ async function assertOperatorV2Response(res: Response, label: string): Promise<v
 
 export async function fetchOperatorOverview(tenantId: string): Promise<OperatorOverview> {
   const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/overview`);
-  await assertOperatorV2Response(res, "operator overview");
+  await assertOk(res, "operator overview");
   return res.json();
 }
 
@@ -51,7 +45,7 @@ export async function fetchOperatorRuntime(
   const res = await adminFetch(
     `/admin/tenants/${tenantId}/cortex/operator/runtime${qs ? `?${qs}` : ""}`,
   );
-  await assertOperatorV2Response(res, "operator runtime");
+  await assertOk(res, "operator runtime");
   return res.json();
 }
 
@@ -76,7 +70,7 @@ export async function postOperatorAction(
 
 export async function fetchOperatorGraphSnapshot(tenantId: string): Promise<OperatorGraphSnapshot> {
   const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/snapshots/graph`);
-  await assertOperatorV2Response(res, "operator graph snapshot");
+  await assertOk(res, "operator graph snapshot");
   return res.json();
 }
 
@@ -95,13 +89,13 @@ export async function fetchOperatorEdgeProvenance(
   if (res.status === 400) {
     throw new Error("edge_query_required");
   }
-  await assertOperatorV2Response(res, "operator edge provenance");
+  await assertOk(res, "operator edge provenance");
   return res.json();
 }
 
 export async function fetchOperatorIslandsList(tenantId: string): Promise<OperatorIslandsList> {
   const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/inspect/islands`);
-  await assertOperatorV2Response(res, "operator islands");
+  await assertOk(res, "operator islands");
   return res.json();
 }
 
@@ -111,7 +105,7 @@ export async function postOperatorGraphSnapshotRefresh(
   const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/snapshots/graph/refresh`, {
     method: "POST",
   });
-  await assertOperatorV2Response(res, "operator graph refresh");
+  await assertOk(res, "operator graph refresh");
   return res.json();
 }
 
@@ -125,7 +119,7 @@ export async function fetchOperatorQueues(
   if (params.offset != null) search.set("offset", String(params.offset));
   const qs = search.toString();
   const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/queues${qs ? `?${qs}` : ""}`);
-  await assertOperatorV2Response(res, "operator queues");
+  await assertOk(res, "operator queues");
   return res.json();
 }
 
@@ -136,7 +130,7 @@ export async function fetchOperatorRetrievalEpochs(
   const res = await adminFetch(
     `/admin/tenants/${tenantId}/cortex/operator/inspect/retrieval/epochs?limit=${limit}`,
   );
-  await assertOperatorV2Response(res, "operator retrieval epochs");
+  await assertOk(res, "operator retrieval epochs");
   return res.json();
 }
 
@@ -163,7 +157,7 @@ export async function fetchOperatorRetrievalEntries(
   if (res.status === 400) {
     throw new Error("search_query_required");
   }
-  await assertOperatorV2Response(res, "operator retrieval entries");
+  await assertOk(res, "operator retrieval entries");
   return res.json();
 }
 
@@ -175,7 +169,7 @@ export async function fetchOperatorRetrievalLineage(
   const res = await adminFetch(
     `/admin/tenants/${tenantId}/cortex/operator/inspect/retrieval/lineage/${encodeURIComponent(artifactKind)}/${encodeURIComponent(artifactRef)}`,
   );
-  await assertOperatorV2Response(res, "operator retrieval lineage");
+  await assertOk(res, "operator retrieval lineage");
   return res.json();
 }
 
@@ -192,7 +186,7 @@ export async function fetchOperatorSynthesisJobs(
   const res = await adminFetch(
     `/admin/tenants/${tenantId}/cortex/operator/inspect/synthesis/jobs${qs ? `?${qs}` : ""}`,
   );
-  await assertOperatorV2Response(res, "operator synthesis jobs");
+  await assertOk(res, "operator synthesis jobs");
   return res.json();
 }
 
@@ -217,6 +211,6 @@ export async function fetchOperatorExecutionThread(
   if (res.status === 400) {
     throw new Error("search_query_required");
   }
-  await assertOperatorV2Response(res, "operator execution thread");
+  await assertOk(res, "operator execution thread");
   return res.json();
 }

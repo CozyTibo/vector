@@ -43,7 +43,6 @@ jobs:
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_GIT_SHA: ${{ github.sha }}
-          VITE_CORTEX_ADMIN_V2: "false"
         run: |
           npm ci
           npm run build

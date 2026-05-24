@@ -41,25 +41,10 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_operator_runtime_disabled_by_default(
+def test_operator_runtime(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "false")
-    tid = _tenant(db_session)
-    db_session.commit()
-    res = client.get(f"/admin/tenants/{tid}/cortex/operator/runtime")
-    assert res.status_code == 404
-    assert res.json()["detail"] == "operator_admin_v2_disabled"
-
-
-def test_operator_runtime_when_flag_enabled(
-    client: TestClient,
-    db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(
@@ -78,27 +63,10 @@ def test_operator_runtime_when_flag_enabled(
     assert "per_island_synthesis" not in body
 
 
-def test_operator_actions_disabled_by_default(
-    client: TestClient,
-    db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "false")
-    tid = _tenant(db_session)
-    db_session.commit()
-    res = client.post(
-        f"/admin/tenants/{tid}/cortex/operator/actions",
-        json={"action": "run_from_phase", "start_phase": "canonical"},
-    )
-    assert res.status_code == 404
-
-
 def test_operator_action_run_from_phase(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.post(
@@ -115,9 +83,7 @@ def test_operator_action_run_from_phase(
 def test_operator_action_confirmation_mismatch(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.post(
@@ -131,9 +97,7 @@ def test_operator_action_confirmation_mismatch(
 def test_operator_action_restart_requires_confirmation(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     bad = client.post(
@@ -157,10 +121,8 @@ def test_operator_action_restart_requires_confirmation(
 def test_operator_action_phrases_exported(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Smoke: confirmation-gated actions accept canonical phrases (no 400 mismatch)."""
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
 

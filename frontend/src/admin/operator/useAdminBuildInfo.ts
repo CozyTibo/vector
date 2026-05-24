@@ -6,7 +6,6 @@ export type AdminBuildInfo = {
   surface_kind: "admin_build_info";
   git_sha: string | null;
   git_sha_short: string | null;
-  cortex_admin_v2_enabled: boolean;
   env: string;
 };
 

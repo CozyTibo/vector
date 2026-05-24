@@ -33,24 +33,10 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_operator_queues_disabled_by_default(
+def test_operator_queues(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "false")
-    tid = _tenant(db_session)
-    db_session.commit()
-    res = client.get(f"/admin/tenants/{tid}/cortex/operator/queues")
-    assert res.status_code == 404
-
-
-def test_operator_queues_when_flag_enabled(
-    client: TestClient,
-    db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(
@@ -74,9 +60,7 @@ def test_operator_queues_when_flag_enabled(
 def test_operator_graph_snapshot_includes_component_snapshot(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/operator/snapshots/graph")
@@ -86,24 +70,10 @@ def test_operator_graph_snapshot_includes_component_snapshot(
     assert body["component_snapshot"]["job_status"] == "idle"
 
 
-def test_operator_graph_refresh_disabled_by_default(
-    client: TestClient,
-    db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "false")
-    tid = _tenant(db_session)
-    db_session.commit()
-    res = client.post(f"/admin/tenants/{tid}/cortex/operator/snapshots/graph/refresh")
-    assert res.status_code == 404
-
-
 def test_operator_graph_refresh_enqueues(
     client: TestClient,
     db_session: Session,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("CORTEX_ADMIN_V2", "true")
     tid = _tenant(db_session)
     db_session.commit()
 
