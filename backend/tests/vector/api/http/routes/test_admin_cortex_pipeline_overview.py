@@ -32,6 +32,19 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
+def test_pipeline_overview_bootstrap_endpoint(client: TestClient, db_session: Session) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    res = client.get(f"/admin/tenants/{tid}/cortex/pipeline/overview/bootstrap")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["surface_kind"] == "pipeline_overview_bootstrap"
+    assert len(body["phases"]) == 7
+    kpi = body.get("operator_primary_kpi") or {}
+    assert isinstance(kpi.get("primary_metric_value"), int)
+    assert isinstance(kpi.get("raw_minus_mat_admin_gap"), int)
+
+
 def test_pipeline_overview_returns_seven_phases(client: TestClient, db_session: Session) -> None:
     tid = _tenant(db_session)
     db_session.commit()

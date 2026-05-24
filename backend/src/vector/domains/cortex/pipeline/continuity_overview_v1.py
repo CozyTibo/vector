@@ -353,6 +353,15 @@ _OPERATOR_PHASES: tuple[OperatorPhase, ...] = (
     "synthesis",
 )
 
+def _safe_int(value: Any) -> int:
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _iso(dt: datetime | None) -> str | None:
     if dt is None:
         return None
@@ -632,7 +641,7 @@ def build_continuity_status_v1(
             state = "BROKEN"
         elif detail.get("last_dual_lane_slice", {}).get("execution_lane_ran"):
             state = "DEGRADED"
-        elif int(detail.get("operator_recovery_job_count") or 0) > 0:
+        elif _safe_int(detail.get("operator_recovery_job_count")) > 0:
             state = "OPERATOR_RECOVERY"
     elif execution_lane in ("BLOCKED", "WAITING") or canonical_lane == "DEGRADED" or propagation_blocked:
         state = "DEGRADED"

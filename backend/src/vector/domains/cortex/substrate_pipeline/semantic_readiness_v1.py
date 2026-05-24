@@ -307,7 +307,20 @@ def _query_identity_continuity_v1(session: Session, *, tenant_id: uuid.UUID) -> 
 
     tid = str(tenant_id)
     boundary = snapshot_anchor_entity_boundary_v1(session, tenant_id=tenant_id)
-    promotion_diversity = snapshot_promotion_diversity_observability_v1(session, tenant_id=tenant_id)
+    promotion_diversity: dict[str, Any] = {}
+    try:
+        promotion_diversity = snapshot_promotion_diversity_observability_v1(
+            session, tenant_id=tenant_id
+        )
+    except Exception:  # noqa: BLE001
+        promotion_diversity = {"promotion_diversity_severity": "unknown"}
+    promotable_by_rule: list[dict[str, Any]] = []
+    try:
+        promotable_by_rule = count_promotable_link_candidates_by_rule_v1(
+            session, tenant_id=tenant_id
+        )
+    except Exception:  # noqa: BLE001
+        promotable_by_rule = []
     cand = session.execute(
         text(
             """
@@ -337,7 +350,7 @@ def _query_identity_continuity_v1(session: Session, *, tenant_id: uuid.UUID) -> 
             if isinstance(boundary.get("anchors_missing_org_entity_pct"), (int, float))
             else None
         ),
-        "promotable_by_rule_id": count_promotable_link_candidates_by_rule_v1(session, tenant_id=tenant_id),
+        "promotable_by_rule_id": promotable_by_rule,
         "promotion_diversity": promotion_diversity,
         "promotion_rule_count_green_min": PROMOTION_RULE_COUNT_GREEN_MIN,
         "second_link_type_policy": "deferred_until_prod_evidence_ge_100_edges",

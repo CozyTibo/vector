@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class OnboardingChatMessageItem(BaseModel):
@@ -4589,6 +4589,34 @@ class AdminCortexOperatorPrimaryKpi(BaseModel):
     untreated_routable_estimate: int = 0
     raw_minus_mat_admin_gap: int = 0
     deferral_counts: dict[str, int] = Field(default_factory=dict)
+
+    @field_validator(
+        "primary_metric_value",
+        "drainable_routable_estimate",
+        "untreated_routable_estimate",
+        "raw_minus_mat_admin_gap",
+        "canonical_backlog_count",
+        "execution_island_count",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_metric_int(cls, value: object) -> int:
+        if value is None:
+            return 0
+        return int(value)
+
+    @field_validator("deferral_counts", mode="before")
+    @classmethod
+    def _coerce_deferral_counts(cls, value: object) -> dict[str, int]:
+        if not isinstance(value, dict):
+            return {}
+        out: dict[str, int] = {}
+        for key, raw in value.items():
+            try:
+                out[str(key)] = int(raw or 0)
+            except (TypeError, ValueError):
+                out[str(key)] = 0
+        return out
     operator_kpi_primary: str | None = None
     raw_minus_mat_banner_deprecated: bool = True
     canonical_backlog_count: int = 0
