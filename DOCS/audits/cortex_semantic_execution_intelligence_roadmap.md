@@ -730,7 +730,9 @@ Fail-loud gates **work** — they prevent fake-green. There is nothing truthful 
 - Job detail shows: retrieval epoch mix, scope entry kinds, claim→evidence_ref linkage.
 - Flag "ungrounded" = claims without resolvable retrieval refs.
 
-### S4.6 — Phase 08 recurrence proof
+### S4.6 — Phase 08 recurrence proof ✅
+
+**Status:** Shipped — AA5 requires jobs_completed plus useful artifact (S4.3); semantic panel tracks useful `published_claims_7d`.
 
 **Files:** `continuity_proof_panel.py` AA5, semantic readiness panel.
 

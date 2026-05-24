@@ -415,6 +415,12 @@ def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
         {"tenant": tid},
     ).scalar()
     published_claims_7d = _to_int(published_7d)
+    from vector.domains.cortex.synthesis.synthesis_useful_artifact_v1 import (
+        snapshot_published_useful_artifacts_v1,
+    )
+
+    useful_snapshot = snapshot_published_useful_artifacts_v1(session, tenant_id=tenant_id)
+    published_useful_7d = int(useful_snapshot.get("published_useful_count") or 0)
     hygiene = snapshot_synthesis_hygiene_v1(session, tenant_id=tenant_id)
     stale_inflight = int(hygiene.get("stale_inflight_count") or 0)
     failed_jobs = int(hygiene.get("failed_job_rows") or 0)
@@ -423,11 +429,13 @@ def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
         "artifacts_total": _to_int(artifacts["total"]) if artifacts else 0,
         "artifacts_published": _to_int(artifacts["published"]) if artifacts else 0,
         "artifacts_with_claims": _to_int(artifacts["with_claims"]) if artifacts else 0,
-        "published_claims_7d": published_claims_7d,
+        "published_claims_7d": published_useful_7d,
+        "published_claims_7d_raw_with_claims": published_claims_7d,
         "published_claims_7d_severity": (
-            "ok" if published_claims_7d >= 1 else ("bad" if _to_int(artifacts["published"]) else "unknown")
+            "ok" if published_useful_7d >= 1 else ("bad" if _to_int(artifacts["published"]) else "unknown")
         ),
         "published_claims_7d_green_min": 1,
+        "useful_artifact_snapshot": useful_snapshot,
         "fail_loud_expected_when_retrieval_weak": True,
         "hygiene": hygiene,
         "synthesis_hygiene_stale_inflight": stale_inflight,

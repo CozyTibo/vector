@@ -32,14 +32,18 @@ def evaluate_aa5_synthesis_jobs_completed_gate_v1(
     )
 
     jobs_completed = int(phase08.get("jobs_completed") or 0)
+    useful_published = int(phase08.get("useful_artifacts_published") or 0)
     scopes_scheduled = int(phase08.get("scopes_scheduled") or 0)
     lawful_empty = _lawful_empty_synthesis_v1(phase08)
     started = phase_08_started_at is not None
     strict = is_aa5_require_jobs_completed_enabled_v1()
 
-    if jobs_completed > 0:
+    if jobs_completed > 0 and useful_published >= 1:
         verdict = "PASS"
-        detail = "synthesis_jobs_completed"
+        detail = "synthesis_jobs_completed_with_useful_artifact"
+    elif jobs_completed > 0:
+        verdict = "FAIL"
+        detail = "synthesis_jobs_completed_without_useful_artifact"
     elif lawful_empty:
         verdict = "PASS"
         detail = "lawful_empty_synthesis"
@@ -58,7 +62,7 @@ def evaluate_aa5_synthesis_jobs_completed_gate_v1(
         "verdict": verdict,
         "pass": verdict == "PASS",
         "criterion": (
-            "phase_08 jobs_completed > 0 or lawful documented empty (C5)"
+            "phase_08 jobs_completed > 0 with useful artifact (S4.3) or lawful documented empty (C5)"
             if strict
             else "phase_08.started_at IS NOT NULL (legacy advisory)"
         ),
@@ -73,13 +77,19 @@ def evaluate_aa5_synthesis_jobs_completed_gate_v1(
             "scope_empty": bool(phase08.get("scope_empty")),
             "lawful_empty": lawful_empty,
             "artifacts_published": int(phase08.get("artifacts_published") or 0),
+            "useful_artifacts_published": useful_published,
             "aa5_strict_jobs_completed_required": strict,
             "phase_c5_schema_version": PHASE_C5_AA5_GATE_SCHEMA_VERSION,
             "fake_started_only_would_pass_legacy": started and jobs_completed == 0 and not lawful_empty,
         },
         "error_code": (
             AA5_JOBS_COMPLETED_CODE_V1
-            if verdict == "FAIL" and detail == "phase_08_started_without_jobs_completed"
+            if verdict == "FAIL"
+            and detail
+            in (
+                "phase_08_started_without_jobs_completed",
+                "synthesis_jobs_completed_without_useful_artifact",
+            )
             else None
         ),
     }
