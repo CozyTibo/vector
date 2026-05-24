@@ -293,6 +293,7 @@ def _run_execution_lane_slice_v1(
     identity_trigger = f"execution:{reason}"
     requeue = False
     waiting_async = False
+    last_p03_output: dict[str, Any] | None = None
 
     while phase in SUBSTRATE_PIPELINE_PHASE_ORDER:
         if time.monotonic() >= deadline:
@@ -314,12 +315,18 @@ def _run_execution_lane_slice_v1(
                 bundle_id=bundle_id,
                 identity_substrate_trigger=identity_trigger,
             )
+            last_p03_output = p03
             store_last_phase_receipt_on_lease_v1(lease, phase_output=p03, session=session)
             phase = PHASE_04_GRAPH
             continue
 
         if phase == PHASE_04_GRAPH:
-            out = run_phase_04_graph_v1(session, tenant_id=tenant_id, pipeline_run_id=pipeline_run_id)
+            out = run_phase_04_graph_v1(
+                session,
+                tenant_id=tenant_id,
+                pipeline_run_id=pipeline_run_id,
+                identity_phase_output=last_p03_output,
+            )
             store_last_phase_receipt_on_lease_v1(lease, phase_output=out, session=session)
             from vector.domains.cortex.substrate_pipeline.post_ingestion_fresh_pipeline_run import (
                 resolve_pipeline_run_id_after_phase04_v1,

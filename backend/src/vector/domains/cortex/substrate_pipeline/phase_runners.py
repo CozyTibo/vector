@@ -14,6 +14,9 @@ from vector.domains.cortex.canonical.forward_progress.constants import (
 from vector.domains.cortex.canonical.forward_progress.drain_runtime import drain_forward_progress_backlog
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.identity.continuity_rebuild import run_identity_substrate_projection_for_pipeline_v1
+from vector.domains.cortex.identity.identity_substrate_phase_helpers_v1 import (
+    should_skip_phase_04_after_identity_v1,
+)
 from vector.domains.cortex.identity.projection_export import run_graph_projection_export_for_pipeline_v1
 from vector.domains.cortex.reasoning.runtime import enqueue_reconstruction_job_v1
 from vector.domains.cortex.retrieval.retrieval_index_materialization import (
@@ -180,9 +183,24 @@ def run_phase_04_graph_v1(
     *,
     tenant_id: uuid.UUID,
     pipeline_run_id: uuid.UUID,
+    identity_phase_output: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     begin_phase_v1(session, pipeline_run_id=pipeline_run_id, phase_id=PHASE_04_GRAPH)
     started_at = utc_now_iso_v1()
+    if identity_phase_output is not None and should_skip_phase_04_after_identity_v1(identity_phase_output):
+        return skip_phase_with_receipt_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=PHASE_04_GRAPH,
+            tenant_id=tenant_id,
+            reason="identity_substrate_zero_delta_skip_graph",
+            started_at=started_at,
+            raw_output={
+                "skipped": True,
+                "reason": "identity_substrate_zero_delta_skip_graph",
+                "distinct_candidate_pairs_delta": identity_phase_output.get("distinct_candidate_pairs_delta"),
+            },
+        )
     try:
         out = run_graph_projection_export_for_pipeline_v1(session, tenant_id=tenant_id)
     except ValueError as exc:
