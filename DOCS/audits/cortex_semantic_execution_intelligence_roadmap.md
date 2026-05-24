@@ -686,7 +686,9 @@ Fail-loud gates **work** — they prevent fake-green. There is nothing truthful 
 
 **Can start on day 1** — no dependency on S1–S3.
 
-### S4.2 — Collapse to single pipeline synthesis path
+### S4.2 — Collapse to single pipeline synthesis path ✅
+
+**Status:** Shipped — pipeline materialize is per-island only; Celery job task documented admin/ad-hoc.
 
 **Files:** `synthesis/synthesis_pipeline.py`, `synthesis/synthesis_per_island.py`, `app/tasks/cortex_synthesis_jobs.py`.
 

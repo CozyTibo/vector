@@ -14,9 +14,7 @@ from vector.domains.cortex.reasoning.reasoning_receipts_proof_artifacts import (
 )
 from vector.domains.cortex.retrieval.retrieval_index_materialization import get_published_index_epoch_v1
 from vector.domains.cortex.synthesis.synthesis_bounded_caps import (
-    SD_PIPELINE_GAP_V1,
     SD_SCOPE_EMPTY_V1,
-    build_synthesis_omission_histogram_v1,
 )
 from vector.domains.cortex.synthesis.synthesis_completeness_projection import (
     pipeline_default_workloads_v1,
@@ -25,11 +23,6 @@ from vector.domains.cortex.synthesis.synthesis_job_contract import (
     DEFAULT_SYNTHESIS_POLICY_PACK_ID_V1,
     SYNTHESIS_JOB_ENVELOPE_SCHEMA_VERSION_V1,
 )
-from vector.domains.cortex.synthesis.synthesis_job_envelope import (
-    compute_synthesis_job_envelope_digest_v1,
-)
-from vector.domains.cortex.synthesis.synthesis_orchestrator import execute_synthesis_job_envelope_v1
-from vector.domains.cortex.synthesis.synthesis_publication import publish_synthesis_epoch_v1
 from vector.domains.cortex.synthesis.synthesis_query_plan import load_synthesis_policy_pack_v1
 from vector.domains.cortex.substrate_pipeline.constants import PHASE_07_RETRIEVAL, PHASE_08_SYNTHESIS
 from vector.domains.cortex.substrate_pipeline.phase_runner_receipt import (
@@ -43,7 +36,6 @@ from vector.domains.cortex.substrate_pipeline.repository import (
 )
 from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import utc_now_iso_v1
 from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
-from vector.infrastructure.db.models.cortex_synthesis_artifact import CortexSynthesisArtifact
 from vector.infrastructure.db.models.cortex_substrate_pipeline_run import CortexSubstratePipelineRun
 from vector.settings import Settings, get_settings
 
@@ -148,7 +140,7 @@ def materialize_synthesis_for_pipeline_v1(
     settings: Settings | None = None,
     epoch_scope_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Run bounded pipeline-default synthesis jobs and publish synthesis epoch."""
+    """Run bounded pipeline synthesis via inline per-island path only (S4.2)."""
     from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
         maybe_reconcile_synthesis_jobs_on_materialize_v1,
     )
@@ -156,204 +148,45 @@ def materialize_synthesis_for_pipeline_v1(
         is_per_island_synthesis_enabled_v1,
         materialize_synthesis_per_island_v1,
     )
+    from vector.domains.cortex.synthesis.synthesis_pipeline_path_v1 import (
+        PIPELINE_SYNTHESIS_PATH_KIND_V1,
+        SynthesisPipelinePathError,
+    )
 
     cfg = settings or get_settings()
+    if not is_per_island_synthesis_enabled_v1():
+        raise SynthesisPipelinePathError(
+            "synthesis_pipeline_per_island_required",
+            detail={
+                "pipeline_path_kind": PIPELINE_SYNTHESIS_PATH_KIND_V1,
+                "rollback": "set CORTEX_SYNTHESIS_PER_ISLAND_ENABLED=1",
+            },
+        )
+
     job_reconcile = maybe_reconcile_synthesis_jobs_on_materialize_v1(
         session,
         tenant_id=tenant_id,
         settings=cfg,
     )
-    if is_per_island_synthesis_enabled_v1():
-        out = materialize_synthesis_per_island_v1(
-            session,
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-            published_index_epoch=published_index_epoch,
-            settings=cfg,
-        )
-        if job_reconcile is not None:
-            out = dict(out)
-            out["synthesis_job_reconcile"] = job_reconcile
-        if epoch_scope_snapshot:
-            out = dict(out)
-            out["synthesis_epoch_scope_alignment"] = epoch_scope_snapshot
-            out["retrieval_entries_in_scope"] = int(
-                epoch_scope_snapshot.get("retrieval_entries_in_scope")
-                or out.get("retrieval_entries_in_scope")
-                or 0
-            )
-        return out
-    index_epoch = published_index_epoch or get_published_index_epoch_v1(session, tenant_id=tenant_id)
-    if not index_epoch:
-        return {
-            "published_index_epoch": None,
-            "jobs_completed": 0,
-            "jobs_failed": 0,
-            "artifact_digests": [],
-            "synthesis_job_ids": [],
-            "sd_rollup": {SD_SCOPE_EMPTY_V1: 1},
-            "synthesis_publication_epoch": None,
-            "scope_empty": True,
-            "error_code": "no_published_index_epoch",
-        }
-
-    max_scopes = synthesis_pipeline_max_scopes_v1(settings=cfg)
-    scopes = list(
-        iter_pipeline_synthesis_scopes_v1(
-            session,
-            tenant_id=tenant_id,
-            published_index_epoch=index_epoch,
-            max_scopes=max_scopes,
-        )
-    )
-    job_results: list[dict[str, Any]] = []
-    artifact_digests: list[str] = []
-    job_ids: list[str] = []
-    jobs_failed = 0
-
-    if not scopes:
-        pub = publish_synthesis_epoch_v1(
-            session,
-            tenant_id=tenant_id,
-            published_index_epoch=index_epoch,
-            substrate_pipeline_run_id=pipeline_run_id,
-            allow_empty_scope=True,
-        )
-        empty_out = {
-            "published_index_epoch": index_epoch,
-            "retrieval_epoch_pinned": index_epoch,
-            "jobs_completed": 0,
-            "jobs_failed": 0,
-            "artifact_digests": [],
-            "synthesis_job_ids": [],
-            "sd_rollup": {SD_SCOPE_EMPTY_V1: 1},
-            "synthesis_publication_epoch": pub["synthesis_publication_epoch"],
-            "scope_empty": True,
-            "scopes_scheduled": 0,
-            "scopes_overflow": False,
-            "empty_scope_reason": "retrieval_empty",
-            "workloads_applied": 0,
-        }
-        from vector.domains.cortex.synthesis.synthesis_activation_audit import (
-            persist_synthesis_activation_audit_v1,
-        )
-
-        persist_synthesis_activation_audit_v1(
-            session,
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-            materialize_output=empty_out,
-            scopes=[],
-        )
-        if job_reconcile is not None:
-            empty_out["synthesis_job_reconcile"] = job_reconcile
-        return empty_out
-
-    workloads_applied = len({s.get("workload") for s in scopes if s.get("workload")})
-
-    for scope in scopes:
-        body = build_pipeline_synthesis_job_envelope_v1(
-            tenant_id=tenant_id,
-            pipeline_run_id=pipeline_run_id,
-            workload=scope["workload"],
-            retrieval_lookup_id=scope["retrieval_lookup_id"],
-            published_index_epoch=index_epoch,
-        )
-        try:
-            out = execute_synthesis_job_envelope_v1(session, tenant_id=tenant_id, body=body)
-            job_results.append(out)
-            if out.get("artifact_digest"):
-                artifact_digests.append(str(out["artifact_digest"]))
-            if out.get("job_id"):
-                job_ids.append(str(out["job_id"]))
-        except Exception as exc:  # noqa: BLE001
-            jobs_failed += 1
-            job_results.append(
-                {
-                    "error": str(exc)[:500],
-                    "sd_code": SD_PIPELINE_GAP_V1,
-                    "envelope_digest": compute_synthesis_job_envelope_digest_v1(body),
-                }
-            )
-
-    artifact_ids: list[uuid.UUID] = []
-    if job_ids:
-        artifact_ids = [
-            uuid.UUID(str(a))
-            for a in session.scalars(
-                select(CortexSynthesisArtifact.id).where(
-                    CortexSynthesisArtifact.tenant_id == tenant_id,
-                    CortexSynthesisArtifact.job_id.in_([uuid.UUID(j) for j in job_ids]),
-                )
-            ).all()
-        ]
-    sd_rollup = _rollup_sd_codes_v1(job_results)
-    synthesis_publication_epoch: str | None = None
-    artifacts_published = 0
-    if not scopes:
-        sd_rollup = {**sd_rollup, SD_SCOPE_EMPTY_V1: 1}
-        pub = publish_synthesis_epoch_v1(
-            session,
-            tenant_id=tenant_id,
-            published_index_epoch=index_epoch,
-            substrate_pipeline_run_id=pipeline_run_id,
-            allow_empty_scope=True,
-        )
-        synthesis_publication_epoch = str(pub["synthesis_publication_epoch"])
-        artifacts_published = int(pub["artifact_count"])
-    elif artifact_ids:
-        pub = publish_synthesis_epoch_v1(
-            session,
-            tenant_id=tenant_id,
-            published_index_epoch=index_epoch,
-            substrate_pipeline_run_id=pipeline_run_id,
-            artifact_ids=artifact_ids,
-        )
-        synthesis_publication_epoch = str(pub["synthesis_publication_epoch"])
-        artifacts_published = int(pub["artifact_count"])
-    elif jobs_failed:
-        sd_rollup = {**sd_rollup, SD_PIPELINE_GAP_V1: jobs_failed}
-    eligible = len(
-        list(
-            iter_pipeline_synthesis_scopes_v1(
-                session,
-                tenant_id=tenant_id,
-                published_index_epoch=index_epoch,
-                max_scopes=10_000,
-            )
-        )
-    )
-    final_out = {
-        "phase": PHASE_08_SYNTHESIS,
-        "published_index_epoch": index_epoch,
-        "retrieval_epoch_pinned": index_epoch,
-        "jobs_completed": len(job_ids),
-        "jobs_failed": jobs_failed,
-        "artifact_digests": artifact_digests,
-        "synthesis_job_ids": job_ids,
-        "synthesis_publication_epoch": synthesis_publication_epoch,
-        "artifacts_published": artifacts_published,
-        "sd_rollup": sd_rollup,
-        "sd_histogram": build_synthesis_omission_histogram_v1(),
-        "scopes_scheduled": len(scopes),
-        "scopes_overflow": eligible > max_scopes,
-        "scope_empty": False,
-        "workloads_applied": workloads_applied,
-    }
-    if job_reconcile is not None:
-        final_out["synthesis_job_reconcile"] = job_reconcile
-    from vector.domains.cortex.synthesis.synthesis_activation_audit import (
-        persist_synthesis_activation_audit_v1,
-    )
-
-    persist_synthesis_activation_audit_v1(
+    out = materialize_synthesis_per_island_v1(
         session,
         tenant_id=tenant_id,
         pipeline_run_id=pipeline_run_id,
-        materialize_output=final_out,
-        scopes=scopes,
+        published_index_epoch=published_index_epoch,
+        settings=cfg,
     )
-    return final_out
+    out = dict(out)
+    out["pipeline_path_kind"] = PIPELINE_SYNTHESIS_PATH_KIND_V1
+    if job_reconcile is not None:
+        out["synthesis_job_reconcile"] = job_reconcile
+    if epoch_scope_snapshot:
+        out["synthesis_epoch_scope_alignment"] = epoch_scope_snapshot
+        out["retrieval_entries_in_scope"] = int(
+            epoch_scope_snapshot.get("retrieval_entries_in_scope")
+            or out.get("retrieval_entries_in_scope")
+            or 0
+        )
+    return out
 
 
 def run_substrate_phase_08_synthesis_v1(

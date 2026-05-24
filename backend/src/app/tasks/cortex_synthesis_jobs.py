@@ -1,4 +1,8 @@
-"""Phase 08 P08-06 — Celery entrypoint for synthesis job FSM."""
+"""Phase 08 P08-06 — Celery entrypoint for synthesis job FSM (admin / ad-hoc only).
+
+Pipeline phase 08 uses inline per-island materialization (`materialize_synthesis_per_island_v1`).
+This task is **not** on the substrate pipeline hot path — use for admin replay and manual jobs only.
+"""
 
 from __future__ import annotations
 
