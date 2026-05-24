@@ -8,6 +8,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from vector.api.http.admin_request_timing import admin_request_timing
 from vector.api.http.deps import get_db, settings_dep
 from vector.contracts.admin import (
     AdminCortexPipelineOverviewExecutionResponse,
@@ -144,7 +145,8 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexPipelineOverviewResponse:
         _assert_tenant(db, tenant_id)
-        raw = build_pipeline_overview_bootstrap_v1(db, settings, tenant_id=tenant_id)
+        with admin_request_timing(endpoint="pipeline.overview.bootstrap", tenant_id=tenant_id):
+            raw = build_pipeline_overview_bootstrap_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexPipelineOverviewResponse.model_validate(raw)
 
     @pr.get("/overview", response_model=AdminCortexPipelineOverviewResponse)
@@ -194,7 +196,8 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminCortexSemanticReadinessResponse:
         _assert_tenant(db, tenant_id)
-        raw = build_semantic_readiness_admin_v1(db, settings, tenant_id=tenant_id)
+        with admin_request_timing(endpoint="pipeline.semantic_readiness", tenant_id=tenant_id):
+            raw = build_semantic_readiness_admin_v1(db, settings, tenant_id=tenant_id)
         return AdminCortexSemanticReadinessResponse.model_validate(raw)
 
     @pr.get("/graph-truth-inspector", response_model=AdminCortexGraphTruthInspectorResponse)

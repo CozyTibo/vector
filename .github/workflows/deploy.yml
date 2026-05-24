@@ -94,6 +94,8 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_GIT_SHA: ${{ github.sha }}
+          VITE_CORTEX_ADMIN_V2: "false"
         run: |
           npm ci
           npm run build
@@ -158,7 +160,12 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           jq --arg IMAGE "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
-            '.containerDefinitions[0].image = $IMAGE' \
+             --arg GIT_SHA "$IMAGE_TAG" \
+             '.containerDefinitions[0].image = $IMAGE |
+              .containerDefinitions[0].environment = (
+                ((.containerDefinitions[0].environment // []) | map(select(.name != "VECTOR_GIT_SHA"))) +
+                [{name: "VECTOR_GIT_SHA", value: $GIT_SHA}]
+              )' \
             api-task-def-caps.json > new-task-def.json
 
       - name: Register new task definition
@@ -266,7 +273,12 @@ jobs:
           python backend/scripts/ecs_align_github_ingest_caps.py \
             clean-worker-task-def.json worker-task-def-caps.json
           jq --arg IMAGE "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
-            '.containerDefinitions[0].image = $IMAGE' \
+             --arg GIT_SHA "$IMAGE_TAG" \
+             '.containerDefinitions[0].image = $IMAGE |
+              .containerDefinitions[0].environment = (
+                ((.containerDefinitions[0].environment // []) | map(select(.name != "VECTOR_GIT_SHA"))) +
+                [{name: "VECTOR_GIT_SHA", value: $GIT_SHA}]
+              )' \
             worker-task-def-caps.json > new-worker-task-def.json
           REGISTERED_WORKER_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-worker-task-def.json \

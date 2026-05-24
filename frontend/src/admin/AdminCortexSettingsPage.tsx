@@ -14,6 +14,7 @@ import {
   usePipelineOverviewIngestion,
 } from "./cortex/usePipelineOverview";
 import { StatusBadge } from "./ui/StatusBadge";
+import { DeployInfoFooter } from "./operator/DeployInfoFooter";
 
 export default function AdminCortexSettingsPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
@@ -105,6 +106,8 @@ export default function AdminCortexSettingsPage() {
         Debug surfaces (replay, doctrine, certification) are not linked from operator nav. Use API or Cursor with
         read-only inspect endpoints.
       </section>
+
+      <DeployInfoFooter />
     </div>
   );
 }
