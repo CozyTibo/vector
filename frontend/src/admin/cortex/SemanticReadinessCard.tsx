@@ -41,6 +41,8 @@ export function SemanticReadinessCard({
     data.semantic_operator_panel && data.semantic_operator_panel.length > 0
       ? data.semantic_operator_panel
       : null;
+  const crossCheck = data.operational_truth_cross_check;
+  const inspection = data.execution_reality_inspection;
 
   return (
     <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
@@ -57,29 +59,13 @@ export function SemanticReadinessCard({
       </div>
 
       {crossCheck?.rule_active ? (
-        <motion.div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           {crossCheck.operator_message ??
             "Runtime AA/M3 PASS does not imply semantic green — check graph truth and retrieval mix."}
-        </motion.div>
+        </div>
       ) : null}
 
-      {inspection ? (
-        <details className="mt-4 rounded-lg border border-emerald-200 bg-white p-3 text-sm" open>
-          <summary className="cursor-pointer font-medium text-emerald-950">
-            Execution reality inspection
-          </summary>
-          <div className="mt-3 grid gap-4 lg:grid-cols-2">
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                Identity continuity
-              </h4>
-              <p className="mt-1 text-stone-800">
-                Distinct pairs{" "}
-                {inspection.identity_continuity?.distinct_candidate_pairs?.toLocaleString() ?? "—"} ·
-                inflation {String(inspection.identity_continuity?.candidate_inflation_ratio ?? "—")}
-              </p>
-            </div>
-            <motion.div>
+      {panel ? (
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
           {panel.map((metric) => (
             <div
@@ -103,6 +89,62 @@ export function SemanticReadinessCard({
             </div>
           ))}
         </dl>
+      ) : null}
+
+      {inspection ? (
+        <details className="mt-4 rounded-lg border border-emerald-200 bg-white p-3 text-sm" open>
+          <summary className="cursor-pointer font-medium text-emerald-950">
+            Execution reality inspection
+          </summary>
+          <div className="mt-3 grid gap-4 lg:grid-cols-2">
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Identity continuity
+              </h4>
+              <p className="mt-1 text-stone-800">
+                Distinct pairs{" "}
+                {inspection.identity_continuity?.distinct_candidate_pairs?.toLocaleString() ?? "—"} ·
+                inflation {String(inspection.identity_continuity?.candidate_inflation_ratio ?? "—")}
+              </p>
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Retrieval mix
+              </h4>
+              <p className="mt-1 text-stone-800">
+                org_link {inspection.retrieval_mix?.org_link_pct ?? "—"}% · execution{" "}
+                {inspection.retrieval_mix?.execution_index_pct ?? "—"}%
+              </p>
+              {(inspection.retrieval_mix?.index_kind_counts ?? []).length > 0 ? (
+                <ul className="mt-2 space-y-1 text-xs text-stone-600">
+                  {(inspection.retrieval_mix?.index_kind_counts ?? []).map((row) => (
+                    <li key={row.index_kind}>
+                      {row.index_kind}: {row.count.toLocaleString()}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Graph truth
+              </h4>
+              <p className="mt-1 text-stone-800">
+                Unique pairs {String(inspection.graph_truth?.unique_auth_pairs ?? "—")} · isolated{" "}
+                {String(inspection.graph_truth?.entities_isolated ?? "—")} entities
+              </p>
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Execution thread (sample)
+              </h4>
+              <p className="mt-1 text-stone-800">
+                TCRE jobs {inspection.execution_thread?.tcre_jobs?.length ?? 0} · transitions{" "}
+                {inspection.execution_thread?.recent_transitions?.length ?? 0}
+              </p>
+            </div>
+          </div>
+        </details>
       ) : null}
 
       <details className="mt-4 rounded-lg border border-stone-200 bg-white/80 p-3 text-sm">

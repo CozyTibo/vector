@@ -47,6 +47,7 @@ export type ContinuityStatus = {
     detail?: string | null;
   };
   progression_class?: string | null;
+  operational_truth_model?: Record<string, unknown>;
 };
 
 export type AttentionItem = {
@@ -197,6 +198,32 @@ export type SemanticOperatorMetric = {
   green_rule?: string | null;
 };
 
+export type OperationalTruthCrossCheck = {
+  rule?: string;
+  rule_active?: boolean;
+  runtime_track_green?: boolean;
+  semantic_track_green?: boolean;
+  combined_operational_green?: boolean;
+  operator_message?: string;
+};
+
+export type ExecutionRealityInspection = {
+  surface_kind?: string;
+  identity_continuity?: Record<string, unknown>;
+  execution_thread?: {
+    status?: string;
+    tcre_jobs?: Array<Record<string, unknown>>;
+    recent_transitions?: Array<Record<string, unknown>>;
+  };
+  retrieval_mix?: {
+    published_index_epoch?: string | null;
+    org_link_pct?: number | null;
+    execution_index_pct?: number | null;
+    index_kind_counts?: Array<{ index_kind: string; count: number }>;
+  };
+  graph_truth?: Record<string, unknown>;
+};
+
 export type SemanticReadiness = {
   surface_kind?: string;
   schema_version?: number;
@@ -207,6 +234,9 @@ export type SemanticReadiness = {
   retrieval: SemanticRetrievalProduct;
   synthesis: SemanticSynthesisTruth;
   semantic_operator_panel?: SemanticOperatorMetric[];
+  operational_truth_model?: Record<string, unknown>;
+  operational_truth_cross_check?: OperationalTruthCrossCheck;
+  execution_reality_inspection?: ExecutionRealityInspection;
   thresholds?: Record<string, number>;
 };
 
