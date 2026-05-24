@@ -15,7 +15,6 @@ from vector.domains.cortex.operational_runtime.graph_density import (
     count_active_org_entities_v1,
     count_entities_with_promoted_edges_v1,
 )
-from vector.domains.cortex.pipeline.operator_admin_overview import invalidate_operator_overview_cache_v1
 from vector.domains.cortex.retrieval.retrieval_index_materialization import get_published_index_epoch_v1
 from vector.domains.cortex.substrate_pipeline.constants import (
     PHASE_03_IDENTITY,
@@ -172,6 +171,10 @@ def upsert_admin_continuity_snapshot_v1(
         row.schema_version = int(payload.get("schema_version") or ADMIN_CONTINUITY_SNAPSHOT_SCHEMA_VERSION)
         row.updated_at = now
     session.flush()
+    from vector.domains.cortex.pipeline.operator_admin_overview import (
+        invalidate_operator_overview_cache_v1,
+    )
+
     invalidate_operator_overview_cache_v1(tenant_id)
     return row
 

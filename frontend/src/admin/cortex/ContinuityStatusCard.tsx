@@ -44,7 +44,8 @@ export function ContinuityStatusCard({
         <div>
           <h2 className="text-lg font-semibold text-stone-900">Cortex continuity status</h2>
           <p className="mt-1 text-sm text-stone-600">
-            Operational truth — autonomous execution health, not substrate vanity counts.
+            Runtime continuity track — lease FSM and AA panel. Semantic readiness is a separate
+            panel (M3/AA PASS ≠ semantic green).
           </p>
         </div>
         <StatusBadge tone={stateTone(status.state)}>

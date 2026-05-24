@@ -4787,6 +4787,9 @@ class AdminCortexSemanticReadinessResponse(BaseModel):
     retrieval: AdminCortexSemanticRetrievalProduct
     synthesis: AdminCortexSemanticSynthesisTruth
     semantic_operator_panel: list[AdminCortexSemanticOperatorMetric] = Field(default_factory=list)
+    operational_truth_model: dict[str, Any] = Field(default_factory=dict)
+    operational_truth_cross_check: dict[str, Any] = Field(default_factory=dict)
+    execution_reality_inspection: dict[str, Any] = Field(default_factory=dict)
     thresholds: dict[str, Any] = Field(default_factory=dict)
 
 

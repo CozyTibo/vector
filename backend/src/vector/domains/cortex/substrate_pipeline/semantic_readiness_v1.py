@@ -16,6 +16,13 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.operational_runtime.graph_orphan_continuity import (
     list_graph_connected_components_v1,
 )
+from vector.domains.cortex.substrate_pipeline.execution_reality_inspection_v1 import (
+    build_execution_reality_inspection_v1,
+)
+from vector.domains.cortex.substrate_pipeline.operational_truth_model_v1 import (
+    build_operational_truth_cross_check_v1,
+    build_semantic_track_attachment_v1,
+)
 
 SEMANTIC_READINESS_SCHEMA_VERSION = 1
 GRAPH_TRUTH_AUDIT_SCHEMA_VERSION = 1
@@ -522,7 +529,7 @@ def build_semantic_readiness_v1(
         retrieval=retrieval,
         synthesis=synthesis,
     )
-    return {
+    payload_core = {
         "surface_kind": "semantic_readiness",
         "schema_version": SEMANTIC_READINESS_SCHEMA_VERSION,
         "tenant_id": str(tenant_id),
@@ -533,6 +540,7 @@ def build_semantic_readiness_v1(
         "retrieval": retrieval,
         "synthesis": synthesis,
         "semantic_operator_panel": operator_panel,
+        "operational_truth_model": build_semantic_track_attachment_v1(),
         "thresholds": {
             "dup_factor_green_max": DUP_FACTOR_GREEN_MAX,
             "promotion_rule_count_green_min": PROMOTION_RULE_COUNT_GREEN_MIN,
@@ -542,6 +550,17 @@ def build_semantic_readiness_v1(
             "retrieval_execution_index_pct_green_min": RETRIEVAL_EXECUTION_PCT_GREEN_MIN,
             "retrieval_freshness_green_minutes": _retrieval_freshness_green_minutes_v1(),
         },
+    }
+    return {
+        **payload_core,
+        "execution_reality_inspection": build_execution_reality_inspection_v1(
+            session,
+            tenant_id=tenant_id,
+            semantic_payload=payload_core,
+        ),
+        "operational_truth_cross_check": build_operational_truth_cross_check_v1(
+            semantic_readiness=payload_core,
+        ),
     }
 
 
@@ -591,6 +610,8 @@ def build_graph_truth_audit_snapshot_v1(
         **core,
         "surface_kind": "graph_truth_audit_snapshot",
         "audit_schema_version": GRAPH_TRUTH_AUDIT_SCHEMA_VERSION,
+        "operational_truth_model": build_semantic_track_attachment_v1(),
+        "companion_script": "backend/scripts/continuity_audit_snapshot.py",
         "candidates": {
             "total": _to_int(candidates["total"]) if candidates else 0,
             "distinct_pairs": _to_int(candidates["distinct_pairs"]) if candidates else 0,

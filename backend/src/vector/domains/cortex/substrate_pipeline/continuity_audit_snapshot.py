@@ -26,6 +26,9 @@ from vector.domains.cortex.substrate_pipeline.continuity_cleanup_freeze import (
 from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation import (
     DEPRECATED_CONTINUITY_PROOF_SCRIPTS_V1,
 )
+from vector.domains.cortex.substrate_pipeline.operational_truth_model_v1 import (
+    build_runtime_track_attachment_v1,
+)
 from vector.domains.cortex.substrate_pipeline.continuity_proof_panel import (
     build_continuity_proof_panel_v1,
     format_continuity_proof_panel_text_v1,
@@ -129,6 +132,8 @@ def build_continuity_audit_snapshot_v1(
         "cleanup_freeze": cleanup_freeze,
         "deprecated_proof_scripts": list(DEPRECATED_CONTINUITY_PROOF_SCRIPTS_V1),
         "canonical_entrypoint": "backend/scripts/continuity_audit_snapshot.py",
+        "operational_truth_model": build_runtime_track_attachment_v1(),
+        "companion_script": "backend/scripts/graph_truth_audit_snapshot.py",
         "summary": {
             "panel_fail_count": int(panel_summary.get("fail_count") or 0),
             "panel_pass_count": int(panel_summary.get("pass_count") or 0),

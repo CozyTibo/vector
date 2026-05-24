@@ -78,6 +78,9 @@ from vector.domains.cortex.substrate_pipeline.pipeline_continuation import (
     get_continuation_for_pipeline_v1,
 )
 from vector.domains.cortex.substrate_pipeline.repository import get_running_pipeline_run_v1
+from vector.domains.cortex.substrate_pipeline.operational_truth_model_v1 import (
+    build_runtime_track_attachment_v1,
+)
 from vector.domains.cortex.synthesis.synthesis_completeness_projection import (
     count_synthesis_eligible_scopes_v1,
 )
@@ -673,11 +676,7 @@ def build_continuity_status_v1(
             "detail": soak.get("p2_soak_detail"),
         },
         "progression_class": progression_class,
-        "operational_truth_model": {
-            "authoritative_source": "convergence_lease_fsm",
-            "pipeline_run_role": "receipt_mirror",
-            "policy": "lease_status_over_pipeline_completed",
-        },
+        "operational_truth_model": build_runtime_track_attachment_v1(),
     }
 
 
