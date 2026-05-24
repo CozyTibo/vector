@@ -47,11 +47,11 @@ def build_operator_primary_kpi_v1(
     )
 
     if is_semantic_primary_operator_kpi_enabled_v1():
-        from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import (
-            build_semantic_readiness_v1,
+        from vector.domains.cortex.pipeline.pipeline_admin_semantic_readiness import (
+            build_semantic_readiness_admin_v1,
         )
 
-        semantic = build_semantic_readiness_v1(session, tenant_id=tenant_id)
+        semantic = build_semantic_readiness_admin_v1(session, settings, tenant_id=tenant_id)
         graph = dict(semantic.get("graph_truth") or {})
         retrieval = dict(semantic.get("retrieval") or {})
         synthesis = dict(semantic.get("synthesis") or {})

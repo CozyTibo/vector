@@ -12,6 +12,7 @@ import {
   fetchPipelineExecutionSlice,
   fetchPipelineIngestionSlice,
   fetchPipelinePhasesSlice,
+  fetchSemanticReadinessSlice,
   invalidateMonolithOverviewCache,
 } from "./fetchPipelineOverviewSlice";
 
@@ -26,6 +27,9 @@ export const pipelineOverviewPhasesQueryKey = (tenantId: string) =>
 
 export const pipelineOverviewIngestionQueryKey = (tenantId: string) =>
   ["admin-cortex-pipeline-overview-ingestion", tenantId] as const;
+
+export const pipelineSemanticReadinessQueryKey = (tenantId: string) =>
+  ["admin-cortex-pipeline-semantic-readiness", tenantId] as const;
 
 export const pipelineOverviewSliceQueryKeys = (tenantId: string) => [
   pipelineOverviewExecutionQueryKey(tenantId),
@@ -105,6 +109,19 @@ export function usePipelineOverviewIngestion() {
     },
     enabled: Boolean(tenantId),
     ...sliceQueryOpts,
+  });
+}
+
+/** Deferred load — semantic panel is expensive; do not block lease/phases paint. */
+export function usePipelineSemanticReadiness() {
+  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  return useQuery({
+    queryKey: pipelineSemanticReadinessQueryKey(tenantId),
+    queryFn: () => fetchSemanticReadinessSlice(tenantId),
+    enabled: Boolean(tenantId),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
   });
 }
 

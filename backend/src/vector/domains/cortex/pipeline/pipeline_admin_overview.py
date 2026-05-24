@@ -23,12 +23,16 @@ _SLICE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
     """Drop cached pipeline overview so operator actions refresh immediately."""
+    from vector.domains.cortex.pipeline.continuity_overview_v1 import (
+        invalidate_continuity_overview_context_cache_v1,
+    )
     from vector.domains.cortex.pipeline.pipeline_admin_semantic_readiness import (
         invalidate_semantic_readiness_cache_v1,
     )
 
     key = str(tenant_id)
     invalidate_semantic_readiness_cache_v1(tenant_id)
+    invalidate_continuity_overview_context_cache_v1(tenant_id)
     with _OVERVIEW_CACHE_LOCK:
         _OVERVIEW_CACHE.pop(key, None)
         for suffix in ("execution", "phases", "ingestion", "continuity_bundle"):
@@ -147,7 +151,9 @@ def build_pipeline_overview_execution_v1(
     cache_key = f"{tenant_id}:execution"
 
     def _build() -> dict[str, Any]:
-        ctx = get_cached_continuity_overview_context_v1(session, settings, tenant_id=tenant_id)
+        ctx = get_cached_continuity_overview_context_v1(
+            session, settings, tenant_id=tenant_id, overview_lite=True
+        )
         continuity_status = build_continuity_status_from_context_v1(
             session, settings, ctx, tenant_id=tenant_id
         )
@@ -158,9 +164,6 @@ def build_pipeline_overview_execution_v1(
             "continuity_status": continuity_status,
             "operator_primary_kpi": build_operator_primary_kpi_v1(
                 session, tenant_id=tenant_id, settings=settings
-            ),
-            "semantic_readiness": build_semantic_readiness_admin_v1(
-                session, settings, tenant_id=tenant_id
             ),
         }
 
@@ -183,11 +186,7 @@ def build_pipeline_overview_phases_v1(
         return {
             "surface_kind": "pipeline_overview_phases",
             "tenant_id": str(tenant_id),
-            "execution": _build_execution_snapshot_v1(session, tenant_id=tenant_id),
             "continuity_status": continuity_status,
-            "operator_primary_kpi": build_operator_primary_kpi_v1(
-                session, tenant_id=tenant_id, settings=settings
-            ),
             "phases": phases,
             "attention": attention,
             "attention_items": attention_items,
@@ -256,9 +255,13 @@ def _build_execution_snapshot_v1(
     *,
     tenant_id: uuid.UUID,
 ) -> dict[str, Any]:
-    inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=5)
-    lease = inspect.get("lease")
-    if not isinstance(lease, dict):
+    from vector.domains.cortex.execution.lease import (
+        get_tenant_execution_lease_v1,
+        lease_overview_public_dict_v1,
+    )
+
+    snap = lease_overview_public_dict_v1(get_tenant_execution_lease_v1(session, tenant_id=tenant_id))
+    if snap is None:
         return {
             "fsm_state": None,
             "phase_cursor": None,
@@ -266,10 +269,10 @@ def _build_execution_snapshot_v1(
             "block_reason_code": None,
         }
     return {
-        "fsm_state": lease.get("fsm_state"),
-        "phase_cursor": lease.get("phase_cursor"),
-        "lease_status": lease.get("status"),
-        "block_reason_code": lease.get("block_reason_code"),
+        "fsm_state": snap.get("fsm_state"),
+        "phase_cursor": snap.get("phase_cursor"),
+        "lease_status": snap.get("status"),
+        "block_reason_code": snap.get("block_reason_code"),
     }
 
 

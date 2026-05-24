@@ -47,6 +47,18 @@ def get_tenant_execution_lease_v1(
     return session.get(CortexTenantConvergenceLease, tenant_id)
 
 
+def lease_overview_public_dict_v1(lease: CortexTenantExecution | None) -> dict[str, Any] | None:
+    """Minimal lease fields for admin pipeline overview surfaces."""
+    if lease is None:
+        return None
+    return {
+        "status": lease.status,
+        "fsm_state": lease.fsm_state,
+        "phase_cursor": lease.phase_cursor,
+        "block_reason_code": lease.block_reason_code,
+    }
+
+
 # Back-compat alias
 get_convergence_lease_v1 = get_tenant_execution_lease_v1
 

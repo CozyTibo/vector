@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Final
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.identity.org_ambiguity import list_org_ambiguity_records
@@ -223,11 +223,17 @@ def _build_linked_components_v1(
     *,
     tenant_id: uuid.UUID,
 ) -> list[frozenset[uuid.UUID]]:
-    links = session.scalars(
-        select(CortexOrgLink).where(
-            CortexOrgLink.tenant_id == tenant_id,
-            CortexOrgLink.revoked_at.is_(None),
-        )
+    """Union-find over active org links (endpoint columns only — no ORM row hydration)."""
+    tid = str(tenant_id)
+    rows = session.execute(
+        text(
+            """
+            SELECT source_entity_id, target_entity_id
+            FROM cortex_org_links
+            WHERE tenant_id = :tenant AND revoked_at IS NULL
+            """
+        ),
+        {"tenant": tid},
     ).all()
     parent: dict[uuid.UUID, uuid.UUID] = {}
 
@@ -242,8 +248,8 @@ def _build_linked_components_v1(
         if ra != rb:
             parent[rb] = ra
 
-    for lk in links:
-        union(lk.source_entity_id, lk.target_entity_id)
+    for source_id, target_id in rows:
+        union(source_id, target_id)
 
     buckets: dict[uuid.UUID, set[uuid.UUID]] = defaultdict(set)
     for node in parent:

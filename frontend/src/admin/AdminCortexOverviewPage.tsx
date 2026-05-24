@@ -16,6 +16,7 @@ import {
   usePipelineOverviewExecution,
   usePipelineOverviewIngestion,
   usePipelineOverviewPhases,
+  usePipelineSemanticReadiness,
 } from "./cortex/usePipelineOverview";
 import { titleConnector } from "./cortexAdminTypes";
 import { StatusBadge } from "./ui/StatusBadge";
@@ -26,6 +27,7 @@ export default function AdminCortexOverviewPage() {
   const executionQ = usePipelineOverviewExecution();
   const phasesQ = usePipelineOverviewPhases();
   const ingestionQ = usePipelineOverviewIngestion();
+  const semanticQ = usePipelineSemanticReadiness();
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
@@ -35,7 +37,7 @@ export default function AdminCortexOverviewPage() {
   const operatorKpi =
     executionQ.data?.operator_primary_kpi ?? phasesQ.data?.operator_primary_kpi ?? undefined;
   const hideLegacyPrimaryKpi = operatorKpi?.hide_from_overview === true;
-  const semanticReadiness = executionQ.data?.semantic_readiness ?? undefined;
+  const semanticReadiness = semanticQ.data ?? executionQ.data?.semantic_readiness ?? undefined;
   const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
   const attentionItems = phasesQ.data?.attention_items ?? [];
   const sched = ingestionQ.data?.scheduler;
@@ -56,7 +58,7 @@ export default function AdminCortexOverviewPage() {
     <div className="space-y-6">
       <SemanticReadinessCard
         data={semanticReadiness}
-        loading={executionQ.isPending && !semanticReadiness}
+        loading={semanticQ.isPending && !semanticReadiness}
       />
 
       <ContinuityStatusCard

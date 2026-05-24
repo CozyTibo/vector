@@ -49,7 +49,7 @@ def test_semantic_readiness_endpoint(client: TestClient, db_session: Session) ->
     assert panel[0]["key"] == "unique_auth_pairs"
 
 
-def test_execution_overview_includes_semantic_readiness(
+def test_execution_overview_defers_semantic_readiness_to_dedicated_endpoint(
     client: TestClient, db_session: Session
 ) -> None:
     tid = _tenant(db_session)
@@ -57,8 +57,10 @@ def test_execution_overview_includes_semantic_readiness(
     res = client.get(f"/admin/tenants/{tid}/cortex/pipeline/overview/execution")
     assert res.status_code == 200
     body = res.json()
-    sr = body.get("semantic_readiness")
-    assert sr is not None
+    assert body.get("semantic_readiness") is None
+    sr_res = client.get(f"/admin/tenants/{tid}/cortex/pipeline/semantic-readiness")
+    assert sr_res.status_code == 200
+    sr = sr_res.json()
     assert sr["graph_truth"]["unique_auth_pairs"] == 0
     assert len(sr["semantic_operator_panel"]) == 6
 

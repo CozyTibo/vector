@@ -41,11 +41,15 @@ async function trySlice<T>(
     if (res.ok) {
       return (await res.json()) as T;
     }
-    if (res.status === 404 || res.status === 405 || res.status === 500 || res.status === 503) {
+    // Only fall back to monolith when slice routes are missing — not on server errors/timeouts.
+    if (res.status === 404 || res.status === 405) {
       return null;
     }
     throw new Error(await readErrorDetail(res));
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message) {
+      throw err;
+    }
     return null;
   }
 }
@@ -58,7 +62,7 @@ export type PipelineExecutionSlice = {
 };
 
 export async function fetchSemanticReadinessSlice(tenantId: string): Promise<SemanticReadiness | null> {
-  return trySlice<SemanticReadiness>(tenantId, "/cortex/pipeline/semantic-readiness", 30_000);
+  return trySlice<SemanticReadiness>(tenantId, "/cortex/pipeline/semantic-readiness", 25_000);
 }
 
 export async function fetchPipelineExecutionSlice(tenantId: string): Promise<PipelineExecutionSlice> {
@@ -67,7 +71,7 @@ export async function fetchPipelineExecutionSlice(tenantId: string): Promise<Pip
     continuity_status?: ContinuityStatus | null;
     operator_primary_kpi?: OperatorPrimaryKpi | null;
     semantic_readiness?: SemanticReadiness | null;
-  }>(tenantId, "/cortex/pipeline/overview/execution", 45_000);
+  }>(tenantId, "/cortex/pipeline/overview/execution", 20_000);
   if (body) {
     return {
       execution: body.execution,
@@ -97,7 +101,7 @@ export async function fetchPipelinePhasesSlice(tenantId: string) {
     continuity_status?: ContinuityStatus | null;
     execution?: PipelineOverview["execution"] | null;
     operator_primary_kpi?: OperatorPrimaryKpi | null;
-  }>(tenantId, "/cortex/pipeline/overview/phases", 45_000);
+  }>(tenantId, "/cortex/pipeline/overview/phases", 25_000);
   if (body) {
     return {
       phases: body.phases,
@@ -129,7 +133,7 @@ export async function fetchPipelineIngestionSlice(tenantId: string) {
     runnable_connectors: string[];
     recent_ingestion_runs: PipelineOverview["recent_ingestion_runs"];
     next_scheduled_ingestion?: PipelineOverview["next_scheduled_ingestion"];
-  }>(tenantId, "/cortex/pipeline/overview/ingestion", 30_000);
+  }>(tenantId, "/cortex/pipeline/overview/ingestion", 15_000);
   if (body) return body;
   const full = await fetchMonolithOverview(tenantId);
   return {

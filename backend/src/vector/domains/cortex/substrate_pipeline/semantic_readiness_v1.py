@@ -64,7 +64,12 @@ def _dup_severity(dup_factor: float | None) -> str:
     return "warn"
 
 
-def _query_graph_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str, Any]:
+def _query_graph_truth_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    include_connected_components: bool = False,
+) -> dict[str, Any]:
     from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
         snapshot_authoritative_link_topology_v1,
     )
@@ -131,17 +136,18 @@ def _query_graph_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict[str
     rules_with_edges = sum(1 for p in promotions if p["unique_pairs"] > 0)
 
     components_summary: dict[str, Any] = {}
-    try:
-        components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
-        sizes = sorted((len(c) for c in components), reverse=True)
-        components_summary = {
-            "component_count": len(sizes),
-            "largest_component_size": sizes[0] if sizes else 0,
-            "component_sizes_top_10": sizes[:10],
-            "components_size_ge_2": sum(1 for s in sizes if s >= 2),
-        }
-    except Exception as exc:  # noqa: BLE001
-        components_summary = {"error": str(exc)[:300]}
+    if include_connected_components:
+        try:
+            components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
+            sizes = sorted((len(c) for c in components), reverse=True)
+            components_summary = {
+                "component_count": len(sizes),
+                "largest_component_size": sizes[0] if sizes else 0,
+                "component_sizes_top_10": sizes[:10],
+                "components_size_ge_2": sum(1 for s in sizes if s >= 2),
+            }
+        except Exception as exc:  # noqa: BLE001
+            components_summary = {"error": str(exc)[:300]}
 
     return {
         "active_entities": active_entities,
@@ -453,9 +459,12 @@ def build_semantic_readiness_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
+    include_connected_components: bool = False,
 ) -> dict[str, Any]:
     """Lean semantic readiness payload for admin API and ops panels."""
-    graph = _query_graph_truth_v1(session, tenant_id=tenant_id)
+    graph = _query_graph_truth_v1(
+        session, tenant_id=tenant_id, include_connected_components=include_connected_components
+    )
     identity = _query_identity_continuity_v1(session, tenant_id=tenant_id)
     retrieval = _query_retrieval_product_v1(session, tenant_id=tenant_id)
     synthesis = _query_synthesis_truth_v1(session, tenant_id=tenant_id)

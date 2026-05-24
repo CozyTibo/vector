@@ -12,7 +12,7 @@ from typing import Any, Literal
 _GRAPH_TOPOLOGY_CACHE_TTL_SECONDS = 90.0
 _GRAPH_TOPOLOGY_CACHE_LOCK = threading.Lock()
 _GRAPH_TOPOLOGY_CACHE: dict[str, tuple[float, tuple[frozenset[uuid.UUID], ...], tuple[frozenset[uuid.UUID], ...], dict[str, Any]]] = {}
-_CONTEXT_CACHE_TTL_SECONDS = 45.0
+_CONTEXT_CACHE_TTL_SECONDS = 120.0
 _CONTINUITY_CONTEXT_CACHE: dict[str, tuple[float, Any]] = {}
 
 from sqlalchemy import func, select
@@ -29,8 +29,10 @@ from vector.domains.cortex.canonical.permanent_orphan_omission_doctrine import (
 from vector.domains.cortex.pipeline.canonical_operator_metrics import (
     snapshot_canonical_operator_metrics_v1,
 )
-from vector.domains.cortex.execution.admin_commands import build_execution_inspect_v1
-from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
+from vector.domains.cortex.execution.lease import (
+    get_tenant_execution_lease_v1,
+    lease_overview_public_dict_v1,
+)
 from vector.domains.cortex.execution.progression_status import build_substrate_progression_status_v1
 from vector.domains.cortex.execution.tenant_constants import (
     FSM_BLOCKED,
@@ -112,6 +114,16 @@ OperatorPhase = Literal[
 ]
 AttentionPriority = Literal["P0", "P1", "P2"]
 
+
+def invalidate_continuity_overview_context_cache_v1(tenant_id: uuid.UUID) -> None:
+    """Drop cached continuity context (lite + full) for a tenant."""
+    key = str(tenant_id)
+    with _GRAPH_TOPOLOGY_CACHE_LOCK:
+        _CONTINUITY_CONTEXT_CACHE.pop(f"{key}:lite", None)
+        _CONTINUITY_CONTEXT_CACHE.pop(key, None)
+        _GRAPH_TOPOLOGY_CACHE.pop(key, None)
+
+
 @dataclass(frozen=True)
 class ContinuityOverviewContextV1:
     """Single-pass inputs for continuity admin surfaces (avoids duplicate heavy queries)."""
@@ -129,6 +141,9 @@ class ContinuityOverviewContextV1:
     deferral: dict[str, int]
     bundle_id: str | None
     synth_scope: dict[str, Any]
+    overview_lite: bool = False
+    graph_islands_estimate: int = 0
+    graph_eligible_islands_estimate: int = 0
 
 
 def _cached_graph_topology_v1(
@@ -166,15 +181,18 @@ def get_cached_continuity_overview_context_v1(
     settings: Settings,
     *,
     tenant_id: uuid.UUID,
+    overview_lite: bool = False,
 ) -> ContinuityOverviewContextV1:
     """Reuse continuity context across execution/phases slices within TTL."""
-    key = str(tenant_id)
+    key = f"{tenant_id}:lite" if overview_lite else str(tenant_id)
     now = time.monotonic()
     with _GRAPH_TOPOLOGY_CACHE_LOCK:
         cached = _CONTINUITY_CONTEXT_CACHE.get(key)
         if cached is not None and now - cached[0] <= _CONTEXT_CACHE_TTL_SECONDS:
             return cached[1]
-    ctx = build_continuity_overview_context_v1(session, settings, tenant_id=tenant_id)
+    ctx = build_continuity_overview_context_v1(
+        session, settings, tenant_id=tenant_id, overview_lite=overview_lite
+    )
     with _GRAPH_TOPOLOGY_CACHE_LOCK:
         _CONTINUITY_CONTEXT_CACHE[key] = (now, ctx)
     return ctx
@@ -185,10 +203,11 @@ def build_continuity_overview_context_v1(
     settings: Settings,
     *,
     tenant_id: uuid.UUID,
+    overview_lite: bool = False,
 ) -> ContinuityOverviewContextV1:
     """Build shared continuity context once per admin overview request."""
-    inspect = build_execution_inspect_v1(session, tenant_id=tenant_id, transition_limit=5)
-    lease = inspect.get("lease") if isinstance(inspect.get("lease"), dict) else None
+    lease_row = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
+    lease = lease_overview_public_dict_v1(lease_row)
     operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
     bundle_id = operator_metrics.get("bundle_id")
     deferral = dict(operator_metrics.get("deferral_counts") or {})
@@ -201,15 +220,46 @@ def build_continuity_overview_context_v1(
         tenant_id=tenant_id,
         precomputed_synth_scope=synth_scope,
     )
+    inspect = {
+        "lease": lease,
+        "progression": progression,
+        "transitions": [],
+    }
 
     entity_count = count_active_org_entities_v1(session, tenant_id=tenant_id)
     linked = count_entities_with_promoted_edges_v1(session, tenant_id=tenant_id)
-    components, eligible, propagation = _cached_graph_topology_v1(
-        session,
-        tenant_id=tenant_id,
-        entity_count=entity_count,
-        linked_entity_count=linked,
-    )
+
+    components: tuple[frozenset[uuid.UUID], ...] = ()
+    eligible: tuple[frozenset[uuid.UUID], ...] = ()
+    islands_est = 0
+    eligible_est = 0
+
+    if overview_lite:
+        propagation = evaluate_traversal_propagation_v1(
+            session,
+            tenant_id=tenant_id,
+            linked_entity_count=linked,
+            entity_count=entity_count,
+            orphan_disconnected_count=max(0, entity_count - linked),
+            orphan_identity_unresolved_count=0,
+            precomputed_eligible_components=(),
+        )
+        islands_est = 1 if linked > 0 else 0
+        if propagation.get("blocked"):
+            eligible_est = 0
+        elif linked >= 2:
+            eligible_est = 1
+        else:
+            eligible_est = islands_est
+    else:
+        components, eligible, propagation = _cached_graph_topology_v1(
+            session,
+            tenant_id=tenant_id,
+            entity_count=entity_count,
+            linked_entity_count=linked,
+        )
+        islands_est = len(components)
+        eligible_est = len(eligible)
 
     canonical_metrics = build_canonical_phase_summary_metrics_v1(
         session,
@@ -231,6 +281,9 @@ def build_continuity_overview_context_v1(
         deferral=deferral,
         bundle_id=str(bundle_id) if bundle_id else None,
         synth_scope=synth_scope,
+        overview_lite=overview_lite,
+        graph_islands_estimate=islands_est,
+        graph_eligible_islands_estimate=eligible_est,
     )
 
 
@@ -772,8 +825,12 @@ def build_continuity_phase_cards_v1(
         linked = ctx.linked_entity_count
         entity_count = ctx.entity_count
         propagation = ctx.propagation
-        islands = len(ctx.components)
-        eligible_islands = len(ctx.eligible_components)
+        if ctx.overview_lite:
+            islands = ctx.graph_islands_estimate
+            eligible_islands = ctx.graph_eligible_islands_estimate
+        else:
+            islands = len(ctx.components)
+            eligible_islands = len(ctx.eligible_components)
     else:
         linked = count_entities_with_promoted_edges_v1(session, tenant_id=tenant_id)
         components_local = list_graph_connected_components_v1(session, tenant_id=tenant_id)
@@ -1081,7 +1138,7 @@ def build_continuity_overview_bundle_v1(
     tenant_id: uuid.UUID,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     """Returns (continuity_status, phases, attention_items, attention_lines)."""
-    ctx = get_cached_continuity_overview_context_v1(session, settings, tenant_id=tenant_id)
+    ctx = get_cached_continuity_overview_context_v1(session, settings, tenant_id=tenant_id, overview_lite=True)
     continuity_status = build_continuity_status_from_context_v1(
         session, settings, ctx, tenant_id=tenant_id
     )
