@@ -554,7 +554,7 @@ Plus companion `causal_chain` / `causal_edge` rows from TCRE.
 
 Admin retrieval page shows mix breakdown per epoch — not just entry count.
 
-### S3.5 — Fix audit tooling schema drift
+### S3.5 — Fix audit tooling schema drift ✅
 
 **Files:** `substrate_pipeline/semantic_readiness_v1.py` line 384 — `published_at` → use `created_at` + `published IS TRUE`.
 

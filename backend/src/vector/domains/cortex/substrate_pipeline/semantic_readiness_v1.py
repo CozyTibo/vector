@@ -192,10 +192,10 @@ def _query_retrieval_product_v1(session: Session, *, tenant_id: uuid.UUID) -> di
     published = session.execute(
         text(
             """
-            SELECT index_epoch, published_at, entry_count
+            SELECT index_epoch, build_state, entry_count, created_at, published_at
             FROM cortex_retrieval_index_epochs
-            WHERE tenant_id = :tenant AND published_at IS NOT NULL
-            ORDER BY published_at DESC NULLS LAST
+            WHERE tenant_id = :tenant AND build_state = 'PUBLISHED'
+            ORDER BY created_at DESC NULLS LAST
             LIMIT 1
             """
         ),
@@ -253,7 +253,9 @@ def _query_retrieval_product_v1(session: Session, *, tenant_id: uuid.UUID) -> di
 
     return {
         "published_index_epoch": epoch,
-        "published_at": published.get("published_at"),
+        "published_at": published.get("published_at") or published.get("created_at"),
+        "published_epoch_created_at": published.get("created_at"),
+        "build_state": str(published.get("build_state") or "PUBLISHED"),
         "entry_count": _to_int(published.get("entry_count")),
         "index_kind_counts": [
             {"index_kind": str(r["index_kind"]), "count": _to_int(r["n"])} for r in mix_rows
@@ -404,7 +406,7 @@ def _query_synthesis_truth_v1(session: Session, *, tenant_id: uuid.UUID) -> dict
             FROM cortex_synthesis_artifacts
             WHERE tenant_id = :tenant
               AND published IS TRUE
-              AND published_at >= NOW() - INTERVAL '7 days'
+              AND created_at >= NOW() - INTERVAL '7 days'
               AND COALESCE(jsonb_array_length(body_json->'claims'), 0) > 0
             """
         ),
