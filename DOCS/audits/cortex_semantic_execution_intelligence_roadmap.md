@@ -345,21 +345,9 @@ Promotion + candidate rules only emit `org.persona_belongs_to_handle`. Graph den
 
 ## Implementation steps (PR-sized)
 
-### S2.1 — Define minimal execution continuity set (artifact-backed, doc only)
+### S2.1 — Define minimal execution continuity set (artifact-backed, doc only) ✅
 
-**Files:** `DOCS/cortex/execution_continuity_minimal_set_v1.md` (short), `retrieval/retrieval_semantic_mix_v1.py` (reference only).
-
-**Work:** Document **5 execution continuity classes** for Fizzer v1. Each class must name the **artifact types** that prove it — not a graph edge type:
-
-| Class | Proving artifacts (examples) | Where it lives |
-|-------|------------------------------|----------------|
-| **Ownership** | PR mat + `authored_by` on canonical object | Mat + S1 identity (not org_link execution edge) |
-| **Work thread** | issue/PR mats, review timeline_mutation mats | Canonical mats → retrieval `materialization` |
-| **Delivery** | merge event mat, deployment mat | Canonical mats + TCRE temporal edges |
-| **Coordination** | Slack message mat + TCRE `handoff` / `escalation` artifact | TCRE → retrieval `causal_edge` |
-| **Incident** | deploy mat + rollback/failure signal mat | Mats + TCRE `negative_signal` |
-
-**Anti-overengineering:** Do **not** model these as new org `link_type` values. Do **not** expand `ContinuityEdgeKind` into the org-link ledger “for completeness.” Execution continuity is **indexed artifact continuity** — retrieval kinds `materialization`, `causal_chain`, `causal_edge`, `walk` — with org_link at most as supporting identity scope (S1).
+**Status:** Shipped — [`DOCS/cortex/execution_continuity_minimal_set_v1.md`](../cortex/execution_continuity_minimal_set_v1.md) defines 5 artifact-backed classes and maps them to retrieval index kinds (`materialization`, `walk`, `causal_chain`, `causal_edge`).
 
 ### S2.2 — Canonical materialization priority for execution-bearing kinds
 
