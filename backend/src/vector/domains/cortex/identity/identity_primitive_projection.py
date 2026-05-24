@@ -11,6 +11,7 @@ Normative: deterministic only — no inference beyond explicit payload / logical
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import dataclass
 from typing import Any, Final
@@ -27,6 +28,12 @@ from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRec
 
 IDENTITY_PRIMITIVE_LANE: Final[str] = "p04_identity_primitive_v1"
 IDENTITY_PRIMITIVE_SCHEMA_VERSION: Final[int] = 2
+
+
+def evidence_scoped_slack_github_fingerprint_enabled_v1() -> bool:
+    """When true (default), Slack/GitHub primitives include ``evidence_canonical_entity_id`` like Notion."""
+    raw = os.environ.get("CORTEX_IDENTITY_EVIDENCE_SCOPED_SLACK_GITHUB_FINGERPRINT", "1")
+    return raw.strip().lower() not in ("0", "false", "no", "off")
 
 _BOT_LOGIN: Final[re.Pattern[str]] = re.compile(r"(bot\]|\[bot|dependabot|renovate|nexora-ci)", re.I)
 
@@ -515,6 +522,9 @@ def extract_identity_primitives(
 
     su = _slack_user_id(payload, prof)
     if su:
+        slack_extra: dict[str, Any] = {"slack_user_id": su}
+        if evidence_scoped_slack_github_fingerprint_enabled_v1():
+            slack_extra["evidence_canonical_entity_id"] = anchor_eid
         out.append(
             IdentityPrimitiveProjection(
                 projection_kind="slack_user",
@@ -522,12 +532,15 @@ def extract_identity_primitives(
                 identity_material=_material(
                     projection_kind="slack_user",
                     connector=connector,
-                    extra={"slack_user_id": su},
+                    extra=slack_extra,
                 ),
             )
         )
 
     for gh_login in _github_login_strings_deterministic(payload, prof):
+        gh_extra: dict[str, Any] = {"github_login": gh_login}
+        if evidence_scoped_slack_github_fingerprint_enabled_v1():
+            gh_extra["evidence_canonical_entity_id"] = anchor_eid
         out.append(
             IdentityPrimitiveProjection(
                 projection_kind="github_user",
@@ -535,7 +548,7 @@ def extract_identity_primitives(
                 identity_material=_material(
                     projection_kind="github_user",
                     connector=connector,
-                    extra={"github_login": gh_login},
+                    extra=gh_extra,
                 ),
             )
         )

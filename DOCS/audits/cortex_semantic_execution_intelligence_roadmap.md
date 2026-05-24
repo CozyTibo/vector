@@ -172,7 +172,9 @@ Phase 03 runs repeatedly with `COMPLETED_EMPTY` (mislabeled — candidates grow,
 
 **Rollout:** Admin-only; no prod writes.
 
-### S1.2 — Fix Slack/GitHub primitive fingerprint model (core unlock)
+### S1.2 — Fix Slack/GitHub primitive fingerprint model (core unlock) ✅
+
+**Status:** Shipped — evidence-scoped fingerprints (default on); revert via `CORTEX_IDENTITY_EVIDENCE_SCOPED_SLACK_GITHUB_FINGERPRINT=0`. Boundary repair runs in anchor backfill path.
 
 **Files:** `identity/identity_primitive_projection.py`, `identity/backfill.py`, tests in `test_identity_primitive_projection.py`.
 

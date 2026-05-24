@@ -6,6 +6,8 @@ import uuid
 from types import SimpleNamespace
 from typing import cast
 
+import pytest
+
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.domains.cortex.identity.identity_primitive_projection import (
     aggregate_github_email_extraction_metrics,
@@ -43,14 +45,29 @@ def _slack_anchor_raw(uid: str, cluster: str) -> tuple[object, object]:
     return anchor, raw
 
 
-def test_two_messages_same_slack_share_primitive_org_id() -> None:
+def test_two_messages_same_slack_distinct_org_ids_when_evidence_scoped() -> None:
+    tid = uuid.uuid4()
+    a1, r1 = _slack_anchor_raw("USAME01", "clust-a")
+    a2, r2 = _slack_anchor_raw("USAME01", "clust-b")
+    p1 = extract_identity_primitives(anchor=a1, raw=r1)[0]
+    p2 = extract_identity_primitives(anchor=a2, raw=r2)[0]
+    assert p1.projection_kind == "slack_user"
+    assert p2.projection_kind == "slack_user"
+    assert p1.identity_material.get("evidence_canonical_entity_id") == str(a1.canonical_entity_id)
+    assert p2.identity_material.get("evidence_canonical_entity_id") == str(a2.canonical_entity_id)
+    assert org_entity_id_for_identity_primitive(tenant_id=tid, projection=p1) != org_entity_id_for_identity_primitive(
+        tenant_id=tid,
+        projection=p2,
+    )
+
+
+def test_two_messages_same_slack_share_org_id_when_legacy_fingerprint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORTEX_IDENTITY_EVIDENCE_SCOPED_SLACK_GITHUB_FINGERPRINT", "0")
     tid = uuid.uuid4()
     a1, r1 = _slack_anchor_raw("USAME01", "clust-a")
     a2, r2 = _slack_anchor_raw("USAME01", "clust-a")
     p1 = extract_identity_primitives(anchor=a1, raw=r1)[0]
     p2 = extract_identity_primitives(anchor=a2, raw=r2)[0]
-    assert p1.projection_kind == "slack_user"
-    assert p2.projection_kind == "slack_user"
     assert org_entity_id_for_identity_primitive(tenant_id=tid, projection=p1) == org_entity_id_for_identity_primitive(
         tenant_id=tid,
         projection=p2,
