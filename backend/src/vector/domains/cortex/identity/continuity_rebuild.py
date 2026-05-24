@@ -66,6 +66,7 @@ def build_identity_substrate_projection_receipt_v1(
     substrate: dict[str, Any],
     substrate_trigger: str,
     counts_before: dict[str, int] | None = None,
+    distinct_candidate_pairs_delta: int | None = None,
 ) -> dict[str, Any]:
     """Deterministic phase-03 receipt JSON — no org-link replay job row ."""
     cand = substrate.get("candidate_regeneration") or {}
@@ -92,6 +93,7 @@ def build_identity_substrate_projection_receipt_v1(
         + int(cand.get("ambiguity_opened_email_norm_slack_multiplicity") or 0)
         + int(cand.get("ambiguity_opened_fixture_cohort") or 0),
         "candidates_generated_count": int(cand.get("candidate_count") or 0),
+        "distinct_candidate_pairs_delta": int(distinct_candidate_pairs_delta or 0),
         "candidate_set_sha256": cand.get("candidate_set_sha256"),
         "anchor_evidence_input_sha256": cand.get("anchor_evidence_input_sha256"),
         "replay_lane": "anchor_continuity",
@@ -138,13 +140,20 @@ def run_identity_substrate_projection_for_pipeline_v1(
     anchor_limit: int = 5_000,
 ) -> dict[str, Any]:
     """Single phase-03 transform: handles/candidates refresh + inline audit receipt (no replay job)."""
+    from vector.domains.cortex.operational_runtime.graph_density import (
+        count_distinct_graph_candidate_pairs_v1,
+    )
+
     counts_before = substrate_counts(db, tenant_id=tenant_id)
+    pairs_before = count_distinct_graph_candidate_pairs_v1(db, tenant_id=tenant_id)
     substrate = run_identity_handles_and_candidates_refresh(
         db,
         tenant_id=tenant_id,
         dry_run=False,
         anchor_limit=anchor_limit,
     )
+    pairs_after = count_distinct_graph_candidate_pairs_v1(db, tenant_id=tenant_id)
+    distinct_candidate_pairs_delta = pairs_after - pairs_before
     from vector.domains.cortex.execution.execution_event_triggers import (
         trigger_identity_promotion_after_substrate_v1,
     )
@@ -162,6 +171,7 @@ def run_identity_substrate_projection_for_pipeline_v1(
         substrate=substrate,
         substrate_trigger=substrate_trigger,
         counts_before=counts_before,
+        distinct_candidate_pairs_delta=distinct_candidate_pairs_delta,
     )
     return {
         "identity_continuity_substrate": substrate,
@@ -170,6 +180,7 @@ def run_identity_substrate_projection_for_pipeline_v1(
         "anchor_limit_applied": anchor_limit,
         "counts_before": counts_before,
         "counts_after": audit.get("counts_after"),
+        "distinct_candidate_pairs_delta": distinct_candidate_pairs_delta,
     }
 
 
@@ -377,6 +388,11 @@ def run_identity_continuity_rebuild(
         dry_run=False,
         anchor_limit=anchor_limit,
     )
+    promotion = schedule_graph_density_promotion_after_identity_substrate_v1(
+        db,
+        tenant_id=tenant_id,
+        substrate=substrate,
+    )
     backfill = {k: v for k, v in substrate.items() if k not in ("candidate_regeneration", "identity_continuity_substrate_pipeline")}
     cand = substrate.get("candidate_regeneration") or {}
     _LOGGER.info(
@@ -412,6 +428,7 @@ def run_identity_continuity_rebuild(
         "determinism_repair": repair,
         "anchor_backfill": backfill,
         "identity_continuity_substrate_pipeline": substrate.get("identity_continuity_substrate_pipeline"),
+        "graph_density_promotion": promotion,
         "candidate_regeneration": cand,
         "authoritative_set_sha256": auth_sha,
         "ambiguity_opened_total": int(cand.get("ambiguity_opened_email_slack_multiplicity") or 0)
