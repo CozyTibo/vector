@@ -34,6 +34,8 @@ from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRec
 PEOPLE_DIRECTORY_SCHEMA_VERSION: Final[int] = 1
 _MAX_DIRECTORY_SCAN: Final[int] = 500
 _MAX_RAW_LABEL_FETCH: Final[int] = 150
+_MAX_SLACK_ROSTER_LOOKUP: Final[int] = 500
+_MAX_NOTION_USER_INDEX_SCAN: Final[int] = 2_000
 
 _WORK_KINDS: Final[frozenset[str]] = frozenset(
     {
@@ -185,6 +187,45 @@ def _meta(entity: dict[str, Any]) -> dict[str, Any]:
     return dict(entity.get("metadata_json") or {})
 
 
+def _extract_slack_member_labels(member: dict[str, Any]) -> dict[str, str | None]:
+    prof = member.get("profile") if isinstance(member.get("profile"), dict) else {}
+    disp = prof.get("display_name_normalized") or prof.get("display_name")
+    real = prof.get("real_name")
+    legacy = member.get("name")
+    label = disp or real or legacy
+    display_name: str | None = None
+    if isinstance(label, str) and label.strip():
+        display_name = label.strip()
+    email: str | None = None
+    email_raw = prof.get("email")
+    if isinstance(email_raw, str) and "@" in email_raw:
+        email = email_raw.strip().lower()
+    return {"display_name": display_name, "email": email}
+
+
+def _tool_native_display_name(meta: dict[str, Any]) -> str | None:
+    """Human-readable label from org handle metadata when richer labels are unavailable."""
+    github = meta.get("github_login")
+    if isinstance(github, str) and github.strip():
+        return github.strip()
+    slack = meta.get("slack_user_id")
+    if isinstance(slack, str) and slack.strip():
+        return f"Slack {slack.strip()}"
+    notion = meta.get("notion_user_id")
+    if isinstance(notion, str) and notion.strip():
+        short = notion.strip().replace("-", "")[:8]
+        return f"Notion user {short}"
+    linear = meta.get("linear_user_id")
+    if isinstance(linear, str) and linear.strip():
+        short = linear.strip().replace("-", "")[:8]
+        return f"Linear user {short}"
+    pk = str(meta.get("projection_kind") or "")
+    label = _SYSTEM_LABELS.get(pk)
+    if label:
+        return f"{label} handle"
+    return None
+
+
 def _format_display_name(raw: str, *, from_norm: bool = False) -> str:
     text = raw.strip()
     if not text:
@@ -245,9 +286,7 @@ def _extract_entity_labels_v1(
                 email = em
 
     if display_name is None:
-        slack = meta.get("slack_user_id")
-        if isinstance(slack, str) and slack.strip():
-            display_name = f"Slack {slack.strip()}"
+        display_name = _tool_native_display_name(meta)
     if display_name is None and email and "@" in email:
         display_name = email.split("@", 1)[0].replace(".", " ").title()
 
@@ -309,7 +348,96 @@ def _enrich_directory_labels_v1(
         )
         if not progressed:
             break
-    return labels
+    return _merge_connector_roster_labels_v1(
+        session,
+        tenant_id=tenant_id,
+        entities_by_id=entities_by_id,
+        labels=labels,
+    )
+
+
+def _merge_connector_roster_labels_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entities_by_id: dict[uuid.UUID, dict[str, Any]],
+    labels: dict[uuid.UUID, dict[str, str | None]],
+) -> dict[uuid.UUID, dict[str, str | None]]:
+    """Upgrade labels from connector-native rosters (Slack users.list, Notion page refs)."""
+    out = dict(labels)
+    slack_ids: set[str] = set()
+    notion_ids: set[str] = set()
+    for _eid, entity in entities_by_id.items():
+        meta = _meta(entity)
+        sid = meta.get("slack_user_id")
+        if isinstance(sid, str) and sid.strip():
+            slack_ids.add(sid.strip())
+        nid = meta.get("notion_user_id")
+        if isinstance(nid, str) and nid.strip():
+            notion_ids.add(nid.strip())
+
+    slack_by_id: dict[str, dict[str, str | None]] = {}
+    if slack_ids:
+        slack_list = sorted(slack_ids)[:_MAX_SLACK_ROSTER_LOOKUP]
+        for row in session.scalars(
+            select(RawIngestionRecord).where(
+                RawIngestionRecord.tenant_id == tenant_id,
+                RawIngestionRecord.resource_type == "slack.user",
+                RawIngestionRecord.external_id.in_(slack_list),
+            )
+        ).all():
+            member = (row.payload_body or {}).get("member") if isinstance(row.payload_body, dict) else None
+            if isinstance(member, dict):
+                slack_by_id[str(row.external_id)] = _extract_slack_member_labels(member)
+
+    notion_by_id: dict[str, dict[str, str | None]] = {}
+    if notion_ids:
+        for row in session.scalars(
+            select(RawIngestionRecord)
+            .where(
+                RawIngestionRecord.tenant_id == tenant_id,
+                RawIngestionRecord.resource_type.in_(
+                    ("notion.page", "notion.block", "notion.database_row", "notion.database")
+                ),
+            )
+            .order_by(RawIngestionRecord.fetched_at.desc())
+            .limit(_MAX_NOTION_USER_INDEX_SCAN)
+        ).all():
+            payload = row.payload_body if isinstance(row.payload_body, dict) else {}
+            for nu in _notion_user_refs_deterministic(payload):
+                uid = str(nu.get("notion_user_id") or "")
+                if uid not in notion_ids or uid in notion_by_id:
+                    continue
+                dn = nu.get("display_name")
+                em = nu.get("email_norm")
+                notion_by_id[uid] = {
+                    "display_name": dn if isinstance(dn, str) else None,
+                    "email": em if isinstance(em, str) else None,
+                }
+            if len(notion_by_id) >= len(notion_ids):
+                break
+
+    for eid, entity in entities_by_id.items():
+        meta = _meta(entity)
+        cur = dict(out.get(eid) or _extract_entity_labels_v1(meta=meta, raw=None, prof={}))
+        sid = meta.get("slack_user_id")
+        if isinstance(sid, str) and sid.strip() in slack_by_id:
+            roster = slack_by_id[sid.strip()]
+            if roster.get("display_name"):
+                cur["display_name"] = roster["display_name"]
+            if roster.get("email"):
+                cur["email"] = roster["email"]
+        nid = meta.get("notion_user_id")
+        if isinstance(nid, str) and nid.strip() in notion_by_id:
+            roster = notion_by_id[nid.strip()]
+            if roster.get("display_name"):
+                cur["display_name"] = roster["display_name"]
+            if roster.get("email"):
+                cur["email"] = roster["email"]
+        if not cur.get("display_name"):
+            cur["display_name"] = _tool_native_display_name(meta)
+        out[eid] = cur
+    return out
 
 
 def _batch_entity_identity_labels_v1(

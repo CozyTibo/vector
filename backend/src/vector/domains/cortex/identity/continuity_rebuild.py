@@ -397,23 +397,17 @@ def enqueue_rebuild_identities_from_anchors_v1(
     anchor_limit: int = 5_000,
     restart_downstream: bool = True,
 ) -> dict[str, Any]:
-    """Clear identity synchronously, then enqueue anchor rescan + optional graph restart (async)."""
+    """Enqueue anchor-only identity rebuild (clear + rescan + optional graph restart run async)."""
     from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
     from vector.domains.cortex.identity.org_link_replay_runtime import (
         create_queued_org_link_replay_job,
     )
-    from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
 
     counts_before = substrate_counts(db, tenant_id=tenant_id)
-    cleared_identity = clear_derived_outputs_from_phase_v1(
-        db,
-        tenant_id=tenant_id,
-        from_phase="IDENTITY",
-    )
     scope_json: dict[str, Any] = {
         "anchor_limit": anchor_limit,
         "restart_downstream": restart_downstream,
-        "identity_already_cleared": True,
+        "identity_already_cleared": False,
     }
     job = create_queued_org_link_replay_job(
         db,
@@ -445,10 +439,10 @@ def enqueue_rebuild_identities_from_anchors_v1(
         "celery_task_id": str(async_result.id),
         "worker_task_status_path": worker_path,
         "counts_before": counts_before,
-        "cleared_identity": cleared_identity,
+        "cleared_identity": None,
         "anchor_limit_applied": anchor_limit,
         "restart_downstream": restart_downstream,
-        "hint": "Identity substrate cleared; anchor rescan runs in the background. Watch Runtime for downstream progress.",
+        "hint": "Identity rebuild queued. Anchor rescan and downstream restart run in the background — watch Runtime.",
     }
 
 
