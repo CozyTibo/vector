@@ -198,22 +198,21 @@ def _cluster_human_actors(
     return clusters
 
 
-def _person_row_from_cluster(
-    session: Session,
-    *,
-    tenant_id: uuid.UUID,
-    cluster: set[uuid.UUID],
-) -> dict[str, Any]:
-    entities: list[dict[str, Any]] = []
-    all_handles: list[dict[str, Any]] = []
-    for eid in sorted(cluster, key=str):
-        row = get_org_entity(session, tenant_id=tenant_id, org_entity_id=eid)
-        if row is None:
-            continue
-        entity = org_entity_public_dict(row)
-        entities.append(entity)
-        all_handles.extend(_list_linked_handles_v1(session, tenant_id=tenant_id, entity_id=eid, limit=16))
+def _systems_from_entities(entities: list[dict[str, Any]]) -> list[str]:
+    systems: set[str] = set()
+    for entity in entities:
+        resolved = _resolved_identity_from_entity(entity)
+        if resolved:
+            systems.update(_systems_from_handles([resolved], entity))
+    return sorted(systems)
 
+
+def _person_row_from_cluster_light(
+    cluster: set[uuid.UUID],
+    entities_by_id: dict[uuid.UUID, dict[str, Any]],
+    entity_ids_in_auth_graph: set[uuid.UUID],
+) -> dict[str, Any]:
+    entities = [entities_by_id[eid] for eid in cluster if eid in entities_by_id]
     if not entities:
         primary_id = sorted(cluster, key=str)[0]
         return {
@@ -222,42 +221,26 @@ def _person_row_from_cluster(
             "display_name": None,
             "email": None,
             "systems": [],
-            "linked_account_count": 0,
-            "in_auth_graph": False,
+            "linked_account_count": len(cluster),
+            "in_auth_graph": any(eid in entity_ids_in_auth_graph for eid in cluster),
             "last_seen_at": None,
             "title": None,
         }
 
-    primary = max(
-        entities,
-        key=lambda ent: _score_entity(
-            ent,
-            [h for h in all_handles if str(h.get("handle_id")) == str(ent.get("id"))],
-        ),
-    )
+    primary = max(entities, key=lambda ent: _score_entity(ent, []))
     primary_id = uuid.UUID(str(primary["id"]))
-    handles = _list_linked_handles_v1(session, tenant_id=tenant_id, entity_id=primary_id, limit=32)
-    display_name = _pick_display_name(handles, primary)
-    email = _pick_email(handles, primary)
-    systems = _systems_from_handles(handles, primary)
+    display_name = _pick_display_name([], primary)
+    email = _pick_email([], primary)
+    if display_name is None or email is None:
+        for ent in entities:
+            if ent is primary:
+                continue
+            if display_name is None:
+                display_name = _pick_display_name([], ent)
+            if email is None:
+                email = _pick_email([], ent)
 
-    auth_edges = int(
-        session.scalar(
-            select(func.count())
-            .select_from(CortexOrgLink)
-            .where(
-                CortexOrgLink.tenant_id == tenant_id,
-                CortexOrgLink.link_authority == "authoritative",
-                CortexOrgLink.revoked_at.is_(None),
-                or_(
-                    CortexOrgLink.source_entity_id.in_(cluster),
-                    CortexOrgLink.target_entity_id.in_(cluster),
-                ),
-            )
-        )
-        or 0
-    )
-
+    systems = _systems_from_entities(entities)
     last_seen = None
     for ent in entities:
         ts = ent.get("updated_at")
@@ -265,11 +248,8 @@ def _person_row_from_cluster(
             last_seen = ts
 
     meta = _meta(primary)
-    title = meta.get("title") or meta.get("role")
-    if isinstance(title, str):
-        title = title.strip() or None
-    else:
-        title = None
+    title_raw = meta.get("title") or meta.get("role")
+    title = title_raw.strip() if isinstance(title_raw, str) and title_raw.strip() else None
 
     return {
         "person_id": str(primary_id),
@@ -277,11 +257,39 @@ def _person_row_from_cluster(
         "display_name": display_name,
         "email": email,
         "systems": systems,
-        "linked_account_count": len({str(h.get("handle_id")) for h in handles}),
-        "in_auth_graph": auth_edges > 0,
+        "linked_account_count": len(cluster),
+        "in_auth_graph": any(eid in entity_ids_in_auth_graph for eid in cluster),
         "last_seen_at": last_seen,
         "title": title,
     }
+
+
+def _entity_ids_in_auth_graph(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entity_ids: set[uuid.UUID],
+) -> set[uuid.UUID]:
+    if not entity_ids:
+        return set()
+    linked: set[uuid.UUID] = set()
+    rows = session.scalars(
+        select(CortexOrgLink.source_entity_id, CortexOrgLink.target_entity_id).where(
+            CortexOrgLink.tenant_id == tenant_id,
+            CortexOrgLink.link_authority == "authoritative",
+            CortexOrgLink.revoked_at.is_(None),
+            or_(
+                CortexOrgLink.source_entity_id.in_(entity_ids),
+                CortexOrgLink.target_entity_id.in_(entity_ids),
+            ),
+        )
+    ).all()
+    for src, tgt in rows:
+        if src in entity_ids:
+            linked.add(src)
+        if tgt in entity_ids:
+            linked.add(tgt)
+    return linked
 
 
 def build_people_directory_v1(
@@ -294,12 +302,17 @@ def build_people_directory_v1(
     """List reconstructed people (human_actor clusters) for operator directory UI."""
     lim = max(1, min(int(limit), 500))
     off = max(0, int(offset))
-    rows, raw_total = _list_human_actor_entities(session, tenant_id=tenant_id, limit=2000, offset=0)
-    entity_ids = {row.id for row in rows}
+    scan_limit = min(1000, max(lim + off + 50, 200))
+    rows, raw_total = _list_human_actor_entities(
+        session, tenant_id=tenant_id, limit=scan_limit, offset=0
+    )
+    entities_by_id = {row.id: org_entity_public_dict(row) for row in rows}
+    entity_ids = set(entities_by_id.keys())
     clusters = _cluster_human_actors(session, tenant_id=tenant_id, entity_ids=entity_ids)
+    auth_graph_ids = _entity_ids_in_auth_graph(session, tenant_id=tenant_id, entity_ids=entity_ids)
 
     people = [
-        _person_row_from_cluster(session, tenant_id=tenant_id, cluster=cluster)
+        _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids)
         for cluster in clusters.values()
     ]
     people.sort(
@@ -491,6 +504,7 @@ def build_person_profile_v1(
         session,
         tenant_id=tenant_id,
         entity_id=entity_id,
+        anchor_scan_limit=5_000,
         receipt_limit=max(1, min(int(activity_limit), 200)),
     )
     activities: list[dict[str, Any]] = []

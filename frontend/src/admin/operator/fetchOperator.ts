@@ -225,9 +225,19 @@ export async function fetchOperatorPeopleDirectory(
   if (params.limit != null) search.set("limit", String(params.limit));
   if (params.offset != null) search.set("offset", String(params.offset));
   const qs = search.toString();
-  const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/people${qs ? `?${qs}` : ""}`);
-  await assertOk(res, "operator people directory");
-  return res.json();
+  try {
+    return await adminJson<OperatorPeopleDirectory>(
+      `/admin/tenants/${tenantId}/cortex/operator/people${qs ? `?${qs}` : ""}`,
+      undefined,
+      { timeoutMs: 90_000 },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("503") || msg.toLowerCase().includes("unavailable")) {
+      throw new Error("People directory API unavailable (503) — backend may still be deploying or the query timed out.");
+    }
+    throw e;
+  }
 }
 
 export async function fetchOperatorPersonProfile(
@@ -238,12 +248,20 @@ export async function fetchOperatorPersonProfile(
   const search = new URLSearchParams();
   if (params.activityLimit != null) search.set("activity_limit", String(params.activityLimit));
   const qs = search.toString();
-  const res = await adminFetch(
-    `/admin/tenants/${tenantId}/cortex/operator/people/${personId}${qs ? `?${qs}` : ""}`,
-  );
-  if (res.status === 404) {
-    throw new Error("person_not_found");
+  try {
+    return await adminJson<OperatorPersonProfile>(
+      `/admin/tenants/${tenantId}/cortex/operator/people/${personId}${qs ? `?${qs}` : ""}`,
+      undefined,
+      { timeoutMs: 90_000 },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("404") || msg.includes("person_not_found")) {
+      throw new Error("person_not_found");
+    }
+    if (msg.includes("503") || msg.toLowerCase().includes("unavailable")) {
+      throw new Error("Person profile API unavailable (503) — backend may still be deploying or the query timed out.");
+    }
+    throw e;
   }
-  await assertOk(res, "operator person profile");
-  return res.json();
 }

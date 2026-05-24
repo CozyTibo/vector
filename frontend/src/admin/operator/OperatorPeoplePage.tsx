@@ -23,7 +23,7 @@ function fmtTime(iso: string | null | undefined): string {
 
 export default function OperatorPeoplePage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const directoryQ = useOperatorPeopleDirectory(tenantId, { limit: 200, offset: 0 });
+  const directoryQ = useOperatorPeopleDirectory(tenantId, { limit: 100, offset: 0 });
 
   return (
     <div className="space-y-6">
@@ -37,7 +37,14 @@ export default function OperatorPeoplePage() {
       {directoryQ.isPending && !directoryQ.data ? (
         <SectionSkeleton variant="table" />
       ) : directoryQ.isError ? (
-        <p className="text-sm text-red-700">{(directoryQ.error as Error).message}</p>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <p className="font-medium">Could not load people directory</p>
+          <p className="mt-1 text-red-800">{(directoryQ.error as Error).message}</p>
+          <p className="mt-2 text-xs text-red-700">
+            If this persists after deploy, the API may still be rolling out or the people query timed out — try Runtime
+            to confirm the API is healthy.
+          </p>
+        </div>
       ) : directoryQ.data ? (
         <>
           <p className="text-xs text-stone-500">
