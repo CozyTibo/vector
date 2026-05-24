@@ -13,6 +13,8 @@ DEPRECATED_OPERATOR_PRIMARY_METRICS_V1: Final[frozenset[str]] = frozenset(
         "authoritative_link_rows_primary",
         "auth_edge_rows_primary",
         "candidate_rows_primary",
+        "edge_count_primary",
+        "phase_04_edge_count_receipt",
     }
 )
 

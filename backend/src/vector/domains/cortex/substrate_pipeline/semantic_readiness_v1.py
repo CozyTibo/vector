@@ -72,10 +72,12 @@ def _query_graph_truth_v1(
 ) -> dict[str, Any]:
     from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
         snapshot_authoritative_link_topology_v1,
+        snapshot_execution_continuity_admin_v1,
     )
 
     tid = str(tenant_id)
     topo = snapshot_authoritative_link_topology_v1(session, tenant_id=tenant_id)
+    execution_continuity = snapshot_execution_continuity_admin_v1(session, tenant_id=tenant_id)
     active_entities = _to_int(
         session.execute(
             text(
@@ -163,6 +165,8 @@ def _query_graph_truth_v1(
         "promotions_by_rule_id": promotions,
         "connected_components": components_summary,
         "primary_metric_key": "unique_auth_pairs",
+        "tcre_artifact_count": execution_continuity.get("tcre_artifact_count"),
+        "execution_continuity_admin": execution_continuity,
     }
 
 

@@ -82,6 +82,20 @@ def allowed_endpoint_pairs(kind: ContinuityEdgeKind) -> tuple[str, str]:
     return hints.get(kind, ("*", "*"))
 
 
+def list_continuity_edge_kinds_schema_only_v1() -> list[dict[str, Any]]:
+    """ContinuityEdgeKind values are schema-only until retrieval indexes artifact paths (S2.6)."""
+    return [
+        {
+            "edge_kind": kind.value,
+            "artifact_materialization_path": "none",
+            "retrieval_indexed": False,
+            "operator_kpi": False,
+            "note": "Non-KPI schema-only; execution continuity uses TCRE + retrieval artifacts",
+        }
+        for kind in ContinuityEdgeKind
+    ]
+
+
 def build_edge_contract(
     *,
     kind: ContinuityEdgeKind,

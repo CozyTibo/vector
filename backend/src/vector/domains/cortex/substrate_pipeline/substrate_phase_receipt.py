@@ -142,7 +142,7 @@ def extract_phase_receipt_detail_v1(phase_id: str, raw: dict[str, Any]) -> dict[
         return {
             "graph_projection_stable_hash_sha256": raw.get("graph_projection_stable_hash_sha256"),
             "node_count": raw.get("node_count"),
-            "edge_count": raw.get("edge_count"),
+            "unique_auth_pairs": raw.get("unique_auth_pairs"),
         }
     if phase_id == PHASE_05_TRAVERSAL:
         return {
@@ -187,7 +187,10 @@ def infer_processed_count_v1(phase_id: str, raw: dict[str, Any]) -> int:
 
         return infer_phase_03_processed_count_v1(raw)
     if phase_id == PHASE_04_GRAPH:
-        return int(raw.get("node_count") or 0) + int(raw.get("edge_count") or 0)
+        pairs = int(raw.get("unique_auth_pairs") or 0)
+        if pairs > 0:
+            return pairs
+        return int(raw.get("node_count") or 0)
     if phase_id == PHASE_05_TRAVERSAL:
         return int(raw.get("walks_persisted") or 0)
     if phase_id == PHASE_06_TCRE:

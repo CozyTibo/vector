@@ -113,3 +113,56 @@ def snapshot_promotion_diversity_observability_v1(
         "latest_candidate_batch_age_hours": batch_age_hours,
         "promotion_diversity_severity": severity,
     }
+
+
+def snapshot_tcre_artifact_volume_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Completed TCRE job artifact counts — execution continuity substrate signal (S2.6)."""
+    tid = str(tenant_id)
+    rows = [
+        dict(r)
+        for r in session.execute(
+            text(
+                """
+                SELECT a.artifact_kind, COUNT(*)::bigint AS n
+                FROM cortex_tcre_reconstruction_artifacts a
+                JOIN cortex_tcre_reconstruction_jobs j ON j.id = a.job_id
+                WHERE j.tenant_id = :tenant AND j.status = 'completed'
+                GROUP BY 1 ORDER BY n DESC, a.artifact_kind ASC
+                """
+            ),
+            {"tenant": tid},
+        ).mappings()
+    ]
+    total = sum(_to_int(r["n"]) for r in rows)
+    return {
+        "schema_version": GRAPH_TRUTH_METRICS_SCHEMA_VERSION,
+        "tenant_id": tid,
+        "tcre_artifact_count": total,
+        "tcre_artifacts_by_kind": [
+            {"artifact_kind": str(r["artifact_kind"]), "count": _to_int(r["n"])} for r in rows
+        ],
+    }
+
+
+def snapshot_execution_continuity_admin_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Admin KPI bundle for artifact-backed execution continuity (not org-link topology)."""
+    from vector.domains.cortex.continuity.edge_contracts import (
+        list_continuity_edge_kinds_schema_only_v1,
+    )
+
+    tcre = snapshot_tcre_artifact_volume_v1(session, tenant_id=tenant_id)
+    schema_only = list_continuity_edge_kinds_schema_only_v1()
+    return {
+        "tcre_artifact_count": tcre["tcre_artifact_count"],
+        "tcre_artifacts_by_kind": tcre["tcre_artifacts_by_kind"],
+        "continuity_edge_kinds_schema_only_non_kpi": schema_only,
+        "continuity_edge_kind_count": len(schema_only),
+    }

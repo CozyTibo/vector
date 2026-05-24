@@ -18,6 +18,7 @@ from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import (
 )
 from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
     snapshot_promotion_diversity_observability_v1,
+    snapshot_execution_continuity_admin_v1,
 )
 
 GRAPH_TRUTH_INSPECTOR_SCHEMA_VERSION = 1
@@ -102,6 +103,9 @@ def build_graph_truth_inspector_v1(
         round(100.0 * execution_unique_pairs / total_unique, 2) if total_unique > 0 else 0.0
     )
     promotion_diversity = snapshot_promotion_diversity_observability_v1(session, tenant_id=tenant_id)
+    execution_continuity = snapshot_execution_continuity_admin_v1(session, tenant_id=tenant_id)
+    retrieval = dict(audit.get("retrieval") or {})
+    index_kind_counts = list(retrieval.get("index_kind_counts") or [])
 
     return {
         **audit,
@@ -126,6 +130,12 @@ def build_graph_truth_inspector_v1(
             "entities_isolated": graph_truth.get("entities_isolated"),
             "promotion_rule_count": graph_truth.get("promotion_rule_count"),
             "promotion_diversity": promotion_diversity,
+            "tcre_artifact_count": execution_continuity.get("tcre_artifact_count"),
+            "tcre_artifacts_by_kind": execution_continuity.get("tcre_artifacts_by_kind"),
+            "retrieval_index_kind_mix": index_kind_counts,
+            "continuity_edge_kinds_schema_only_non_kpi": execution_continuity.get(
+                "continuity_edge_kinds_schema_only_non_kpi"
+            ),
         },
         "product_laws": {
             "retrieval_org_link_pct_max": audit.get("thresholds", {}).get("retrieval_org_link_pct_green_max"),

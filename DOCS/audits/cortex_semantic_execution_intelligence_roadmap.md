@@ -373,7 +373,7 @@ Promotion + candidate rules only emit `org.persona_belongs_to_handle`. Graph den
 - Prefer walk start nodes = org entities incident to **canonical PR/deploy mats** on the island, not random high-degree handles.
 - Receipt: `walks_persisted` + `execution_anchor_count`.
 
-### S2.6 — Dead topology cleanup
+### S2.6 — Dead topology cleanup ✅
 
 **Files:** `pipeline/pipeline_admin_graph_truth_inspector.py`, phase 04 receipts.
 
