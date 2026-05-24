@@ -528,7 +528,7 @@ Plus companion `causal_chain` / `causal_edge` rows from TCRE.
 - Default `CORTEX_RETRIEVAL_MAX_ORG_LINK_ENTRIES_PER_EPOCH`: 500 → **100** (Fizzer prod).
 - If `execution_index_count / total >= 0.60` before org_link pass, **skip org_link materialization** entirely for that epoch.
 
-### S3.3 — Boost canonical mat materialization on island
+### S3.3 — Boost canonical mat materialization on island ✅
 
 **Files:** `retrieval/retrieval_canonical_materialization_v1.py`.
 
