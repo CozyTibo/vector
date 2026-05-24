@@ -12,7 +12,7 @@
 
 ## Proof scripts (pytest + optional prod receipt)
 
-Each `continuity_p0_phase_*_proof.py` pairs with domain logic under `vector.domains.cortex.substrate_pipeline.continuity_p0_*`. Run in CI via targeted pytest modules; prod `--apply` flows require explicit operator approval.
+Each archived `continuity_*_proof.py` under `backend/scripts/archive/continuity_proofs/` pairs with domain logic under `vector.domains.cortex.substrate_pipeline.continuity_p0_*`. Run in CI via targeted pytest modules; prod `--apply` flows require explicit operator approval.
 
 | Script | Phase / step | Primary test module |
 |--------|--------------|---------------------|

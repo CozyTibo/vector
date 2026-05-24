@@ -841,7 +841,9 @@ Complexity tax consumes the team that should be building S1–S4. Fake-green sur
 | `prod_substrate_proof_queries.py` | Already deprecated — remove from docs |
 | Admin auth link COUNT(*) hero | `pipeline/pipeline_admin_operator_kpi.py` |
 
-### S5.2 — SIMPLIFY list
+### S5.2 — SIMPLIFY list ✅
+
+**Status:** Shipped — 37 proof scripts archived; CI matrix + runbook point to two canonical scripts; lease-first continuity model; Graph + Traversal tab label.
 
 | Item | Action |
 |------|--------|

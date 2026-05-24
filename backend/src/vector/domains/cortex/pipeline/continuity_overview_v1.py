@@ -673,6 +673,11 @@ def build_continuity_status_v1(
             "detail": soak.get("p2_soak_detail"),
         },
         "progression_class": progression_class,
+        "operational_truth_model": {
+            "authoritative_source": "convergence_lease_fsm",
+            "pipeline_run_role": "receipt_mirror",
+            "policy": "lease_status_over_pipeline_completed",
+        },
     }
 
 

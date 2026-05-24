@@ -206,7 +206,28 @@ python scripts/synthesis_useful_artifact_bootstrap.py \
 
 Baseline: [`baselines/synthesis_usefulness_fizzer_wave_s4_baseline.json`](baselines/synthesis_usefulness_fizzer_wave_s4_baseline.json)
 
-## Wave S5 — Cleanup (COMPLETE)
+---
+
+## Operator environment variables (10)
+
+These are the only `CORTEX_*` vars operators need for prod sign-off (S5.2). Defaults in repo are production-safe unless noted.
+
+| Variable | Purpose |
+|----------|---------|
+| `CORTEX_EXECUTION_DUAL_LANE` | Must be `1` — serial fallback removed (S5.1) |
+| `CORTEX_CONVERGENCE_SWEEPER_ENABLED` | Convergence sweeper Celery beat |
+| `CORTEX_SUBSTRATE_PIPELINE_PHASE_08_ENABLED` | Phase 08 synthesis materialization |
+| `CORTEX_RETRIEVAL_SEMANTIC_MIX_GATE_ENABLED` | Block org_link-heavy retrieval publish |
+| `CORTEX_SYNTHESIS_RETRIEVAL_SEMANTIC_GATE_ENABLED` | Block synthesis on weak retrieval mix |
+| `CORTEX_SYNTHESIS_REQUIRE_EXECUTION_REFS` | Require execution refs before synthesis LLM |
+| `CORTEX_SYNTHESIS_PER_ISLAND_ENABLED` | Inline per-island synthesis pipeline path |
+| `CORTEX_AA5_REQUIRE_JOBS_COMPLETED` | AA5: jobs_completed + useful artifact |
+| `CORTEX_WAVE_S5_SEMANTIC_PRIMARY_OPERATOR_KPI` | Semantic panel as primary admin KPI |
+| `CORTEX_SYNTHESIS_JOB_RECONCILE_ON_MATERIALIZE` | Reconcile stale synthesis jobs pre phase 08 |
+
+---
+
+## Wave S5 — Cleanup (in progress)
 
 | Step | Deliverable |
 |------|-------------|
@@ -224,4 +245,4 @@ Baseline template: [`baselines/wave_s5_cleanup_fizzer_baseline.json`](baselines/
 
 - `backend/scripts/prod_substrate_proof_queries.py` (deprecated; use continuity + graph truth snapshots)
 - `backend/scripts/archive/unlock/*` (recovery only)
-- Per-step `continuity_p0_phase_*_proof.py` (CI gates only, not daily ops)
+- Per-step `continuity_*_proof.py` under `backend/scripts/archive/continuity_proofs/` (CI gates only, not daily ops)

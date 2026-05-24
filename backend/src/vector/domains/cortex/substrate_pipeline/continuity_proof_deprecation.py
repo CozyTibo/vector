@@ -22,8 +22,10 @@ def deprecated_continuity_proof_script_names_v1(*, scripts_dir: Path | None = No
     """All ``continuity_*_proof.py`` CLI scripts except the canonical audit snapshot."""
     root = scripts_dir or Path(__file__).resolve().parents[6] / "backend" / "scripts"
     names: list[str] = []
-    if root.is_dir():
-        for path in sorted(root.glob("continuity_*_proof.py")):
+    for search_root in (root, root / "archive" / "continuity_proofs"):
+        if not search_root.is_dir():
+            continue
+        for path in sorted(search_root.glob("continuity_*_proof.py")):
             if path.name not in _DEPRECATION_EXEMPT_SCRIPT_NAMES_V1:
                 names.append(path.name)
     for extra in (
@@ -41,9 +43,9 @@ DEPRECATED_CONTINUITY_PROOF_SCRIPTS_V1: Final[tuple[str, ...]] = deprecated_cont
 def deprecation_message_for_script_v1(script_path: str | Path) -> str:
     name = Path(script_path).name
     return (
-        f"{name} is deprecated (Phase C3). Use backend/scripts/"
+        f"{name} is deprecated (Phase C3 / S5.2). Use backend/scripts/"
         f"{CANONICAL_AUDIT_SNAPSHOT_SCRIPT_V1} for unified JSON + AA panel + SQL snapshot. "
-        "Per-phase proof scripts remain for CI step gates only."
+        "Archived per-phase proofs live under backend/scripts/archive/continuity_proofs/ (CI gates only)."
     )
 
 

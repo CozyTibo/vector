@@ -257,7 +257,7 @@ export const OPERATOR_PHASES: Array<{ phase: OperatorPhase; label: string; route
   { phase: "ingestion", label: "Ingestion", route: "ingestion" },
   { phase: "canonical", label: "Canonical", route: "canonical" },
   { phase: "identity", label: "Identity", route: "identity" },
-  { phase: "graph", label: "Graph", route: "graph" },
+  { phase: "graph", label: "Graph + Traversal", route: "graph" },
   { phase: "reconstruction", label: "Traversal", route: "reconstruction" },
   { phase: "retrieval", label: "Retrieval", route: "retrieval" },
   { phase: "synthesis", label: "Synthesis", route: "synthesis" },
