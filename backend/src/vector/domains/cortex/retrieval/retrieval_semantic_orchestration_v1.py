@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from vector.domains.cortex.retrieval.retrieval_materialization_caps_v1 import (
     get_retrieval_max_org_link_entries_per_epoch_v1,
+    should_skip_org_link_materialization_v1,
 )
 from vector.infrastructure.db.models.cortex_org_link import CortexOrgLink
 from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
@@ -329,13 +330,28 @@ def run_wave_s3_retrieval_materialization_pass_v1(
         omission_summary=omission_summary,
         stats=stats,
     )
-    materialize_bounded_org_links_for_scope_v1(
+    skip_org_link, skip_meta = should_skip_org_link_materialization_v1(
         session,
         tenant_id=tenant_id,
-        replay_identity=replay_identity,
         index_epoch=index_epoch,
-        island=island,
-        omission_summary=omission_summary,
-        stats=stats,
     )
+    stats["org_link_skip_decision"] = skip_meta
+    if skip_org_link:
+        stats.setdefault("skip_reasons", []).append(
+            {
+                "source": "org_link",
+                "code": "org_link_skipped_execution_mix_met",
+                "detail": skip_meta,
+            }
+        )
+    else:
+        materialize_bounded_org_links_for_scope_v1(
+            session,
+            tenant_id=tenant_id,
+            replay_identity=replay_identity,
+            index_epoch=index_epoch,
+            island=island,
+            omission_summary=omission_summary,
+            stats=stats,
+        )
     return stats

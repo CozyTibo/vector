@@ -520,7 +520,7 @@ Plus companion `causal_chain` / `causal_edge` rows from TCRE.
 
 *(Shipped in S2.4 — no duplicate implementation.)*
 
-### S3.2 — Lower org_link cap + conditional skip
+### S3.2 — Lower org_link cap + conditional skip ✅
 
 **Files:** `retrieval/retrieval_materialization_caps_v1.py`, `retrieval/retrieval_semantic_orchestration_v1.py`.
 

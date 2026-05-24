@@ -878,7 +878,7 @@ class Settings(BaseSettings):
         ),
     )
     cortex_retrieval_max_org_link_entries_per_epoch: int = Field(
-        default=500,
+        default=100,
         ge=0,
         le=50_000,
         validation_alias="CORTEX_RETRIEVAL_MAX_ORG_LINK_ENTRIES_PER_EPOCH",
