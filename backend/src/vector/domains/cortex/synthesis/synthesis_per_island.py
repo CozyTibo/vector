@@ -28,6 +28,12 @@ from vector.domains.cortex.synthesis.synthesis_bounded_caps import (
 from vector.domains.cortex.synthesis.synthesis_completeness_projection import (
     pipeline_default_workloads_v1,
 )
+from vector.domains.cortex.synthesis.synthesis_useful_artifact_v1 import (
+    SD_LAWFUL_EMPTY_NO_EXECUTION_INDEX_V1,
+    audit_artifacts_usefulness_v1,
+    fizzer_v1_pipeline_workloads_v1,
+    is_lawful_empty_island_synthesis_v1,
+)
 from vector.domains.cortex.synthesis.synthesis_orchestrator import execute_synthesis_job_envelope_v1
 from vector.domains.cortex.synthesis.synthesis_pipeline import (
     _rollup_sd_codes_v1,
@@ -112,7 +118,7 @@ def iter_island_synthesis_scopes_v1(
     max_scopes: int,
     workloads: Sequence[str] | None = None,
 ) -> Iterator[dict[str, str]]:
-    wl = list(workloads or pipeline_default_workloads_v1())
+    wl = list(workloads or fizzer_v1_pipeline_workloads_v1() or pipeline_default_workloads_v1())
     rows = list_retrieval_entries_for_island_v1(
         session,
         tenant_id=tenant_id,
@@ -277,6 +283,27 @@ def materialize_synthesis_per_island_v1(
             published_index_epoch=index_epoch,
             island_scope_id=scope_id,
         )
+        if not entries and is_lawful_empty_island_synthesis_v1(
+            session,
+            tenant_id=tenant_id,
+            published_index_epoch=index_epoch,
+            island_scope_id=scope_id,
+        ):
+            island_results.append(
+                {
+                    "island_scope_id": scope_id,
+                    "entity_count": int(island.get("entity_count") or 0),
+                    "retrieval_entries_in_scope": 0,
+                    "scopes_scheduled": 0,
+                    "jobs_completed": 0,
+                    "jobs_failed": 0,
+                    "artifact_digests": [],
+                    "synthesis_job_ids": [],
+                    "lawful_empty": True,
+                    "empty_sd_code": SD_LAWFUL_EMPTY_NO_EXECUTION_INDEX_V1,
+                }
+            )
+            continue
         cap_row = materialize_capped_island_scopes_v1(
             session,
             tenant_id=tenant_id,
@@ -414,6 +441,12 @@ def materialize_synthesis_per_island_v1(
     elif jobs_failed:
         sd_rollup = {**sd_rollup, SD_PIPELINE_GAP_V1: jobs_failed}
 
+    useful_audit = audit_artifacts_usefulness_v1(
+        session,
+        tenant_id=tenant_id,
+        artifact_ids=artifact_ids,
+    )
+
     final_out = {
         "phase": PHASE_08_SYNTHESIS,
         "per_island_mode": True,
@@ -426,6 +459,9 @@ def materialize_synthesis_per_island_v1(
         "synthesis_job_ids": job_ids,
         "synthesis_publication_epoch": synthesis_publication_epoch,
         "artifacts_published": artifacts_published,
+        "useful_artifacts_published": int(useful_audit.get("useful_count") or 0),
+        "useful_artifact_audit": useful_audit,
+        "fizzer_v1_product_workload": "execution_continuity_brief",
         "sd_rollup": sd_rollup,
         "sd_histogram": build_synthesis_omission_histogram_v1(),
         "scopes_scheduled": scopes_scheduled,

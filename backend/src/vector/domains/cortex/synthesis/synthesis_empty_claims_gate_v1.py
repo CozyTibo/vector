@@ -19,6 +19,8 @@ _USEFUL_ARTIFACT_KINDS_V1: Final[frozenset[str]] = frozenset(
         "execution_understanding",
         "execution_narrative",
         "operational_synthesis",
+        "continuity_assessment",
+        "execution_continuity_brief",
     }
 )
 

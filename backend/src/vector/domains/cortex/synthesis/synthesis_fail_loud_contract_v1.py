@@ -15,6 +15,8 @@ SYNTHESIS_FAIL_LOUD_GATE_IDS_V1: Final[tuple[str, ...]] = (
     "synthesis_epoch_scope_in_scope",
     "synthesis_empty_claims_publish",
     "synthesis_retrieval_semantic_mix",
+    "synthesis_execution_grounding",
+    "synthesis_useful_artifact_v1",
 )
 
 
@@ -60,6 +62,11 @@ def verify_synthesis_fail_loud_pipeline_wiring_v1() -> dict[str, Any]:
         errors.append("missing_per_island_fail_loud_handler")
     if "enforce_retrieval_semantic_before_synthesis_v1" not in src:
         errors.append("missing_retrieval_semantic_gate_in_phase08_runner")
+    from vector.domains.cortex.synthesis import synthesis_orchestrator as orch_mod
+
+    orch_src = inspect.getsource(orch_mod.execute_synthesis_job_envelope_v1)
+    if "enforce_execution_grounding_before_llm_v1" not in orch_src:
+        errors.append("missing_execution_grounding_in_orchestrator")
     if "attach_synthesis_epoch_scope_gate_v1" not in src:
         errors.append("missing_epoch_scope_gate_in_phase08_runner")
     if "should_fail_phase08_for_epoch_scope_violation_v1" not in src:

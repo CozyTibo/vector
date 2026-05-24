@@ -697,7 +697,9 @@ Fail-loud gates **work** — they prevent fake-green. There is nothing truthful 
 - Celery `run_synthesis_job_task` → admin/ad-hoc only; document as non-pipeline.
 - Delete duplicate activation in `operational_runtime` if still referenced.
 
-### S4.3 — Minimal useful synthesis definition (v1)
+### S4.3 — Minimal useful synthesis definition (v1) ✅
+
+**Status:** Shipped — `execution +execution_continuity_brief` product workload maps to `continuity_assessment`; useful claims require execution refs.
 
 **Files:** `synthesis/synthesis_useful_artifact_v1.py`, `synthesis/synthesis_fail_loud_contract_v1.py`.
 
