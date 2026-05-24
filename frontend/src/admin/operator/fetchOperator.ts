@@ -237,6 +237,11 @@ export async function fetchOperatorPeopleDirectory(
     if (msg.includes("503") || msg.toLowerCase().includes("unavailable")) {
       throw new Error("People directory API unavailable (503) — backend may still be deploying or the query timed out.");
     }
+    if (msg === "Failed to fetch" || msg.toLowerCase().includes("networkerror")) {
+      throw new Error(
+        "People directory request failed (network/CORS) — usually a gateway timeout on the API. Retry after deploy or check Runtime health.",
+      );
+    }
     throw e;
   }
 }

@@ -5,7 +5,10 @@ from __future__ import annotations
 import uuid
 from types import SimpleNamespace
 
-from vector.domains.cortex.identity.people_directory_v1 import _extract_entity_labels_v1
+from vector.domains.cortex.identity.people_directory_v1 import (
+    _entity_needs_raw_enrichment,
+    _extract_entity_labels_v1,
+)
 from vector.domains.cortex.identity.identity_primitive_projection import (
     extract_identity_primitives,
     identity_primitive_backfill_metadata,
@@ -42,6 +45,20 @@ def test_identity_primitive_backfill_metadata_surfaces_human_fields() -> None:
     assert meta["notion_user_id"] == "notion-user-1"
     assert meta["display_name"] == "Ada Lovelace"
     assert meta["email_norm"] == "ada@example.com"
+
+
+def test_entity_needs_raw_enrichment() -> None:
+    assert _entity_needs_raw_enrichment({"display_name": None, "email": "a@b.com"}) is True
+    assert _entity_needs_raw_enrichment({"display_name": "Ada", "email": None}) is False
+
+
+def test_extract_entity_labels_from_metadata_github_login() -> None:
+    labels = _extract_entity_labels_v1(
+        meta={"projection_kind": "github_user", "github_login": "octocat"},
+        raw=None,
+        prof={},
+    )
+    assert labels["display_name"] == "octocat"
 
 
 def test_extract_entity_labels_from_raw_payload() -> None:

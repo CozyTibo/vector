@@ -32,6 +32,8 @@ from vector.infrastructure.db.models.cortex_org_link import CortexOrgLink
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 
 PEOPLE_DIRECTORY_SCHEMA_VERSION: Final[int] = 1
+_MAX_DIRECTORY_SCAN: Final[int] = 500
+_MAX_RAW_LABEL_FETCH: Final[int] = 150
 
 _WORK_KINDS: Final[frozenset[str]] = frozenset(
     {
@@ -151,45 +153,77 @@ def _extract_entity_labels_v1(
     return {"display_name": display_name, "email": email}
 
 
+def _entity_needs_raw_enrichment(labels: dict[str, str | None]) -> bool:
+    return not labels.get("display_name")
+
+
+def _metadata_labels_for_entities(
+    entities_by_id: dict[uuid.UUID, dict[str, Any]],
+) -> dict[uuid.UUID, dict[str, str | None]]:
+    return {
+        eid: _extract_entity_labels_v1(meta=_meta(entity), raw=None, prof={})
+        for eid, entity in entities_by_id.items()
+    }
+
+
 def _batch_entity_identity_labels_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
     entities_by_id: dict[uuid.UUID, dict[str, Any]],
+    seed_labels: dict[uuid.UUID, dict[str, str | None]] | None = None,
 ) -> dict[uuid.UUID, dict[str, str | None]]:
     if not entities_by_id:
         return {}
 
+    seeded = dict(seed_labels or {})
+    out: dict[uuid.UUID, dict[str, str | None]] = dict(seeded)
+
     raw_ids: set[int] = set()
-    for entity in entities_by_id.values():
+    anchor_pairs: set[tuple[int, str]] = set()
+    for eid, entity in entities_by_id.items():
+        labels = seeded.get(eid) or _extract_entity_labels_v1(meta=_meta(entity), raw=None, prof={})
+        out[eid] = labels
+        if not _entity_needs_raw_enrichment(labels):
+            continue
         meta = _meta(entity)
         raw_id = meta.get("source_anchor_raw_record_id")
         if raw_id is None:
             continue
         try:
-            raw_ids.add(int(raw_id))
+            rid = int(raw_id)
         except (TypeError, ValueError):
             continue
+        raw_ids.add(rid)
+        canon = str(meta.get("canonical_entity_id") or "")
+        if canon:
+            anchor_pairs.add((rid, canon))
 
+    if not raw_ids:
+        return out
+
+    raw_ids_list = sorted(raw_ids)[:_MAX_RAW_LABEL_FETCH]
     raw_by_id: dict[int, RawIngestionRecord] = {}
-    if raw_ids:
-        for row in session.scalars(select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids))).all():
-            raw_by_id[int(row.id)] = row
+    for row in session.scalars(
+        select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids_list))
+    ).all():
+        raw_by_id[int(row.id)] = row
 
     prof_by_anchor: dict[tuple[int, str], dict[str, Any]] = {}
-    if raw_ids:
+    if anchor_pairs:
         for anchor in session.scalars(
             select(CortexCanonicalIdentityAnchor).where(
                 CortexCanonicalIdentityAnchor.tenant_id == tenant_id,
-                CortexCanonicalIdentityAnchor.raw_record_id.in_(raw_ids),
+                CortexCanonicalIdentityAnchor.raw_record_id.in_(raw_ids_list),
             )
         ).all():
-            prof_by_anchor[(int(anchor.raw_record_id), str(anchor.canonical_entity_id))] = dict(
-                anchor.provider_identity_json or {}
-            )
+            key = (int(anchor.raw_record_id), str(anchor.canonical_entity_id))
+            if key in anchor_pairs:
+                prof_by_anchor[key] = dict(anchor.provider_identity_json or {})
 
-    out: dict[uuid.UUID, dict[str, str | None]] = {}
     for eid, entity in entities_by_id.items():
+        if not _entity_needs_raw_enrichment(out.get(eid) or {}):
+            continue
         meta = _meta(entity)
         raw: RawIngestionRecord | None = None
         prof: dict[str, Any] = {}
@@ -452,6 +486,15 @@ def _entity_ids_in_auth_graph(
     return linked
 
 
+def _person_sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        row.get("display_name") is None,
+        (row.get("display_name") or "").lower(),
+        str(row.get("last_seen_at") or ""),
+        row.get("person_id") or "",
+    )
+
+
 def build_people_directory_v1(
     session: Session,
     *,
@@ -462,38 +505,49 @@ def build_people_directory_v1(
     """List reconstructed people (human_actor clusters) for operator directory UI."""
     lim = max(1, min(int(limit), 500))
     off = max(0, int(offset))
-    scan_limit = min(1000, max(lim + off + 50, 200))
+    scan_limit = min(_MAX_DIRECTORY_SCAN, max(lim + off + 50, 200))
     rows, raw_total = _list_human_actor_entities(
         session, tenant_id=tenant_id, limit=scan_limit, offset=0
     )
     entities_by_id = {row.id: org_entity_public_dict(row) for row in rows}
     entity_ids = set(entities_by_id.keys())
-    labels_by_entity_id = _batch_entity_identity_labels_v1(
-        session,
-        tenant_id=tenant_id,
-        entities_by_id=entities_by_id,
-    )
+    metadata_labels = _metadata_labels_for_entities(entities_by_id)
     clusters = _cluster_human_actors(session, tenant_id=tenant_id, entity_ids=entity_ids)
     auth_graph_ids = _entity_ids_in_auth_graph(session, tenant_id=tenant_id, entity_ids=entity_ids)
 
-    people = [
-        _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids, labels_by_entity_id)
+    cluster_rows: list[tuple[set[uuid.UUID], dict[str, Any]]] = [
+        (
+            cluster,
+            _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids, metadata_labels),
+        )
         for cluster in clusters.values()
     ]
-    people.sort(
-        key=lambda p: (
-            p.get("display_name") is None,
-            (p.get("display_name") or "").lower(),
-            p.get("person_id") or "",
-        )
+    cluster_rows.sort(key=lambda item: _person_sort_key(item[1]))
+    page_clusters = cluster_rows[off : off + lim]
+
+    page_entity_ids: set[uuid.UUID] = set()
+    for cluster, _ in page_clusters:
+        page_entity_ids.update(cluster)
+    page_entities = {eid: entities_by_id[eid] for eid in page_entity_ids if eid in entities_by_id}
+    page_labels = _batch_entity_identity_labels_v1(
+        session,
+        tenant_id=tenant_id,
+        entities_by_id=page_entities,
+        seed_labels={eid: metadata_labels[eid] for eid in page_entities if eid in metadata_labels},
     )
-    page = people[off : off + lim]
+    merged_labels = {**metadata_labels, **page_labels}
+
+    people = [
+        _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids, merged_labels)
+        for cluster, _ in page_clusters
+    ]
+    people.sort(key=_person_sort_key)
     return {
         "surface_kind": "operator_people_directory_v1",
         "schema_version": PEOPLE_DIRECTORY_SCHEMA_VERSION,
         "tenant_id": str(tenant_id),
-        "people": page,
-        "total": len(people),
+        "people": people,
+        "total": len(cluster_rows),
         "raw_entity_count": raw_total,
         "limit": lim,
         "offset": off,
