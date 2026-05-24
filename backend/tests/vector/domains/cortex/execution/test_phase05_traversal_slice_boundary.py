@@ -26,6 +26,7 @@ def test_traversal_slice_helper_sorts_starts_and_materializes() -> None:
     pick_src = inspect.getsource(ste_mod._pick_start_node_ids_v1)
     assert ".sort()" in pick_src
     slice_src = inspect.getsource(ste_mod.run_traversal_slice_for_pipeline_v1)
-    assert "_pick_start_node_ids_v1" in slice_src
+    assert "_pick_execution_anchor_start_node_ids_v1" in slice_src
+    assert "execution_anchor_count" in slice_src
     assert "run_substrate_traversal_materialization_v1" in slice_src
     assert "traversal_explainability_panel" not in slice_src

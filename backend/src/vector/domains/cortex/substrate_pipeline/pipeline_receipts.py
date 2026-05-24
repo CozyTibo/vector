@@ -37,6 +37,7 @@ def _summarize_phase_output(phase_id: str, output: dict[str, Any]) -> dict[str, 
             "primary_octs_walk_id": output.get("primary_octs_walk_id"),
             "walks_persisted": output.get("walks_persisted"),
             "starts_selected": output.get("starts_selected"),
+            "execution_anchor_count": output.get("execution_anchor_count"),
         }
     if phase_id.endswith("tcre"):
         return {

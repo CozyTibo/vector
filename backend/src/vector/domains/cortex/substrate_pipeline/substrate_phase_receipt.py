@@ -149,6 +149,7 @@ def extract_phase_receipt_detail_v1(phase_id: str, raw: dict[str, Any]) -> dict[
             "primary_octs_walk_id": raw.get("primary_octs_walk_id"),
             "walks_persisted": raw.get("walks_persisted"),
             "starts_selected": raw.get("starts_selected"),
+            "execution_anchor_count": raw.get("execution_anchor_count"),
         }
     if phase_id == PHASE_06_TCRE:
         return {

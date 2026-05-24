@@ -9,6 +9,9 @@ from typing import Any, Final, cast
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.identity.projection_export import build_org_graph_projection_export_document
+from vector.domains.cortex.reasoning.runtime.execution_artifact_tcre_scope_v1 import (
+    org_entity_ids_for_execution_materializations_v1,
+)
 from vector.domains.cortex.reasoning.reasoning_receipts_proof_artifacts import (
     hash_reasoning_canonical_json_sha256_v1,
 )
@@ -39,6 +42,19 @@ SUBSTRATE_WALK_POLICY_V1: Final[dict[str, Any]] = {
 }
 
 
+def _org_entity_ids_in_projection_v1(projection_inner: Mapping[str, Any]) -> set[str]:
+    nodes = projection_inner.get("nodes")
+    if not isinstance(nodes, list):
+        return set()
+    out: set[str] = set()
+    for node in nodes:
+        if isinstance(node, dict) and str(node.get("kind")) == "org_entity":
+            nid = str(node.get("id") or "").strip()
+            if nid:
+                out.add(nid)
+    return out
+
+
 def _pick_start_node_ids_v1(projection_inner: Mapping[str, Any], *, limit: int) -> list[str]:
     nodes = projection_inner.get("nodes")
     if not isinstance(nodes, list):
@@ -54,6 +70,28 @@ def _pick_start_node_ids_v1(projection_inner: Mapping[str, Any], *, limit: int) 
             ids.append(nid)
     ids.sort()
     return ids[: max(1, int(limit))]
+
+
+def _pick_execution_anchor_start_node_ids_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    projection_inner: Mapping[str, Any],
+    limit: int,
+) -> tuple[list[str], int]:
+    """Prefer walk starts on org entities incident to PR/deploy/message canonical mats."""
+    lim = max(1, int(limit))
+    valid = _org_entity_ids_in_projection_v1(projection_inner)
+    exec_entities = org_entity_ids_for_execution_materializations_v1(
+        session,
+        tenant_id=tenant_id,
+        limit=lim * 2,
+    )
+    picked = [eid for eid in exec_entities if eid in valid][:lim]
+    if picked:
+        return picked, len(picked)
+    fallback = _pick_start_node_ids_v1(projection_inner, limit=lim)
+    return fallback, 0
 
 
 def _edge_fingerprints_for_visit_order_v1(
@@ -247,7 +285,12 @@ def run_traversal_slice_for_pipeline_v1(
             "primary_octs_walk_id": None,
         }
 
-    starts = _pick_start_node_ids_v1(inner, limit=max(1, int(max_starts)))
+    starts, execution_anchor_count = _pick_execution_anchor_start_node_ids_v1(
+        session,
+        tenant_id=tenant_id,
+        projection_inner=inner,
+        limit=max(1, int(max_starts)),
+    )
     mat = run_substrate_traversal_materialization_v1(
         session,
         tenant_id=tenant_id,
@@ -260,6 +303,7 @@ def run_traversal_slice_for_pipeline_v1(
         "pipeline_run_id": str(pipeline_run_id),
         "starts_selected": len(starts),
         "selected_start_node_ids": starts,
+        "execution_anchor_count": execution_anchor_count,
         "walks_persisted": int(mat.get("walks_persisted") or 0),
         "walk_ids": list(mat.get("walk_ids") or []),
         "primary_octs_walk_id": mat.get("primary_octs_walk_id"),

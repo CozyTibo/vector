@@ -375,6 +375,11 @@ def verify_phase05_traversal_slice_boundary_v1() -> list[str]:
     pick_src = inspect.getsource(ste_mod._pick_start_node_ids_v1)
     if ".sort()" not in pick_src:
         errors.append("pick_start_node_ids_must_sort_deterministically")
+    slice_src = inspect.getsource(ste_mod.run_traversal_slice_for_pipeline_v1)
+    if "_pick_execution_anchor_start_node_ids_v1" not in slice_src:
+        errors.append("traversal_slice_must_pick_execution_anchor_starts")
+    if "execution_anchor_count" not in slice_src:
+        errors.append("traversal_slice_must_emit_execution_anchor_count")
     return errors
 
 

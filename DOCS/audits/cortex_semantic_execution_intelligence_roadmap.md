@@ -365,7 +365,7 @@ Promotion + candidate rules only emit `org.persona_belongs_to_handle`. Graph den
 - Materialize `index_kind=causal_edge` rows from TCRE `causal_edge` artifacts (today: lookup map only).
 - Cap per epoch via existing TCRE materialization limits.
 
-### S2.5 — Walk start-node selection for execution continuity
+### S2.5 — Walk start-node selection for execution continuity ✅
 
 **Files:** `substrate_pipeline/substrate_traversal_execution.py`, `traversal/runtime_execution_model.py`.
 
