@@ -73,6 +73,9 @@ from vector.domains.cortex.retrieval.retrieval_observability import (
 from vector.domains.cortex.retrieval.retrieval_degradation_taxonomy import (
     build_retrieval_degradation_topology_catalog_v1,
 )
+from vector.domains.cortex.retrieval.retrieval_index_row_inspector_v1 import (
+    build_retrieval_index_row_inspector_v1,
+)
 from vector.domains.cortex.retrieval.retrieval_index_materialization import (
     RetrievalIndexMaterializationError,
     bootstrap_retrieval_index_from_upstream_v1,
@@ -187,6 +190,26 @@ def register_cortex_retrieval_routes(router: APIRouter) -> None:
             db, tenant_id=tenant_id
         )
         return doc
+
+    @r.get("/index-row-inspector", response_model=None)
+    def get_retrieval_index_row_inspector(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        index_epoch: Annotated[str, Query()],
+        index_kind: Annotated[str | None, Query()] = None,
+        limit: Annotated[int, Query()] = 50,
+    ) -> JSONResponse | dict[str, Any]:
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
+        if not index_epoch.strip():
+            return JSONResponse(status_code=400, content={"error": "index_epoch_required"})
+        return build_retrieval_index_row_inspector_v1(
+            db,
+            tenant_id=tenant_id,
+            index_epoch=index_epoch.strip(),
+            index_kind=index_kind,
+            limit=limit,
+        )
 
     @r.get("/index", response_model=None)
     def get_retrieval_index(

@@ -560,7 +560,7 @@ Admin retrieval page shows mix breakdown per epoch — not just entry count.
 
 **Work:** Unblock `graph_truth_audit_snapshot.py` and `identity_continuity_audit_snapshot.py` on prod.
 
-### S3.6 — Retrieval inspector: good vs useless rows
+### S3.6 — Retrieval inspector: good vs useless rows ✅
 
 **Files:** `api/http/routes/admin_cortex_retrieval.py`.
 
