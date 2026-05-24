@@ -467,7 +467,7 @@ def _entity_ids_in_auth_graph(
     if not entity_ids:
         return set()
     linked: set[uuid.UUID] = set()
-    rows = session.scalars(
+    rows = session.execute(
         select(CortexOrgLink.source_entity_id, CortexOrgLink.target_entity_id).where(
             CortexOrgLink.tenant_id == tenant_id,
             CortexOrgLink.link_authority == "authoritative",
