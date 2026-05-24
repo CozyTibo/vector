@@ -80,6 +80,107 @@ class _UnionFind:
             self._parent[rb] = ra
 
 
+def _identity_signal_keys(
+    entity: dict[str, Any],
+    labels: dict[str, str | None] | None,
+) -> list[tuple[str, str]]:
+    """Stable cross-handle keys used to collapse one human across evidence-scoped org rows."""
+    keys: list[tuple[str, str]] = []
+    meta = _meta(entity)
+    email = (labels or {}).get("email") or meta.get("email_norm") or meta.get("email")
+    if isinstance(email, str) and "@" in email:
+        keys.append(("email", email.strip().lower()))
+    for field in ("github_login", "slack_user_id", "notion_user_id", "linear_user_id"):
+        val = meta.get(field)
+        if isinstance(val, str) and val.strip():
+            normalized = val.strip().lower() if field == "github_login" else val.strip()
+            keys.append((field, normalized))
+    return keys
+
+
+def _union_clusters_by_identity_signals(
+    uf: _UnionFind,
+    *,
+    entity_ids: set[uuid.UUID],
+    entities_by_id: dict[uuid.UUID, dict[str, Any]],
+    labels_by_entity_id: dict[uuid.UUID, dict[str, str | None]],
+) -> None:
+    by_key: dict[tuple[str, str], list[uuid.UUID]] = {}
+    for eid in entity_ids:
+        entity = entities_by_id.get(eid)
+        if entity is None:
+            continue
+        for key in _identity_signal_keys(entity, labels_by_entity_id.get(eid)):
+            by_key.setdefault(key, []).append(eid)
+    for members in by_key.values():
+        if len(members) < 2:
+            continue
+        head = members[0]
+        for eid in members[1:]:
+            uf.union(head, eid)
+
+
+def _query_entity_ids_by_metadata_field_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    field: str,
+    value: str,
+    limit: int = 500,
+) -> set[uuid.UUID]:
+    col = CortexOrgEntity.metadata_json[field].astext
+    rows = session.scalars(
+        select(CortexOrgEntity.id)
+        .where(
+            CortexOrgEntity.tenant_id == tenant_id,
+            CortexOrgEntity.entity_kind == OrgEntityKind.HUMAN_ACTOR.value,
+            CortexOrgEntity.tombstoned_at.is_(None),
+            col == value,
+        )
+        .limit(max(1, min(limit, 1000)))
+    ).all()
+    return set(rows)
+
+
+def _resolve_people_cluster_entity_ids_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    signal_lookup_limit: int = 500,
+) -> set[uuid.UUID]:
+    """All org handles that represent the same reconstructed person as ``entity_id``."""
+    cluster: set[uuid.UUID] = set(_list_linked_entity_ids_v1(session, tenant_id=tenant_id, entity_id=entity_id, limit=64))
+    cluster.add(entity_id)
+    row = get_org_entity(session, tenant_id=tenant_id, org_entity_id=entity_id)
+    if row is None:
+        return cluster
+    entity = org_entity_public_dict(row)
+    labels = _batch_entity_identity_labels_v1(
+        session,
+        tenant_id=tenant_id,
+        entities_by_id={entity_id: entity},
+    )
+    for signal, value in _identity_signal_keys(entity, labels.get(entity_id)):
+        if signal == "email":
+            cluster |= _query_entity_ids_by_metadata_field_v1(
+                session,
+                tenant_id=tenant_id,
+                field="email_norm",
+                value=value,
+                limit=signal_lookup_limit,
+            )
+        elif signal in ("github_login", "slack_user_id", "notion_user_id", "linear_user_id"):
+            cluster |= _query_entity_ids_by_metadata_field_v1(
+                session,
+                tenant_id=tenant_id,
+                field=signal,
+                value=value,
+                limit=signal_lookup_limit,
+            )
+    return cluster
+
+
 def _meta(entity: dict[str, Any]) -> dict[str, Any]:
     return dict(entity.get("metadata_json") or {})
 
@@ -354,6 +455,8 @@ def _cluster_human_actors(
     *,
     tenant_id: uuid.UUID,
     entity_ids: set[uuid.UUID],
+    entities_by_id: dict[uuid.UUID, dict[str, Any]] | None = None,
+    labels_by_entity_id: dict[uuid.UUID, dict[str, str | None]] | None = None,
 ) -> dict[uuid.UUID, set[uuid.UUID]]:
     if not entity_ids:
         return {}
@@ -375,6 +478,13 @@ def _cluster_human_actors(
         src, tgt = link.source_entity_id, link.target_entity_id
         if src in entity_ids and tgt in entity_ids:
             uf.union(src, tgt)
+    if entities_by_id and labels_by_entity_id:
+        _union_clusters_by_identity_signals(
+            uf,
+            entity_ids=entity_ids,
+            entities_by_id=entities_by_id,
+            labels_by_entity_id=labels_by_entity_id,
+        )
     clusters: dict[uuid.UUID, set[uuid.UUID]] = {}
     for eid in entity_ids:
         root = uf.find(eid)
@@ -512,7 +622,32 @@ def build_people_directory_v1(
     entities_by_id = {row.id: org_entity_public_dict(row) for row in rows}
     entity_ids = set(entities_by_id.keys())
     metadata_labels = _metadata_labels_for_entities(entities_by_id)
-    clusters = _cluster_human_actors(session, tenant_id=tenant_id, entity_ids=entity_ids)
+    missing_email_ids = [
+        eid for eid in entity_ids if not (metadata_labels.get(eid) or {}).get("email")
+    ]
+    if missing_email_ids:
+        probe_entities = {
+            eid: entities_by_id[eid]
+            for eid in missing_email_ids[:_MAX_RAW_LABEL_FETCH]
+            if eid in entities_by_id
+        }
+        if probe_entities:
+            metadata_labels = {
+                **metadata_labels,
+                **_batch_entity_identity_labels_v1(
+                    session,
+                    tenant_id=tenant_id,
+                    entities_by_id=probe_entities,
+                    seed_labels=metadata_labels,
+                ),
+            }
+    clusters = _cluster_human_actors(
+        session,
+        tenant_id=tenant_id,
+        entity_ids=entity_ids,
+        entities_by_id=entities_by_id,
+        labels_by_entity_id=metadata_labels,
+    )
     auth_graph_ids = _entity_ids_in_auth_graph(session, tenant_id=tenant_id, entity_ids=entity_ids)
 
     cluster_rows: list[tuple[set[uuid.UUID], dict[str, Any]]] = [
@@ -677,7 +812,11 @@ def build_person_profile_v1(
         raise ValueError("person_not_found")
 
     entity = org_entity_public_dict(row)
-    linked_ids = _list_linked_entity_ids_v1(session, tenant_id=tenant_id, entity_id=entity_id, limit=64)
+    linked_ids = _resolve_people_cluster_entity_ids_v1(
+        session,
+        tenant_id=tenant_id,
+        entity_id=entity_id,
+    )
     linked_entities_by_id: dict[uuid.UUID, dict[str, Any]] = {}
     for eid in linked_ids:
         linked_row = get_org_entity(session, tenant_id=tenant_id, org_entity_id=eid)
@@ -688,19 +827,26 @@ def build_person_profile_v1(
         tenant_id=tenant_id,
         entities_by_id=linked_entities_by_id,
     )
-    handles = _list_linked_handles_v1(session, tenant_id=tenant_id, entity_id=entity_id, limit=64)
-    for handle in handles:
-        hid = handle.get("handle_id")
-        if not hid:
+    handles: list[dict[str, Any]] = []
+    seen_handle_ids: set[str] = set()
+    for eid in sorted(linked_ids, key=str):
+        ent = linked_entities_by_id.get(eid)
+        if ent is None:
             continue
-        try:
-            handle_labels = labels_by_entity_id.get(uuid.UUID(str(hid))) or {}
-        except ValueError:
+        resolved = _resolved_identity_from_entity(ent)
+        if resolved is None:
             continue
-        if handle_labels.get("display_name") and not handle.get("display_name"):
-            handle["display_name"] = handle_labels["display_name"]
-        if handle_labels.get("email") and not handle.get("email_norm"):
-            handle["email_norm"] = handle_labels["email"]
+        hid = str(resolved.get("handle_id") or eid)
+        if hid in seen_handle_ids:
+            continue
+        seen_handle_ids.add(hid)
+        lbl = labels_by_entity_id.get(eid) or {}
+        if lbl.get("display_name") and not resolved.get("display_name"):
+            resolved["display_name"] = lbl["display_name"]
+        if lbl.get("email") and not resolved.get("email_norm"):
+            resolved["email_norm"] = lbl["email"]
+        resolved["is_primary"] = eid == entity_id
+        handles.append(resolved)
     entity_labels = labels_by_entity_id.get(entity_id) or {}
     display_name = _pick_display_name(handles, entity, labels=entity_labels)
     email = _pick_email(handles, entity, labels=entity_labels)
@@ -764,10 +910,25 @@ def build_person_profile_v1(
         receipt_limit=max(1, min(int(activity_limit), 200)),
     )
     activities: list[dict[str, Any]] = []
+    seen_activity_ids: set[str] = set()
     for receipt in evidence.get("evidence_receipts") or []:
         item = _activity_from_receipt(session, receipt)
-        if item is not None:
+        if item is not None and item["activity_id"] not in seen_activity_ids:
+            seen_activity_ids.add(item["activity_id"])
             activities.append(item)
+    for other_id in sorted(linked_ids - {entity_id}, key=str)[:31]:
+        other_evidence = build_entity_continuity_evidence_inspection_v1(
+            session,
+            tenant_id=tenant_id,
+            entity_id=other_id,
+            anchor_scan_limit=2_000,
+            receipt_limit=max(8, min(int(activity_limit) // 4, 40)),
+        )
+        for receipt in other_evidence.get("evidence_receipts") or []:
+            item = _activity_from_receipt(session, receipt)
+            if item is not None and item["activity_id"] not in seen_activity_ids:
+                seen_activity_ids.add(item["activity_id"])
+                activities.append(item)
     activities.sort(key=lambda a: a.get("occurred_at") or "", reverse=True)
 
     retrieval: dict[str, Any] | None = None

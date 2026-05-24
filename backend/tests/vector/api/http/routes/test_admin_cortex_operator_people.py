@@ -43,6 +43,42 @@ def test_operator_people_directory_empty(client: TestClient, db_session: Session
     assert body["total"] == 0
 
 
+def test_operator_people_directory_unions_same_email_without_link(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    from vector.infrastructure.db.models.cortex_org_entity import CortexOrgEntity
+
+    tid = _tenant(db_session)
+    shared_email = "maximilien@fizzer.com"
+    entities = [
+        CortexOrgEntity(
+            id=uuid.uuid4(),
+            tenant_id=tid,
+            entity_kind="human_actor",
+            lifecycle_state="active",
+            identity_key_fingerprint=f"{i}" * 64,
+            metadata_json={
+                "projection_kind": "email_identity" if i == 0 else "github_user",
+                "email_norm": shared_email,
+                "display_name": "Maximilien",
+            },
+            engine_build_ref="test",
+        )
+        for i in range(3)
+    ]
+    db_session.add_all(entities)
+    db_session.commit()
+
+    res = client.get(f"/admin/tenants/{tid}/cortex/operator/people")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total"] == 1
+    assert body["people"][0]["display_name"] == "Maximilien"
+    assert body["people"][0]["email"] == shared_email
+    assert body["people"][0]["linked_account_count"] == 3
+
+
 def test_operator_people_directory_with_auth_graph_link(
     client: TestClient,
     db_session: Session,

@@ -6,6 +6,7 @@ import uuid
 from types import SimpleNamespace
 
 from vector.domains.cortex.identity.people_directory_v1 import (
+    _cluster_human_actors,
     _entity_needs_raw_enrichment,
     _extract_entity_labels_v1,
 )
@@ -45,6 +46,53 @@ def test_identity_primitive_backfill_metadata_surfaces_human_fields() -> None:
     assert meta["notion_user_id"] == "notion-user-1"
     assert meta["display_name"] == "Ada Lovelace"
     assert meta["email_norm"] == "ada@example.com"
+
+
+def test_cluster_unions_entities_with_same_email() -> None:
+    tid = uuid.uuid4()
+    e1, e2, e3 = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    entities = {
+        e1: {
+            "id": str(e1),
+            "entity_kind": "human_actor",
+            "metadata_json": {"email_norm": "max@example.com", "projection_kind": "email_identity"},
+        },
+        e2: {
+            "id": str(e2),
+            "entity_kind": "human_actor",
+            "metadata_json": {"email_norm": "max@example.com", "projection_kind": "github_user"},
+        },
+        e3: {
+            "id": str(e3),
+            "entity_kind": "human_actor",
+            "metadata_json": {"email_norm": "other@example.com", "projection_kind": "email_identity"},
+        },
+    }
+    labels = {
+        e1: {"display_name": "Max", "email": "max@example.com"},
+        e2: {"display_name": "Max", "email": "max@example.com"},
+        e3: {"display_name": "Other", "email": "other@example.com"},
+    }
+
+    class _FakeSession:
+        def scalars(self, *_args, **_kwargs):
+            return _EmptyScalars()
+
+    class _EmptyScalars:
+        def all(self):
+            return []
+
+    clusters = _cluster_human_actors(
+        _FakeSession(),
+        tenant_id=tid,
+        entity_ids={e1, e2, e3},
+        entities_by_id=entities,
+        labels_by_entity_id=labels,
+    )
+    assert len(clusters) == 2
+    merged = next(c for c in clusters.values() if e1 in c)
+    assert e2 in merged
+    assert e3 not in merged
 
 
 def test_entity_needs_raw_enrichment() -> None:
