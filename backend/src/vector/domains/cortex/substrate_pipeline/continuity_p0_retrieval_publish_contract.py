@@ -35,12 +35,42 @@ def verify_b1_retrieval_publish_contract_wiring_v1() -> dict[str, Any]:
     for needle in (
         "begin_pipeline_retrieval_index_build_v1",
         "finalize_pipeline_retrieval_index_build_v1",
-        "auto_publish=False",
     ):
         if needle not in comp_src:
             errors.append(f"component_mat_missing_{needle}")
+    if "run_wave_s3_retrieval_materialization_pass_v1" not in comp_src:
+        errors.append("component_mat_missing_wave_s3_orchestration_pass")
     if "publish_retrieval_index_epoch_v1(" in comp_src:
         errors.append("component_mat_direct_publish_call")
+
+    from vector.domains.cortex.retrieval import retrieval_semantic_orchestration_v1 as orch_mod
+
+    wave_s3_helpers = (
+        "materialize_walks_for_scope_v1",
+        "materialize_tcre_for_scope_v1",
+        "materialize_canonical_mats_for_scope_v1",
+        "materialize_bounded_org_links_for_scope_v1",
+    )
+    for helper_name in wave_s3_helpers:
+        helper_fn = getattr(orch_mod, helper_name, None)
+        if helper_fn is None:
+            errors.append(f"wave_s3_orchestration_missing_{helper_name}")
+            continue
+        helper_src = inspect.getsource(helper_fn)
+        if "auto_publish=False" in helper_src:
+            continue
+        if helper_name == "materialize_canonical_mats_for_scope_v1":
+            from vector.domains.cortex.retrieval import retrieval_canonical_materialization_v1 as canon_mod
+
+            canon_src = inspect.getsource(
+                canon_mod.materialize_canonical_materializations_for_island_v1
+            )
+            if "auto_publish=False" not in canon_src:
+                errors.append(
+                    "wave_s3_orchestration_missing_deferred_publish_materialize_canonical_mats_for_scope_v1"
+                )
+            continue
+        errors.append(f"wave_s3_orchestration_missing_deferred_publish_{helper_name}")
 
     mat_src = inspect.getsource(mat_mod.materialize_retrieval_index_for_pipeline_v1)
     if "is_retrieval_component_scope_enabled_v1()" in mat_src:
