@@ -15,6 +15,9 @@ from vector.domains.cortex.identity.anchor_continuity_candidates import (
     continuity_identity_signals_for_anchor,
     summarize_rule_bucket_maps_v1,
 )
+from vector.domains.cortex.identity.identity_primitive_projection import (
+    aggregate_connector_email_bridge_coverage_v1,
+)
 from vector.infrastructure.db.models.cortex_canonical_identity_anchor import CortexCanonicalIdentityAnchor
 from vector.infrastructure.db.models.cortex_org_link_candidate_batch import CortexOrgLinkCandidateBatch
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
@@ -91,6 +94,7 @@ def build_identity_continuity_diagnosis_v1(
     rule_phases, anchors, raw_by_id = collect_anchor_continuity_rule_buckets_v1(session, tenant_id=tenant_id)
     bucket_diagnosis = summarize_rule_bucket_maps_v1(rule_phases)
     latest_batch = _latest_candidate_batch_v1(session, tenant_id=tenant_id)
+    email_bridge_coverage = aggregate_connector_email_bridge_coverage_v1(anchors=anchors, raw_by_id=raw_by_id)
 
     return {
         "surface_kind": "identity_continuity_diagnosis",
@@ -100,6 +104,7 @@ def build_identity_continuity_diagnosis_v1(
         "anchor_count": len(anchors),
         "anchor_counts_by_connector": _anchor_counts_by_connector_v1(anchors),
         "bucket_diagnosis": bucket_diagnosis,
+        "email_bridge_coverage": email_bridge_coverage,
         "anchor_samples_by_connector": _sample_anchors_by_connector_v1(anchors, raw_by_id),
         "latest_candidate_batch": latest_batch,
         "receipt_links": {

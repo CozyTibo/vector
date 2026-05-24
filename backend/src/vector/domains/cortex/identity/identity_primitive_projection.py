@@ -426,15 +426,52 @@ def _display_name(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def _email_for_rule(payload: dict[str, Any], prof: dict[str, Any]) -> tuple[str | None, str | None]:
-    github_emails = _github_emails_deterministic(payload, prof)
-    pr_email = github_emails[0] if github_emails else None
-    slack_nested = None
+def _slack_emails_deterministic(payload: dict[str, Any], prof: dict[str, Any]) -> list[str]:
+    """Explicit email strings on Slack-shaped payloads (sorted, de-duplicated)."""
+    found: set[str] = set()
+    _add_norm_email(found, payload.get("user_email"))
+    _add_norm_email(found, payload.get("email"))
+    _add_norm_email(found, prof.get("email"))
+
+    profile = payload.get("profile")
+    if isinstance(profile, dict):
+        _add_norm_email(found, profile.get("email"))
+
+    member = payload.get("member")
+    if isinstance(member, dict):
+        mp = member.get("profile")
+        if isinstance(mp, dict):
+            _add_norm_email(found, mp.get("email"))
+
     uo = payload.get("user")
     if isinstance(uo, dict):
+        _add_norm_email(found, uo.get("email"))
         nested_profile = uo.get("profile")
         if isinstance(nested_profile, dict):
-            slack_nested = _norm_email(nested_profile.get("email"))
+            _add_norm_email(found, nested_profile.get("email"))
+
+    prof_profile = prof.get("profile")
+    if isinstance(prof_profile, dict):
+        _add_norm_email(found, prof_profile.get("email"))
+
+    msg = payload.get("message")
+    if isinstance(msg, dict):
+        _add_norm_email(found, msg.get("user_email"))
+        mu = msg.get("user")
+        if isinstance(mu, dict):
+            _add_norm_email(found, mu.get("email"))
+            mprof = mu.get("profile")
+            if isinstance(mprof, dict):
+                _add_norm_email(found, mprof.get("email"))
+
+    return sorted(found)
+
+
+def _email_for_rule(payload: dict[str, Any], prof: dict[str, Any]) -> tuple[str | None, str | None]:
+    github_emails = _github_emails_deterministic(payload, prof)
+    slack_emails = _slack_emails_deterministic(payload, prof)
+    pr_email = github_emails[0] if github_emails else None
+    slack_email = slack_emails[0] if slack_emails else None
     notion_email = None
     for nu in _notion_user_refs_deterministic(payload):
         notion_email = notion_email or _norm_email(nu.get("email_norm"))
@@ -443,9 +480,10 @@ def _email_for_rule(payload: dict[str, Any], prof: dict[str, Any]) -> tuple[str 
         or _norm_email(payload.get("email"))
         or _norm_email(prof.get("email"))
         or pr_email
-        or slack_nested
+        or slack_email
         or notion_email
         or (github_emails[0] if github_emails else None)
+        or (slack_emails[0] if slack_emails else None)
     )
     if not em or "@" not in em:
         return None, None
@@ -784,6 +822,57 @@ def notion_user_ids_for_continuity(payload: dict[str, Any]) -> list[str]:
 def github_emails_for_continuity(payload: dict[str, Any], prof: dict[str, Any]) -> list[str]:
     """Public: sorted explicit GitHub emails on a raw payload."""
     return _github_emails_deterministic(payload, prof)
+
+
+def slack_emails_for_continuity(payload: dict[str, Any], prof: dict[str, Any]) -> list[str]:
+    """Public: sorted explicit Slack emails on a raw payload."""
+    return _slack_emails_deterministic(payload, prof)
+
+
+def aggregate_connector_email_bridge_coverage_v1(
+    *,
+    anchors: list[CortexCanonicalIdentityAnchor],
+    raw_by_id: dict[int, RawIngestionRecord],
+) -> dict[str, Any]:
+    """Per-connector share of anchors with extractable email primitives (S1.3 audit)."""
+    by_connector: dict[str, dict[str, int]] = {}
+    for anchor in anchors:
+        connector = (anchor.connector or "unknown").strip().lower() or "unknown"
+        stats = by_connector.setdefault(
+            connector,
+            {"anchors_scanned": 0, "anchors_with_email_primitive": 0, "anchors_with_extractable_email_signal": 0},
+        )
+        stats["anchors_scanned"] += 1
+        raw = raw_by_id.get(int(anchor.raw_record_id))
+        prof = dict(anchor.provider_identity_json or {})
+        payload = dict(raw.payload_body) if raw is not None and isinstance(raw.payload_body, dict) else {}
+        projs = extract_identity_primitives(anchor=anchor, raw=raw)
+        if any(p.projection_kind in ("email_identity", "email_display_identity") for p in projs):
+            stats["anchors_with_email_primitive"] += 1
+        signal_em = (
+            slack_emails_for_continuity(payload, prof)
+            or github_emails_for_continuity(payload, prof)
+        )
+        if signal_em:
+            stats["anchors_with_extractable_email_signal"] += 1
+
+    per_connector: dict[str, Any] = {}
+    for connector, stats in sorted(by_connector.items()):
+        scanned = stats["anchors_scanned"] or 1
+        per_connector[connector] = {
+            **stats,
+            "email_primitive_rate_percent": round((stats["anchors_with_email_primitive"] / scanned) * 100.0, 2),
+            "extractable_email_signal_rate_percent": round(
+                (stats["anchors_with_extractable_email_signal"] / scanned) * 100.0,
+                2,
+            ),
+        }
+
+    return {
+        "schema_version": "p04.connector_email_bridge_coverage.v1",
+        "per_connector": per_connector,
+        "primary_metric_key": "email_primitive_rate_percent",
+    }
 
 
 def aggregate_github_email_extraction_metrics(

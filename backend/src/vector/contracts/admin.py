@@ -4820,6 +4820,7 @@ class AdminCortexIdentityContinuityDiagnosisResponse(BaseModel):
     anchor_count: int = 0
     anchor_counts_by_connector: dict[str, int] = Field(default_factory=dict)
     bucket_diagnosis: dict[str, Any] = Field(default_factory=dict)
+    email_bridge_coverage: dict[str, Any] = Field(default_factory=dict)
     anchor_samples_by_connector: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
     latest_candidate_batch: dict[str, Any] | None = None
     receipt_links: dict[str, Any] = Field(default_factory=dict)

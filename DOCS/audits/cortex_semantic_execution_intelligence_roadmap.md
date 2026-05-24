@@ -187,7 +187,9 @@ Phase 03 runs repeatedly with `COMPLETED_EMPTY` (mislabeled — candidates grow,
 
 **Anti-overengineering:** Do **not** add ML scoring or new entity kinds. One fingerprint change + repair script.
 
-### S1.3 — Email bridge coverage audit + fix gaps
+### S1.3 — Email bridge coverage audit + fix gaps ✅
+
+**Status:** Shipped — `aggregate_connector_email_bridge_coverage_v1` in diagnosis harness; Slack member/profile and GitHub PR author email paths widened.
 
 **Files:** `identity/identity_primitive_projection.py` (email extraction), GitHub/Slack connector payload paths.
 

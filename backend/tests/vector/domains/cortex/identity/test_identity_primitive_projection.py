@@ -162,6 +162,51 @@ def test_notion_page_created_by_projects_notion_user_primitive() -> None:
     assert org_entity_id_for_identity_primitive(tenant_id=tid, projection=notion[0])
 
 
+def test_slack_member_profile_email_extracted() -> None:
+    anchor = SimpleNamespace(
+        canonical_entity_id=uuid.uuid4(),
+        provider_identity_hash="h-slack-member",
+        canonical_object_kind="member",
+        connector="slack",
+        raw_record_id=1,
+        provider_identity_json={},
+    )
+    raw = SimpleNamespace(
+        resource_type="slack.member",
+        payload_body={
+            "member": {"profile": {"email": "pat@nexora.test", "real_name": "Pat"}},
+            "user": {"id": "U123"},
+        },
+    )
+    projs = extract_identity_primitives(anchor=anchor, raw=raw)
+    email_kinds = [p for p in projs if p.projection_kind in ("email_identity", "email_display_identity")]
+    assert len(email_kinds) >= 1
+    assert email_kinds[0].identity_material["email_norm"] == "pat@nexora.test"
+
+
+def test_github_pr_author_email_extracted_for_display_rule() -> None:
+    anchor = SimpleNamespace(
+        canonical_entity_id=uuid.uuid4(),
+        provider_identity_hash="h-gh-pr",
+        canonical_object_kind="pull_request",
+        connector="github",
+        raw_record_id=1,
+        provider_identity_json={},
+    )
+    raw = SimpleNamespace(
+        resource_type="github.pull_request",
+        payload_body={
+            "pull_request": {
+                "user": {"login": "alice", "email": "alice@nexora.test", "name": "Alice"},
+            }
+        },
+    )
+    projs = extract_identity_primitives(anchor=anchor, raw=raw)
+    display = [p for p in projs if p.projection_kind == "email_display_identity"]
+    assert len(display) == 1
+    assert display[0].identity_material["email_norm"] == "alice@nexora.test"
+
+
 def test_cross_tool_cluster_primitive_distinct_from_slack() -> None:
     tid = uuid.uuid4()
     anchor, raw = _slack_anchor_raw("UX01", "clust-x")
