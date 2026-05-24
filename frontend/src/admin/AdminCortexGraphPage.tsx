@@ -1,7 +1,7 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { PhaseRerunCta } from "./cortex/PhaseRerunCta";
-import { usePipelineOverviewPhases } from "./cortex/usePipelineOverview";
+import { usePipelineOverviewBootstrap } from "./cortex/usePipelineOverview";
 import { StatusBadge } from "./ui/StatusBadge";
 import { ExecutionThreadInspector } from "./cortex/graph/ExecutionThreadInspector";
 import { GraphInspectorDescription, GraphInspectorNav } from "./cortex/graph/GraphInspectorNav";
@@ -43,9 +43,9 @@ export default function AdminCortexGraphPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const inspector = resolveInspector(searchParams.get("inspector"));
 
-  const phasesQ = usePipelineOverviewPhases();
-  const inspectorQ = useGraphTruthInspector();
-  const graphPhase = phasesQ.data?.phases?.find((p) => p.phase === "graph");
+  const bootstrapQ = usePipelineOverviewBootstrap();
+  const inspectorQ = useGraphTruthInspector(inspector);
+  const graphPhase = bootstrapQ.data?.phases?.find((p) => p.phase === "graph");
 
   const setInspector = (next: GraphInspectorId) => {
     setSearchParams((prev) => {
@@ -68,8 +68,10 @@ export default function AdminCortexGraphPage() {
             <StatusBadge tone={statusTone(graphPhase.status)}>
               {graphPhase.status_label ?? graphPhase.status}
             </StatusBadge>
-          ) : phasesQ.isPending ? (
+          ) : bootstrapQ.isPending ? (
             <span className="text-sm text-stone-400">loading phase status…</span>
+          ) : bootstrapQ.isError ? (
+            <span className="text-sm text-red-700">phase status unavailable</span>
           ) : null}
         </div>
         <p className="max-w-3xl text-sm text-stone-600">
@@ -77,7 +79,7 @@ export default function AdminCortexGraphPage() {
           retrieval composition, islands, and promotion lineage. Not graph vanity metrics.
         </p>
         <Link
-          to={`/admin/tenants/${tenantId}/cortex`}
+          to={`/admin/tenants/${tenantId}/cortex/overview`}
           className="inline-block text-sm font-medium text-indigo-700 no-underline hover:underline"
         >
           ← Pipeline overview
@@ -96,7 +98,7 @@ export default function AdminCortexGraphPage() {
       {inspector === "graph-truth" ? (
         <GraphTruthInspector data={inspectorData} loading={inspectorQ.isPending} error={inspectorError} />
       ) : null}
-      {inspector === "identity" ? <IdentityContinuityInspector data={inspectorData} /> : null}
+      {inspector === "identity" ? <IdentityContinuityInspector /> : null}
       {inspector === "retrieval" ? <RetrievalRealityInspector data={inspectorData} /> : null}
       {inspector === "island" ? <IslandInspector data={inspectorData} /> : null}
       {inspector === "execution-thread" ? <ExecutionThreadInspector /> : null}

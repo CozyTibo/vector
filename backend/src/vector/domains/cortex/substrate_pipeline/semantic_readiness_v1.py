@@ -301,9 +301,13 @@ def _query_identity_continuity_v1(session: Session, *, tenant_id: uuid.UUID) -> 
     from vector.domains.cortex.identity.identity_continuity_promotion_v1 import (
         count_promotable_link_candidates_by_rule_v1,
     )
+    from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
+        snapshot_promotion_diversity_observability_v1,
+    )
 
     tid = str(tenant_id)
     boundary = snapshot_anchor_entity_boundary_v1(session, tenant_id=tenant_id)
+    promotion_diversity = snapshot_promotion_diversity_observability_v1(session, tenant_id=tenant_id)
     cand = session.execute(
         text(
             """
@@ -334,10 +338,12 @@ def _query_identity_continuity_v1(session: Session, *, tenant_id: uuid.UUID) -> 
             else None
         ),
         "promotable_by_rule_id": count_promotable_link_candidates_by_rule_v1(session, tenant_id=tenant_id),
+        "promotion_diversity": promotion_diversity,
         "promotion_rule_count_green_min": PROMOTION_RULE_COUNT_GREEN_MIN,
         "second_link_type_policy": "deferred_until_prod_evidence_ge_100_edges",
         "primary_metric_keys": [
-            "promotion_rule_count",
+            "promotable_by_rule_id",
+            "promotion_diversity.promotion_diversity_severity",
             "anchors_missing_org_entity_pct",
             "candidate_inflation_ratio",
         ],
@@ -500,9 +506,14 @@ def build_graph_truth_audit_snapshot_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
+    include_connected_components: bool = False,
 ) -> dict[str, Any]:
     """Full graph-truth audit JSON (operators: ``graph_truth_audit_snapshot.py``)."""
-    core = build_semantic_readiness_v1(session, tenant_id=tenant_id)
+    core = build_semantic_readiness_v1(
+        session,
+        tenant_id=tenant_id,
+        include_connected_components=include_connected_components,
+    )
     tid = str(tenant_id)
     candidates = session.execute(
         text(
@@ -514,20 +525,25 @@ def build_graph_truth_audit_snapshot_v1(
         ),
         {"tenant": tid},
     ).mappings().first()
-    unpromoted = session.execute(
-        text(
-            """
-            SELECT COUNT(*)::bigint AS n
-            FROM cortex_org_link_candidates c
-            WHERE c.tenant_id = :tenant
-              AND NOT EXISTS (
-                SELECT 1 FROM cortex_org_links l
-                WHERE l.tenant_id = c.tenant_id AND l.promoted_from_candidate_id = c.id
-              )
-            """
-        ),
-        {"tenant": tid},
-    ).mappings().first()
+    unpromoted_count = 0
+    try:
+        unpromoted = session.execute(
+            text(
+                """
+                SELECT COUNT(*)::bigint AS n
+                FROM cortex_org_link_candidates c
+                WHERE c.tenant_id = :tenant
+                  AND NOT EXISTS (
+                    SELECT 1 FROM cortex_org_links l
+                    WHERE l.tenant_id = c.tenant_id AND l.promoted_from_candidate_id = c.id
+                  )
+                """
+            ),
+            {"tenant": tid},
+        ).mappings().first()
+        unpromoted_count = _to_int(unpromoted["n"]) if unpromoted else 0
+    except Exception:  # noqa: BLE001
+        unpromoted_count = 0
     return {
         **core,
         "surface_kind": "graph_truth_audit_snapshot",
@@ -536,7 +552,7 @@ def build_graph_truth_audit_snapshot_v1(
             "total": _to_int(candidates["total"]) if candidates else 0,
             "distinct_pairs": _to_int(candidates["distinct_pairs"]) if candidates else 0,
         },
-        "unpromoted_candidates": _to_int(unpromoted["n"]) if unpromoted else 0,
+        "unpromoted_candidates": unpromoted_count,
         "repro_command": "python backend/scripts/graph_truth_audit_snapshot.py --tenant <id> --json",
         "companion_command": (
             "python backend/scripts/continuity_audit_snapshot.py --tenant <id> --json"

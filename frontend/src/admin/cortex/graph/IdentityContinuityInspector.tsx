@@ -12,7 +12,7 @@ import {
 } from "./useIdentityContinuityInspector";
 
 type Props = {
-  data: GraphTruthInspectorPayload | undefined;
+  data?: GraphTruthInspectorPayload;
 };
 
 function severityTone(sev: string | undefined): "ok" | "warn" | "bad" {

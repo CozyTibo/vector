@@ -33,6 +33,11 @@ def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
     key = str(tenant_id)
     invalidate_semantic_readiness_cache_v1(tenant_id)
     invalidate_continuity_overview_context_cache_v1(tenant_id)
+    from vector.domains.cortex.pipeline.pipeline_admin_graph_truth_inspector import (
+        invalidate_graph_truth_inspector_cache_v1,
+    )
+
+    invalidate_graph_truth_inspector_cache_v1(tenant_id)
     with _OVERVIEW_CACHE_LOCK:
         _OVERVIEW_CACHE.pop(key, None)
         for suffix in ("execution", "phases", "ingestion", "continuity_bundle", "bootstrap"):

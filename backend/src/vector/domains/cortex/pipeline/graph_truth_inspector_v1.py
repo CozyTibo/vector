@@ -16,6 +16,9 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import (
     build_graph_truth_audit_snapshot_v1,
 )
+from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
+    snapshot_promotion_diversity_observability_v1,
+)
 
 GRAPH_TRUTH_INSPECTOR_SCHEMA_VERSION = 1
 _TOPOLOGY_MIRROR_LINK_TYPE = "org.persona_belongs_to_handle"
@@ -75,9 +78,14 @@ def build_graph_truth_inspector_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
+    include_connected_components: bool = False,
 ) -> dict[str, Any]:
     """Operator graph-truth inspector payload for admin graph tab (Phase G1)."""
-    audit = build_graph_truth_audit_snapshot_v1(session, tenant_id=tenant_id)
+    audit = build_graph_truth_audit_snapshot_v1(
+        session,
+        tenant_id=tenant_id,
+        include_connected_components=include_connected_components,
+    )
     graph_truth = dict(audit.get("graph_truth") or {})
     edge_types = _query_edge_type_distribution_v1(session, tenant_id=tenant_id)
 
@@ -93,6 +101,7 @@ def build_graph_truth_inspector_v1(
     cross_system_pct = (
         round(100.0 * execution_unique_pairs / total_unique, 2) if total_unique > 0 else 0.0
     )
+    promotion_diversity = snapshot_promotion_diversity_observability_v1(session, tenant_id=tenant_id)
 
     return {
         **audit,
@@ -116,6 +125,7 @@ def build_graph_truth_inspector_v1(
             "entities_in_auth_graph_pct": graph_truth.get("entities_in_auth_graph_pct"),
             "entities_isolated": graph_truth.get("entities_isolated"),
             "promotion_rule_count": graph_truth.get("promotion_rule_count"),
+            "promotion_diversity": promotion_diversity,
         },
         "product_laws": {
             "retrieval_org_link_pct_max": audit.get("thresholds", {}).get("retrieval_org_link_pct_green_max"),

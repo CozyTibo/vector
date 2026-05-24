@@ -202,9 +202,15 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
         settings: Annotated[Settings, Depends(settings_dep)],
+        include_connected_components: Annotated[bool, Query(alias="include_connected_components")] = False,
     ) -> AdminCortexGraphTruthInspectorResponse:
         _assert_tenant(db, tenant_id)
-        raw = build_graph_truth_inspector_admin_v1(db, settings, tenant_id=tenant_id)
+        raw = build_graph_truth_inspector_admin_v1(
+            db,
+            settings,
+            tenant_id=tenant_id,
+            include_connected_components=include_connected_components,
+        )
         return AdminCortexGraphTruthInspectorResponse.model_validate(raw)
 
     @pr.get(
