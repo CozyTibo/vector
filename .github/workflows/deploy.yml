@@ -11,10 +11,8 @@ env:
   ECS_CLUSTER: vector-prod
   ECS_SERVICE: vector-backend-service
   ECS_TASK_DEFINITION: vector-backend
-  # Worker: same cluster; task definition family name in ECS (must match console)
   ECS_WORKER_SERVICE: vector-worker-service
   ECS_WORKER_TASK_DEFINITION: vector-backend-worker
-  # Container name in the API task definition (used for run-task overrides)
   ECS_CONTAINER_NAME: backend
   S3_FRONTEND_BUCKET: vector-frontend-prod
 
@@ -27,6 +25,78 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend test dependencies
+        run: |
+          cd backend
+          python -m pip install --quiet -r requirements.txt jsonschema
+
+      - name: Cortex continuity regression (unit, no DB)
+        run: |
+          cd backend
+          VECTOR_SETTINGS_SKIP_DOTENV=1 PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/substrate_pipeline/ \
+            --ignore=tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_recovery.py \
+            --ignore=tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase05_proof.py \
+            tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py \
+            tests/vector/domains/cortex/execution/test_single_tcre_execution_resume_boundary.py \
+            tests/vector/domains/cortex/execution/test_tcre_worker_no_retrieval_materialization_boundary.py \
+            tests/vector/domains/cortex/execution/test_dual_lane_worker.py \
+            tests/vector/domains/cortex/execution/test_dual_lane_lease.py \
+            tests/vector/domains/cortex/execution/test_execution_event_triggers.py \
+            tests/vector/domains/cortex/execution/test_execution_ingest_deferral_monitoring.py \
+            tests/vector/domains/cortex/operational_runtime/test_execution_island_registry.py \
+            tests/vector/domains/cortex/synthesis/test_synthesis_per_island.py \
+            tests/vector/domains/cortex/retrieval/test_retrieval_publish_contract.py \
+            tests/vector/domains/cortex/retrieval/test_retrieval_epoch_scope_alignment.py \
+            tests/vector/domains/cortex/retrieval/test_p1c_retrieval_component_materialization.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_retrieval_registry_epoch.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_phase05_walks_persisted_gate.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase05_walks_persisted.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_graph_hash_autonomous_chain.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_graph_hash_autonomous_chain.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_post_ingestion_fresh_pipeline_run.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_post_ingestion_fresh_pipeline_run.py \
+            tests/vector/domains/cortex/synthesis/test_phase08_empty_scope_truth_gate.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase08_empty_scope_truth.py \
+            tests/vector/domains/cortex/synthesis/test_synthesis_per_island_scope_cap_gate.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c2_synthesis_scope_caps.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_audit_snapshot.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c3_audit_snapshot.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c4_aa_clock_restart.py \
+            tests/vector/domains/cortex/synthesis/test_phase_c5_aa5_synthesis_jobs_completed_gate.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_c5_aa5_synthesis_jobs_completed.py \
+            tests/vector/domains/cortex/pipeline/test_pipeline_admin_operator_kpi.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d1_admin_operator_primary_kpi.py \
+            tests/vector/domains/cortex/ingestion/test_github_ingest_caps_code_defaults.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d2_github_caps_align.py \
+            tests/vector/domains/cortex/operational_runtime/test_graph_density_promotion_convergence_schedule.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d3_graph_promotion_schedule.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d4_permanent_orphan_omission.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d5_legacy_coordinator_enqueue_deletion.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_cleanup_freeze.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: |
+          npm ci
+          npm run build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -42,12 +112,21 @@ jobs:
       - name: Set image tag
         run: echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
 
-      - name: Build and push backend image
+      - name: Build and push API and worker images (parallel)
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f backend/Dockerfile backend
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          set -euo pipefail
+          docker build -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" -f backend/Dockerfile backend &
+          PID_API=$!
+          docker build -t "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" -f backend/worker.Dockerfile backend &
+          PID_WORKER=$!
+          wait "$PID_API" "$PID_WORKER"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" &
+          PUSH_API=$!
+          docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" &
+          PUSH_WORKER=$!
+          wait "$PUSH_API" "$PUSH_WORKER"
 
       - name: Get current task definition
         run: |
@@ -159,32 +238,22 @@ jobs:
           fi
           echo "Migrations applied successfully."
 
-      - name: Deploy to ECS
+      - name: Deploy API and worker to ECS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
+          set -euo pipefail
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_SERVICE" \
             --task-definition "$REGISTERED_TASK_DEFINITION_ARN" \
             --force-new-deployment \
             --region "$AWS_REGION"
-
-      - name: Build and push worker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          docker build -t "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" -f backend/worker.Dockerfile backend
-          docker push "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG"
-
-      - name: Get current worker task definition
-        run: |
           aws ecs describe-task-definition \
             --task-definition "$ECS_WORKER_TASK_DEFINITION" \
             --region "$AWS_REGION" \
             --query taskDefinition \
             > worker-task-def.json
-
-      - name: Clean worker task definition
-        run: |
           jq 'del(
             .taskDefinitionArn,
             .revision,
@@ -194,31 +263,16 @@ jobs:
             .registeredAt,
             .registeredBy
           )' worker-task-def.json > clean-worker-task-def.json
-
-      - name: Align GitHub ingest caps on worker task definition (D2)
-        run: |
           python backend/scripts/ecs_align_github_ingest_caps.py \
             clean-worker-task-def.json worker-task-def-caps.json
-
-      - name: Update worker image in task definition
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
           jq --arg IMAGE "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
             '.containerDefinitions[0].image = $IMAGE' \
             worker-task-def-caps.json > new-worker-task-def.json
-
-      - name: Register new worker task definition
-        run: |
-          WORKER_TASK_DEF_ARN=$(aws ecs register-task-definition \
+          REGISTERED_WORKER_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-worker-task-def.json \
             --region "$AWS_REGION" \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
-          echo "REGISTERED_WORKER_TASK_DEFINITION_ARN=$WORKER_TASK_DEF_ARN" >> "$GITHUB_ENV"
-
-      - name: Deploy worker to ECS
-        run: |
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_WORKER_SERVICE" \
@@ -250,21 +304,6 @@ jobs:
           test "$api_tag" = "$IMAGE_TAG"
           test "$worker_tag" = "$IMAGE_TAG"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Build frontend
-        working-directory: frontend
-        env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-        run: |
-          npm ci
-          npm run build
-
       - name: Upload frontend to S3
         run: |
           aws s3 sync frontend/dist "s3://$S3_FRONTEND_BUCKET" \
@@ -289,4 +328,3 @@ jobs:
             --distribution-id "$DISTRIBUTION_ID" \
             --paths "/*" \
             --region "$AWS_REGION"
-
