@@ -315,3 +315,38 @@ class OperatorExecutionThreadResponse(BaseModel):
     tcre_jobs: list[dict[str, Any]]
     index_entries: list[dict[str, Any]]
     generated_at_utc: datetime
+
+
+class OperatorPeopleDirectoryResponse(BaseModel):
+    surface_kind: Literal["operator_people_directory_v1"] = "operator_people_directory_v1"
+    schema_version: int
+    tenant_id: str
+    people: list[dict[str, Any]]
+    total: int
+    raw_entity_count: int
+    limit: int
+    offset: int
+    generated_at_utc: datetime
+
+
+class OperatorPersonProfileResponse(BaseModel):
+    surface_kind: Literal["operator_person_profile_v1"] = "operator_person_profile_v1"
+    schema_version: int
+    tenant_id: str
+    person_id: str
+    entity_ids: list[str]
+    display_name: str | None = None
+    email: str | None = None
+    title: str | None = None
+    systems: list[str] = Field(default_factory=list)
+    accounts: list[dict[str, Any]] = Field(default_factory=list)
+    primary_identity: dict[str, Any] | None = None
+    related_people: list[dict[str, Any]] = Field(default_factory=list)
+    authoritative_link_count: int = 0
+    activity: list[dict[str, Any]] = Field(default_factory=list)
+    activity_total: int = 0
+    work_summary: dict[str, int] = Field(default_factory=dict)
+    retrieval_entries: list[dict[str, Any]] = Field(default_factory=list)
+    retrieval_total: int = 0
+    evidence_anchor_count: int | None = None
+    generated_at_utc: datetime

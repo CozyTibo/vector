@@ -20,12 +20,18 @@ from vector.contracts.operator_admin import (
     OperatorGraphSnapshotResponse,
     OperatorIslandsListResponse,
     OperatorOverviewResponse,
+    OperatorPeopleDirectoryResponse,
+    OperatorPersonProfileResponse,
     OperatorQueuesResponse,
     OperatorRetrievalEntriesResponse,
     OperatorRetrievalEpochsResponse,
     OperatorRetrievalLineageResponse,
     OperatorRuntimeResponse,
     OperatorSynthesisJobsResponse,
+)
+from vector.domains.cortex.identity.people_directory_v1 import (
+    build_people_directory_v1,
+    build_person_profile_v1,
 )
 from vector.domains.cortex.pipeline.admin_graph_component_snapshot import (
     enqueue_graph_component_snapshot_refresh_v1,
@@ -327,5 +333,39 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         return OperatorExecutionThreadResponse.model_validate(raw)
+
+    @op.get("/people", response_model=OperatorPeopleDirectoryResponse)
+    def get_operator_people_directory(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> OperatorPeopleDirectoryResponse:
+        _assert_tenant(db, tenant_id)
+        with admin_request_timing(endpoint="operator.people.directory", tenant_id=tenant_id):
+            raw = build_people_directory_v1(db, tenant_id=tenant_id, limit=limit, offset=offset)
+        return OperatorPeopleDirectoryResponse.model_validate(raw)
+
+    @op.get("/people/{person_id}", response_model=OperatorPersonProfileResponse)
+    def get_operator_person_profile(
+        tenant_id: uuid.UUID,
+        person_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        activity_limit: Annotated[int, Query(ge=1, le=200)] = 80,
+    ) -> OperatorPersonProfileResponse:
+        _assert_tenant(db, tenant_id)
+        try:
+            with admin_request_timing(endpoint="operator.people.profile", tenant_id=tenant_id):
+                raw = build_person_profile_v1(
+                    db,
+                    tenant_id=tenant_id,
+                    entity_id=person_id,
+                    activity_limit=activity_limit,
+                )
+        except ValueError as exc:
+            if str(exc) == "person_not_found":
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return OperatorPersonProfileResponse.model_validate(raw)
 
     router.include_router(op)

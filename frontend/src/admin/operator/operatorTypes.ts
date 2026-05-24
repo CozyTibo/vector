@@ -264,3 +264,74 @@ export type OperatorExecutionThread = {
   index_entries: Record<string, unknown>[];
   generated_at_utc: string;
 };
+
+export type OperatorPersonRow = {
+  person_id: string;
+  entity_ids: string[];
+  display_name: string | null;
+  email: string | null;
+  systems: string[];
+  linked_account_count: number;
+  in_auth_graph: boolean;
+  last_seen_at: string | null;
+  title: string | null;
+};
+
+export type OperatorPeopleDirectory = {
+  surface_kind: "operator_people_directory_v1";
+  schema_version: number;
+  tenant_id: string;
+  people: OperatorPersonRow[];
+  total: number;
+  raw_entity_count: number;
+  limit: number;
+  offset: number;
+  generated_at_utc: string;
+};
+
+export type OperatorPersonActivity = {
+  activity_id: string;
+  kind: string;
+  connector: string;
+  title: string;
+  occurred_at: string | null;
+  raw_record_id: number | null;
+  external_id: string | null;
+  resource_type: string | null;
+  canonical_entity_id: string | null;
+};
+
+export type OperatorPersonProfile = {
+  surface_kind: "operator_person_profile_v1";
+  schema_version: number;
+  tenant_id: string;
+  person_id: string;
+  entity_ids: string[];
+  display_name: string | null;
+  email: string | null;
+  title: string | null;
+  systems: string[];
+  accounts: Array<{
+    system: string;
+    projection_kind: string;
+    detail: string;
+    entity_id: string;
+    is_primary: boolean;
+  }>;
+  primary_identity: Record<string, unknown> | null;
+  related_people: Array<{
+    person_id: string;
+    display_name: string | null;
+    email: string | null;
+    link_type: string | null;
+    rule_id: string | null;
+  }>;
+  authoritative_link_count: number;
+  activity: OperatorPersonActivity[];
+  activity_total: number;
+  work_summary: Record<string, number>;
+  retrieval_entries: Record<string, unknown>[];
+  retrieval_total: number;
+  evidence_anchor_count: number | null;
+  generated_at_utc: string;
+};

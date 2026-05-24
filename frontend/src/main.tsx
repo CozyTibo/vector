@@ -15,6 +15,8 @@ import OperatorRetrievalInspectPage from "./admin/operator/inspect/OperatorRetri
 import OperatorRetrievalLineageInspectPage from "./admin/operator/inspect/OperatorRetrievalLineageInspectPage.tsx";
 import OperatorSynthesisInspectPage from "./admin/operator/inspect/OperatorSynthesisInspectPage.tsx";
 import OperatorIslandsInspectPage from "./admin/operator/inspect/OperatorIslandsInspectPage.tsx";
+import OperatorPeoplePage from "./admin/operator/OperatorPeoplePage.tsx";
+import OperatorPersonProfilePage from "./admin/operator/OperatorPersonProfilePage.tsx";
 import OperatorOverviewPage from "./admin/operator/OperatorOverviewPage.tsx";
 import OperatorRuntimePage from "./admin/operator/OperatorRuntimePage.tsx";
 import OperatorQueuesPage from "./admin/operator/OperatorQueuesPage.tsx";
@@ -102,6 +104,8 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="overview" element={<OperatorOverviewPage />} />
                 <Route path="runtime" element={<OperatorRuntimePage />} />
                 <Route path="queues" element={<OperatorQueuesPage />} />
+                <Route path="people" element={<OperatorPeoplePage />} />
+                <Route path="people/:personId" element={<OperatorPersonProfilePage />} />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
                 <Route path="canonical" element={<AdminCortexCanonicalLayout />}>
                   <Route index element={<OperatorCanonicalPage />} />

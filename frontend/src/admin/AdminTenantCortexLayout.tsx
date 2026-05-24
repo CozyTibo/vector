@@ -4,6 +4,7 @@ const CORTEX_SECTIONS: Array<{ key: string; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "runtime", label: "Runtime" },
   { key: "queues", label: "Queues" },
+  { key: "people", label: "People" },
   { key: "inspect", label: "Inspect" },
   { key: "ingestion", label: "Ingestion" },
   { key: "canonical", label: "Canonical" },

@@ -16,6 +16,8 @@ import type {
   OperatorRuntime,
   OperatorSynthesisJobs,
   OperatorExecutionThread,
+  OperatorPeopleDirectory,
+  OperatorPersonProfile,
 } from "./operatorTypes";
 
 async function assertOk(res: Response, label: string): Promise<void> {
@@ -212,5 +214,36 @@ export async function fetchOperatorExecutionThread(
     throw new Error("search_query_required");
   }
   await assertOk(res, "operator execution thread");
+  return res.json();
+}
+
+export async function fetchOperatorPeopleDirectory(
+  tenantId: string,
+  params: { limit?: number; offset?: number } = {},
+): Promise<OperatorPeopleDirectory> {
+  const search = new URLSearchParams();
+  if (params.limit != null) search.set("limit", String(params.limit));
+  if (params.offset != null) search.set("offset", String(params.offset));
+  const qs = search.toString();
+  const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/people${qs ? `?${qs}` : ""}`);
+  await assertOk(res, "operator people directory");
+  return res.json();
+}
+
+export async function fetchOperatorPersonProfile(
+  tenantId: string,
+  personId: string,
+  params: { activityLimit?: number } = {},
+): Promise<OperatorPersonProfile> {
+  const search = new URLSearchParams();
+  if (params.activityLimit != null) search.set("activity_limit", String(params.activityLimit));
+  const qs = search.toString();
+  const res = await adminFetch(
+    `/admin/tenants/${tenantId}/cortex/operator/people/${personId}${qs ? `?${qs}` : ""}`,
+  );
+  if (res.status === 404) {
+    throw new Error("person_not_found");
+  }
+  await assertOk(res, "operator person profile");
   return res.json();
 }
