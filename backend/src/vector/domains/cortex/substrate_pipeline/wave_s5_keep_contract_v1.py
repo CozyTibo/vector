@@ -43,14 +43,15 @@ KEEP_SURFACES_V1: Final[tuple[dict[str, str], ...]] = (
     {
         "key": "identity_continuity_inspector",
         "kind": "admin_inspector",
-        "route": "pipeline/identity-continuity-inspector",
+        "route": "identity/continuity-inspector",
+        "route_module": "admin.py",
         "why": "Debug surface — cross-system identity promotions",
     },
     {
-        "key": "graph_truth_inspector",
+        "key": "operator_graph_snapshot",
         "kind": "admin_inspector",
-        "route": "pipeline/graph-truth-inspector",
-        "why": "Debug surface — unique pairs, dup factor, topology",
+        "route": "operator/snapshots/graph",
+        "why": "Debug surface — materialized graph snapshot (R6 operator inspect)",
     },
 )
 
@@ -85,8 +86,20 @@ def verify_s5_3_keep_contract_v1(*, repo_root: Path | None = None) -> dict[str, 
             if not ok:
                 errors.append(f"missing_script:{key}")
         elif "route" in item:
+            route_module = item.get("route_module", "admin_cortex_pipeline.py")
             route_file = (
-                root / "backend" / "src" / "vector" / "api" / "http" / "routes" / "admin_cortex_pipeline.py"
+                root
+                / "backend"
+                / "src"
+                / "vector"
+                / "api"
+                / "http"
+                / "routes"
+                / (
+                    "admin_cortex_operator.py"
+                    if item["route"].startswith("operator/")
+                    else route_module
+                )
             )
             needle = item["route"].split("/")[-1]
             ok = route_file.is_file() and needle in route_file.read_text(encoding="utf-8")

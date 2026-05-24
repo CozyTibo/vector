@@ -44,11 +44,6 @@ def evaluate_fix5_admin_operator_routes_v1() -> tuple[bool, str]:
     if bypass_errors:
         return False, f"admin_bypass:{','.join(bypass_errors)}"
 
-    ort = importlib.import_module("vector.api.http.routes.admin_cortex_operational_runtime")
-    ort_src = inspect.getsource(ort.register_cortex_operational_runtime_routes)
-    if "graph-density-promotion/run" not in ort_src:
-        return False, "missing_graph_density_promotion_run_route"
-
     admin_mod = importlib.import_module("vector.api.http.routes.admin")
     admin_src = inspect.getsource(admin_mod.build_admin_router)
     if "identity/replay-jobs/run" not in admin_src:

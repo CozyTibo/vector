@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vector.domains.cortex.pipeline.pipeline_admin_operator_kpi import (
-    PHASE_D1_OPERATOR_KPI_SCHEMA_VERSION,
-)
 from vector.domains.cortex.substrate_pipeline.continuity_p0_phase_d1_admin_operator_primary_kpi import (
+    PHASE_D1_OPERATOR_KPI_SCHEMA_VERSION,
     evaluate_p0_d1_admin_operator_primary_kpi_proof_v1,
     verify_d1_admin_operator_primary_kpi_wiring_v1,
 )

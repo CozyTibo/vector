@@ -42,7 +42,6 @@ _ADMIN_ROUTE_MODULES_V1: Final[tuple[str, ...]] = (
     "vector.api.http.routes.admin_substrate_pipeline",
     "vector.api.http.routes.admin_cortex_retrieval",
     "vector.api.http.routes.admin_cortex_synthesis",
-    "vector.api.http.routes.admin_cortex_operational_runtime",
 )
 
 

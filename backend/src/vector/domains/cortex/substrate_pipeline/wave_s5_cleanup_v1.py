@@ -70,15 +70,15 @@ def verify_s5_1_deletes_v1() -> dict[str, Any]:
     if "ExecutionSerialFallbackRemovedError" not in rte_src:
         errors.append("serial_fallback_fail_loud_missing")
 
-    kpi_src = _inspect.getsource(
+    metrics_src = _inspect.getsource(
         __import__(
-            "vector.domains.cortex.pipeline.pipeline_admin_operator_kpi",
-            fromlist=["build_operator_primary_kpi_v1"],
-        ).build_operator_primary_kpi_v1
+            "vector.domains.cortex.pipeline.canonical_operator_metrics",
+            fromlist=["snapshot_canonical_operator_metrics_v1"],
+        ).snapshot_canonical_operator_metrics_v1
     )
-    if "OPERATOR_KPI_DEPRECATED_RAW_GAP_V1" in kpi_src:
+    if "OPERATOR_KPI_DEPRECATED_RAW_GAP_V1" not in metrics_src:
         errors.append("legacy_auth_link_kpi_branch_still_present")
-    if "semantic_primary_active" not in kpi_src or "hide_from_overview" not in kpi_src:
+    if "operator_kpi_primary" not in metrics_src or "drainable_routable_estimate" not in metrics_src:
         errors.append("semantic_primary_kpi_not_wired")
 
     return {

@@ -60,12 +60,14 @@ def evaluate_fix6_github_ingest_caps_v1(
 
 
 def evaluate_fix7_admin_metric_truth_v1() -> tuple[bool, str]:
-    """Fix 7: canonical completeness + pipeline overview expose drainable truth."""
+    """Fix 7: canonical completeness + operator overview expose drainable truth."""
     from vector.domains.cortex.completeness import canonical_completeness_projection as can_mod
-    from vector.domains.cortex.pipeline import pipeline_admin_overview as pipe_mod
+    from vector.domains.cortex.pipeline import canonical_operator_metrics as metrics_mod
+    from vector.domains.cortex.pipeline import operator_admin_overview as op_mod
 
     can_src = inspect.getsource(can_mod.project_canonical_completeness_v1)
-    pipe_mod_src = inspect.getsource(pipe_mod)
+    op_src = inspect.getsource(op_mod)
+    metrics_src = inspect.getsource(metrics_mod)
     required = (
         "drainable_routable_estimate",
         "untreated_routable_estimate",
@@ -75,10 +77,12 @@ def evaluate_fix7_admin_metric_truth_v1() -> tuple[bool, str]:
     missing = [k for k in required if k not in can_src]
     if missing:
         return False, f"canonical_projection_missing:{','.join(missing)}"
-    if "_canonical_operator_backlog_count" not in pipe_mod_src:
-        return False, "pipeline_overview_missing_drainable_backlog_helper"
-    if "drainable_routable_estimate" not in pipe_mod_src:
-        return False, "pipeline_overview_missing_drainable_backlog_wiring"
+    if "_canonical_operator_backlog_count" not in metrics_src:
+        return False, "operator_metrics_missing_drainable_backlog_helper"
+    if "build_operator_overview_v1" not in op_src:
+        return False, "operator_overview_missing_v1_builder"
+    if "drainable_routable_estimate" not in metrics_src:
+        return False, "operator_metrics_missing_drainable_backlog_wiring"
     return True, "admin_metric_truth_wired"
 
 

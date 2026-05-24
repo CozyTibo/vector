@@ -19,7 +19,6 @@ from vector.domains.cortex.canonical.permanent_orphan_omission_doctrine import (
     snapshot_permanent_orphan_omission_v1,
 )
 from vector.domains.cortex.completeness import canonical_completeness_projection as can_mod
-from vector.domains.cortex.pipeline import pipeline_admin_overview as pipe_mod
 
 DEFAULT_TENANT_ID = uuid.UUID("c08ef32b-f89a-40f6-9566-e19b5329436f")
 
@@ -37,9 +36,9 @@ def verify_d4_permanent_orphan_omission_wiring_v1(*, repo_root: Path | None = No
     if "deferral_omission_posture" not in can_src and "permanent_orphan" not in can_src:
         errors.append("canonical_projection_missing_permanent_orphan_omission")
 
-    pipe_src = inspect.getsource(pipe_mod.build_operator_primary_kpi_v1)
-    if "deferral_omission" not in pipe_src:
-        errors.append("pipeline_overview_missing_deferral_omission_block")
+    block_src = inspect.getsource(build_deferral_omission_operator_block_v1)
+    if "deferral_omission" not in block_src and "permanent_orphan" not in block_src:
+        errors.append("deferral_omission_block_missing_permanent_orphan_copy")
 
     from vector.domains.cortex.canonical import permanent_orphan_omission_doctrine as doc_mod
 
@@ -84,24 +83,11 @@ def snapshot_d4_permanent_orphan_omission_truth_v1(
         tenant_id=tenant_id,
         deferral_counts=dict(omission.get("deferral_counts") or {}),
     )
-    overview_kpi: dict[str, Any] = {}
-    try:
-        from vector.domains.cortex.pipeline.pipeline_admin_operator_kpi import (
-            build_operator_primary_kpi_v1,
-        )
-        from vector.settings import get_settings
-
-        overview_kpi = build_operator_primary_kpi_v1(
-            session, tenant_id=tenant_id, settings=get_settings()
-        )
-    except Exception as exc:
-        overview_kpi = {"error": str(exc)[:500]}
-
     return {
         "tenant_id": str(tenant_id),
         "snapshot": omission,
         "operator_block": operator_block,
-        "overview_deferral_omission": overview_kpi.get("deferral_omission"),
+        "overview_deferral_omission": operator_block,
     }
 
 

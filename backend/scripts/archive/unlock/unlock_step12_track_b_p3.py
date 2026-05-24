@@ -38,7 +38,9 @@ from vector.domains.cortex.canonical.forward_progress.operator_snapshot import (
 from vector.domains.cortex.completeness.canonical_completeness_projection import (  # noqa: E402
     project_canonical_completeness_v1,
 )
-from vector.domains.cortex.pipeline.pipeline_admin_overview import build_pipeline_overview_v1  # noqa: E402
+from vector.domains.cortex.pipeline.canonical_operator_metrics import (  # noqa: E402
+    snapshot_canonical_operator_metrics_v1,
+)
 from vector.domains.cortex.retrieval.retrieval_index_materialization import (  # noqa: E402
     get_published_index_epoch_v1,
 )
@@ -154,11 +156,10 @@ def main() -> dict:
         lease = _lease_snapshot(db, TID)
         out["lease"] = lease
 
-        overview = build_pipeline_overview_v1(db, settings, tenant_id=TID)
-        canonical_phase = next((p for p in overview.get("phases") or [] if p.get("phase") == "canonical"), {})
+        op_metrics = snapshot_canonical_operator_metrics_v1(db, tenant_id=TID)
         out["pipeline_overview_canonical"] = {
-            "backlog_count": canonical_phase.get("backlog_count"),
-            "status": canonical_phase.get("status"),
+            "backlog_count": op_metrics.get("drainable_routable_estimate"),
+            "status": None,
         }
 
         pipeline_run_id = _resolve_pipeline_run_id(db, TID)

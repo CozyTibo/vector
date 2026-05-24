@@ -5042,10 +5042,4 @@ def build_admin_router() -> APIRouter:
 
     register_cortex_synthesis_routes(r)
 
-    from vector.api.http.routes.admin_cortex_operational_runtime import (
-        register_cortex_operational_runtime_routes,
-    )
-
-    register_cortex_operational_runtime_routes(r)
-
     return r

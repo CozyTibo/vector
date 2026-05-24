@@ -32,14 +32,25 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_identity_continuity_inspector_tenant(client: TestClient, db_session: Session) -> None:
+def test_identity_continuity_inspector_pipeline_route_removed(
+    client: TestClient, db_session: Session
+) -> None:
     tid = _tenant(db_session)
     db_session.commit()
     res = client.get(f"/admin/tenants/{tid}/cortex/pipeline/identity-continuity-inspector")
+    assert res.status_code == 404
+
+
+def test_identity_continuity_inspector_search_surface(client: TestClient, db_session: Session) -> None:
+    tid = _tenant(db_session)
+    db_session.commit()
+    res = client.get(
+        f"/admin/tenants/{tid}/cortex/identity/continuity-inspector/search",
+        params={"github_login": "octocat"},
+    )
     assert res.status_code == 200
     body = res.json()
-    assert body["surface_kind"] == "identity_continuity_inspector"
-    assert "identity_continuity" in body
+    assert body["surface_kind"] == "identity_continuity_search"
 
 
 def test_identity_continuity_search_requires_param(client: TestClient, db_session: Session) -> None:

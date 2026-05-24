@@ -43,12 +43,20 @@ def invalidate_cortex_ingestion_admin_caches_v1(tenant_id: uuid.UUID) -> None:
     from vector.domains.cortex.ingestion.admin_recent_raw import (
         invalidate_recent_ingestion_runs_cache_v1,
     )
-    from vector.domains.cortex.pipeline.pipeline_admin_overview import (
-        invalidate_pipeline_overview_cache_v1,
+    from vector.domains.cortex.pipeline.operator_admin_overview import (
+        invalidate_operator_overview_cache_v1,
+    )
+    from vector.domains.cortex.pipeline.operator_admin_queues import (
+        invalidate_operator_queues_cache_v1,
+    )
+    from vector.domains.cortex.pipeline.operator_admin_runtime import (
+        invalidate_operator_runtime_cache_v1,
     )
 
     invalidate_recent_ingestion_runs_cache_v1(tenant_id)
-    invalidate_pipeline_overview_cache_v1(tenant_id)
+    invalidate_operator_overview_cache_v1(tenant_id)
+    invalidate_operator_runtime_cache_v1(tenant_id)
+    invalidate_operator_queues_cache_v1(tenant_id)
 
 
 def _operator_scheduler_label(
