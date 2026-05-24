@@ -633,7 +633,9 @@ ORDER BY created_at DESC LIMIT 3;
 
 ---
 
-# Phase S4 — Synthesis stabilization
+# Phase S4 — Synthesis stabilization ✅
+
+**Status:** S4.1–S4.6 complete (pushed to `main`).
 
 ## Objective
 

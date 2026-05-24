@@ -14,12 +14,12 @@ from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
 
 def test_aa5_pass_when_jobs_completed() -> None:
     gate = evaluate_aa5_synthesis_jobs_completed_gate_v1(
-        {"jobs_completed": 2, "scope_empty": False},
+        {"jobs_completed": 2, "useful_artifacts_published": 1, "scope_empty": False},
         phase_08_started_at="2026-05-23T00:00:00+00:00",
         phase_08_status="completed",
     )
     assert gate["verdict"] == "PASS"
-    assert gate["detail"] == "synthesis_jobs_completed"
+    assert gate["detail"] == "synthesis_jobs_completed_with_useful_artifact"
 
 
 def test_aa5_fail_started_only_under_strict(monkeypatch) -> None:
