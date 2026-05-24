@@ -1035,23 +1035,36 @@ Frontend:
 
 ---
 
-## Phase R2 — Runtime tab + unified actions (1 week)
+## Phase R2 — Runtime tab + unified actions (1 week) ✅ **Complete (2026-05-24)**
 
 Backend:
 
-- `GET /operator/runtime` wrapping `build_execution_inspect_v1`
-- `POST /operator/actions` merging `pipeline_run_v1` + execution POSTs
-- Audit log table or use existing transition log for actions
+- ✅ `GET /operator/runtime` via `build_operator_runtime_v1` (lean — no island registry scan; 15s cache; paginated transitions)
+- ✅ `POST /operator/actions` via `execute_operator_action_v1` (pipeline run + execution POSTs + retrieval bootstrap)
+- ✅ Operator actions audited via `CortexExecutionTransitionLog` (`operator_action:*` trigger)
+- ✅ Legacy `pipeline/run` and execution POST routes marked `@deprecated`
 
 Frontend:
 
-- `OperatorRuntimePage` with timeline + actions
-- Move flush/restart from scattered buttons to Runtime
-- `ActionPanel` on Overview → thin client for safe actions only
+- ✅ `OperatorRuntimePage` with lease truth, dual-lane facts, transition timeline, queue hints, full action panel
+- ✅ `OperatorActionPanel` shared component — compact on Overview (safe actions), full on Runtime (destructive)
+- ✅ Runtime tab in cortex nav when `VITE_CORTEX_ADMIN_V2=true`
+- ✅ Overview compact actions call `POST /operator/actions` (not legacy `/pipeline/run`)
 
-**Deletes:** `PipelineActions` flush on overview (move to Runtime).
+**Deliverables:**
 
-**Operator value:** Can see **why blocked** via transition log without SQL.
+| Area | Path / note |
+|------|-------------|
+| Runtime builder | `backend/src/vector/domains/cortex/pipeline/operator_admin_runtime.py` |
+| Actions executor | `backend/src/vector/domains/cortex/pipeline/operator_admin_actions.py` |
+| Routes | `GET /operator/runtime`, `POST /operator/actions` |
+| Contracts | `OperatorRuntimeResponse`, `OperatorActionRequest/Response` in `operator_admin.py` |
+| Frontend | `OperatorRuntimePage.tsx`, `OperatorActionPanel.tsx`, `AdminCortexRuntimeGateway.tsx` |
+| Tests | `test_admin_cortex_operator_r2.py` |
+
+**Deletes (v2 path):** `PipelineActions` flush on overview — moved to Runtime action panel.
+
+**Operator value:** Can see **why blocked** via transition log without SQL; unified mutations via one endpoint.
 
 ---
 
@@ -1177,4 +1190,4 @@ R0 guardrails
 
 ---
 
-**End of refactor plan.** R0–R1 complete; next step: R2 Runtime tab (enable flags in staging first).
+**End of refactor plan.** R0–R2 complete; next step: R3 Inspector hub (enable flags in staging first).

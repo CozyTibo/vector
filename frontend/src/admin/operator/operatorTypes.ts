@@ -65,3 +65,81 @@ export type OperatorOverview = {
   runnable_connectors: string[];
   query_groups_used: number;
 };
+
+export type OperatorRuntimeLease = {
+  status: string | null;
+  fsm_state: string | null;
+  phase_cursor: string | null;
+  obligation_epoch: number | null;
+  target_epoch: number | null;
+  pipeline_run_id: string | null;
+  block_reason_code: string | null;
+  block_detail: unknown;
+  last_error: string | null;
+  canonical_lane_status: string | null;
+  execution_lane_status: string | null;
+};
+
+export type OperatorRuntimeTransition = {
+  from_state: string;
+  to_state: string;
+  trigger: string;
+  gate_result: string | null;
+  receipt_hash: string | null;
+  pipeline_run_id: string | null;
+  created_at: string;
+  detail_json: Record<string, unknown>;
+};
+
+export type OperatorDualLane = {
+  dual_lane_enabled?: boolean;
+  canonical_lane?: Record<string, unknown> | null;
+  execution_lane?: Record<string, unknown> | null;
+};
+
+export type OperatorRuntime = {
+  surface_kind: "operator_runtime_v1";
+  tenant_id: string;
+  generated_at_utc: string;
+  lease: OperatorRuntimeLease | null;
+  dual_lane: OperatorDualLane;
+  progression: Record<string, unknown>;
+  transitions: OperatorRuntimeTransition[];
+  transition_total: number;
+  transition_limit: number;
+  transition_offset: number;
+  queue_counts: {
+    deferral_retry_ready: number;
+    synthesis_failed: number;
+    tcre_queued: number;
+  };
+};
+
+export type OperatorActionKind =
+  | "run_from_ingestion"
+  | "run_from_phase"
+  | "restart_execution"
+  | "clear_derived"
+  | "flush_derived"
+  | "flush_all"
+  | "rebuild_retrieval_index"
+  | "p0_recover";
+
+export type OperatorActionRequest = {
+  action: OperatorActionKind;
+  start_phase?: string;
+  from_phase?: string;
+  confirmation?: string;
+  force?: boolean;
+  break_glass?: boolean;
+  scope?: string;
+  pipeline_run_id?: string;
+  p0_strategy?: "new_run" | "recover_in_place";
+};
+
+export type OperatorActionResponse = {
+  surface_kind: "operator_action_v1";
+  action: OperatorActionKind;
+  tenant_id: string;
+  result: Record<string, unknown>;
+};

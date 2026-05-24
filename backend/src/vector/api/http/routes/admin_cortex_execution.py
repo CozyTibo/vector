@@ -35,7 +35,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
 
-    @er.get("/state")
+    @er.get("/state", deprecated=True)
     def get_execution_state(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -72,7 +72,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
             "transitions": body.get("transitions") or [],
         }
 
-    @er.post("/restart")
+    @er.post("/restart", deprecated=True)
     def post_execution_restart(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -97,7 +97,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    @er.post("/clear")
+    @er.post("/clear", deprecated=True)
     def post_execution_clear(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -165,7 +165,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
             pipeline_run_id=pipeline_run_id,
         )
 
-    @er.post("/continuity-p0-recover")
+    @er.post("/continuity-p0-recover", deprecated=True)
     def post_continuity_p0_recover(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -188,7 +188,7 @@ def register_cortex_execution_routes(router: APIRouter) -> None:
         db.commit()
         return out
 
-    @er.post("/rerun")
+    @er.post("/rerun", deprecated=True)
     def post_execution_rerun(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],

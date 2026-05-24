@@ -264,7 +264,7 @@ def register_cortex_pipeline_routes(router: APIRouter) -> None:
         raw = build_identity_continuity_diagnosis_v1(db, tenant_id=tenant_id)
         return AdminCortexIdentityContinuityDiagnosisResponse.model_validate(raw)
 
-    @pr.post("/run", response_model=AdminCortexPipelineRunResponse)
+    @pr.post("/run", response_model=AdminCortexPipelineRunResponse, deprecated=True)
     def post_pipeline_run(
         tenant_id: uuid.UUID,
         body: AdminCortexPipelineRunRequest,

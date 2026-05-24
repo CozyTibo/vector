@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Literal
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OperatorStatusBanner(BaseModel):
@@ -101,3 +102,83 @@ class AdminBuildInfoResponse(BaseModel):
     git_sha_short: str | None = None
     cortex_admin_v2_enabled: bool = False
     env: str = "development"
+
+
+class OperatorRuntimeLease(BaseModel):
+    status: str | None = None
+    fsm_state: str | None = None
+    phase_cursor: str | None = None
+    obligation_epoch: int | None = None
+    target_epoch: int | None = None
+    pipeline_run_id: str | None = None
+    block_reason_code: str | None = None
+    block_detail: Any | None = None
+    last_error: str | None = None
+    canonical_lane_status: str | None = None
+    execution_lane_status: str | None = None
+
+
+class OperatorRuntimeTransition(BaseModel):
+    from_state: str
+    to_state: str
+    trigger: str
+    gate_result: str | None = None
+    receipt_hash: str | None = None
+    pipeline_run_id: str | None = None
+    created_at: datetime
+    detail_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class OperatorRuntimeResponse(BaseModel):
+    surface_kind: Literal["operator_runtime_v1"] = "operator_runtime_v1"
+    tenant_id: str
+    generated_at_utc: datetime
+    lease: OperatorRuntimeLease | None = None
+    dual_lane: dict[str, Any] = Field(default_factory=dict)
+    progression: dict[str, Any] = Field(default_factory=dict)
+    transitions: list[OperatorRuntimeTransition]
+    transition_total: int
+    transition_limit: int
+    transition_offset: int
+    queue_counts: OperatorQueueCounts
+
+
+OperatorActionKind = Literal[
+    "run_from_ingestion",
+    "run_from_phase",
+    "restart_execution",
+    "clear_derived",
+    "flush_derived",
+    "flush_all",
+    "rebuild_retrieval_index",
+    "p0_recover",
+]
+
+
+class OperatorActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: OperatorActionKind
+    start_phase: Literal[
+        "canonical",
+        "identity",
+        "graph",
+        "reconstruction",
+        "retrieval",
+        "synthesis",
+    ] | None = None
+    from_phase: str | None = None
+    confirmation: str | None = None
+    force: bool = False
+    break_glass: bool = False
+    scope: str | None = None
+    pipeline_run_id: UUID | None = None
+    p0_strategy: Literal["new_run", "recover_in_place"] = "new_run"
+    source_pipeline_run_id: UUID | None = None
+
+
+class OperatorActionResponse(BaseModel):
+    surface_kind: Literal["operator_action_v1"] = "operator_action_v1"
+    action: OperatorActionKind
+    tenant_id: str
+    result: dict[str, Any] = Field(default_factory=dict)
