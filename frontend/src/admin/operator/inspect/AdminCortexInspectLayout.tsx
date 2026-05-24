@@ -5,6 +5,9 @@ const INSPECT_LENSES = [
   { key: "identity", label: "Identity" },
   { key: "graph", label: "Graph" },
   { key: "islands", label: "Islands" },
+  { key: "retrieval", label: "Retrieval" },
+  { key: "synthesis", label: "Synthesis" },
+  { key: "execution", label: "Execution" },
 ] as const;
 
 function tabCls(isActive: boolean): string {

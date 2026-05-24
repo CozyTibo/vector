@@ -266,3 +266,53 @@ class OperatorIslandsListResponse(BaseModel):
     tenant_id: str
     island_count: int
     islands: list[dict[str, Any]]
+
+
+class OperatorRetrievalEpochsResponse(BaseModel):
+    surface_kind: Literal["operator_retrieval_epochs_v1"] = "operator_retrieval_epochs_v1"
+    tenant_id: str
+    epochs: list[dict[str, Any]]
+    limit: int
+    generated_at_utc: datetime
+
+
+class OperatorRetrievalEntriesResponse(BaseModel):
+    surface_kind: Literal["operator_retrieval_entries_v1"] = "operator_retrieval_entries_v1"
+    tenant_id: str
+    query: dict[str, Any] = Field(default_factory=dict)
+    items: list[dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
+    generated_at_utc: datetime
+
+
+class OperatorRetrievalLineageResponse(BaseModel):
+    surface_kind: Literal["operator_retrieval_lineage_v1"] = "operator_retrieval_lineage_v1"
+    tenant_id: str
+    artifact_kind: str
+    artifact_ref: str
+    chain: dict[str, Any] = Field(default_factory=dict)
+    generated_at_utc: datetime
+
+
+class OperatorSynthesisJobsResponse(BaseModel):
+    surface_kind: Literal["operator_synthesis_jobs_v1"] = "operator_synthesis_jobs_v1"
+    tenant_id: str
+    query: dict[str, Any] = Field(default_factory=dict)
+    jobs: list[dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
+    recent_artifacts: list[dict[str, Any]] = Field(default_factory=list)
+    generated_at_utc: datetime
+
+
+class OperatorExecutionThreadResponse(BaseModel):
+    surface_kind: Literal["operator_execution_thread_v1"] = "operator_execution_thread_v1"
+    tenant_id: str
+    query: dict[str, Any] = Field(default_factory=dict)
+    walk_lineage: list[dict[str, Any]]
+    tcre_jobs: list[dict[str, Any]]
+    index_entries: list[dict[str, Any]]
+    generated_at_utc: datetime

@@ -10,7 +10,12 @@ import type {
   OperatorOverview,
   OperatorQueueTab,
   OperatorQueues,
+  OperatorRetrievalEntries,
+  OperatorRetrievalEpochs,
+  OperatorRetrievalLineage,
   OperatorRuntime,
+  OperatorSynthesisJobs,
+  OperatorExecutionThread,
 } from "./operatorTypes";
 
 async function assertOperatorV2Response(res: Response, label: string): Promise<void> {
@@ -121,5 +126,97 @@ export async function fetchOperatorQueues(
   const qs = search.toString();
   const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/operator/queues${qs ? `?${qs}` : ""}`);
   await assertOperatorV2Response(res, "operator queues");
+  return res.json();
+}
+
+export async function fetchOperatorRetrievalEpochs(
+  tenantId: string,
+  limit = 5,
+): Promise<OperatorRetrievalEpochs> {
+  const res = await adminFetch(
+    `/admin/tenants/${tenantId}/cortex/operator/inspect/retrieval/epochs?limit=${limit}`,
+  );
+  await assertOperatorV2Response(res, "operator retrieval epochs");
+  return res.json();
+}
+
+export async function fetchOperatorRetrievalEntries(
+  tenantId: string,
+  params: {
+    entity_id?: string;
+    scope_ref?: string;
+    index_kind?: string;
+    walk_id?: string;
+    external_url?: string;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<OperatorRetrievalEntries> {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null && String(value).trim()) search.set(key, String(value).trim());
+  }
+  const qs = search.toString();
+  const res = await adminFetch(
+    `/admin/tenants/${tenantId}/cortex/operator/inspect/retrieval/entries${qs ? `?${qs}` : ""}`,
+  );
+  if (res.status === 400) {
+    throw new Error("search_query_required");
+  }
+  await assertOperatorV2Response(res, "operator retrieval entries");
+  return res.json();
+}
+
+export async function fetchOperatorRetrievalLineage(
+  tenantId: string,
+  artifactKind: string,
+  artifactRef: string,
+): Promise<OperatorRetrievalLineage> {
+  const res = await adminFetch(
+    `/admin/tenants/${tenantId}/cortex/operator/inspect/retrieval/lineage/${encodeURIComponent(artifactKind)}/${encodeURIComponent(artifactRef)}`,
+  );
+  await assertOperatorV2Response(res, "operator retrieval lineage");
+  return res.json();
+}
+
+export async function fetchOperatorSynthesisJobs(
+  tenantId: string,
+  params: { status?: string; q?: string; limit?: number; offset?: number } = {},
+): Promise<OperatorSynthesisJobs> {
+  const search = new URLSearchParams();
+  if (params.status) search.set("status", params.status);
+  if (params.q) search.set("q", params.q);
+  if (params.limit != null) search.set("limit", String(params.limit));
+  if (params.offset != null) search.set("offset", String(params.offset));
+  const qs = search.toString();
+  const res = await adminFetch(
+    `/admin/tenants/${tenantId}/cortex/operator/inspect/synthesis/jobs${qs ? `?${qs}` : ""}`,
+  );
+  await assertOperatorV2Response(res, "operator synthesis jobs");
+  return res.json();
+}
+
+export async function fetchOperatorExecutionThread(
+  tenantId: string,
+  params: {
+    walk_id?: string;
+    tcre_job_id?: string;
+    scope_ref?: string;
+    replay_identity?: string;
+    limit?: number;
+  },
+): Promise<OperatorExecutionThread> {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null && String(value).trim()) search.set(key, String(value).trim());
+  }
+  const qs = search.toString();
+  const res = await adminFetch(
+    `/admin/tenants/${tenantId}/cortex/operator/inspect/execution/thread${qs ? `?${qs}` : ""}`,
+  );
+  if (res.status === 400) {
+    throw new Error("search_query_required");
+  }
+  await assertOperatorV2Response(res, "operator execution thread");
   return res.json();
 }

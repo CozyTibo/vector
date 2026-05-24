@@ -1118,20 +1118,24 @@ Frontend:
 
 ---
 
-## Phase R5 — Retrieval/synthesis inspect + lineage (1 week)
+## Phase R5 — Retrieval/synthesis inspect + lineage (1 week) ✅ **Complete (2026-05-24)**
 
 Backend:
 
-- Wire lineage routes under `/operator/inspect/retrieval/lineage/...`
-- Job search endpoint (paginated)
+- ✅ `GET /operator/inspect/retrieval/epochs` — last N index epochs with mix notes
+- ✅ `GET /operator/inspect/retrieval/entries` — on-demand entry search
+- ✅ `GET /operator/inspect/retrieval/lineage/{kind}/{ref}` — wires `build_retrieval_lineage_explorer_chain_v1`
+- ✅ `GET /operator/inspect/synthesis/jobs` — paginated job search + recent artifacts
+- ✅ `GET /operator/inspect/execution/thread` — walk replay + TCRE + index entries
 
 Frontend:
 
-- Retrieval lens: epoch list + entry search + lineage chain UI
-- Synthesis lens: job search → existing debugger
-- Execution thread lens: walk/TCRE chain
+- ✅ Retrieval lens: epoch list + entry search + lineage chain UI
+- ✅ Synthesis lens: job search → existing debugger
+- ✅ Execution thread lens: walk/TCRE chain
+- ✅ Legacy retrieval/synthesis/reconstruction tabs redirect to inspect when v2 enabled
 
-**Deletes:** AdminCortexRetrievalPage, AdminCortexSynthesisPage, AdminCortexReconstructionPage.
+**Deletes:** AdminCortexRetrievalPage, AdminCortexSynthesisPage, AdminCortexReconstructionPage from v2 nav (legacy pages kept behind gateway when v2 off).
 
 **Operator value:** **PR → retrieval → synthesis** evidence chain.
 
@@ -1203,4 +1207,4 @@ R0 guardrails
 
 ---
 
-**End of refactor plan.** R0–R4 complete; next step: R5 retrieval/synthesis inspect (enable flags in staging first).
+**End of refactor plan.** R0–R5 complete; next step: R6 backend deletion (enable flags in staging first).

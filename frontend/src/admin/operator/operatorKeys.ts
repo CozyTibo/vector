@@ -7,6 +7,15 @@ export const operatorKeys = {
     ["cortex-operator-inspect", tenantId, "edges", query] as const,
   islands: (tenantId: string) => ["cortex-operator-inspect", tenantId, "islands"] as const,
   queues: (tenantId: string, tab: string) => ["cortex-operator-queues", tenantId, tab] as const,
+  retrievalEpochs: (tenantId: string) => ["cortex-operator-inspect", tenantId, "retrieval-epochs"] as const,
+  retrievalEntries: (tenantId: string, query: Record<string, string>) =>
+    ["cortex-operator-inspect", tenantId, "retrieval-entries", query] as const,
+  retrievalLineage: (tenantId: string, kind: string, ref: string) =>
+    ["cortex-operator-inspect", tenantId, "retrieval-lineage", kind, ref] as const,
+  synthesisJobs: (tenantId: string, query: Record<string, string>) =>
+    ["cortex-operator-inspect", tenantId, "synthesis-jobs", query] as const,
+  executionThread: (tenantId: string, query: Record<string, string>) =>
+    ["cortex-operator-inspect", tenantId, "execution-thread", query] as const,
 };
 
 export function invalidateOperatorOverviewKey(tenantId: string) {

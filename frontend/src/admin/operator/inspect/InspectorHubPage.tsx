@@ -19,6 +19,24 @@ const LENSES = [
     description: "What execution scopes are alive in the registry?",
     question: "Registry list only — no connected-component scan on load.",
   },
+  {
+    key: "retrieval",
+    title: "Retrieval",
+    description: "Was this PR or scope indexed? What epoch and lineage?",
+    question: "Epoch list + entry search + terminal→root chain.",
+  },
+  {
+    key: "synthesis",
+    title: "Synthesis",
+    description: "What claim came from which retrieval pins?",
+    question: "Job search → existing debugger with artifact evidence.",
+  },
+  {
+    key: "execution",
+    title: "Execution thread",
+    description: "What walk/TCRE/index chain exists for this scope?",
+    question: "Walk replay lineage + TCRE jobs + related index entries.",
+  },
 ] as const;
 
 export default function InspectorHubPage() {
@@ -47,10 +65,6 @@ export default function InspectorHubPage() {
           </Link>
         ))}
       </div>
-
-      <p className="text-xs text-stone-500">
-        Retrieval, synthesis, and execution thread lenses arrive in R5. Queues async graph refresh in R4.
-      </p>
     </div>
   );
 }

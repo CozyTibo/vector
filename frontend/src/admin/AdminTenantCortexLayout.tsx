@@ -22,9 +22,6 @@ const CORTEX_V2_SECTIONS: Array<{ key: string; label: string }> = [
   { key: "inspect", label: "Inspect" },
   { key: "ingestion", label: "Ingestion" },
   { key: "canonical", label: "Canonical" },
-  { key: "reconstruction", label: "Reconstruction" },
-  { key: "retrieval", label: "Retrieval" },
-  { key: "synthesis", label: "Synthesis" },
   { key: "settings", label: "Settings" },
 ];
 

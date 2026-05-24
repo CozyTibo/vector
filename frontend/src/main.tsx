@@ -13,17 +13,21 @@ import InspectorHubPage from "./admin/operator/inspect/InspectorHubPage.tsx";
 import OperatorGraphInspectPage from "./admin/operator/inspect/OperatorGraphInspectPage.tsx";
 import OperatorIdentityEntityInspectPage from "./admin/operator/inspect/OperatorIdentityEntityInspectPage.tsx";
 import OperatorIdentityInspectPage from "./admin/operator/inspect/OperatorIdentityInspectPage.tsx";
-import OperatorIslandsInspectPage from "./admin/operator/inspect/OperatorIslandsInspectPage.tsx";
+import AdminCortexReconstructionGateway from "./admin/operator/inspect/AdminCortexReconstructionGateway.tsx";
+import AdminCortexRetrievalGateway from "./admin/operator/inspect/AdminCortexRetrievalGateway.tsx";
+import AdminCortexSynthesisGateway from "./admin/operator/inspect/AdminCortexSynthesisGateway.tsx";
+import OperatorExecutionInspectPage from "./admin/operator/inspect/OperatorExecutionInspectPage.tsx";
+import OperatorRetrievalInspectPage from "./admin/operator/inspect/OperatorRetrievalInspectPage.tsx";
+import OperatorRetrievalLineageInspectPage from "./admin/operator/inspect/OperatorRetrievalLineageInspectPage.tsx";
+import OperatorSynthesisInspectPage from "./admin/operator/inspect/OperatorSynthesisInspectPage.tsx";
 import AdminCortexOverviewGateway from "./admin/operator/AdminCortexOverviewGateway.tsx";
 import AdminCortexQueuesGateway from "./admin/operator/AdminCortexQueuesGateway.tsx";
 import AdminCortexRuntimeGateway from "./admin/operator/AdminCortexRuntimeGateway.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminCortexReasoningJobDetailPage from "./admin/AdminCortexReasoningJobDetailPage.tsx";
-import AdminCortexReconstructionPage from "./admin/AdminCortexReconstructionPage.tsx";
-import AdminCortexRetrievalPage from "./admin/AdminCortexRetrievalPage.tsx";
 import AdminCortexSettingsPage from "./admin/AdminCortexSettingsPage.tsx";
 import AdminCortexSynthesisJobDetailPage from "./admin/AdminCortexSynthesisJobDetailPage.tsx";
-import AdminCortexSynthesisPage from "./admin/AdminCortexSynthesisPage.tsx";
+import OperatorIslandsInspectPage from "./admin/operator/inspect/OperatorIslandsInspectPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
 import AdminTenantOnboardingPage from "./admin/AdminTenantOnboardingPage.tsx";
@@ -112,12 +116,16 @@ createRoot(document.getElementById("root")!).render(
                   <Route path="identity/e/:entityId" element={<OperatorIdentityEntityInspectPage />} />
                   <Route path="graph" element={<OperatorGraphInspectPage />} />
                   <Route path="islands" element={<OperatorIslandsInspectPage />} />
+                  <Route path="retrieval" element={<OperatorRetrievalInspectPage />} />
+                  <Route path="retrieval/lineage" element={<OperatorRetrievalLineageInspectPage />} />
+                  <Route path="synthesis" element={<OperatorSynthesisInspectPage />} />
+                  <Route path="execution" element={<OperatorExecutionInspectPage />} />
                 </Route>
-                <Route path="reconstruction" element={<AdminCortexReconstructionPage />} />
+                <Route path="reconstruction" element={<AdminCortexReconstructionGateway />} />
                 <Route path="reconstruction/jobs/:jobId" element={<AdminCortexReasoningJobDetailPage />} />
-                <Route path="retrieval" element={<AdminCortexRetrievalPage />} />
+                <Route path="retrieval" element={<AdminCortexRetrievalGateway />} />
                 <Route path="retrieval/index" element={<Navigate to=".." replace />} />
-                <Route path="synthesis" element={<AdminCortexSynthesisPage />} />
+                <Route path="synthesis" element={<AdminCortexSynthesisGateway />} />
                 <Route path="synthesis/jobs/:jobId" element={<AdminCortexSynthesisJobDetailPage />} />
                 <Route path="settings" element={<AdminCortexSettingsPage />} />
                 <Route path="entity-resolution" element={<Navigate to="../identity" replace />} />

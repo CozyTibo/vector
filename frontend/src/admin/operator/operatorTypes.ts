@@ -214,3 +214,53 @@ export type OperatorIslandsList = {
   island_count: number;
   islands: Record<string, unknown>[];
 };
+
+export type OperatorRetrievalEpochs = {
+  surface_kind: "operator_retrieval_epochs_v1";
+  tenant_id: string;
+  epochs: Record<string, unknown>[];
+  limit: number;
+  generated_at_utc: string;
+};
+
+export type OperatorRetrievalEntries = {
+  surface_kind: "operator_retrieval_entries_v1";
+  tenant_id: string;
+  query: Record<string, unknown>;
+  items: Record<string, unknown>[];
+  total: number;
+  limit: number;
+  offset: number;
+  generated_at_utc: string;
+};
+
+export type OperatorRetrievalLineage = {
+  surface_kind: "operator_retrieval_lineage_v1";
+  tenant_id: string;
+  artifact_kind: string;
+  artifact_ref: string;
+  chain: Record<string, unknown>;
+  generated_at_utc: string;
+};
+
+export type OperatorSynthesisJobs = {
+  surface_kind: "operator_synthesis_jobs_v1";
+  tenant_id: string;
+  query: Record<string, unknown>;
+  jobs: Record<string, unknown>[];
+  total: number;
+  limit: number;
+  offset: number;
+  recent_artifacts: Record<string, unknown>[];
+  generated_at_utc: string;
+};
+
+export type OperatorExecutionThread = {
+  surface_kind: "operator_execution_thread_v1";
+  tenant_id: string;
+  query: Record<string, unknown>;
+  walk_lineage: Record<string, unknown>[];
+  tcre_jobs: Record<string, unknown>[];
+  index_entries: Record<string, unknown>[];
+  generated_at_utc: string;
+};

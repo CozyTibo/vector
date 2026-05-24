@@ -15,12 +15,17 @@ from vector.contracts.operator_admin import (
     OperatorActionRequest,
     OperatorActionResponse,
     OperatorEdgeProvenanceResponse,
+    OperatorExecutionThreadResponse,
     OperatorGraphComponentRefreshResponse,
     OperatorGraphSnapshotResponse,
     OperatorIslandsListResponse,
     OperatorOverviewResponse,
     OperatorQueuesResponse,
+    OperatorRetrievalEntriesResponse,
+    OperatorRetrievalEpochsResponse,
+    OperatorRetrievalLineageResponse,
     OperatorRuntimeResponse,
+    OperatorSynthesisJobsResponse,
 )
 from vector.domains.cortex.pipeline.admin_graph_component_snapshot import (
     enqueue_graph_component_snapshot_refresh_v1,
@@ -31,9 +36,20 @@ from vector.domains.cortex.pipeline.operator_admin_inspect import (
     build_operator_islands_list_v1,
     lookup_edge_provenance_v1,
 )
+from vector.domains.cortex.pipeline.operator_admin_inspect_chains import (
+    build_operator_retrieval_epochs_v1,
+    build_operator_retrieval_lineage_v1,
+    search_operator_execution_thread_v1,
+    search_operator_retrieval_entries_v1,
+    search_operator_synthesis_jobs_v1,
+)
 from vector.domains.cortex.pipeline.operator_admin_overview import build_operator_overview_v1
 from vector.domains.cortex.pipeline.operator_admin_queues import build_operator_queues_v1
 from vector.domains.cortex.pipeline.operator_admin_runtime import build_operator_runtime_v1
+from vector.domains.cortex.retrieval.retrieval_ingress import (
+    RetrievalIngressError,
+    validate_retrieval_ingress_artifact_kind_v1,
+)
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 from vector.infrastructure.build_info import build_deploy_info_payload
 from vector.settings import Settings
@@ -222,5 +238,124 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         with admin_request_timing(endpoint="operator.inspect.islands", tenant_id=tenant_id):
             raw = build_operator_islands_list_v1(db, tenant_id=tenant_id)
         return OperatorIslandsListResponse.model_validate(raw)
+
+    @op.get("/inspect/retrieval/epochs", response_model=OperatorRetrievalEpochsResponse)
+    def get_operator_retrieval_epochs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    ) -> OperatorRetrievalEpochsResponse:
+        _require_operator_v2(settings)
+        _assert_tenant(db, tenant_id)
+        with admin_request_timing(endpoint="operator.inspect.retrieval.epochs", tenant_id=tenant_id):
+            raw = build_operator_retrieval_epochs_v1(db, tenant_id=tenant_id, limit=limit)
+        return OperatorRetrievalEpochsResponse.model_validate(raw)
+
+    @op.get("/inspect/retrieval/entries", response_model=OperatorRetrievalEntriesResponse)
+    def get_operator_retrieval_entries(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        entity_id: Annotated[str | None, Query()] = None,
+        scope_ref: Annotated[str | None, Query()] = None,
+        index_kind: Annotated[str | None, Query()] = None,
+        walk_id: Annotated[str | None, Query()] = None,
+        external_url: Annotated[str | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> OperatorRetrievalEntriesResponse:
+        _require_operator_v2(settings)
+        _assert_tenant(db, tenant_id)
+        try:
+            raw = search_operator_retrieval_entries_v1(
+                db,
+                tenant_id=tenant_id,
+                entity_id=entity_id,
+                scope_ref=scope_ref,
+                index_kind=index_kind,
+                walk_id=walk_id,
+                external_url=external_url,
+                limit=limit,
+                offset=offset,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return OperatorRetrievalEntriesResponse.model_validate(raw)
+
+    @op.get("/inspect/retrieval/lineage/{artifact_kind}/{artifact_ref:path}", response_model=OperatorRetrievalLineageResponse)
+    def get_operator_retrieval_lineage(
+        tenant_id: uuid.UUID,
+        artifact_kind: str,
+        artifact_ref: str,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        max_lineage_hops: Annotated[int, Query(ge=1, le=256)] = 64,
+    ) -> OperatorRetrievalLineageResponse:
+        _require_operator_v2(settings)
+        _assert_tenant(db, tenant_id)
+        try:
+            validate_retrieval_ingress_artifact_kind_v1(artifact_kind)
+        except RetrievalIngressError as exc:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=exc.code) from exc
+        with admin_request_timing(endpoint="operator.inspect.retrieval.lineage", tenant_id=tenant_id):
+            raw = build_operator_retrieval_lineage_v1(
+                db,
+                tenant_id=tenant_id,
+                artifact_kind=artifact_kind,
+                artifact_ref=artifact_ref,
+                max_hops=max_lineage_hops,
+            )
+        return OperatorRetrievalLineageResponse.model_validate(raw)
+
+    @op.get("/inspect/synthesis/jobs", response_model=OperatorSynthesisJobsResponse)
+    def get_operator_synthesis_jobs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        status: Annotated[str | None, Query()] = None,
+        q: Annotated[str | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ) -> OperatorSynthesisJobsResponse:
+        _require_operator_v2(settings)
+        _assert_tenant(db, tenant_id)
+        with admin_request_timing(endpoint="operator.inspect.synthesis.jobs", tenant_id=tenant_id):
+            raw = search_operator_synthesis_jobs_v1(
+                db,
+                tenant_id=tenant_id,
+                status=status,
+                q=q,
+                limit=limit,
+                offset=offset,
+            )
+        return OperatorSynthesisJobsResponse.model_validate(raw)
+
+    @op.get("/inspect/execution/thread", response_model=OperatorExecutionThreadResponse)
+    def get_operator_execution_thread(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        walk_id: Annotated[uuid.UUID | None, Query()] = None,
+        tcre_job_id: Annotated[uuid.UUID | None, Query()] = None,
+        scope_ref: Annotated[str | None, Query()] = None,
+        replay_identity: Annotated[str | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    ) -> OperatorExecutionThreadResponse:
+        _require_operator_v2(settings)
+        _assert_tenant(db, tenant_id)
+        try:
+            raw = search_operator_execution_thread_v1(
+                db,
+                tenant_id=tenant_id,
+                walk_id=walk_id,
+                tcre_job_id=tcre_job_id,
+                scope_ref=scope_ref,
+                replay_identity=replay_identity,
+                limit=limit,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return OperatorExecutionThreadResponse.model_validate(raw)
 
     router.include_router(op)
