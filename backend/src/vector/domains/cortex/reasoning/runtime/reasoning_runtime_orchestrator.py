@@ -90,6 +90,12 @@ def load_bounded_materializations_v1(
     tenant_id: uuid.UUID,
     scope: Mapping[str, Any],
 ) -> list[CortexCanonicalTransformMaterialization]:
+    from vector.domains.cortex.reasoning.runtime.execution_artifact_tcre_scope_v1 import (
+        EXECUTION_MATERIALIZATION_OBJECT_KINDS_V1,
+        filter_materializations_for_execution_artifact_scope_v1,
+        resolve_walk_start_node_ids_v1,
+    )
+
     norm = normalize_reconstruction_scope_v1(scope)
     q = select(CortexCanonicalTransformMaterialization).where(
         CortexCanonicalTransformMaterialization.tenant_id == tenant_id,
@@ -97,15 +103,45 @@ def load_bounded_materializations_v1(
     bundle_id = norm.get("bundle_id")
     if bundle_id:
         q = q.where(CortexCanonicalTransformMaterialization.bundle_id == str(bundle_id))
-    lim = int(norm["materialization_limit"])
+
+    execution_scope = bool(norm.get("octs_walk_id")) or bool(norm.get("execution_artifact_scope_v1"))
+    if execution_scope:
+        q = q.where(
+            CortexCanonicalTransformMaterialization.canonical_object_kind.in_(
+                tuple(EXECUTION_MATERIALIZATION_OBJECT_KINDS_V1)
+            )
+        )
+
+    fetch_lim = int(norm["materialization_limit"])
+    if execution_scope:
+        fetch_lim = min(int(norm["materialization_limit"]) * 4, TCRE_RUNTIME_SLICE_MAX_LIMIT)
+
     q = (
         q.order_by(
             nullslast(CortexCanonicalTransformMaterialization.temporal_ordering_key.asc()),
             CortexCanonicalTransformMaterialization.id.asc(),
         )
-        .limit(lim)
+        .limit(fetch_lim)
     )
-    return list(db.scalars(q).all())
+    mats = list(db.scalars(q).all())
+
+    if execution_scope:
+        walk_starts = resolve_walk_start_node_ids_v1(
+            db,
+            tenant_id=tenant_id,
+            octs_walk_id=str(norm.get("octs_walk_id") or "") or None,
+        )
+        mats, scope_meta = filter_materializations_for_execution_artifact_scope_v1(
+            db,
+            tenant_id=tenant_id,
+            materializations=mats,
+            walk_start_node_ids=walk_starts or None,
+        )
+        if isinstance(scope, dict):
+            scope["mat_scope_meta"] = scope_meta
+        lim = int(norm["materialization_limit"])
+        mats = mats[:lim]
+    return mats
 
 
 def _run_reconstruction_pipeline_in_memory_v1(
@@ -118,7 +154,8 @@ def _run_reconstruction_pipeline_in_memory_v1(
 ) -> dict[str, Any]:
     policy, _, _ = _policy_context_v1()
     norm_scope = normalize_reconstruction_scope_v1(scope)
-    mats = load_bounded_materializations_v1(db, tenant_id=tenant_id, scope=norm_scope)
+    mats = load_bounded_materializations_v1(db, tenant_id=tenant_id, scope=scope)
+    mat_scope_meta = scope.get("mat_scope_meta") if isinstance(scope.get("mat_scope_meta"), dict) else {}
     chronology_rows = reduce_chronology_rows_v1(
         mats,
         policy=policy,
@@ -167,6 +204,8 @@ def _run_reconstruction_pipeline_in_memory_v1(
     aggregate = aggregate_artifact_digest_v1(digests)
     return {
         "materialization_count": len(mats),
+        "mat_scope_count": int(mat_scope_meta.get("mat_scope_count") or len(mats)),
+        "mat_scope_meta": mat_scope_meta,
         "chronology_rows": chronology_rows,
         "edge_rows": edge_rows,
         "chain": chain,

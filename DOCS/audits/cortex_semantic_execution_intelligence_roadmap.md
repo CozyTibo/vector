@@ -353,13 +353,9 @@ Promotion + candidate rules only emit `org.persona_belongs_to_handle`. Graph den
 
 **Status:** Shipped — `execution_kind_priority_v1.py` boosts PR/deploy/timeline/message drain order; low-value GitHub refs fast-track to `permanent_orphan`. Revert via `CORTEX_CANONICAL_EXECUTION_KIND_PRIORITY=0`.
 
-### S2.3 — TCRE scope binding to execution artifacts
+### S2.3 — TCRE scope binding to execution artifacts ✅
 
-**Files:** `reasoning/runtime/reasoning_runtime_orchestrator.py`, `substrate_pipeline/phase_runners.py` (phase 06).
-
-**Work:**
-- Ensure TCRE jobs bind to walks whose start nodes intersect **canonical materializations** (PR/deploy), not only org-entity handles.
-- Receipt must pin `primary_octs_walk_id` + mat scope count.
+**Status:** Shipped — `execution_artifact_tcre_scope_v1.py` filters TCRE mats to execution kinds + walk start intersection; phase 06 enables strict binding when walk present.
 
 ### S2.4 — Index TCRE causal edges in retrieval (prerequisite for S3)
 

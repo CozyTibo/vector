@@ -328,7 +328,8 @@ def run_phase_06_tcre_v1(
 
     scope: dict[str, Any] = {
         "substrate_pipeline_run_id": str(pipeline_run_id),
-        "octs_strict_binding": False,
+        "execution_artifact_scope_v1": True,
+        "octs_strict_binding": bool(walk_id),
     }
     if walk_id:
         scope["octs_walk_id"] = str(walk_id)
@@ -342,6 +343,9 @@ def run_phase_06_tcre_v1(
             run_sync=False,
         )
         out = {**enqueue_out, "async": True}
+        if walk_id:
+            out["primary_octs_walk_id"] = str(walk_id)
+        out.setdefault("execution_artifact_scope_v1", True)
         complete_async_phase_with_receipt_v1(
             session,
             pipeline_run_id=pipeline_run_id,
