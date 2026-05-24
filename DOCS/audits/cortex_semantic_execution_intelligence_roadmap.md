@@ -829,7 +829,9 @@ Complexity tax consumes the team that should be building S1–S4. Fake-green sur
 
 ## Implementation steps (PR-sized)
 
-### S5.1 — DELETE list (immediate)
+### S5.1 — DELETE list (immediate) ✅
+
+**Status:** Shipped — Celery `run_tenant` alias removed, serial dual-lane fallback deleted, semantic-primary KPI only, unlock import ban.
 
 | Item | Path / action |
 |------|----------------|

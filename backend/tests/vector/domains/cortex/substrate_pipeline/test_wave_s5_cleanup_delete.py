@@ -31,5 +31,12 @@ def test_semantic_primary_operator_kpi_enabled_by_default() -> None:
     assert is_semantic_primary_operator_kpi_enabled_v1() is True
 
 
+def test_wave_s5_s5_1_deletes_contract() -> None:
+    from vector.domains.cortex.substrate_pipeline.wave_s5_cleanup_v1 import verify_s5_1_deletes_v1
+
+    out = verify_s5_1_deletes_v1()
+    assert out["s5_1_ok"] is True, out["errors"]
+
+
 def test_wave_s5_step_constant() -> None:
     assert WAVE_S5_STEP_21 == "wave_s5_semantic_cleanup_delete"

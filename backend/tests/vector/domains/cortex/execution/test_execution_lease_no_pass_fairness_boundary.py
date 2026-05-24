@@ -19,7 +19,9 @@ def test_execution_worker_has_no_pass_fairness_helpers() -> None:
     assert "_store_canonical_pass_index_on_lease" not in src
     assert "_store_pass_fairness_on_lease" not in src
     assert "parse_pass_cooldown_until" not in src
-    assert "_store_canonical_slice_outcome_on_lease" in src
+    from vector.domains.cortex.execution import dual_lane_worker as dl_mod
+
+    assert "store_last_phase_receipt_on_lease_v1" in inspect.getsource(dl_mod)
 
 
 def test_phase02_runner_has_no_pass_fairness_parameters() -> None:

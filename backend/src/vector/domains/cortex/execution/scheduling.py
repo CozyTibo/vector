@@ -11,7 +11,9 @@ from vector.settings import Settings
 
 CELERY_CONVERGENCE_SWEEP_BEAT_KEY_V1: Final[str] = "cortex-convergence-sweep"
 CELERY_CONVERGENCE_SWEEP_TASK_NAME_V1: Final[str] = "vector.cortex.convergence.sweep"
-CELERY_CONVERGENCE_RUN_TASK_NAME_V1: Final[str] = "vector.cortex.convergence.run_tenant"
+
+# Removed S5.1 — use vector.cortex.execution.run_slice only.
+CELERY_CONVERGENCE_RUN_TASK_REMOVED_V1: Final[str] = "vector.cortex.convergence.run_tenant"
 CELERY_EXECUTION_SLICE_TASK_NAME_V1: Final[str] = "vector.cortex.execution.run_slice"
 
 
@@ -546,8 +548,11 @@ def verify_execution_lease_no_pass_fairness_boundary_v1() -> list[str]:
         if sym in exec_src:
             errors.append(f"execution_worker_still_uses_pass_fairness:{sym}")
 
-    if "_store_canonical_slice_outcome_on_lease" not in exec_src:
-        errors.append("execution_worker_missing_canonical_slice_outcome_store")
+    from vector.domains.cortex.execution import dual_lane_worker as dl_mod
+
+    dl_src = inspect.getsource(dl_mod)
+    if "store_last_phase_receipt_on_lease_v1" not in dl_src:
+        errors.append("dual_lane_worker_missing_phase_receipt_store")
 
     p02 = inspect.getsource(pr_mod.run_phase_02_canonical_v1)
     if "pass_index: int" in p02:

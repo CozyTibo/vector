@@ -1,51 +1,22 @@
-"""Convergence Celery task names — same implementation as execution slice (M6)."""
+"""Convergence Celery tasks — sweeper only (S5.1: ``run_tenant`` alias removed).
+
+Tenant execution uses ``app.tasks.cortex_execution.run_execution_slice_task`` exclusively.
+"""
 
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Any
 
 from app.celery_app import celery_app
-from vector.domains.cortex.execution.execution_path_telemetry import (
-    EXECUTION_PATH_CONVERGENCE,
-    emit_execution_path_telemetry_v1,
-)
-from vector.domains.cortex.execution.run_tenant_execution import run_tenant_convergence_v1
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
 
 _LOGGER = logging.getLogger("app")
 
-_TASK_RUN = "vector.cortex.convergence.run_tenant"
 _TASK_SWEEP = "vector.cortex.convergence.sweep"
 
-
-@celery_app.task(name=_TASK_RUN, queue="vector", bind=True, max_retries=2)
-def run_tenant_convergence_task(
-    self,
-    tenant_id: str,
-    reason: str = "worker",
-) -> dict[str, Any]:
-    """Backward-compatible alias for ``vector.cortex.execution.run_slice``."""
-    cfg = get_settings()
-    tid = uuid.UUID(tenant_id)
-    emit_execution_path_telemetry_v1(
-        tenant_id=tid,
-        execution_path=EXECUTION_PATH_CONVERGENCE,
-        trigger=f"convergence_worker:{reason}",
-        celery_task_id=str(self.request.id),
-    )
-    with session_scope() as session:
-        out = run_tenant_convergence_v1(
-            session,
-            tenant_id=tid,
-            settings=cfg,
-            reason=reason,
-            celery_task_id=str(self.request.id),
-        )
-        session.commit()
-    return out
+CELERY_CONVERGENCE_SWEEP_TASK_NAME_V1 = _TASK_SWEEP
 
 
 @celery_app.task(name=_TASK_SWEEP, queue="vector")
