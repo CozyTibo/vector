@@ -35,7 +35,7 @@ def invalidate_pipeline_overview_cache_v1(tenant_id: uuid.UUID) -> None:
     invalidate_continuity_overview_context_cache_v1(tenant_id)
     with _OVERVIEW_CACHE_LOCK:
         _OVERVIEW_CACHE.pop(key, None)
-        for suffix in ("execution", "phases", "ingestion", "continuity_bundle"):
+        for suffix in ("execution", "phases", "ingestion", "continuity_bundle", "bootstrap"):
             _SLICE_CACHE.pop(f"{key}:{suffix}", None)
 
 from sqlalchemy.orm import Session
@@ -218,6 +218,55 @@ def build_pipeline_overview_ingestion_v1(
     return _cached_slice_v1(cache_key=cache_key, build=_build)
 
 
+def build_pipeline_overview_bootstrap_v1(
+    session: Session,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Single-pass overview payload for admin UI (no semantic readiness)."""
+    cache_key = f"{tenant_id}:bootstrap"
+
+    def _build() -> dict[str, Any]:
+        ctx = get_cached_continuity_overview_context_v1(
+            session, settings, tenant_id=tenant_id, overview_lite=True
+        )
+        ingestion_admin = build_cortex_ingestion_admin_overview(
+            session, settings, tenant_id, lite=True
+        )
+        continuity_status, phases, attention_items, attention = build_continuity_overview_bundle_v1(
+            session,
+            settings,
+            tenant_id=tenant_id,
+            ctx=ctx,
+            ingestion_admin=ingestion_admin,
+        )
+        return {
+            "surface_kind": "pipeline_overview_bootstrap",
+            "tenant_id": str(tenant_id),
+            "execution": _build_execution_snapshot_v1(session, tenant_id=tenant_id),
+            "continuity_status": continuity_status,
+            "operator_primary_kpi": build_operator_primary_kpi_v1(
+                session,
+                tenant_id=tenant_id,
+                settings=settings,
+                overview_slice=True,
+                precomputed_metrics=ctx.operator_metrics,
+            ),
+            "phases": phases,
+            "attention": attention,
+            "attention_items": attention_items,
+            **_build_ingestion_panel_v1(
+                session,
+                settings,
+                tenant_id=tenant_id,
+                ingestion_admin=ingestion_admin,
+            ),
+        }
+
+    return _cached_slice_v1(cache_key=cache_key, build=_build)
+
+
 def build_pipeline_overview_v1(
     session: Session,
     settings: Settings,
@@ -285,10 +334,12 @@ def _build_ingestion_panel_v1(
     settings: Settings,
     *,
     tenant_id: uuid.UUID,
+    ingestion_admin: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ingestion_admin = build_cortex_ingestion_admin_overview(
-        session, settings, tenant_id, lite=True
-    )
+    if ingestion_admin is None:
+        ingestion_admin = build_cortex_ingestion_admin_overview(
+            session, settings, tenant_id, lite=True
+        )
     runnable = [
         row["connector"]
         for row in ingestion_admin.get("connectors") or []

@@ -7,10 +7,11 @@ import type {
   OperatorPrimaryKpi,
   PipelineOverview,
 } from "./pipelineTypes";
-import type { PipelineExecutionSlice } from "./fetchPipelineOverviewSlice";
+import type { PipelineExecutionSlice, PipelineOverviewBootstrap } from "./fetchPipelineOverviewSlice";
 import {
   fetchPipelineExecutionSlice,
   fetchPipelineIngestionSlice,
+  fetchPipelineOverviewBootstrap,
   fetchPipelinePhasesSlice,
   fetchSemanticReadinessSlice,
   invalidateMonolithOverviewCache,
@@ -18,6 +19,9 @@ import {
 
 export const pipelineOverviewQueryKey = (tenantId: string) =>
   ["admin-cortex-pipeline-overview", tenantId] as const;
+
+export const pipelineOverviewBootstrapQueryKey = (tenantId: string) =>
+  ["admin-cortex-pipeline-overview-bootstrap", tenantId] as const;
 
 export const pipelineOverviewExecutionQueryKey = (tenantId: string) =>
   ["admin-cortex-pipeline-overview-execution", tenantId] as const;
@@ -32,6 +36,7 @@ export const pipelineSemanticReadinessQueryKey = (tenantId: string) =>
   ["admin-cortex-pipeline-semantic-readiness", tenantId] as const;
 
 export const pipelineOverviewSliceQueryKeys = (tenantId: string) => [
+  pipelineOverviewBootstrapQueryKey(tenantId),
   pipelineOverviewExecutionQueryKey(tenantId),
   pipelineOverviewPhasesQueryKey(tenantId),
   pipelineOverviewIngestionQueryKey(tenantId),
@@ -62,8 +67,21 @@ export type PipelineOverviewIngestion = {
 const sliceQueryOpts = {
   staleTime: 60_000,
   gcTime: 5 * 60_000,
-  retry: 1,
+  retry: 0,
 } as const;
+
+/** Primary overview load — one request, one DB context build on the backend. */
+export function usePipelineOverviewBootstrap() {
+  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  return useQuery({
+    queryKey: pipelineOverviewBootstrapQueryKey(tenantId),
+    queryFn: () => fetchPipelineOverviewBootstrap(tenantId),
+    enabled: Boolean(tenantId),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    retry: 0,
+  });
+}
 
 export function usePipelineOverviewExecution() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
@@ -121,19 +139,19 @@ export function usePipelineSemanticReadiness() {
     enabled: Boolean(tenantId),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
-    retry: 1,
+    retry: 0,
   });
 }
 
-/** Prefetch all overview slices in parallel (layout warm-up). */
-export function usePrefetchPipelineOverviewSlices() {
-  usePipelineOverviewExecution();
-  usePipelineOverviewPhases();
-  usePipelineOverviewIngestion();
+/** Warm overview bootstrap once per cortex layout mount. */
+export function usePrefetchPipelineOverviewBootstrap() {
+  usePipelineOverviewBootstrap();
 }
 
-/** Invalidate slice caches after pipeline mutations. */
+/** Invalidate overview caches after pipeline mutations. */
 export function invalidatePipelineOverviewCaches(tenantId: string) {
   invalidateMonolithOverviewCache();
   return pipelineOverviewSliceQueryKeys(tenantId);
 }
+
+export type { PipelineOverviewBootstrap };

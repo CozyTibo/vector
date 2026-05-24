@@ -14,6 +14,8 @@ _GRAPH_TOPOLOGY_CACHE_LOCK = threading.Lock()
 _GRAPH_TOPOLOGY_CACHE: dict[str, tuple[float, tuple[frozenset[uuid.UUID], ...], tuple[frozenset[uuid.UUID], ...], dict[str, Any]]] = {}
 _CONTEXT_CACHE_TTL_SECONDS = 120.0
 _CONTINUITY_CONTEXT_CACHE: dict[str, tuple[float, Any]] = {}
+_CONTEXT_INFLIGHT: dict[str, threading.Event] = {}
+_CONTEXT_INFLIGHT_LOCK = threading.Lock()
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -130,6 +132,7 @@ class ContinuityOverviewContextV1:
 
     inspect: dict[str, Any]
     lease: dict[str, Any] | None
+    lease_detail: dict[str, Any]
     progression: dict[str, Any]
     operator_metrics: dict[str, Any]
     canonical_metrics: dict[str, Any]
@@ -183,19 +186,42 @@ def get_cached_continuity_overview_context_v1(
     tenant_id: uuid.UUID,
     overview_lite: bool = False,
 ) -> ContinuityOverviewContextV1:
-    """Reuse continuity context across execution/phases slices within TTL."""
+    """Reuse continuity context across overview slices; singleflight on cold cache."""
     key = f"{tenant_id}:lite" if overview_lite else str(tenant_id)
     now = time.monotonic()
     with _GRAPH_TOPOLOGY_CACHE_LOCK:
         cached = _CONTINUITY_CONTEXT_CACHE.get(key)
         if cached is not None and now - cached[0] <= _CONTEXT_CACHE_TTL_SECONDS:
             return cached[1]
-    ctx = build_continuity_overview_context_v1(
-        session, settings, tenant_id=tenant_id, overview_lite=overview_lite
-    )
-    with _GRAPH_TOPOLOGY_CACHE_LOCK:
-        _CONTINUITY_CONTEXT_CACHE[key] = (now, ctx)
-    return ctx
+
+    leader = False
+    inflight: threading.Event | None = None
+    with _CONTEXT_INFLIGHT_LOCK:
+        inflight = _CONTEXT_INFLIGHT.get(key)
+        if inflight is None:
+            inflight = threading.Event()
+            _CONTEXT_INFLIGHT[key] = inflight
+            leader = True
+
+    if not leader and inflight is not None:
+        inflight.wait(timeout=120.0)
+        with _GRAPH_TOPOLOGY_CACHE_LOCK:
+            cached = _CONTINUITY_CONTEXT_CACHE.get(key)
+            if cached is not None:
+                return cached[1]
+
+    try:
+        ctx = build_continuity_overview_context_v1(
+            session, settings, tenant_id=tenant_id, overview_lite=overview_lite
+        )
+        with _GRAPH_TOPOLOGY_CACHE_LOCK:
+            _CONTINUITY_CONTEXT_CACHE[key] = (time.monotonic(), ctx)
+        return ctx
+    finally:
+        if leader and inflight is not None:
+            inflight.set()
+            with _CONTEXT_INFLIGHT_LOCK:
+                _CONTEXT_INFLIGHT.pop(key, None)
 
 
 def build_continuity_overview_context_v1(
@@ -208,13 +234,18 @@ def build_continuity_overview_context_v1(
     """Build shared continuity context once per admin overview request."""
     lease_row = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
     lease = lease_overview_public_dict_v1(lease_row)
-    operator_metrics = snapshot_canonical_operator_metrics_v1(session, tenant_id=tenant_id)
+    lease_detail = dict(lease_row.detail_json or {}) if lease_row is not None else {}
+    operator_metrics = snapshot_canonical_operator_metrics_v1(
+        session, tenant_id=tenant_id, overview_lite=overview_lite
+    )
     bundle_id = operator_metrics.get("bundle_id")
     deferral = dict(operator_metrics.get("deferral_counts") or {})
     if not deferral and bundle_id:
         deferral = count_deferrals(session, tenant_id=tenant_id, bundle_id=str(bundle_id))
 
-    synth_scope = count_synthesis_eligible_scopes_v1(session, tenant_id=tenant_id)
+    synth_scope = count_synthesis_eligible_scopes_v1(
+        session, tenant_id=tenant_id, overview_lite=overview_lite
+    )
     progression = build_substrate_progression_status_v1(
         session,
         tenant_id=tenant_id,
@@ -265,11 +296,13 @@ def build_continuity_overview_context_v1(
         session,
         tenant_id=tenant_id,
         operator_metrics=operator_metrics,
+        overview_lite=overview_lite,
     )
 
     return ContinuityOverviewContextV1(
         inspect=inspect,
         lease=lease,
+        lease_detail=lease_detail,
         progression=progression,
         operator_metrics=operator_metrics,
         canonical_metrics=canonical_metrics,
@@ -299,11 +332,14 @@ def build_continuity_status_from_context_v1(
         tenant_id=tenant_id,
         settings=settings,
         lease=ctx.lease,
+        lease_detail=ctx.lease_detail,
         progression=ctx.progression,
         propagation=ctx.propagation,
         canonical_metrics=ctx.canonical_metrics,
         operator_metrics=ctx.operator_metrics,
         deferral=ctx.deferral,
+        synth_scope=ctx.synth_scope,
+        overview_lite=ctx.overview_lite,
     )
 
 
@@ -440,30 +476,47 @@ def build_continuity_status_v1(
     canonical_metrics: dict[str, Any],
     operator_metrics: dict[str, Any] | None = None,
     deferral: dict[str, int] | None = None,
+    lease_detail: dict[str, Any] | None = None,
+    synth_scope: dict[str, Any] | None = None,
+    overview_lite: bool = False,
 ) -> dict[str, Any]:
     """Top-level Cortex continuity status card."""
+    del settings
     lease_status = str((lease or {}).get("status") or "").strip().lower()
     fsm = str((lease or {}).get("fsm_state") or "").strip().upper()
     block_code = (lease or {}).get("block_reason_code")
     phase_cursor = str((lease or {}).get("phase_cursor") or progression.get("active_phase") or "")
 
-    last_t05 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_05_TRAVERSAL)
-    last_t06 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_06_TCRE)
-    last_t07 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_07_RETRIEVAL)
-    last_t08 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_08_SYNTHESIS)
-    chain_times = [t for t in (last_t05, last_t06, last_t07, last_t08) if t is not None]
-    last_full_chain_at = max(chain_times) if len(chain_times) == 4 else None
+    last_full_chain_at: datetime | None = None
+    if overview_lite:
+        raw_chain = progression.get("last_full_chain_at")
+        if isinstance(raw_chain, str) and raw_chain.strip():
+            try:
+                last_full_chain_at = datetime.fromisoformat(raw_chain.replace("Z", "+00:00"))
+            except ValueError:
+                last_full_chain_at = None
+    else:
+        last_t05 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_05_TRAVERSAL)
+        last_t06 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_06_TCRE)
+        last_t07 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_07_RETRIEVAL)
+        last_t08 = _last_phase_completed_at(session, tenant_id=tenant_id, phase_id=PHASE_08_SYNTHESIS)
+        chain_times = [t for t in (last_t05, last_t06, last_t07, last_t08) if t is not None]
+        last_full_chain_at = max(chain_times) if len(chain_times) == 4 else None
 
-    published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
+    published = (synth_scope or {}).get("published_index_epoch") if overview_lite else None
+    if not published:
+        published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
     retrieval_published_at = _published_epoch_published_at(
         session, tenant_id=tenant_id, index_epoch=published
     )
-    last_synth = session.scalar(
-        select(CortexSynthesisArtifact.created_at)
-        .where(CortexSynthesisArtifact.tenant_id == tenant_id)
-        .order_by(CortexSynthesisArtifact.created_at.desc())
-        .limit(1)
-    )
+    last_synth: datetime | None = None
+    if not overview_lite:
+        last_synth = session.scalar(
+            select(CortexSynthesisArtifact.created_at)
+            .where(CortexSynthesisArtifact.tenant_id == tenant_id)
+            .order_by(CortexSynthesisArtifact.created_at.desc())
+            .limit(1)
+        )
 
     execution_lane: LaneStatus = "UNKNOWN"
     if fsm == FSM_BLOCKED or block_code:
@@ -511,8 +564,7 @@ def build_continuity_status_v1(
     elif untreated > 0 and execution_lane == "BLOCKED":
         canonical_lane = "WAITING"
 
-    lease_row = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
-    detail = dict(lease_row.detail_json or {}) if lease_row is not None else {}
+    detail = dict(lease_detail or {})
     last_canonical_outcome = str(
         detail.get("last_canonical_outcome") or detail.get("last_phase_outcome") or ""
     )
@@ -536,15 +588,17 @@ def build_continuity_status_v1(
 
     propagation_blocked = bool(propagation.get("blocked"))
     progression_class = str(progression.get("progression_class") or "")
-    run = get_running_pipeline_run_v1(session, tenant_id=tenant_id)
-    continuation_stalled = False
-    if run is not None:
-        cont = get_continuation_for_pipeline_v1(session, pipeline_run_id=run.id)
-        if cont is not None:
-            continuation_stalled = cont.continuation_status in (
-                CONTINUATION_STATUS_WAITING,
-                CONTINUATION_STATUS_STALLED,
-            )
+    continuation_stalled = bool(progression.get("continuation_stalled"))
+    if not overview_lite:
+        run = get_running_pipeline_run_v1(session, tenant_id=tenant_id)
+        continuation_stalled = False
+        if run is not None:
+            cont = get_continuation_for_pipeline_v1(session, pipeline_run_id=run.id)
+            if cont is not None:
+                continuation_stalled = cont.continuation_status in (
+                    CONTINUATION_STATUS_WAITING,
+                    CONTINUATION_STATUS_STALLED,
+                )
 
     state: ContinuityState = "AUTONOMOUS"
     if propagation_blocked and int(propagation.get("entity_count") or 0) > 0:
@@ -558,20 +612,23 @@ def build_continuity_status_v1(
             PHASE_OUTCOME_COMPLETED_EMPTY,
         )
 
-        p08 = session.scalar(
-            select(CortexSubstratePhaseRun)
-            .join(
-                CortexSubstratePipelineRun,
-                CortexSubstratePipelineRun.id == CortexSubstratePhaseRun.pipeline_run_id,
+        p08_outcome: str | None = None
+        if not overview_lite:
+            p08 = session.scalar(
+                select(CortexSubstratePhaseRun)
+                .join(
+                    CortexSubstratePipelineRun,
+                    CortexSubstratePipelineRun.id == CortexSubstratePhaseRun.pipeline_run_id,
+                )
+                .where(
+                    CortexSubstratePipelineRun.tenant_id == tenant_id,
+                    CortexSubstratePhaseRun.phase_id == PHASE_08_SYNTHESIS,
+                )
+                .order_by(CortexSubstratePhaseRun.finished_at.desc().nullslast())
+                .limit(1)
             )
-            .where(
-                CortexSubstratePipelineRun.tenant_id == tenant_id,
-                CortexSubstratePhaseRun.phase_id == PHASE_08_SYNTHESIS,
-            )
-            .order_by(CortexSubstratePhaseRun.finished_at.desc().nullslast())
-            .limit(1)
-        )
-        if p08 is not None and str(p08.outcome or "") == PHASE_OUTCOME_COMPLETED_EMPTY:
+            p08_outcome = str(p08.outcome or "") if p08 is not None else None
+        if p08_outcome == PHASE_OUTCOME_COMPLETED_EMPTY:
             state = "BROKEN"
         elif detail.get("last_dual_lane_slice", {}).get("execution_lane_ran"):
             state = "DEGRADED"
@@ -676,15 +733,18 @@ def build_continuity_phase_cards_v1(
     lease: dict[str, Any] | None,
     progression: dict[str, Any],
     ctx: ContinuityOverviewContextV1 | None = None,
+    ingestion_admin: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Operational phase strip — indexed counts and receipts only."""
     fsm = str((lease or {}).get("fsm_state") or "").strip().upper()
     lease_running = (lease or {}).get("status") == LEASE_STATUS_RUNNING
     mirror: dict[str, str] = dict(progression.get("phase_status") or {})
+    overview_lite = bool(ctx.overview_lite) if ctx is not None else False
 
-    ingestion_admin = build_cortex_ingestion_admin_overview(
-        session, settings, tenant_id, lite=True
-    )
+    if ingestion_admin is None:
+        ingestion_admin = build_cortex_ingestion_admin_overview(
+            session, settings, tenant_id, lite=True
+        )
     connectors = list(ingestion_admin.get("connectors") or [])
     stale_connectors = 0
     latest_sync: datetime | None = None
@@ -807,9 +867,11 @@ def build_continuity_phase_cards_v1(
         id_status = "running"
     from vector.domains.cortex.substrate_pipeline.constants import PHASE_03_IDENTITY
 
-    phase03_outcome = _latest_substrate_phase_outcome_v1(
-        session, tenant_id=tenant_id, phase_id=PHASE_03_IDENTITY
-    )
+    phase03_outcome = None
+    if not overview_lite:
+        phase03_outcome = _latest_substrate_phase_outcome_v1(
+            session, tenant_id=tenant_id, phase_id=PHASE_03_IDENTITY
+        )
     id_card = _phase_card(
         phase="identity",
         status=id_status,
@@ -849,7 +911,7 @@ def build_continuity_phase_cards_v1(
             precomputed_eligible_components=eligible_local,
         )
     if ctx is not None and ctx.overview_lite:
-        promoted = count_graph_promoted_edge_count_v1(session, tenant_id=tenant_id)
+        promoted = ctx.linked_entity_count
         candidate_rows = 0
         distinct_candidate_pairs = 0
     else:
@@ -912,7 +974,25 @@ def build_continuity_phase_cards_v1(
     )
 
     since = datetime.now(UTC) - timedelta(hours=24)
-    walks = _walk_operational_counts(session, tenant_id=tenant_id, since=since)
+    if overview_lite:
+        recent_walks = int(
+            session.scalar(
+                select(func.count())
+                .select_from(CortexOctsDurableWalkRecord)
+                .where(
+                    CortexOctsDurableWalkRecord.tenant_id == tenant_id,
+                    CortexOctsDurableWalkRecord.created_at >= since,
+                )
+            )
+            or 0
+        )
+        walks = {
+            "recent_walks_24h": recent_walks,
+            "completed_walks_24h": recent_walks,
+            "failed_walks_24h": 0,
+        }
+    else:
+        walks = _walk_operational_counts(session, tenant_id=tenant_id, since=since)
     trav_status: PhaseStatus = "healthy"
     if walks["failed_walks_24h"] > walks["completed_walks_24h"] and walks["failed_walks_24h"] > 0:
         trav_status = "degraded"
@@ -938,9 +1018,13 @@ def build_continuity_phase_cards_v1(
         last_success_at=_iso(last_walk),
     )
 
-    index_stats = count_retrieval_indexed_in_published_epoch_v1(session, tenant_id=tenant_id)
-    published = index_stats.get("published_index_epoch")
-    indexed = int(index_stats.get("indexed_count") or 0)
+    if overview_lite and ctx is not None:
+        published = ctx.synth_scope.get("published_index_epoch")
+        indexed = int(ctx.synth_scope.get("index_row_count") or ctx.synth_scope.get("retrieval_entries_in_scope") or 0)
+    else:
+        index_stats = count_retrieval_indexed_in_published_epoch_v1(session, tenant_id=tenant_id)
+        published = index_stats.get("published_index_epoch")
+        indexed = int(index_stats.get("indexed_count") or 0)
     ret_published_at = _published_epoch_published_at(
         session, tenant_id=tenant_id, index_epoch=str(published) if published else None
     )
@@ -970,23 +1054,24 @@ def build_continuity_phase_cards_v1(
         else count_synthesis_eligible_scopes_v1(session, tenant_id=tenant_id)
     )
     eligible_scopes = int(synth_scope.get("eligible_scopes") or 0)
-    synth_count = int(
-        session.scalar(
-            select(func.count())
-            .select_from(CortexSynthesisArtifact)
-            .where(CortexSynthesisArtifact.tenant_id == tenant_id)
-        )
-        or 0
-    )
-    last_synth = session.scalar(
-        select(CortexSynthesisArtifact.created_at)
-        .where(CortexSynthesisArtifact.tenant_id == tenant_id)
-        .order_by(CortexSynthesisArtifact.created_at.desc())
-        .limit(1)
-    )
-    autonomous = lease_running and fsm == "SYNTHESIS"
-    historical_only = synth_count > 0 and not lease_running
     in_scope = int(synth_scope.get("retrieval_entries_in_scope") or 0)
+    synth_count = 0
+    last_synth = None
+    if not overview_lite:
+        synth_count = int(
+            session.scalar(
+                select(func.count())
+                .select_from(CortexSynthesisArtifact)
+                .where(CortexSynthesisArtifact.tenant_id == tenant_id)
+            )
+            or 0
+        )
+        last_synth = session.scalar(
+            select(CortexSynthesisArtifact.created_at)
+            .where(CortexSynthesisArtifact.tenant_id == tenant_id)
+            .order_by(CortexSynthesisArtifact.created_at.desc())
+            .limit(1)
+        )
     syn_status: PhaseStatus = "healthy" if synth_count > 0 else "waiting"
     if eligible_scopes > 0 and synth_count == 0:
         syn_status = "degraded"
@@ -1163,9 +1248,13 @@ def build_continuity_overview_bundle_v1(
     settings: Settings,
     *,
     tenant_id: uuid.UUID,
+    ctx: ContinuityOverviewContextV1 | None = None,
+    ingestion_admin: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     """Returns (continuity_status, phases, attention_items, attention_lines)."""
-    ctx = get_cached_continuity_overview_context_v1(session, settings, tenant_id=tenant_id, overview_lite=True)
+    ctx = ctx or get_cached_continuity_overview_context_v1(
+        session, settings, tenant_id=tenant_id, overview_lite=True
+    )
     continuity_status = build_continuity_status_from_context_v1(
         session, settings, ctx, tenant_id=tenant_id
     )
@@ -1176,6 +1265,7 @@ def build_continuity_overview_bundle_v1(
         lease=ctx.lease,
         progression=ctx.progression,
         ctx=ctx,
+        ingestion_admin=ingestion_admin,
     )
     attention_items = build_continuity_attention_items_v1(
         continuity_status=continuity_status,

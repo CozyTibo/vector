@@ -26,8 +26,33 @@ def snapshot_canonical_operator_metrics_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
+    overview_lite: bool = False,
 ) -> dict[str, Any]:
-    """Fast canonical operator counts for admin surfaces (no full completeness scan)."""
+    """Canonical operator counts for admin surfaces.
+
+    ``overview_lite=True`` skips full-table raw/mat scans and anti-join drain
+    estimates — deferral breakdown only (pipeline overview bootstrap path).
+    """
+    bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
+    deferral_counts: dict[str, int] = {}
+    if bundle_id is not None:
+        deferral_counts = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
+
+    if overview_lite:
+        retry_ready = int(deferral_counts.get("deferred_retry_ready") or 0)
+        return {
+            "bundle_id": str(bundle_id) if bundle_id is not None else None,
+            "raw_count": None,
+            "canonicalized_count": None,
+            "raw_minus_mat_admin_gap": None,
+            "untreated_routable_estimate": None,
+            "drainable_routable_estimate": retry_ready,
+            "deferral_counts": deferral_counts,
+            "operator_kpi_primary": OPERATOR_KPI_PRIMARY_DRAINABLE_V1,
+            "operator_kpi_deprecated": OPERATOR_KPI_DEPRECATED_RAW_GAP_V1,
+            "overview_lite_estimate": True,
+        }
+
     raw_total = int(
         session.scalar(
             select(func.count())
@@ -46,10 +71,8 @@ def snapshot_canonical_operator_metrics_v1(
     )
     raw_minus_mat_admin_gap = max(0, raw_total - mat_total)
 
-    bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
     untreated_routable_estimate = 0
     drainable_routable_estimate = 0
-    deferral_counts: dict[str, int] = {}
     if bundle_id is not None:
         untreated_routable_estimate = int(
             list_untreated_routable_count_estimate(
@@ -66,7 +89,6 @@ def snapshot_canonical_operator_metrics_v1(
             )
             or 0
         )
-        deferral_counts = count_deferrals(session, tenant_id=tenant_id, bundle_id=bundle_id)
 
     return {
         "bundle_id": str(bundle_id) if bundle_id is not None else None,

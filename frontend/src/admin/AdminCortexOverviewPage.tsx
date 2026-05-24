@@ -13,9 +13,7 @@ import {
 } from "./cortex/OperationalPhaseStrip";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
 import {
-  usePipelineOverviewExecution,
-  usePipelineOverviewIngestion,
-  usePipelineOverviewPhases,
+  usePipelineOverviewBootstrap,
   usePipelineSemanticReadiness,
 } from "./cortex/usePipelineOverview";
 import { titleConnector } from "./cortexAdminTypes";
@@ -24,24 +22,21 @@ import { StatusBadge } from "./ui/StatusBadge";
 export default function AdminCortexOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
 
-  const executionQ = usePipelineOverviewExecution();
-  const phasesQ = usePipelineOverviewPhases();
-  const ingestionQ = usePipelineOverviewIngestion();
+  const bootstrapQ = usePipelineOverviewBootstrap();
   const semanticQ = usePipelineSemanticReadiness();
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
-  const exec = executionQ.data?.execution ?? phasesQ.data?.execution ?? null;
-  const continuity =
-    executionQ.data?.continuity_status ?? phasesQ.data?.continuity_status ?? undefined;
-  const operatorKpi =
-    executionQ.data?.operator_primary_kpi ?? phasesQ.data?.operator_primary_kpi ?? undefined;
+  const bootstrap = bootstrapQ.data;
+  const exec = bootstrap?.execution ?? null;
+  const continuity = bootstrap?.continuity_status ?? undefined;
+  const operatorKpi = bootstrap?.operator_primary_kpi ?? undefined;
   const hideLegacyPrimaryKpi = operatorKpi?.hide_from_overview === true;
-  const semanticReadiness = semanticQ.data ?? executionQ.data?.semantic_readiness ?? undefined;
-  const operationalPhases = phasesForOperationalStrip(phasesQ.data?.phases);
-  const attentionItems = phasesQ.data?.attention_items ?? [];
-  const sched = ingestionQ.data?.scheduler;
-  const runnableConnectors = ingestionQ.data?.runnable_connectors ?? [];
+  const semanticReadiness = semanticQ.data ?? undefined;
+  const operationalPhases = phasesForOperationalStrip(bootstrap?.phases);
+  const attentionItems = bootstrap?.attention_items ?? [];
+  const sched = bootstrap?.scheduler;
+  const runnableConnectors = bootstrap?.runnable_connectors ?? [];
 
   const schedulerLabel = !sched?.env_scheduler_enabled
     ? "Scheduled polling: OFF (env)"
@@ -49,10 +44,7 @@ export default function AdminCortexOverviewPage() {
       ? "Scheduled polling: PAUSED (operator)"
       : "Scheduled polling: ON";
 
-  const phasesError =
-    (phasesQ.isError ? (phasesQ.error as Error).message : null) ??
-    (executionQ.isError ? (executionQ.error as Error).message : null);
-  const ingestionError = ingestionQ.isError ? (ingestionQ.error as Error).message : null;
+  const bootstrapError = bootstrapQ.isError ? (bootstrapQ.error as Error).message : null;
 
   return (
     <div className="space-y-6">
@@ -63,19 +55,19 @@ export default function AdminCortexOverviewPage() {
 
       <ContinuityStatusCard
         status={continuity}
-        loading={(executionQ.isPending && !continuity) || (phasesQ.isPending && !continuity)}
+        loading={bootstrapQ.isPending && !continuity}
       />
 
       {!hideLegacyPrimaryKpi ? (
         <OperatorPrimaryKpiCard
           kpi={operatorKpi}
-          loading={(executionQ.isPending && !operatorKpi) || (phasesQ.isPending && !operatorKpi)}
+          loading={bootstrapQ.isPending && !operatorKpi}
         />
       ) : null}
 
       <DeferralOmissionCard
         omission={operatorKpi?.deferral_omission ?? undefined}
-        loading={phasesQ.isPending && !phasesQ.data}
+        loading={bootstrapQ.isPending && !bootstrap}
       />
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -84,19 +76,19 @@ export default function AdminCortexOverviewPage() {
             <h2 className="text-lg font-semibold text-stone-900">Pipeline continuity</h2>
             <p className="text-sm text-stone-600">
               Lease FSM is authoritative
-              {phasesQ.isPending && !exec ? (
+              {bootstrapQ.isPending && !exec ? (
                 <span className="text-stone-400"> · loading…</span>
               ) : exec ? (
                 <>
                   {" "}
                   · FSM {exec.fsm_state ?? "—"} · cursor {exec.phase_cursor ?? "—"}
                 </>
-              ) : phasesQ.isError ? (
+              ) : bootstrapError ? (
                 <span className="text-red-700"> · pipeline status unavailable</span>
               ) : null}
             </p>
           </div>
-          {phasesQ.isPending && !exec ? (
+          {bootstrapQ.isPending && !exec ? (
             <div className="h-6 w-20 animate-pulse rounded bg-stone-200" aria-hidden />
           ) : exec?.block_reason_code ? (
             <StatusBadge tone="bad">{exec.block_reason_code}</StatusBadge>
@@ -107,17 +99,17 @@ export default function AdminCortexOverviewPage() {
           ) : null}
         </div>
         <div className="mt-4">
-          {phasesQ.isPending && !phasesQ.data ? (
+          {bootstrapQ.isPending && !bootstrap ? (
             <SectionSkeleton variant="strip" />
-          ) : phasesError ? (
-            <p className="text-sm text-red-700">{phasesError}</p>
+          ) : bootstrapError ? (
+            <p className="text-sm text-red-700">{bootstrapError}</p>
           ) : (
             <OperationalPhaseStrip phases={operationalPhases} />
           )}
         </div>
       </section>
 
-      {phasesQ.isPending && !phasesQ.data ? (
+      {bootstrapQ.isPending && !bootstrap ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-amber-950">What needs attention</h3>
           <div className="mt-3">
@@ -128,34 +120,34 @@ export default function AdminCortexOverviewPage() {
         <ContinuityAttentionList items={attentionItems} />
       )}
 
-      {ingestionQ.isPending && !ingestionQ.data ? (
+      {bootstrapQ.isPending && !bootstrap ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <p className="text-sm font-medium text-stone-900">Pipeline actions</p>
           <div className="mt-4">
             <SectionSkeleton variant="actions" />
           </div>
         </section>
-      ) : ingestionError ? (
+      ) : bootstrapError ? (
         <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-red-700">{ingestionError}</p>
+          <p className="text-sm text-red-700">{bootstrapError}</p>
         </section>
       ) : (
         <PipelineActions runnableConnectors={runnableConnectors} />
       )}
 
       <RecentIngestionRuns
-        runs={ingestionQ.data?.recent_ingestion_runs ?? []}
+        runs={bootstrap?.recent_ingestion_runs ?? []}
         tenantId={tenantId}
-        nextScheduled={ingestionQ.data?.next_scheduled_ingestion}
-        loading={ingestionQ.isPending && !ingestionQ.data}
-        error={ingestionError}
+        nextScheduled={bootstrap?.next_scheduled_ingestion}
+        loading={bootstrapQ.isPending && !bootstrap}
+        error={bootstrapError}
       />
 
       <section className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
-        {ingestionQ.isPending && !ingestionQ.data ? (
+        {bootstrapQ.isPending && !bootstrap ? (
           <SectionSkeleton variant="footer" />
-        ) : ingestionError ? (
-          <p className="text-sm text-red-700">{ingestionError}</p>
+        ) : bootstrapError ? (
+          <p className="text-sm text-red-700">{bootstrapError}</p>
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">

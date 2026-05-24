@@ -124,8 +124,34 @@ def count_synthesis_eligible_scopes_v1(
     *,
     tenant_id: uuid.UUID,
     pack: Mapping[str, Any] | None = None,
+    overview_lite: bool = False,
 ) -> dict[str, Any]:
     """Eligible scopes = published index rows × default pipeline workloads."""
+    if overview_lite:
+        published = get_published_index_epoch_v1(session, tenant_id=tenant_id)
+        workloads = pipeline_default_workloads_v1(pack=pack)
+        index_count = 0
+        if published:
+            index_count = int(
+                session.scalar(
+                    select(func.count())
+                    .select_from(CortexRetrievalIndexEntry)
+                    .where(
+                        CortexRetrievalIndexEntry.tenant_id == tenant_id,
+                        CortexRetrievalIndexEntry.index_epoch == published,
+                    )
+                )
+                or 0
+            )
+        eligible = index_count * len(workloads)
+        return {
+            "published_index_epoch": published,
+            "index_row_count": index_count,
+            "retrieval_entries_in_scope": index_count,
+            "pipeline_default_workloads": workloads,
+            "eligible_scopes": eligible,
+            "scope_law": "published_epoch_index_count_lite",
+        }
     try:
         from vector.settings import get_settings
 

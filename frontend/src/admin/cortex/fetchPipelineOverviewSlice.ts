@@ -11,10 +11,18 @@ import type {
 
 let monolithInflight: Promise<PipelineOverview> | null = null;
 let monolithTenantId: string | null = null;
+let bootstrapInflight: Promise<PipelineOverviewBootstrap> | null = null;
+let bootstrapTenantId: string | null = null;
+
+export type PipelineOverviewBootstrap = Omit<PipelineOverview, "semantic_readiness"> & {
+  surface_kind?: string;
+};
 
 export function invalidateMonolithOverviewCache() {
   monolithInflight = null;
   monolithTenantId = null;
+  bootstrapInflight = null;
+  bootstrapTenantId = null;
 }
 
 async function fetchMonolithOverview(tenantId: string): Promise<PipelineOverview> {
@@ -41,7 +49,6 @@ async function trySlice<T>(
     if (res.ok) {
       return (await res.json()) as T;
     }
-    // Only fall back to monolith when slice routes are missing — not on server errors/timeouts.
     if (res.status === 404 || res.status === 405) {
       return null;
     }
@@ -54,6 +61,35 @@ async function trySlice<T>(
   }
 }
 
+/** Single backend pass — replaces parallel execution/phases/ingestion slice storm. */
+export async function fetchPipelineOverviewBootstrap(
+  tenantId: string,
+): Promise<PipelineOverviewBootstrap> {
+  if (bootstrapInflight && bootstrapTenantId === tenantId) {
+    return bootstrapInflight;
+  }
+  bootstrapTenantId = tenantId;
+  bootstrapInflight = (async () => {
+    const body = await trySlice<PipelineOverviewBootstrap>(
+      tenantId,
+      "/cortex/pipeline/overview/bootstrap",
+      60_000,
+    );
+    if (body) {
+      return body;
+    }
+    const full = await fetchMonolithOverview(tenantId);
+    const { semantic_readiness: _ignored, ...rest } = full as PipelineOverview & {
+      semantic_readiness?: SemanticReadiness | null;
+    };
+    return rest;
+  })().finally(() => {
+    bootstrapInflight = null;
+    bootstrapTenantId = null;
+  });
+  return bootstrapInflight;
+}
+
 export type PipelineExecutionSlice = {
   execution: PipelineOverview["execution"];
   continuity_status?: ContinuityStatus | null;
@@ -62,7 +98,7 @@ export type PipelineExecutionSlice = {
 };
 
 export async function fetchSemanticReadinessSlice(tenantId: string): Promise<SemanticReadiness | null> {
-  return trySlice<SemanticReadiness>(tenantId, "/cortex/pipeline/semantic-readiness", 25_000);
+  return trySlice<SemanticReadiness>(tenantId, "/cortex/pipeline/semantic-readiness", 45_000);
 }
 
 export async function fetchPipelineExecutionSlice(tenantId: string): Promise<PipelineExecutionSlice> {
