@@ -720,7 +720,9 @@ Fail-loud gates **work** — they prevent fake-green. There is nothing truthful 
 - Require ≥ 1 `materialization` / `causal_chain` / `walk` ref in scope before LLM call.
 - Keep existing Q1 retrieval semantic gate — do not bypass.
 
-### S4.5 — Synthesis inspector
+### S4.5 — Synthesis inspector ✅
+
+**Status:** Shipped — admin `/jobs/{job_id}/inspector` with epoch mix, scope kinds, ungrounded claim flags.
 
 **Files:** `api/http/routes/admin_cortex_synthesis.py`.
 

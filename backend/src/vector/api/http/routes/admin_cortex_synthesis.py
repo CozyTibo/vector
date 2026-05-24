@@ -77,6 +77,9 @@ from vector.domains.cortex.synthesis.synthesis_legality_matrix import (
     build_synthesis_jobs_by_legality_histogram_v1,
     build_synthesis_legality_matrix_catalog_v1,
 )
+from vector.domains.cortex.synthesis.synthesis_job_inspector_v1 import (
+    build_synthesis_job_inspector_v1,
+)
 from vector.domains.cortex.synthesis.synthesis_orchestrator import (
     SynthesisOrchestratorError,
     execute_synthesis_job_envelope_v1,
@@ -1079,6 +1082,24 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
         try:
             raw = get_synthesis_job_detail_v1(db, tenant_id=tenant_id, job_id=job_id)
             return AdminCortexSynthesisJobDetailResponse.model_validate(raw)
+        except SynthesisOrchestratorError as exc:
+            return JSONResponse(
+                status_code=exc.http_status,
+                content={"error": exc.code, "detail": exc.detail},
+            )
+
+    @sr.get("/jobs/{job_id}/inspector", response_model=None)
+    def get_synthesis_job_inspector(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> JSONResponse:
+        """S4.5 — retrieval epoch mix, scope index kinds, claim→evidence linkage."""
+        if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
+            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "tenant_not_found"})
+        try:
+            raw = build_synthesis_job_inspector_v1(db, tenant_id=tenant_id, job_id=job_id)
+            return JSONResponse(status_code=status.HTTP_200_OK, content=raw)
         except SynthesisOrchestratorError as exc:
             return JSONResponse(
                 status_code=exc.http_status,
