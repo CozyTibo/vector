@@ -2439,6 +2439,8 @@
 }
 
 .hero--centered {
+  position: relative;
+  overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -2563,5 +2565,93 @@
   );
   opacity: 0.4;
   margin: 0;
+}
+
+@keyframes signal-pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+.hero-graph {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(100% - 160px);
+  pointer-events: all;
+  overflow: hidden;
+  opacity: 0.2;
+  z-index: 0;
+  clip-path: inset(0 0 0 0);
+}
+
+.hero-centered-shell {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.hero-centered-shell a,
+.hero-centered-shell button {
+  pointer-events: all;
+}
+
+@keyframes node-pulse {
+  0%, 100% { opacity: 0; transform: scale(0.8); }
+  40%, 60% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes edge-appear {
+  0%, 100% { opacity: 0; }
+  40%, 60% { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+
+  /* Hero headline — allow wrapping on mobile */
+  .hero-copy--centered h1 {
+    white-space: normal;
+    font-size: clamp(24px, 7vw, 38px);
+    text-align: center;
+  }
+
+  /* Hero subline — full width on mobile */
+  .hero-sub--centered {
+    max-width: 100%;
+    font-size: 15px;
+    padding: 0 16px;
+    margin-bottom: 48px;
+  }
+
+  /* Hero centered shell — add padding */
+  .hero-centered-shell {
+    padding: 0 20px;
+  }
+
+  /* FAQ — stack vertically on mobile */
+  #faq .section-inner > div[style] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 24px !important;
+  }
+
+  #faq ul {
+    width: 100% !important;
+  }
+
+  #faq ul button {
+    font-size: 14px !important;
+    padding: 12px !important;
+  }
+
+  /* FAQ answer panel — full width */
+  #faq > div > div > div:last-child {
+    width: 100% !important;
+    min-height: auto !important;
+    padding: 16px !important;
+  }
+
 }
 

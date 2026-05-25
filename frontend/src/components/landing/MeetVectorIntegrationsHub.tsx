@@ -93,6 +93,8 @@ export function MeetVectorIntegrationsHub() {
                 width: "1px",
                 height: "24px",
                 background: "linear-gradient(to bottom, #E878BE, rgba(232,120,190,0.2))",
+                animation: `signal-pulse 2s ease-in-out infinite`,
+                animationDelay: `${i * 0.3}s`,
               }}
             />
             <div
@@ -102,6 +104,8 @@ export function MeetVectorIntegrationsHub() {
                 borderLeft: "3px solid transparent",
                 borderRight: "3px solid transparent",
                 borderTop: "4px solid rgba(232,120,190,0.5)",
+                animation: `signal-pulse 2s ease-in-out infinite`,
+                animationDelay: `${i * 0.3}s`,
               }}
             />
           </div>
@@ -162,6 +166,8 @@ export function MeetVectorIntegrationsHub() {
             width: "1px",
             height: "24px",
             background: "linear-gradient(to bottom, #E878BE, rgba(232,120,190,0.2))",
+            animation: "signal-pulse 2s ease-in-out infinite",
+            animationDelay: "1.2s",
           }}
         />
         <div
