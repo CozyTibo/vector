@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react";
-
 const SI_ICON_BASE =
   "https://raw.githubusercontent.com/simple-icons/simple-icons/11.6.0/icons";
 
