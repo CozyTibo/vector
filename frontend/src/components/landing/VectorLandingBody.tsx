@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import React, { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import vectorHeroAvatarUrl from "../../assets/logo.jpeg";
@@ -9,20 +9,16 @@ const DEMO_CAL_URL = "https://calendar.app.google/GcS9iPFBuL9XFzhc8";
 
 const PERCEPTION_CAPABILITIES = [
   {
-    title: "Understands real work",
-    sub: "Pulls signals from GitHub, Linear, Slack, and docs, including what people say, not just what they log.",
+    title: "Every signal, structured or human",
+    sub: "Vector connects to any tool your team uses and reads beyond artifacts. Commits, tickets, but also Slack threads, call transcripts, and the decisions buried in conversations.",
   },
   {
-    title: "Captures human signals",
-    sub: "Detects commitments, blockers, ownership gaps, and ambiguity, even when implicit.",
+    title: "Instant context, always available",
+    sub: "The moment a pattern is captured, it is queryable. By your team, by any agent in your stack, at any time.",
   },
   {
-    title: "Reconstructs execution state",
-    sub: "Knows what's moving, stuck, unclear, or drifting across threads and tools.",
-  },
-  {
-    title: "Connects everything together",
-    sub: "Automatically links discussions to execution and outcomes. No manual stitching.",
+    title: "A graph that compounds over time",
+    sub: "Every new signal refines Vector's understanding of how your teams work. The longer it runs, the deeper the context.",
   },
 ] as const;
 
@@ -50,50 +46,39 @@ const FAQ_ITEMS: ReadonlyArray<{ q: string; a: ReactNode }> = [
     q: "Who is Vector for?",
     a: (
       <p>
-        Engineering leaders and their managers, anyone responsible for delivery who ends up absorbing the
-        coordination tax instead of shipping. Vector removes that overhead. No more firefighting. No more
-        surprises. Lean delivery.
+        CTOs and engineering leaders running teams where AI is already embedded in the shipping cycle. If your
+        agents are writing, reviewing, and shipping code but your org&apos;s conventions and decisions
+        aren&apos;t in the loop, Vector is built for you.
       </p>
     ),
   },
   {
-    q: "How does Vector show up for me?",
-    a: (
-      <>
-        <p>You don&apos;t go to Vector. Vector comes to you, entirely through Slack.</p>
-        <p>
-          A daily briefing every morning. A nudge in the right thread when something needs action. A sprint
-          recap when you ask for it.
-        </p>
-        <p>No new tool. No new workflow. Just the right context at the right moment.</p>
-      </>
-    ),
-  },
-  {
-    q: "How is Vector different from productivity tools?",
-    a: (
-      <>
-        <p>
-          Most tools make managers more informed. Vector makes managers less necessary for routine
-          coordination.
-        </p>
-        <p>
-          The difference is where the loop closes: with a dashboard, you still have to read it, interpret it,
-          act. With Vector, the loop closes automatically. You&apos;re only notified when something needs a
-          human decision, everything else is handled.
-        </p>
-      </>
-    ),
-  },
-  {
-    q: "How is Vector different from a Claude agent we could build ourselves?",
+    q: "What does Vector connect to?",
     a: (
       <p>
-        Building the agent is the easy part. The hard part is knowing which signals predict a miss, which
-        coordination patterns precede a slip, what healthy execution looks like, and encoding that into
-        something that works reliably across engineering orgs. That&apos;s Vector&apos;s core product.
-        You&apos;re not buying an LLM wrapper. You&apos;re buying a brain that understands how your team
-        works.
+        GitHub, Linear, Slack, Notion, Google Drive, and call transcripts — with new integrations shipping every
+        week. Vector reads across both structured data and human signals to build the execution graph. No new
+        tools required, no behavior change for your team.
+      </p>
+    ),
+  },
+  {
+    q: "Do we need to change how our team works?",
+    a: (
+      <p>
+        No. Vector plugs into your existing stack and observes how your team already operates. There is no new
+        workflow, no new interface, nothing to adopt.
+      </p>
+    ),
+  },
+  {
+    q: "How is Vector different from a RAG system or a Claude agent we could build ourselves?",
+    a: (
+      <p>
+        Building the retrieval layer is straightforward. The hard part is knowing which signals matter, how to
+        extract decisions from unstructured conversations, and how to model execution patterns across an
+        engineering org over time. That&apos;s Vector&apos;s core product. You&apos;re not buying an LLM wrapper.
+        You&apos;re buying a model that understands how your org works.
       </p>
     ),
   },
@@ -102,13 +87,10 @@ const FAQ_ITEMS: ReadonlyArray<{ q: string; a: ReactNode }> = [
     a: (
       <>
         <p>
-          Yes, and this is deliberate. Most execution problems don&apos;t show up in Jira. They surface in a
-          message that didn&apos;t get a reply, or a thread where a decision quietly shifted.
+          Yes, public channels only. Most execution decisions don&apos;t show up in tickets. They surface in
+          threads, calls, and conversations.
         </p>
-        <p>
-          Vector reads channel content to build a real picture of coordination. Private messages are out of scope and
-          remain private.
-        </p>
+        <p>Private messages are never in scope and remain private.</p>
       </>
     ),
   },
@@ -116,24 +98,18 @@ const FAQ_ITEMS: ReadonlyArray<{ q: string; a: ReactNode }> = [
     q: "Does Vector track individual performance?",
     a: (
       <p>
-        No. Vector tracks coordination patterns: whether work is moving, where dependencies are forming, where
-        blockers are accumulating. It doesn&apos;t score individuals, rank engineers, or produce performance
-        ratings.
+        No. Vector tracks coordination patterns and execution signals at the team level. It does not score
+        individuals, rank engineers, or produce performance ratings.
       </p>
     ),
   },
   {
-    q: "How do we know our data is safe?",
+    q: "Who owns the data?",
     a: (
       <p>
-        Our DPA explicitly prohibits Anthropic from using your data for AI training, limits data retention to
-        what&apos;s needed to process a request, and lists every subprocessor with access. Infrastructure
-        runs on AWS Ireland (SOC 2 Type II, ISO 27001, ISO 27701). If procurement needs to review it before
-        signing, reach out at{" "}
-        <a className="faq-link" href="mailto:victoire@angelcorp.ai">
-          victoire@angelcorp.ai
-        </a>
-        .
+        You do. Vector acts as a data processor on your behalf. Your data is never used to train LLMs, internal
+        models, or any other system. Contractually guaranteed. Processing can be paused or terminated at any
+        time.
       </p>
     ),
   },
@@ -142,30 +118,263 @@ const FAQ_ITEMS: ReadonlyArray<{ q: string; a: ReactNode }> = [
 const IMPACT_BLOCKS = [
   {
     accent: true,
-    stat: "Focus",
-    copy: "Get 30% of your week back leading, not chasing updates.",
+    stat: "42%",
+    copy: "of coding time lost to context gaps. Not to meetings. Not to bugs. Just to ramping back up after every switch.",
   },
   {
     accent: false,
-    stat: "Act fast",
-    copy: `The next best action, surfaced instantly.
-No digging. No guessing. Just move.`,
+    stat: "4.4h",
+    copy: "saved per senior engineer per week. When context is available. Right now, it isn't.",
   },
   {
     accent: true,
-    stat: "Control",
-    copy: `Fix how work flows, not just what's stuck.
-Fewer escalations. Cleaner execution.`,
+    stat: "3.2x",
+    copy: "more technical debt when agents work without context. They reintroduce the patterns your team already rejected.",
   },
 ] as const;
 
 function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string; sub: string }[] }) {
+  const cards = [
+    {
+      visual: (
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            marginBottom: "16px",
+            padding: "16px",
+            border: "1px solid #F0F0F0",
+            borderRadius: "10px",
+            background: "#FAFAFA",
+            fontSize: "11px",
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                color: "#AAAAAA",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: "8px",
+                fontSize: "10px",
+              }}
+            >
+              Structured
+            </div>
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #EEEEEE",
+                borderRadius: "6px",
+                padding: "6px 8px",
+                marginBottom: "6px",
+                color: "#333",
+                fontSize: "11px",
+              }}
+            >
+              PR #214 merged
+            </div>
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #EEEEEE",
+                borderRadius: "6px",
+                padding: "6px 8px",
+                color: "#333",
+                fontSize: "11px",
+              }}
+            >
+              PAY-640 in review
+            </div>
+          </div>
+          <div
+            style={{
+              width: "1px",
+              background: "#E878BE",
+              opacity: 0.3,
+              flexShrink: 0,
+            }}
+          />
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                color: "#AAAAAA",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: "8px",
+                fontSize: "10px",
+              }}
+            >
+              Human
+            </div>
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #EEEEEE",
+                borderRadius: "6px",
+                padding: "6px 8px",
+                color: "#333",
+                fontSize: "11px",
+                lineHeight: 1.4,
+              }}
+            >
+              <span style={{ color: "#E878BE" }}>@alex</span> we decided to drop the retry lib
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      visual: (
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "16px",
+            border: "1px solid #F0F0F0",
+            borderRadius: "10px",
+            background: "#FAFAFA",
+            fontSize: "11px",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #EEEEEE",
+              borderRadius: "6px",
+              padding: "8px 10px",
+              marginBottom: "8px",
+              color: "#333",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <span style={{ color: "#AAAAAA", fontSize: "10px" }}>Query</span>
+            <span>What error-handling pattern do we use?</span>
+            <span
+              style={{
+                display: "inline-block",
+                width: "2px",
+                height: "12px",
+                background: "#E878BE",
+                animation: "blink 1s step-end infinite",
+                marginLeft: "2px",
+              }}
+            />
+          </div>
+          <div
+            style={{
+              background: "#FFF0F8",
+              border: "1px solid #FFB3D9",
+              borderRadius: "6px",
+              padding: "8px 10px",
+              color: "#333",
+              lineHeight: 1.5,
+            }}
+          >
+            Exponential backoff — decided in <span style={{ color: "#E878BE" }}>#payments</span>, March 2026
+          </div>
+        </div>
+      ),
+    },
+    {
+      visual: (
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "16px",
+            border: "1px solid #F0F0F0",
+            borderRadius: "10px",
+            background: "#FAFAFA",
+            height: "120px",
+            display: "flex",
+            alignItems: "flex-end",
+            gap: "12px",
+            justifyContent: "center",
+          }}
+        >
+          {[
+            { label: "Week 1", height: "30%", opacity: 0.3 },
+            { label: "Week 4", height: "60%", opacity: 0.6 },
+            { label: "Week 12", height: "90%", opacity: 1 },
+          ].map((bar) => (
+            <div
+              key={bar.label}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "6px",
+                flex: 1,
+                height: "100%",
+                justifyContent: "flex-end",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  height: bar.height,
+                  background: "#E878BE",
+                  opacity: bar.opacity,
+                  borderRadius: "4px 4px 0 0",
+                  transition: "height 0.3s ease",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: "#333",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {bar.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <ul className="empower-cap-list empower-cap-list--grid" aria-label="Capabilities">
-      {items.map((item) => (
-        <li key={item.title} className="empower-cap-item">
-          <span className="empower-nav-title">{item.title}</span>
-          <span className="empower-nav-sub">{item.sub}</span>
+    <ul
+      className="empower-cap-list empower-cap-list--grid"
+      aria-label="Capabilities"
+      style={{ listStyle: "none", padding: 0, margin: 0 }}
+    >
+      {items.map((item, i) => (
+        <li
+          key={item.title}
+          style={{
+            border: "1px solid #EEEEEE",
+            borderRadius: "12px",
+            padding: "24px",
+            background: "#ffffff",
+          }}
+        >
+          {cards[i]?.visual}
+          <span
+            style={{
+              display: "block",
+              fontWeight: 700,
+              fontSize: "15px",
+              color: "#111111",
+              marginBottom: "8px",
+            }}
+          >
+            {item.title}
+          </span>
+          <span
+            style={{
+              display: "block",
+              fontSize: "13px",
+              color: "#666666",
+              lineHeight: 1.6,
+            }}
+          >
+            {item.sub}
+          </span>
         </li>
       ))}
     </ul>
@@ -388,6 +597,58 @@ function useRevealInViewRef() {
   return ref;
 }
 
+type ImpactBlock = (typeof IMPACT_BLOCKS)[number];
+
+function AnimatedImpactColumn({ block }: { block: ImpactBlock }) {
+  const colRef = useRevealInViewRef();
+  const [displayed, setDisplayed] = useState("0");
+  const [animated, setAnimated] = useState(false);
+
+  useEffect(() => {
+    const el = colRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !animated) {
+            setAnimated(true);
+            obs.unobserve(entry.target);
+            const raw = block.stat;
+            const num = parseFloat(raw);
+            const suffix = raw.replace(String(num), "");
+            const duration = 1800;
+            const steps = 60;
+            const interval = duration / steps;
+            let step = 0;
+            const timer = setInterval(() => {
+              step++;
+              const progress = step / steps;
+              const eased = 1 - Math.pow(1 - progress, 3);
+              const current = num * eased;
+              const decimals = raw.includes(".") ? 1 : 0;
+              setDisplayed(current.toFixed(decimals) + suffix);
+              if (step >= steps) {
+                clearInterval(timer);
+                setDisplayed(raw);
+              }
+            }, interval);
+          }
+        }
+      },
+      { threshold: 0.3 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [animated, block.stat]);
+
+  return (
+    <article ref={colRef} className="impact-strip__col">
+      <p className={`impact-strip__stat${block.accent ? " impact-strip__stat--accent" : ""}`}>{displayed}</p>
+      <p className="impact-strip__copy">{block.copy}</p>
+    </article>
+  );
+}
+
 export type VectorLandingSignedCta = { to: string; label: string };
 
 type VectorLandingBodyProps = {
@@ -395,38 +656,85 @@ type VectorLandingBodyProps = {
   signedInWorkspaceCta?: VectorLandingSignedCta;
 };
 
+function FaqTwoCol({ items }: { items: ReadonlyArray<{ q: string; a: ReactNode }> }) {
+  const [active, setActive] = React.useState(0);
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "48px",
+        alignItems: "start",
+      }}
+    >
+      <ul
+        style={{
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+        }}
+      >
+        {items.map((item, i) => (
+          <li key={item.q}>
+            <button
+              type="button"
+              onClick={() => setActive(i)}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                background: active === i ? "#FFF0F8" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "14px 16px",
+                borderRadius: "8px",
+                fontSize: "15px",
+                fontWeight: active === i ? 600 : 400,
+                color: active === i ? "#111111" : "#666666",
+                borderLeft: active === i ? "2px solid #E878BE" : "2px solid transparent",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {item.q}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div
+        style={{
+          padding: "24px 32px",
+          border: "1px solid #F0F0F0",
+          borderRadius: "12px",
+          background: "#FAFAFA",
+          fontSize: "15px",
+          color: "#444444",
+          lineHeight: 1.7,
+          minHeight: "160px",
+        }}
+      >
+        <p
+          style={{
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#E878BE",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            margin: 0,
+            marginBottom: "12px",
+          }}
+        >
+          {items[active].q}
+        </p>
+        <div style={{ color: "#444444" }}>{items[active].a}</div>
+      </div>
+    </div>
+  );
+}
+
 export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyProps) {
-  const problemBannerRef = useRevealInViewRef();
-
-  const timelineSlots = [
-    {
-      time: "9:00",
-      without:
-        "You're rebuilding team status from tickets, PRs, and Slack. Still not sure what actually moved versus what people said moved.",
-      with:
-        "Vector's standup digest: shipped, blocked, drifting. You run the meeting on facts, not archaeology.",
-    },
-    {
-      time: "10:15",
-      without:
-        'A change has been "almost merged" for days; you ping around and learn it\'s waiting on a review thread nobody owns.',
-      with: "Two hours of real work. Vector already surfaced who's waiting on what.",
-    },
-    {
-      time: "2:30",
-      without:
-        "A channel blew up overnight: dozens of messages, fuzzy ownership, and no obvious next step.",
-      with:
-        "Escalation shows up with context, receipts, and a concrete next action. The loop closes fast.",
-    },
-    {
-      time: "4:40",
-      without:
-        "Leadership wants visibility on the team and the roadmap, so you start manually stitching the week's story.",
-      with: "The readout is drafted. You tighten the narrative, not invent the facts.",
-    },
-  ] as const;
-
   return (
     <div id="vector-landing">
       <div className="page-bg" aria-hidden="true">
@@ -435,44 +743,60 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
       </div>
 
       <main>
-        <div className="wrap hero">
-          <div className="hero-shell">
-            <div className="hero-copy">
-              <div className="hero-lead">
-                <h1>
-                  <span className="block hero-headline-line">Turn messy execution into</span>
-                  <span className="block hero-headline-line">
-                    <span className="accent">predictable delivery.</span>
-                  </span>
-                </h1>
-              </div>
-              <div className="hero-sub-row">
-                <p className="sub hero-sub">
-                  Vector surfaces risks and guides your next steps based on live data from your team.
-                </p>
-                <div className="hero-cta-row">
-                  <a className="btn-light" href={DEMO_CAL_URL} target="_blank" rel="noopener noreferrer">
-                    Book a demo
-                  </a>
-                </div>
+        <div className="wrap hero hero--centered">
+          <div className="hero-centered-shell">
+            <div className="hero-copy hero-copy--centered">
+              <h1>
+                <span className="hero-headline-line">
+                  Agents don&apos;t inherit context. <span className="accent">Vector does.</span>
+                </span>
+              </h1>
+              <p className="sub hero-sub hero-sub--centered">
+                Build a persistent understanding of how your teams ship, and make it queryable by humans and agents
+                alike.
+              </p>
+              <div className="hero-cta-row hero-cta-row--centered">
+                <a className="btn-light" href={DEMO_CAL_URL} target="_blank" rel="noopener noreferrer">
+                  Book a demo
+                </a>
               </div>
             </div>
-            <div className="hero-product">
-              <div className="hero-product__slack-wrap">
-                <LandingHeroSlackPreview />
+
+            <div className="hero-marquee" aria-hidden="true">
+              <div className="hero-marquee__track">
+                {[
+                  { slug: "notion", label: "Notion" },
+                  { slug: "slack", label: "Slack" },
+                  { slug: "linear", label: "Linear" },
+                  { slug: "github", label: "GitHub" },
+                  { slug: "google", label: "Google" },
+                  { slug: "googlegemini", label: "Google Gemini" },
+                  { slug: "sentry", label: "Sentry" },
+                  { slug: "notion", label: "Notion" },
+                  { slug: "slack", label: "Slack" },
+                  { slug: "linear", label: "Linear" },
+                  { slug: "github", label: "GitHub" },
+                  { slug: "google", label: "Google" },
+                  { slug: "googlegemini", label: "Google Gemini" },
+                  { slug: "sentry", label: "Sentry" },
+                ].map((tool, i) => (
+                  <div key={i} className="hero-marquee__item">
+                    <img
+                      src={`https://raw.githubusercontent.com/simple-icons/simple-icons/11.6.0/icons/${tool.slug}.svg`}
+                      width={20}
+                      height={20}
+                      alt={tool.label}
+                      style={{ filter: "invert(0.4)" }}
+                    />
+                    <span className="hero-marquee__label">{tool.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
-        <section ref={problemBannerRef} className="problem-banner" aria-label="Execution challenge">
-          <div className="problem-banner__grid" aria-hidden="true" />
-          <div className="problem-banner__inner">
-            <div className="problem-banner__block problem-banner__block--focus">
-              <p className="problem-banner__text">Everything looks in progress, but nothing is moving...</p>
-            </div>
-          </div>
-        </section>
+        <div className="hero-divider" aria-hidden="true" />
 
         <section className="section" id="meet-vector" aria-labelledby="meet-vector-heading">
           <div className="container">
@@ -481,11 +805,11 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
                 <h2 id="meet-vector-heading">
                   Meet <span className="accent">Vector</span>
                 </h2>
-                <p className="sub meet-vector__sub">Your new AI team member</p>
+                <p className="sub meet-vector__sub">
+                  The ground truth layer for your engineering.
+                </p>
                 <p className="sub meet-vector__support">
-                  Vector connects to the tools your team uses and pushes risks, slowdowns, and concrete actions in real
-                  time. Instead of chasing updates across different sources and stakeholders, Vector is guiding the next
-                  steps. You can focus on strategy while Vector runs delivery.
+                  Vector is a living execution graph of your org, extracting hidden insights from structured data and human signals across your entire stack. Queryable by your team and every agent in it.
                 </p>
               </div>
               <MeetVectorIntegrationsHub />
@@ -496,7 +820,7 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
         <section className="join-strip" id="join-strip" aria-labelledby="join-strip-heading">
           <div className="join-strip__inner">
             <h2 id="join-strip-heading" className="join-strip__heading">
-              Onboard Vector and <span className="accent">improve your execution.</span>
+              Close the <span className="accent">context gap.</span>
             </h2>
             <div className="join-strip__cta">
               {signedInWorkspaceCta ? (
@@ -521,31 +845,11 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               <div className="value-pillar">
                 <header className="value-pillar__header text-center">
                   <h2 id="value-pillar-perception-heading">
-                    Vector <span className="accent">sees</span> what your team is really doing
+                    How Vector builds <span className="accent">your execution graph</span>
                   </h2>
                 </header>
                 <div className="value-pillar-features">
                   <ValuePillarCapabilityGrid items={PERCEPTION_CAPABILITIES} />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="section" aria-labelledby="value-pillar-action-heading">
-            <div className="section-inner value-pillars">
-              <div className="value-pillar">
-                <header className="value-pillar__header text-center">
-                  <h2 id="value-pillar-action-heading">
-                    Vector <span className="accent">moves work forward</span> for you
-                  </h2>
-                </header>
-                <div className="empowers-split">
-                  <ValuePillarCapabilityList items={ACTION_CAPABILITIES} />
-                  <div className="empowers-panel-wrap">
-                    <div className="empower-detail">
-                      <MovesWorkForwardSlackPreview />
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -556,46 +860,143 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
           <div className="impact-strip__inner">
             <div className="impact-strip__row">
               {IMPACT_BLOCKS.map((block) => (
-                <article key={block.stat} className="impact-strip__col">
-                  <p className={`impact-strip__stat${block.accent ? " impact-strip__stat--accent" : ""}`}>
-                    {block.stat}
-                  </p>
-                  <p className="impact-strip__copy">{block.copy}</p>
-                </article>
+                <AnimatedImpactColumn key={block.stat} block={block} />
               ))}
             </div>
           </div>
         </section>
 
-        <section className="timeline-contrast" aria-labelledby="timeline-contrast-heading">
-          <div className="timeline-contrast__inner">
-            <header className="timeline-contrast__header">
-              <h2 id="timeline-contrast-heading">One timeline. Two realities.</h2>
-            </header>
-            <div className="timeline-contrast__sync" aria-label="Execution timeline comparison">
-              <div className="timeline-contrast__labels">
-                <p className="timeline-contrast__label timeline-contrast__label--without">Without Vector</p>
-                <p className="timeline-contrast__label timeline-contrast__label--with">With Vector</p>
-              </div>
+        <div className="hero-divider" aria-hidden="true" />
 
-              <div className="timeline-contrast__rows" role="list">
-                {timelineSlots.map((slot) => (
-                  <div key={slot.time} className="timeline-contrast__slot" role="listitem">
-                    <div className="timeline-contrast__side timeline-contrast__side--without">
-                      <span className="timeline-contrast__dot" aria-hidden="true" />
-                      <p className="timeline-contrast__text">
-                        {slot.time}. {slot.without}
-                      </p>
-                    </div>
-                    <div className="timeline-contrast__side timeline-contrast__side--with">
-                      <span className="timeline-contrast__dot" aria-hidden="true" />
-                      <p className="timeline-contrast__text">
-                        <span className="timeline-contrast__stamp">{slot.time}.</span> {slot.with}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        <section className="section" id="security" aria-labelledby="security-heading">
+          <div className="section-inner">
+            <header className="text-center" style={{ marginBottom: "48px" }}>
+              <h2 id="security-heading">
+                Your data <span className="accent">stays yours.</span>
+              </h2>
+            </header>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: "24px",
+                maxWidth: "860px",
+                margin: "0 auto",
+              }}
+            >
+              {[
+                {
+                  icon: (
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#E878BE"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  ),
+                  title: "Never used for training",
+                  body: "Your data is never used to train LLMs, internal models, or any other system. Contractually guaranteed.",
+                },
+                {
+                  icon: (
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#E878BE"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  ),
+                  title: "Suspend or delete at any time",
+                  body: "Data processing can be paused on request, no questions asked. All data removed automatically when your contract ends.",
+                },
+                {
+                  icon: (
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#E878BE"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  ),
+                  title: "Engineering signals only",
+                  body: "Vector never touches Slack DMs, customer PII, financial records, or HR data. Work tools only, nothing else.",
+                },
+                {
+                  icon: (
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#E878BE"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+                      <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+                      <line x1="6" y1="6" x2="6.01" y2="6" />
+                      <line x1="6" y1="18" x2="6.01" y2="18" />
+                    </svg>
+                  ),
+                  title: "AWS Ireland. Encrypted end to end.",
+                  body: "AES-256 at rest, TLS 1.2+ in transit. GDPR compliant. SOC 2 in progress.",
+                },
+              ].map((block) => (
+                <div
+                  key={block.title}
+                  style={{
+                    border: "1px solid #E8E8E8",
+                    borderRadius: "12px",
+                    padding: "28px 32px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <div style={{ marginBottom: "4px" }}>{block.icon}</div>
+                  <p
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      color: "#111111",
+                      margin: 0,
+                    }}
+                  >
+                    {block.title}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "14px",
+                      color: "#555555",
+                      lineHeight: 1.6,
+                      margin: 0,
+                    }}
+                  >
+                    {block.body}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -609,15 +1010,15 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               <ol className="cta-steps">
                 <li>
                   <span className="cta-num">1</span>
-                  <span className="cta-step-copy">Connect Vector</span>
+                  <span className="cta-step-copy">Connect your stack</span>
                 </li>
                 <li>
                   <span className="cta-num">2</span>
-                  <span className="cta-step-copy">Vector understands how your team operates</span>
+                  <span className="cta-step-copy">Vector builds your execution graph</span>
                 </li>
                 <li>
                   <span className="cta-num">3</span>
-                  <span className="cta-step-copy">Vector surfaces what's stuck and what to do next</span>
+                  <span className="cta-step-copy">Get the context your teams and agents have been missing</span>
                 </li>
               </ol>
               <div className="cta-actions">
@@ -641,26 +1042,14 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
           </div>
         </section>
 
-        <section className="faq-strip" id="faq" aria-labelledby="faq-heading">
-          <div className="faq-strip__inner">
-            <header className="faq-strip__header">
+        <section className="section" id="faq" aria-labelledby="faq-heading">
+          <div className="section-inner">
+            <header style={{ marginBottom: "48px" }}>
               <h2 id="faq-heading">
                 Frequently asked <span className="accent">questions</span>
               </h2>
             </header>
-            <ul className="faq-list" role="list">
-              {FAQ_ITEMS.map((item) => (
-                <li key={item.q} className="faq-list__item">
-                  <details className="faq-item">
-                    <summary className="faq-item__q">
-                      <span className="faq-item__q-text">{item.q}</span>
-                      <span className="faq-item__icon" aria-hidden="true" />
-                    </summary>
-                    <div className="faq-item__a">{item.a}</div>
-                  </details>
-                </li>
-              ))}
-            </ul>
+            <FaqTwoCol items={FAQ_ITEMS} />
           </div>
         </section>
       </main>
