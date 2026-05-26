@@ -30,7 +30,6 @@ from vector.domains.cortex.retrieval.retrieval_operator_workflows import (
 from vector.domains.cortex.identity.continuity_rebuild import (
     REBUILD_IDENTITIES_CONFIRM_PHRASE,
     rebuild_identities_from_anchors_v1,
-    enqueue_rebuild_identities_from_anchors_v1,
 )
 from vector.domains.cortex.substrate_pipeline.continuity_p0_recovery import (
     RecoveryStrategyV1,
@@ -189,13 +188,7 @@ def execute_operator_action_v1(
         result = bootstrap_retrieval_index_from_upstream_v1(session, tenant_id=tenant_id)
     elif action == "rebuild_identities":
         _require_confirmation(confirmation, REBUILD_IDENTITIES_CONFIRM_PHRASE)
-        try:
-            result = enqueue_rebuild_identities_from_anchors_v1(session, tenant_id=tenant_id)
-        except RuntimeError as exc:
-            if str(exc).startswith("celery_enqueue_failed:"):
-                result = rebuild_identities_from_anchors_v1(session, tenant_id=tenant_id)
-            else:
-                raise
+        result = rebuild_identities_from_anchors_v1(session, tenant_id=tenant_id)
     elif action == "p0_recover":
         _require_confirmation(confirmation, CONTINUITY_P0_RECOVER_CONFIRM_PHRASE)
         result = recover_continuity_p0_pipeline_v1(

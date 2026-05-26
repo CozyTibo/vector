@@ -266,23 +266,15 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
             )
         elif job_kind == "identity_rebuild_from_anchors":
             from vector.domains.cortex.identity.continuity_rebuild import (
-                _run_rebuild_identities_substrate_v1,
+                rebuild_identities_from_anchors_v1,
                 substrate_counts,
             )
-            from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
 
             scope = dict(job.scope_json or {})
             alim = int(scope.get("anchor_limit") or 5000)
             restart_downstream = bool(scope.get("restart_downstream", True))
             counts_before = substrate_counts(db, tenant_id=job.tenant_id)
-            cleared_identity: dict[str, Any] | None = None
-            if not scope.get("identity_already_cleared"):
-                cleared_identity = clear_derived_outputs_from_phase_v1(
-                    db,
-                    tenant_id=job.tenant_id,
-                    from_phase="IDENTITY",
-                )
-            downstream = _run_rebuild_identities_substrate_v1(
+            downstream = rebuild_identities_from_anchors_v1(
                 db,
                 tenant_id=job.tenant_id,
                 anchor_limit=alim,
@@ -293,11 +285,12 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
                 "tenant_id": str(job.tenant_id),
                 "counts_before": counts_before,
                 "counts_after": downstream["counts_after"],
-                "cleared_identity": cleared_identity,
-                "substrate": downstream["substrate"],
-                "cleared_downstream": downstream["cleared_downstream"],
-                "restarted": downstream["restarted"],
-                "anchor_limit_applied": alim,
+                "cleared_identity": None,
+                "substrate": downstream.get("repair_until_exhausted"),
+                "cleared_downstream": downstream.get("cleared_downstream"),
+                "restarted": downstream.get("restarted"),
+                "anchor_limit_applied": downstream.get("anchor_limit_applied"),
+                "destructive_clear": False,
             }
             _append_receipt(
                 db,

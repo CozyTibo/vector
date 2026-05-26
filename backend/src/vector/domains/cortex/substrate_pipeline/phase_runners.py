@@ -167,6 +167,15 @@ def run_phase_03_identity_v1(
         substrate_trigger=identity_substrate_trigger,
         anchor_limit=5_000,
     )
+    from vector.domains.cortex.identity.identity_substrate_phase_helpers_v1 import (
+        resolve_phase_03_outcome_v1,
+    )
+
+    outcome, blocked_reason = resolve_phase_03_outcome_v1(
+        session,
+        tenant_id=tenant_id,
+        raw_output=out,
+    )
     return complete_phase_with_receipt_v1(
         session,
         pipeline_run_id=pipeline_run_id,
@@ -175,6 +184,8 @@ def run_phase_03_identity_v1(
         raw_output=out,
         started_at=started_at,
         input_epoch=bid,
+        outcome=outcome,
+        blocked_reason=blocked_reason,
     )
 
 

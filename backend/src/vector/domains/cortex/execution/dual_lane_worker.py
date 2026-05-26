@@ -274,6 +274,33 @@ def _run_canonical_lane_slice_v1(
     }
 
 
+def resolve_execution_lane_entry_phase_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    lease: CortexTenantConvergenceLease,
+) -> str:
+    """Rewind to phase 03 when identity substrate is broken/degraded — before 04–08."""
+    from vector.domains.cortex.identity.identity_substrate_health_v1 import (
+        evaluate_identity_substrate_health_v1,
+        execution_downstream_blocked_by_identity_v1,
+        identity_substrate_repair_owed_v1,
+    )
+
+    phase = (lease.phase_cursor or PHASE_03_IDENTITY).strip()
+    if phase == PHASE_02_CANONICAL or phase not in SUBSTRATE_PIPELINE_PHASE_ORDER:
+        return PHASE_03_IDENTITY
+    health = evaluate_identity_substrate_health_v1(session, tenant_id=tenant_id)
+    if identity_substrate_repair_owed_v1(health):
+        return PHASE_03_IDENTITY
+    if execution_downstream_blocked_by_identity_v1(health) and phase in (
+        PHASE_07_RETRIEVAL,
+        PHASE_08_SYNTHESIS,
+    ):
+        return PHASE_03_IDENTITY
+    return phase
+
+
 def _run_execution_lane_slice_v1(
     session: Session,
     *,
@@ -286,9 +313,7 @@ def _run_execution_lane_slice_v1(
     reason: str,
 ) -> dict[str, Any]:
     """Budget B — advance execution lane from ``phase_cursor`` (never re-run phase 02 here)."""
-    phase = (lease.phase_cursor or PHASE_03_IDENTITY).strip()
-    if phase == PHASE_02_CANONICAL or phase not in SUBSTRATE_PIPELINE_PHASE_ORDER:
-        phase = PHASE_03_IDENTITY
+    phase = resolve_execution_lane_entry_phase_v1(session, tenant_id=tenant_id, lease=lease)
     graph_hash: str | None = None
     identity_trigger = f"execution:{reason}"
     requeue = False

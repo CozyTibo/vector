@@ -48,7 +48,7 @@ def replay_authoritative_links_task(tenant_id: str) -> dict[str, Any]:
     return {"tenant_id": tenant_id, "authoritative_set_sha256": sha, "authoritative_link_count": n}
 
 
-@celery_app.task(name=_TASK_ORG_LINK_REPLAY_JOB)
+@celery_app.task(name=_TASK_ORG_LINK_REPLAY_JOB, queue="vector")
 def run_org_link_replay_job_task(
     tenant_id: str,
     job_kind: str | None = None,

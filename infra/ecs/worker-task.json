@@ -16,7 +16,9 @@
         "-A",
         "app.worker",
         "worker",
-        "--loglevel=info"
+        "--loglevel=info",
+        "-Q",
+        "vector,cortex_live,cortex_replay"
       ],
       "environment": [
         {

@@ -139,49 +139,31 @@ def run_identity_substrate_projection_for_pipeline_v1(
     substrate_trigger: str,
     anchor_limit: int = 5_000,
 ) -> dict[str, Any]:
-    """Single phase-03 transform: handles/candidates refresh + inline audit receipt (no replay job)."""
-    from vector.domains.cortex.operational_runtime.graph_density import (
-        count_distinct_graph_candidate_pairs_v1,
+    """Single phase-03 transform: paginated repair slice + audit receipt (convergence-owned)."""
+    from vector.domains.cortex.identity.identity_substrate_repair_v1 import (
+        run_identity_substrate_repair_slice_v1,
     )
 
-    counts_before = substrate_counts(db, tenant_id=tenant_id)
-    pairs_before = count_distinct_graph_candidate_pairs_v1(db, tenant_id=tenant_id)
-    substrate = run_identity_handles_and_candidates_refresh(
+    _ = anchor_limit  # batch size comes from settings via repair slice
+    out = run_identity_substrate_repair_slice_v1(
         db,
         tenant_id=tenant_id,
-        dry_run=False,
-        anchor_limit=anchor_limit,
+        bundle_id=bundle_id,
+        substrate_trigger=substrate_trigger,
     )
-    pairs_after = count_distinct_graph_candidate_pairs_v1(db, tenant_id=tenant_id)
-    distinct_candidate_pairs_delta = pairs_after - pairs_before
     from vector.domains.cortex.execution.execution_event_triggers import (
         trigger_identity_promotion_after_substrate_v1,
     )
 
+    substrate = out.get("identity_continuity_substrate") or {}
     promotion_trigger = trigger_identity_promotion_after_substrate_v1(
         db,
         tenant_id=tenant_id,
-        substrate=substrate,
+        substrate=substrate if isinstance(substrate, dict) else {},
     )
-    graph_density_promotion = promotion_trigger.get("promotion")
-    audit = build_identity_substrate_projection_receipt_v1(
-        db,
-        tenant_id=tenant_id,
-        bundle_id=bundle_id,
-        substrate=substrate,
-        substrate_trigger=substrate_trigger,
-        counts_before=counts_before,
-        distinct_candidate_pairs_delta=distinct_candidate_pairs_delta,
-    )
-    return {
-        "identity_continuity_substrate": substrate,
-        "identity_substrate_audit": audit,
-        "graph_density_promotion": graph_density_promotion,
-        "anchor_limit_applied": anchor_limit,
-        "counts_before": counts_before,
-        "counts_after": audit.get("counts_after"),
-        "distinct_candidate_pairs_delta": distinct_candidate_pairs_delta,
-    }
+    if out.get("graph_density_promotion") is None:
+        out["graph_density_promotion"] = promotion_trigger.get("promotion")
+    return out
 
 
 def finalize_identity_substrate_operator_audit(
@@ -319,21 +301,56 @@ def _run_rebuild_identities_substrate_v1(
     anchor_limit: int,
     restart_downstream: bool,
 ) -> dict[str, Any]:
-    """Backfill handles/candidates from anchors and optionally restart graph downstream."""
-    from vector.domains.cortex.execution.admin_commands import restart_execution_from_phase_v1
-    from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
-
-    substrate = run_identity_handles_and_candidates_refresh(
+    """Non-destructive substrate refresh (one repair slice or full exhaustion when anchor_limit high)."""
+    _ = anchor_limit
+    return rebuild_identities_from_anchors_v1(
         db,
         tenant_id=tenant_id,
-        dry_run=False,
-        anchor_limit=anchor_limit,
+        restart_downstream=restart_downstream,
     )
-    counts_after = substrate_counts(db, tenant_id=tenant_id)
 
-    cleared_downstream: dict[str, Any] | None = None
+
+def rebuild_identities_from_anchors_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    anchor_limit: int = 5_000,
+    restart_downstream: bool = True,
+) -> dict[str, Any]:
+    """Non-destructive identity rebuild: paginated backfill until anchors exhausted (+ optional graph restart)."""
+    from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
+    from vector.domains.cortex.identity.identity_substrate_repair_v1 import (
+        identity_repair_anchor_batch_size_v1,
+        reset_identity_substrate_repair_state_v1,
+        run_identity_substrate_repair_until_exhausted_v1,
+    )
+
+    counts_before = substrate_counts(db, tenant_id=tenant_id)
+    bundle_id = resolve_default_bundle_id_for_stub_transform(db, tenant_id=tenant_id) or ""
+    if not bundle_id.strip():
+        msg = "no_default_bundle_for_identity_rebuild"
+        raise ValueError(msg)
+    reset_identity_substrate_repair_state_v1(
+        db,
+        tenant_id=tenant_id,
+        anchors_total=int(counts_before.get("identity_anchors") or 0),
+    )
+    batch = identity_repair_anchor_batch_size_v1()
+    max_slices = max(1, min(50, int(counts_before.get("identity_anchors") or 0) // max(batch, 1) + 2))
+    repair = run_identity_substrate_repair_until_exhausted_v1(
+        db,
+        tenant_id=tenant_id,
+        bundle_id=bundle_id,
+        substrate_trigger="operator:rebuild_identities_incremental",
+        max_slices=max_slices,
+    )
+
     restarted: dict[str, Any] | None = None
+    cleared_downstream: dict[str, Any] | None = None
     if restart_downstream:
+        from vector.domains.cortex.execution.admin_commands import restart_execution_from_phase_v1
+        from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
+
         cleared_downstream = clear_derived_outputs_from_phase_v1(
             db,
             tenant_id=tenant_id,
@@ -346,47 +363,17 @@ def _run_rebuild_identities_substrate_v1(
         )
 
     return {
-        "counts_after": counts_after,
-        "substrate": substrate,
-        "cleared_downstream": cleared_downstream,
-        "restarted": restarted,
-        "anchor_limit_applied": anchor_limit,
-    }
-
-
-def rebuild_identities_from_anchors_v1(
-    db: Session,
-    *,
-    tenant_id: uuid.UUID,
-    anchor_limit: int = 5_000,
-    restart_downstream: bool = True,
-) -> dict[str, Any]:
-    """Clear org identity substrate and rebuild handles + candidates from canonical anchors only."""
-    from vector.domains.cortex.ingestion.full_pipeline_reset import clear_derived_outputs_from_phase_v1
-
-    counts_before = substrate_counts(db, tenant_id=tenant_id)
-    cleared_identity = clear_derived_outputs_from_phase_v1(
-        db,
-        tenant_id=tenant_id,
-        from_phase="IDENTITY",
-    )
-    downstream = _run_rebuild_identities_substrate_v1(
-        db,
-        tenant_id=tenant_id,
-        anchor_limit=anchor_limit,
-        restart_downstream=restart_downstream,
-    )
-
-    return {
         "surface_kind": "identity_rebuild_from_anchors_v1",
         "tenant_id": str(tenant_id),
         "counts_before": counts_before,
-        "counts_after": downstream["counts_after"],
-        "cleared_identity": cleared_identity,
-        "substrate": downstream["substrate"],
-        "cleared_downstream": downstream["cleared_downstream"],
-        "restarted": downstream["restarted"],
-        "anchor_limit_applied": anchor_limit,
+        "counts_after": repair.get("counts_after"),
+        "cleared_identity": None,
+        "substrate": repair.get("last_slice"),
+        "cleared_downstream": cleared_downstream,
+        "restarted": restarted,
+        "anchor_limit_applied": identity_repair_anchor_batch_size_v1(),
+        "repair_until_exhausted": repair,
+        "destructive_clear": False,
     }
 
 

@@ -713,6 +713,13 @@ class Settings(BaseSettings):
             "when unpromoted candidates exceed backlog threshold. Rollback false: manual/admin only."
         ),
     )
+    cortex_identity_repair_anchor_batch_size: int = Field(
+        default=5_000,
+        ge=500,
+        le=10_000,
+        validation_alias="CORTEX_IDENTITY_REPAIR_ANCHOR_BATCH_SIZE",
+        description="Phase 03 repair slice: anchors scanned per convergence slice before pagination resumes.",
+    )
     cortex_orphan_stitching_sample_limit: int = Field(
         default=100,
         ge=1,
