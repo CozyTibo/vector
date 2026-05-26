@@ -7,7 +7,7 @@ import uuid
 
 from app.celery_app import celery_app
 from vector.domains.cortex.ingestion.sync_context import IngestionSyncContext
-from vector.domains.cortex.ingestion.sync_executor import execute_connector_sync
+from vector.domains.cortex.ingestion.sync_router import execute_connector_sync
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
 

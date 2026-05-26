@@ -1247,15 +1247,6 @@ def walks_failed(card: dict[str, Any]) -> bool:
     return False
 
 
-def attention_items_to_legacy_lines(items: list[dict[str, Any]]) -> list[str]:
-    lines: list[str] = []
-    for item in items:
-        lines.append(
-            f"[{item['priority']}] {item['title']} — Impact: {item['impact']} — Action: {item['action']}"
-        )
-    return lines
-
-
 def build_continuity_overview_bundle_v1(
     session: Session,
     settings: Settings,
@@ -1263,8 +1254,8 @@ def build_continuity_overview_bundle_v1(
     tenant_id: uuid.UUID,
     ctx: ContinuityOverviewContextV1 | None = None,
     ingestion_admin: dict[str, Any] | None = None,
-) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[str]]:
-    """Returns (continuity_status, phases, attention_items, attention_lines)."""
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Returns (continuity_status, phases, attention_items)."""
     ctx = ctx or get_cached_continuity_overview_context_v1(
         session, settings, tenant_id=tenant_id, overview_lite=True
     )
@@ -1286,9 +1277,4 @@ def build_continuity_overview_bundle_v1(
         lease=ctx.lease,
         propagation=ctx.propagation,
     )
-    return (
-        continuity_status,
-        phases,
-        attention_items,
-        attention_items_to_legacy_lines(attention_items),
-    )
+    return continuity_status, phases, attention_items

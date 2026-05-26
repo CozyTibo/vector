@@ -676,6 +676,18 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] `substrate_soak_v6_v8_check.py` for 24h Fizzer soak (V6 promotion rules, V7 hash, V8 isolation)
 - [x] `verify_wave5_deploy_contract_v1` + tests in `test_substrate_wave5_deploy_contract.py`
 
+### Wave 6 — Domain residue purge — **DONE**
+
+- [x] Deleted `graph_hash_autonomous_chain.py`, `continuity_p0_graph_hash_autonomous_chain.py`, setting `CORTEX_GRAPH_HASH_AUTONOMOUS_CHAIN`
+- [x] `seed_stale_graph_projection_hash_v1` on `execution_event_triggers` (replaces chain seed helper)
+- [x] Removed `post_ingestion_refresh_celery_task_id`; no fake Celery `task_id` on schedule wrapper return
+- [x] `app/tasks/cortex_ingestion_sync.py` imports `sync_router` (residue gate bans `sync_executor` in production)
+- [x] Removed duplicate `schedule_graph_density_promotion_after_identity_substrate_v1` from `continuity_rebuild.py`
+- [x] `substrate_residue_v1` + `verify_wave6_residue_purge_v1` wired into CI coherence gates
+- [x] Deprecated admin `/runtime-maturity` and `/continuation` routes; structured attention only in continuity bundle
+- [x] Onboarding: `DOCS/cortex/substrate_coherence_modules_v1.md` (18 authoritative modules)
+- [x] Tests: `test_substrate_wave6_residue_purge.py`
+
 **Each wave is independently shippable.** No new orchestrator at any wave.
 
 ---

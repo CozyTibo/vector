@@ -23,7 +23,7 @@ SOAK_CHECK_V8_ISOLATED_PCT_MAX_V1: Final[float] = 90.0
 
 
 def verify_substrate_coherence_ci_gates_v1() -> list[str]:
-    """Static gates for waves 1–4 + M9 + D3/D5 (run in CI before deploy)."""
+    """Static gates for waves 1–6 + M9 + D3/D5 (run in CI before deploy)."""
     from vector.domains.cortex.execution.scheduling import (
         verify_d3_graph_promotion_on_convergence_worker_v1,
         verify_d5_legacy_coordinator_enqueue_paths_deleted_v1,
@@ -31,6 +31,7 @@ def verify_substrate_coherence_ci_gates_v1() -> list[str]:
         verify_wave2_operator_paths_v1,
         verify_wave3_dead_weight_v1,
         verify_wave4_graph_truth_v1,
+        verify_wave6_residue_purge_v1,
     )
 
     errors: list[str] = []
@@ -40,6 +41,7 @@ def verify_substrate_coherence_ci_gates_v1() -> list[str]:
     errors.extend(verify_wave2_operator_paths_v1())
     errors.extend(verify_wave3_dead_weight_v1())
     errors.extend(verify_wave4_graph_truth_v1())
+    errors.extend(verify_wave6_residue_purge_v1())
     return errors
 
 

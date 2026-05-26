@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wave 5 — run substrate coherence CI gates (M9 + waves 1–4 static verifiers)."""
+"""Wave 5/6 — run substrate coherence CI gates (M9 + waves 1–6 static verifiers)."""
 
 from __future__ import annotations
 

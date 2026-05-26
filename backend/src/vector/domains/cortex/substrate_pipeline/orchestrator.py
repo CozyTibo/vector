@@ -95,7 +95,6 @@ def schedule_substrate_pipeline_v1(
             **out,
             "coalesced": False,
             "trigger_kind": trigger_kind,
-            "task_id": substrate_pipeline_celery_task_id(tenant_id),
         }
     return out
 

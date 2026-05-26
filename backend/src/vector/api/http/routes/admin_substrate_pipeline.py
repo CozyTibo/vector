@@ -174,7 +174,7 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
 
         return evaluate_substrate_operational_health_v1(db, tenant_id=tenant_id)
 
-    @r.get("/runtime-maturity")
+    @r.get("/runtime-maturity", deprecated=True)
     def get_runtime_maturity(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
@@ -187,7 +187,7 @@ def register_substrate_pipeline_routes(router: APIRouter) -> None:
 
         return evaluate_tenant_runtime_maturity_v1(db, tenant_id=tenant_id)
 
-    @r.get("/continuation")
+    @r.get("/continuation", deprecated=True)
     def get_pipeline_continuation(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],

@@ -224,6 +224,23 @@ def resolve_live_graph_projection_hash_v1(
     return str(export_doc.get("stable_hash_sha256") or "").strip() or None
 
 
+def seed_stale_graph_projection_hash_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Force hash-change detection on next graph-hash trigger (proof / continuity tests)."""
+    live_hash = resolve_live_graph_projection_hash_v1(session, tenant_id=tenant_id)
+    lease = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
+    if lease is None or not live_hash:
+        return {"seeded": False, "reason": "missing_lease_or_live_hash"}
+    detail = dict(lease.detail_json or {})
+    detail[DETAIL_KEY_LAST_GRAPH_HASH_V1] = "stale_hash_for_graph_trigger_proof"
+    lease.detail_json = detail
+    session.flush()
+    return {"seeded": True, "live_hash": live_hash}
+
+
 def build_event_triggers_inspect_v1(
     session: Session,
     *,

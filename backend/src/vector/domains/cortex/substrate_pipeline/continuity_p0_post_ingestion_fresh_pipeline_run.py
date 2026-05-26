@@ -172,13 +172,13 @@ def drive_graph_change_fresh_run_proof_v1(
         get_tenant_execution_lease_v1,
         resolve_live_graph_projection_hash_v1,
     )
-    from vector.domains.cortex.substrate_pipeline.graph_hash_autonomous_chain import (
-        seed_stale_graph_hash_for_chain_v1,
+    from vector.domains.cortex.execution.execution_event_triggers import (
+        seed_stale_graph_projection_hash_v1,
     )
     from vector.domains.cortex.substrate_pipeline.phase_runners import run_phase_04_graph_v1
     from vector.domains.cortex.substrate_pipeline.repository import get_phase_run_v1
 
-    seed = seed_stale_graph_hash_for_chain_v1(session, tenant_id=tenant_id)
+    seed = seed_stale_graph_projection_hash_v1(session, tenant_id=tenant_id)
     live_hash = resolve_live_graph_projection_hash_v1(session, tenant_id=tenant_id)
     if not live_hash:
         return {"started": False, "reason": "missing_live_graph_hash", "seed": seed}

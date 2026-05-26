@@ -891,14 +891,6 @@ class Settings(BaseSettings):
             "at least one walk (BLOCKED receipt if zero)."
         ),
     )
-    cortex_graph_hash_autonomous_chain_enabled: bool = Field(
-        default=True,
-        validation_alias="CORTEX_GRAPH_HASH_AUTONOMOUS_CHAIN",
-        description=(
-            "B5: allow graph-hash trigger → walks → sync TCRE → phase 07 chain runner "
-            "(prod proof / continuity); disable to rollback autonomous chain drives."
-        ),
-    )
     cortex_post_ingestion_fresh_run_on_graph_change_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_POST_INGESTION_FRESH_RUN_ON_GRAPH_CHANGE",

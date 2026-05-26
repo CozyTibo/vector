@@ -454,6 +454,18 @@ def verify_wave4_graph_truth_v1() -> list[str]:
     return errors
 
 
+def verify_wave6_residue_purge_v1() -> list[str]:
+    """Wave 6: dead substrate residue grep gates (graph-hash chain, fiction ids, import scope)."""
+    from vector.domains.cortex.substrate_pipeline.substrate_residue_v1 import (
+        verify_no_substrate_residue_v1,
+    )
+
+    errors: list[str] = []
+    errors.extend(verify_m9_dead_celery_modules_absent_v1())
+    errors.extend(verify_no_substrate_residue_v1())
+    return errors
+
+
 def verify_wave5_deploy_contract_v1(*, repo_root: Path | None = None) -> list[str]:
     """Wave 5: CI coherence gates + deploy contract scripts wired in GitHub workflows."""
     from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (

@@ -57,6 +57,14 @@ run_sync [cortex_live]
 - `CORTEX_SUBSTRATE_SKIP_WALK_SCHEDULE_V1=true` (default): hash persisted on lease, no OCTS walk schedule from phase 04.
 - People operator UI lists **clusters** (`GET .../cortex/operator/people`) with `cluster_size` and `connector_id_count`.
 
+**Wave 6 (residue purge):**
+
+- Deleted `graph_hash_autonomous_chain` experiment and `CORTEX_GRAPH_HASH_AUTONOMOUS_CHAIN` setting.
+- Removed `post_ingestion_refresh_celery_task_id` and fake `task_id` on `schedule_substrate_pipeline_v1`.
+- Production ingest uses `sync_router.execute_connector_sync` (not `sync_executor` shim).
+- Static gate: `verify_no_substrate_residue_v1` / `test_substrate_wave6_residue_purge.py`.
+- Module map: [substrate_coherence_modules_v1.md](./substrate_coherence_modules_v1.md).
+
 **Wave 3 (removed dead paths):**
 
 - Celery tasks `vector.cortex.identity.regenerate_link_candidates` and `replay_authoritative_links` are **not registered** (use convergence + repair slice).
