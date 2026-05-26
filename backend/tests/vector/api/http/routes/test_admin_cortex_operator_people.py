@@ -338,7 +338,9 @@ def test_operator_people_directory_labels_notion_user_from_page_refs(
     assert person["email"] == "ada@example.com"
 
 
-@patch("vector.domains.cortex.identity.continuity_rebuild.enqueue_rebuild_identities_from_anchors_v1")
+@patch(
+    "vector.domains.cortex.pipeline.operator_admin_actions.enqueue_rebuild_identities_from_anchors_v1",
+)
 def test_operator_rebuild_identities_enqueues_async_repair(
     mock_enqueue: MagicMock,
     client: TestClient,

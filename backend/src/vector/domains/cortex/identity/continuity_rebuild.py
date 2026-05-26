@@ -375,7 +375,7 @@ def rebuild_identities_from_anchors_v1(
     from vector.domains.cortex.execution.convergence_dispatch import mark_dirty_and_enqueue_convergence_v1
 
     convergence_dispatch = mark_dirty_and_enqueue_convergence_v1(
-        tenant_id,
+        tenant_id=tenant_id,
         reason="operator:rebuild_identities_complete",
         telemetry_trigger="operator:rebuild_identities_complete",
     )
@@ -464,7 +464,7 @@ def enqueue_rebuild_identities_from_anchors_v1(
     from vector.domains.cortex.execution.convergence_dispatch import mark_dirty_and_enqueue_convergence_v1
 
     convergence_dispatch = mark_dirty_and_enqueue_convergence_v1(
-        tenant_id,
+        tenant_id=tenant_id,
         reason="operator:rebuild_identities_enqueued",
         telemetry_trigger="operator:rebuild_identities_enqueued",
     )
