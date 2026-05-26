@@ -991,6 +991,14 @@ class Settings(BaseSettings):
             "and graph-hash walk scheduling."
         ),
     )
+    cortex_substrate_skip_walk_schedule_v1: bool = Field(
+        default=True,
+        validation_alias="CORTEX_SUBSTRATE_SKIP_WALK_SCHEDULE_V1",
+        description=(
+            "Wave 4: when true, phase 04 persists graph hash but does not schedule OCTS walks "
+            "on hash change (substrate KPI sign-off; walks are out of scope)."
+        ),
+    )
     cortex_execution_canonical_lane_budget_seconds: int = Field(
         default=0,
         ge=0,

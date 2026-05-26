@@ -32,7 +32,8 @@ export default function OperatorPeoplePage() {
       <header className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h1 className="text-lg font-semibold text-stone-900">People</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Reconstructed identities across your connectors — browse the organization without searching by id.
+          Reconstructed people (union-find on authoritative links + shared identity signals) — not a flat list of
+          every org handle.
         </p>
       </header>
 
@@ -96,9 +97,14 @@ export default function OperatorPeoplePage() {
                                 {sys}
                               </span>
                             ))}
-                            {person.linked_account_count > 1 ? (
+                            {person.cluster_size > 1 ? (
+                              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-800">
+                                {person.cluster_size} handles merged
+                              </span>
+                            ) : null}
+                            {person.connector_id_count >= 2 ? (
                               <span className="text-xs text-stone-500">
-                                {person.linked_account_count} linked accounts
+                                {person.connector_id_count} connector IDs
                               </span>
                             ) : null}
                             {person.in_auth_graph ? (

@@ -661,11 +661,12 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] Archive dead paths in control plane guide + link ledger metadata (`control_plane.py`, `link_ledger_metadata.py`)
 - [x] `verify_wave3_dead_weight_v1` + tests in `test_substrate_wave3_dead_weight.py`
 
-### Wave 4 — Graph truth
+### Wave 4 — Graph truth — **DONE**
 
-- Phase 04 receipt uses isolation + hash delta only
-- Disable walk trigger from phase 04 for substrate KPI (optional flag)
-- People UI clusters
+- [x] Phase 04 export + receipt: `projection_hash_changed`, `isolated_pct`, `isolated_pct_delta`, `largest_component_entity_pct` (`graph_truth_metrics_v1`, `projection_export`, `substrate_phase_receipt`)
+- [x] `cortex_substrate_skip_walk_schedule_v1` (default true) — phase 04 persists hash without scheduling OCTS walks (`execution_event_triggers`)
+- [x] People directory: union-find clusters surfaced with `cluster_size`, `connector_id_count`; UI shows merged clusters first
+- [x] `verify_wave4_graph_truth_v1` + tests in `test_substrate_wave4_graph_truth.py`
 
 ### Wave 5 — Deploy contract
 

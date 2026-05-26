@@ -51,6 +51,12 @@ run_sync [cortex_live]
 |--------|-----|----------|
 | **Rebuild identities** | `POST .../cortex/operator/actions` `{ "action": "rebuild_identities", "confirmation": "REBUILD IDENTITIES FROM CANONICAL ANCHORS" }` | `reset_identity_substrate_repair_state_v1` + `mark_dirty_and_enqueue_convergence_v1` — **no** `identity_rebuild_from_anchors` replay job |
 
+**Wave 4 (graph truth KPIs):**
+
+- Phase 04 receipt primary signals: `projection_hash_changed`, `isolated_pct` / `isolated_pct_delta` (not `node_count` / `edge_count`).
+- `CORTEX_SUBSTRATE_SKIP_WALK_SCHEDULE_V1=true` (default): hash persisted on lease, no OCTS walk schedule from phase 04.
+- People operator UI lists **clusters** (`GET .../cortex/operator/people`) with `cluster_size` and `connector_id_count`.
+
 **Wave 3 (removed dead paths):**
 
 - Celery tasks `vector.cortex.identity.regenerate_link_candidates` and `replay_authoritative_links` are **not registered** (use convergence + repair slice).

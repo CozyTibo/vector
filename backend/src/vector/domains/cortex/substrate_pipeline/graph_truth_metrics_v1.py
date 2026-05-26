@@ -31,6 +31,70 @@ def _to_int(value: Any) -> int:
     return int(value)
 
 
+def snapshot_graph_substrate_isolation_v1(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, Any]:
+    """Isolation + largest auth component — primary phase 04 / substrate_truth KPIs (Wave 4)."""
+    from vector.domains.cortex.operational_runtime.graph_orphan_continuity import (
+        list_graph_connected_components_v1,
+    )
+
+    tid = str(tenant_id)
+    active_entities = _to_int(
+        session.execute(
+            text(
+                """
+                SELECT COUNT(*)::bigint AS n FROM cortex_org_entities
+                WHERE tenant_id = :tenant AND tombstoned_at IS NULL AND lifecycle_state = 'active'
+                """
+            ),
+            {"tenant": tid},
+        ).scalar()
+    )
+    incident = session.execute(
+        text(
+            """
+            WITH incident AS (
+              SELECT source_entity_id AS eid FROM cortex_org_links
+              WHERE tenant_id = :tenant AND link_authority = 'authoritative' AND revoked_at IS NULL
+              UNION
+              SELECT target_entity_id FROM cortex_org_links
+              WHERE tenant_id = :tenant AND link_authority = 'authoritative' AND revoked_at IS NULL
+            )
+            SELECT COUNT(DISTINCT eid)::bigint AS in_graph
+            FROM incident
+            """
+        ),
+        {"tenant": tid},
+    ).mappings().first()
+    in_graph = _to_int(incident["in_graph"]) if incident else 0
+    isolated = max(0, active_entities - in_graph)
+    isolated_pct = round(100.0 * isolated / active_entities, 2) if active_entities else 0.0
+    in_graph_pct = round(100.0 * in_graph / active_entities, 2) if active_entities else 0.0
+
+    components = list_graph_connected_components_v1(session, tenant_id=tenant_id)
+    largest = max((len(c) for c in components), default=0)
+    largest_component_entity_pct = (
+        round(100.0 * largest / active_entities, 2) if active_entities else 0.0
+    )
+
+    return {
+        "schema_version": GRAPH_TRUTH_METRICS_SCHEMA_VERSION,
+        "tenant_id": tid,
+        "active_entities": active_entities,
+        "entities_in_auth_graph": in_graph,
+        "entities_isolated": isolated,
+        "entities_in_auth_graph_pct": in_graph_pct,
+        "isolated_pct": isolated_pct,
+        "entities_in_largest_auth_component": largest,
+        "largest_component_entity_pct": largest_component_entity_pct,
+        "auth_component_count": len(components),
+        "primary_metric_keys": ("isolated_pct", "largest_component_entity_pct"),
+    }
+
+
 def snapshot_authoritative_link_topology_v1(
     session: Session,
     *,

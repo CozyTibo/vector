@@ -26,8 +26,8 @@ def test_graph_projection_export_pipeline_helper_uses_build_document() -> None:
     src = inspect.getsource(pe_mod.run_graph_projection_export_for_pipeline_v1)
     assert "build_org_graph_projection_export_document" in src
     assert "graph_projection_stable_hash_sha256" in src
-    assert "node_count" in src
-    assert "edge_count" in src
+    assert "projection_hash_changed" in src
+    assert "isolated_pct" in src
     assert "unique_auth_pairs" in src
-    assert "unique_pairs_delta" in src
     assert "snapshot_authoritative_link_topology_v1" in src
+    assert "snapshot_graph_substrate_isolation_v1" in src

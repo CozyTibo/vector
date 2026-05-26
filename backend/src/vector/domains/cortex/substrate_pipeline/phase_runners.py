@@ -212,8 +212,25 @@ def run_phase_04_graph_v1(
                 "distinct_candidate_pairs_delta": identity_phase_output.get("distinct_candidate_pairs_delta"),
             },
         )
+    from vector.domains.cortex.execution.execution_event_triggers import (
+        DETAIL_KEY_LAST_GRAPH_HASH_V1,
+        DETAIL_KEY_LAST_GRAPH_ISOLATED_PCT_V1,
+    )
+    from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
+
+    lease = get_tenant_execution_lease_v1(session, tenant_id=tenant_id)
+    lease_detail = dict(lease.detail_json or {}) if lease is not None else {}
+    prior_hash = str(lease_detail.get(DETAIL_KEY_LAST_GRAPH_HASH_V1) or "").strip() or None
+    prior_iso_raw = lease_detail.get(DETAIL_KEY_LAST_GRAPH_ISOLATED_PCT_V1)
+    prior_isolated_pct = float(prior_iso_raw) if prior_iso_raw is not None else None
+
     try:
-        out = run_graph_projection_export_for_pipeline_v1(session, tenant_id=tenant_id)
+        out = run_graph_projection_export_for_pipeline_v1(
+            session,
+            tenant_id=tenant_id,
+            prior_graph_projection_stable_hash=prior_hash,
+            prior_isolated_pct=prior_isolated_pct,
+        )
     except ValueError as exc:
         fail_phase_with_receipt_v1(
             session,
@@ -235,6 +252,12 @@ def run_phase_04_graph_v1(
         graph_projection_stable_hash=str(out.get("graph_projection_stable_hash_sha256") or "") or None,
         pipeline_run_id=pipeline_run_id,
     )
+    if lease is not None:
+        lease_detail = dict(lease.detail_json or {})
+        if out.get("isolated_pct") is not None:
+            lease_detail[DETAIL_KEY_LAST_GRAPH_ISOLATED_PCT_V1] = out["isolated_pct"]
+        lease.detail_json = lease_detail
+        session.flush()
     return complete_phase_with_receipt_v1(
         session,
         pipeline_run_id=pipeline_run_id,

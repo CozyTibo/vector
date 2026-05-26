@@ -22,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 P2_B_STEP = "2b_event_triggers"
 DETAIL_KEY_EVENT_TRIGGERS_V1: Final[str] = "event_triggers"
 DETAIL_KEY_LAST_GRAPH_HASH_V1: Final[str] = "last_graph_projection_stable_hash_sha256"
+DETAIL_KEY_LAST_GRAPH_ISOLATED_PCT_V1: Final[str] = "last_graph_isolated_pct_v1"
 
 EVENT_TRIGGER_INGEST_V1: Final[str] = "post_ingestion_mark_dirty"
 EVENT_TRIGGER_IDENTITY_PROMOTION_V1: Final[str] = "identity_projection_promotion"
@@ -33,6 +34,15 @@ def is_execution_event_triggers_enabled_v1() -> bool:
         from vector.settings import get_settings
 
         return bool(get_settings().cortex_execution_event_triggers_enabled)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def is_substrate_walk_schedule_skipped_v1() -> bool:
+    try:
+        from vector.settings import get_settings
+
+        return bool(get_settings().cortex_substrate_skip_walk_schedule_v1)
     except Exception:  # noqa: BLE001
         return True
 
@@ -152,7 +162,8 @@ def trigger_graph_hash_walk_schedule_v1(
             schedule_target_run_id = uuid.UUID(str(fresh_run["fresh_pipeline_run_id"]))
 
     schedule_out: dict[str, Any] | None = None
-    if (changed or force_schedule) and new_hash:
+    skip_walks = is_substrate_walk_schedule_skipped_v1() and not force_schedule
+    if (changed or force_schedule) and new_hash and not skip_walks:
         schedule_out = schedule_octs_walks_for_tenant_v1(
             tenant_id=tenant_id,
             trigger=TRAVERSAL_SCHEDULE_TRIGGER_GRAPH_HASH_CHANGED_V1,
@@ -171,7 +182,10 @@ def trigger_graph_hash_walk_schedule_v1(
         "hash_changed": changed,
         "walk_schedule": schedule_out,
         "walks_scheduled": bool((schedule_out or {}).get("scheduled")),
+        "substrate_skip_walk_schedule_v1": skip_walks,
     }
+    if skip_walks:
+        manifest["walk_schedule_skipped_reason"] = "cortex_substrate_skip_walk_schedule_v1"
     if fresh_run and fresh_run.get("started") and fresh_run.get("fresh_pipeline_run_id"):
         manifest["fresh_pipeline_run_id"] = fresh_run["fresh_pipeline_run_id"]
         manifest["superseded_pipeline_run_ids"] = list(fresh_run.get("superseded_pipeline_run_ids") or [])

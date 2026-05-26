@@ -690,6 +690,9 @@ def _person_row_from_cluster_light(
             "email": None,
             "systems": [],
             "linked_account_count": len(cluster),
+            "cluster_size": len(cluster),
+            "connector_id_count": 0,
+            "is_singleton_cluster": len(cluster) <= 1,
             "in_auth_graph": any(eid in entity_ids_in_auth_graph for eid in cluster),
             "last_seen_at": None,
             "title": None,
@@ -735,6 +738,13 @@ def _person_row_from_cluster_light(
         "email": email,
         "systems": systems,
         "linked_account_count": len(cluster),
+        "cluster_size": len(cluster),
+        "connector_id_count": _connector_id_count_for_cluster(
+            cluster,
+            entities_by_id=entities_by_id,
+            labels_by_entity_id=labels_by_entity_id,
+        ),
+        "is_singleton_cluster": len(cluster) <= 1,
         "in_auth_graph": any(eid in entity_ids_in_auth_graph for eid in cluster),
         "last_seen_at": last_seen,
         "title": title,
@@ -769,8 +779,25 @@ def _entity_ids_in_auth_graph(
     return linked
 
 
+def _connector_id_count_for_cluster(
+    cluster: set[uuid.UUID],
+    *,
+    entities_by_id: dict[uuid.UUID, dict[str, Any]],
+    labels_by_entity_id: dict[uuid.UUID, dict[str, str | None]],
+) -> int:
+    """Distinct cross-tool identity signals (V9 spot-check: engineer should show ≥2)."""
+    keys: set[tuple[str, str]] = set()
+    for eid in cluster:
+        entity = entities_by_id.get(eid)
+        if entity is None:
+            continue
+        keys.update(_identity_signal_keys(entity, labels_by_entity_id.get(eid)))
+    return len(keys)
+
+
 def _person_sort_key(row: dict[str, Any]) -> tuple[Any, ...]:
     return (
+        -(int(row.get("linked_account_count") or 0)),
         row.get("display_name") is None,
         (row.get("display_name") or "").lower(),
         str(row.get("last_seen_at") or ""),
@@ -831,10 +858,17 @@ def build_people_directory_v1(
     )
     merged_labels = {**metadata_labels, **page_labels}
 
-    people = [
-        _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids, merged_labels)
-        for cluster, _ in page_clusters
-    ]
+    people = []
+    for cluster, _ in page_clusters:
+        row = _person_row_from_cluster_light(cluster, entities_by_id, auth_graph_ids, merged_labels)
+        row["cluster_size"] = len(cluster)
+        row["connector_id_count"] = _connector_id_count_for_cluster(
+            cluster,
+            entities_by_id=entities_by_id,
+            labels_by_entity_id=merged_labels,
+        )
+        row["is_singleton_cluster"] = len(cluster) <= 1
+        people.append(row)
     people.sort(key=_person_sort_key)
     return {
         "surface_kind": "operator_people_directory_v1",

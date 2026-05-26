@@ -400,6 +400,60 @@ def verify_wave3_dead_weight_v1() -> list[str]:
     return errors
 
 
+def verify_wave4_graph_truth_v1() -> list[str]:
+    """Wave 4: phase 04 graph-truth KPIs; walk schedule skipped for substrate by default."""
+    errors: list[str] = []
+    from vector.settings import Settings
+
+    if "cortex_substrate_skip_walk_schedule_v1" not in Settings.model_fields:
+        errors.append("missing_cortex_substrate_skip_walk_schedule_v1_setting")
+
+    from vector.domains.cortex.identity import projection_export as pe_mod
+
+    export_src = inspect.getsource(pe_mod.run_graph_projection_export_for_pipeline_v1)
+    for token in (
+        "projection_hash_changed",
+        "isolated_pct",
+        "isolated_pct_delta",
+        "snapshot_graph_substrate_isolation_v1",
+    ):
+        if token not in export_src:
+            errors.append(f"graph_export_missing_{token}")
+
+    from vector.domains.cortex.substrate_pipeline import phase_runners as pr_mod
+
+    p04_src = inspect.getsource(pr_mod.run_phase_04_graph_v1)
+    if "prior_graph_projection_stable_hash" not in p04_src:
+        errors.append("phase04_missing_prior_hash_handoff")
+    if "trigger_graph_hash_walk_schedule_v1" not in p04_src:
+        errors.append("phase04_missing_graph_hash_trigger_call")
+
+    from vector.domains.cortex.execution import execution_event_triggers as et_mod
+
+    if not callable(getattr(et_mod, "is_substrate_walk_schedule_skipped_v1", None)):
+        errors.append("missing_is_substrate_walk_schedule_skipped_v1")
+    et_src = inspect.getsource(et_mod.trigger_graph_hash_walk_schedule_v1)
+    if "is_substrate_walk_schedule_skipped_v1" not in et_src:
+        errors.append("graph_hash_trigger_missing_substrate_skip_guard")
+
+    from vector.domains.cortex.substrate_pipeline import substrate_phase_receipt as spr_mod
+
+    detail_src = inspect.getsource(spr_mod.extract_phase_receipt_detail_v1)
+    if "projection_hash_changed" not in detail_src or "isolated_pct" not in detail_src:
+        errors.append("phase04_receipt_missing_graph_truth_kpis")
+    if '"node_count"' in detail_src and "PHASE_04_GRAPH" in detail_src:
+        errors.append("phase04_receipt_still_uses_node_count")
+
+    from vector.domains.cortex.identity import people_directory_v1 as pd_mod
+
+    if "_cluster_human_actors" not in inspect.getsource(pd_mod.build_people_directory_v1):
+        errors.append("people_directory_missing_cluster_build")
+    if "connector_id_count" not in inspect.getsource(pd_mod._person_row_from_cluster_light):
+        errors.append("people_row_missing_connector_id_count")
+
+    return errors
+
+
 def verify_phase03_identity_projection_boundary_v1() -> list[str]:
     """Return error codes if phase 03 still enqueues identity audit replay jobs ."""
     errors: list[str] = []

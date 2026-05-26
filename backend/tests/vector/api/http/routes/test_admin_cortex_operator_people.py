@@ -161,6 +161,9 @@ def test_operator_people_directory_unions_same_email_without_link(
     assert body["people"][0]["display_name"] == "Maximilien"
     assert body["people"][0]["email"] == shared_email
     assert body["people"][0]["linked_account_count"] == 3
+    assert body["people"][0]["cluster_size"] == 3
+    assert body["people"][0]["connector_id_count"] >= 1
+    assert body["people"][0]["is_singleton_cluster"] is False
 
 
 def test_operator_people_directory_with_auth_graph_link(

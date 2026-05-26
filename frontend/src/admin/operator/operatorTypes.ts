@@ -316,6 +316,9 @@ export type OperatorPersonRow = {
   email: string | null;
   systems: string[];
   linked_account_count: number;
+  cluster_size: number;
+  connector_id_count: number;
+  is_singleton_cluster: boolean;
   in_auth_graph: boolean;
   last_seen_at: string | null;
   title: string | null;

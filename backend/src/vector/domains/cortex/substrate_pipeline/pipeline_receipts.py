@@ -65,7 +65,10 @@ def _summarize_phase_output(phase_id: str, output: dict[str, Any]) -> dict[str, 
     if phase_id.endswith("graph"):
         return {
             "graph_projection_stable_hash_sha256": output.get("graph_projection_stable_hash_sha256"),
-            "node_count": output.get("node_count"),
+            "projection_hash_changed": output.get("projection_hash_changed"),
+            "isolated_pct": output.get("isolated_pct"),
+            "isolated_pct_delta": output.get("isolated_pct_delta"),
+            "largest_component_entity_pct": output.get("largest_component_entity_pct"),
             "unique_auth_pairs": output.get("unique_auth_pairs"),
         }
     return {k: output[k] for k in list(output.keys())[:12]}

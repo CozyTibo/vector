@@ -271,10 +271,13 @@ def run_graph_projection_export_for_pipeline_v1(
     db: Session,
     *,
     tenant_id: uuid.UUID,
+    prior_graph_projection_stable_hash: str | None = None,
+    prior_isolated_pct: float | None = None,
 ) -> dict[str, Any]:
     """Single phase-04 transform: direct projection export (no org-link replay job)."""
     from vector.domains.cortex.substrate_pipeline.graph_truth_metrics_v1 import (
         snapshot_authoritative_link_topology_v1,
+        snapshot_graph_substrate_isolation_v1,
     )
 
     doc = build_org_graph_projection_export_document(db, tenant_id=tenant_id)
@@ -289,8 +292,15 @@ def run_graph_projection_export_for_pipeline_v1(
     node_count = len(nodes) if isinstance(nodes, list) else 0
     projection_edge_count = len(edges) if isinstance(edges, list) else 0
     topo = snapshot_authoritative_link_topology_v1(db, tenant_id=tenant_id)
+    isolation = snapshot_graph_substrate_isolation_v1(db, tenant_id=tenant_id)
     auth_edge_rows = int(topo.get("auth_edge_rows") or 0)
     unique_auth_pairs = int(topo.get("unique_auth_pairs") or 0)
+    prior_hash = (prior_graph_projection_stable_hash or "").strip()
+    projection_hash_changed = bool(prior_hash) and stable != prior_hash
+    isolated_pct = float(isolation.get("isolated_pct") or 0.0)
+    isolated_pct_delta: float | None = None
+    if prior_isolated_pct is not None:
+        isolated_pct_delta = round(isolated_pct - float(prior_isolated_pct), 2)
     return {
         "graph_projection_stable_hash_sha256": stable,
         "node_count": node_count,
@@ -302,6 +312,14 @@ def run_graph_projection_export_for_pipeline_v1(
         "unique_auth_pairs_delta": 0,
         "dup_factor": topo.get("dup_factor"),
         "graph_truth_primary_metric_key": "unique_auth_pairs",
+        "graph_truth_phase04_kpi_keys": ("projection_hash_changed", "isolated_pct_delta"),
+        "projection_hash_changed": projection_hash_changed,
+        "isolated_pct": isolated_pct,
+        "isolated_pct_delta": isolated_pct_delta,
+        "entities_in_largest_auth_component": isolation.get("entities_in_largest_auth_component"),
+        "largest_component_entity_pct": isolation.get("largest_component_entity_pct"),
+        "entities_in_auth_graph": isolation.get("entities_in_auth_graph"),
+        "entities_isolated": isolation.get("entities_isolated"),
         "org_graph_projection_schema_version": doc.get("org_graph_projection_schema_version"),
         "engine_build_ref": doc.get("engine_build_ref"),
     }
