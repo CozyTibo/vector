@@ -1,10 +1,46 @@
 name: CI
 
-# PR gate: frontend build only. Production deploy runs on push to main (see deploy.yml).
+# PR gate: frontend build + substrate coherence (Wave 5). Production deploy runs on push to main (see deploy.yml).
 on:
   pull_request:
 
 jobs:
+  backend-substrate-coherence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Substrate coherence gates (M9 + waves 1–4 static)
+        working-directory: backend
+        env:
+          VECTOR_SETTINGS_SKIP_DOTENV: "1"
+          DATABASE_URL: postgresql+psycopg://vector:vector@localhost:5432/vector_test
+        run: |
+          PYTHONPATH=src python scripts/substrate_ci_gates.py
+          PYTHONPATH=src python -m pytest -q \
+            tests/vector/domains/cortex/execution/test_m9_scheduling.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave1_promotion_collapse.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave2_operator_paths.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave3_dead_weight.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave4_graph_truth.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave5_deploy_contract.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_dead_topology_cleanup_s2.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d5_legacy_coordinator_enqueue_deletion.py \
+            tests/vector/domains/cortex/execution/test_phase04_graph_projection_export_boundary.py \
+            tests/vector/domains/cortex/identity/test_projection_export_graph_truth_wave4.py
+
   frontend:
     runs-on: ubuntu-latest
     steps:

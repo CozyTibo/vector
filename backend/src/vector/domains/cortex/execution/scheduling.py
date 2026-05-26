@@ -454,6 +454,23 @@ def verify_wave4_graph_truth_v1() -> list[str]:
     return errors
 
 
+def verify_wave5_deploy_contract_v1(*, repo_root: Path | None = None) -> list[str]:
+    """Wave 5: CI coherence gates + deploy contract scripts wired in GitHub workflows."""
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        verify_substrate_coherence_ci_gates_v1,
+        verify_wave5_deploy_contract_wiring_v1,
+    )
+
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import discover_repo_root_v1
+
+    errors: list[str] = []
+    errors.extend(verify_substrate_coherence_ci_gates_v1())
+    root = repo_root or discover_repo_root_v1()
+    if root is not None:
+        errors.extend(verify_wave5_deploy_contract_wiring_v1(repo_root=root))
+    return errors
+
+
 def verify_phase03_identity_projection_boundary_v1() -> list[str]:
     """Return error codes if phase 03 still enqueues identity audit replay jobs ."""
     errors: list[str] = []

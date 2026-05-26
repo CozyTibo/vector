@@ -101,7 +101,36 @@ Trust **`overall_status`** and **`red_rules`**, not pipeline `completed` or raw 
 
 ---
 
-## Deploy check (minimal)
+## Deploy check (Wave 5 — mandatory)
 
-1. `probe_prod_ecs_deploy_v1` — API and worker SHA match.
-2. `substrate_truth_audit_snapshot.py` — diff vs `DOCS/audits/baselines/substrate_truth_fizzer_wave0_baseline.json`.
+**CI (every PR):** GitHub Actions `backend-substrate-coherence` runs M9 + waves 1–5 static gates and substrate pytest.
+
+**CD (every main deploy):**
+
+```bash
+# After ECS stable (automated in deploy.yml)
+cd backend && PYTHONPATH=src python scripts/substrate_post_deploy_gate.py \
+  --expected-sha "$GITHUB_SHA" \
+  --baseline ../DOCS/audits/baselines/substrate_truth_fizzer_wave0_baseline.json
+```
+
+Requires `DB_PROD_*` secrets for baseline diff; ECS probe always runs.
+
+**24h Fizzer soak (V6–V8):**
+
+```bash
+cd backend && PYTHONPATH=src python scripts/substrate_soak_v6_v8_check.py \
+  --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json
+# Optional: --isolation-waiver when signed ticket exists
+# V7: pass --prior-graph-hash from earlier sample in the window
+```
+
+| Check | Script / gate |
+|-------|----------------|
+| ECS SHA | `substrate_post_deploy_gate.py` → `probe_prod_ecs_deploy_v1` |
+| Regression diff | same script vs committed baseline |
+| V6–V8 soak | `substrate_soak_v6_v8_check.py` |
+
+Manual snapshot (update baseline after green deploy):
+
+1. `substrate_truth_audit_snapshot.py` — diff vs `DOCS/audits/baselines/substrate_truth_fizzer_wave0_baseline.json`.

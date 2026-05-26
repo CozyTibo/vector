@@ -668,11 +668,13 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] People directory: union-find clusters surfaced with `cluster_size`, `connector_id_count`; UI shows merged clusters first
 - [x] `verify_wave4_graph_truth_v1` + tests in `test_substrate_wave4_graph_truth.py`
 
-### Wave 5 — Deploy contract
+### Wave 5 — Deploy contract — **DONE**
 
-- CI: substrate outcome tests + M9
-- CD: mandatory probe + snapshot diff
-- 24h Fizzer soak: V6–V8
+- [x] CI: `backend-substrate-coherence` job — M9 + waves 1–5 pytest + `substrate_ci_gates.py`
+- [x] CD: deploy verifies API + ingestion worker + **substrate worker** SHA; `substrate_post_deploy_gate.py` (probe + baseline diff)
+- [x] `substrate_deploy_contract_v1` — coherence gates, baseline diff, soak V6–V8 evaluator
+- [x] `substrate_soak_v6_v8_check.py` for 24h Fizzer soak (V6 promotion rules, V7 hash, V8 isolation)
+- [x] `verify_wave5_deploy_contract_v1` + tests in `test_substrate_wave5_deploy_contract.py`
 
 **Each wave is independently shippable.** No new orchestrator at any wave.
 

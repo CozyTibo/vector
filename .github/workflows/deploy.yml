@@ -300,15 +300,37 @@ jobs:
             --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
           worker_img=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_WORKER_SERVICE" \
             --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
+          substrate_img=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SUBSTRATE_WORKER_SERVICE" \
+            --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
           api_tag=$(aws ecs describe-task-definition --task-definition "$api_img" --region "$AWS_REGION" \
             --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
           worker_tag=$(aws ecs describe-task-definition --task-definition "$worker_img" --region "$AWS_REGION" \
             --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
+          substrate_tag=$(aws ecs describe-task-definition --task-definition "$substrate_img" --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
           echo "API image tag: $api_tag"
           echo "Worker image tag: $worker_tag"
+          echo "Substrate worker image tag: $substrate_tag"
           echo "Expected: $IMAGE_TAG"
           test "$api_tag" = "$IMAGE_TAG"
           test "$worker_tag" = "$IMAGE_TAG"
+          test "$substrate_tag" = "$IMAGE_TAG"
+
+      - name: Substrate post-deploy gate (probe + baseline diff)
+        env:
+          VECTOR_SETTINGS_SKIP_DOTENV: "1"
+          DB_PROD_HOST: ${{ secrets.DB_PROD_HOST }}
+          DB_PROD_PORT: ${{ secrets.DB_PROD_PORT }}
+          DB_PROD_USER: ${{ secrets.DB_PROD_USER }}
+          DB_PROD_PASSWORD: ${{ secrets.DB_PROD_PASSWORD }}
+          DB_PROD_DATABASE: ${{ secrets.DB_PROD_DATABASE }}
+        run: |
+          set -euo pipefail
+          cd backend
+          pip install -q -r requirements.txt
+          PYTHONPATH=src python scripts/substrate_post_deploy_gate.py \
+            --expected-sha "$IMAGE_TAG" \
+            --json
 
       - name: Upload frontend to S3
         run: |
