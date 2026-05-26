@@ -36,8 +36,12 @@ run_sync [cortex_live]
 | Dirty | `convergence_dispatch.mark_dirty_and_enqueue_convergence_v1` |
 | Materialize + anchor | `materialize_raw_record` + `upsert_identity_anchor_for_materialization` |
 | Identity repair | `identity_substrate_repair_v1.run_identity_substrate_repair_slice_v1` |
-| Promotion | `graph_density_promotion.run_graph_density_promotion_pass_v1` (end of repair slice) |
+| Promotion | `graph_density_promotion.run_graph_density_promotion_pass_v1` (end of repair slice only) |
 | Graph export | `projection_export.run_graph_projection_export_for_pipeline_v1` |
+
+**Wave 1 (no duplicate promotion):** Pre-slice `schedule_graph_density_promotion_on_convergence_worker_v1`, event-trigger promotion, and orphan-stitch auto-promotion are removed. Promotion runs at most once per repair slice when backfill/regen produced work.
+
+**Phase status (Wave 1):** `phase_run.status` follows receipt — `BLOCKED`/`topology_wait` → `waiting`; phase 03 `FAILED` → `failed`; repair-in-progress → `waiting` (not green `completed`).
 
 ---
 

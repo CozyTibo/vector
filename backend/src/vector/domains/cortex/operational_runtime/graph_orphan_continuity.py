@@ -22,7 +22,6 @@ from vector.domains.cortex.operational_runtime.graph_density import (
 )
 from vector.domains.cortex.operational_runtime.graph_density_promotion import (
     count_unpromoted_link_candidates_v1,
-    schedule_graph_density_pass_v1,
 )
 from vector.domains.cortex.operational_runtime.normative import (
     PHASE085_NORMATIVE_TREE_V1,
@@ -438,12 +437,6 @@ def run_continuity_stitching_pass_v1(
             anchor_regen_summary = run_anchor_continuity_candidate_regeneration(
                 session,
                 tenant_id=tenant_id,
-            )
-        if awaiting > 0 and get_orphan_stitching_auto_schedule_promotion_v1():
-            promotion_schedule = schedule_graph_density_pass_v1(
-                tenant_id=tenant_id,
-                trigger=STITCH_TRIGGER_AFTER_PROMOTION_V1,
-                force=True,
             )
         if excluded > 0:
             documented = document_intentionally_excluded_orphans_v1(session, tenant_id=tenant_id)

@@ -73,10 +73,6 @@ def test_topology_wait_does_not_skip_execution_lane() -> None:
             "vector.domains.cortex.execution.dual_lane_worker._run_execution_lane_slice_v1",
             return_value=exec_result,
         ) as exec_mock,
-        patch(
-            "vector.domains.cortex.operational_runtime.graph_density_promotion.schedule_graph_density_promotion_on_convergence_worker_v1",
-            return_value={},
-        ),
         patch("vector.domains.cortex.execution.dual_lane_worker.emit_execution_path_telemetry_v1"),
         patch("vector.domains.cortex.execution.dual_lane_worker.sync_dual_lane_fields_on_lease_v1"),
         patch("vector.domains.cortex.execution.dual_lane_worker.enqueue_tenant_convergence_v1"),

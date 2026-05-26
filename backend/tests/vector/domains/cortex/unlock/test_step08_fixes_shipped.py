@@ -18,8 +18,10 @@ def test_fix3_phase03_promotion_hook() -> None:
     ok, _ = evaluate_fix3_promotion_hook_v1()
     assert ok is True
     assert verify_phase03_identity_projection_boundary_v1() == []
-    src = inspect.getsource(id_mod.run_identity_substrate_projection_for_pipeline_v1)
-    assert "graph_density_promotion" in src
+    from vector.domains.cortex.identity import identity_substrate_repair_v1 as repair_mod
+
+    src = inspect.getsource(repair_mod.run_identity_substrate_repair_slice_v1)
+    assert "schedule_graph_density_pass_v1" in src
 
 
 def test_fix4_backfill_include_candidate_regen() -> None:

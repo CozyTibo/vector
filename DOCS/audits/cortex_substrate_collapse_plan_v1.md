@@ -631,12 +631,15 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 
 **Wave 0 does not** change repair/promotion behavior (Wave 1).
 
-### Wave 1 — Stop the bleeding
+### Wave 1 — Stop the bleeding — **DONE**
 
-- Remove pre-slice `schedule_graph_density_promotion_on_convergence_worker_v1`
-- Remove event-trigger duplicate promotion
-- Enforce `resolve_phase_03_outcome_v1` on all paths
-- Fix `phase_run.status` vs receipt for phase 02/03
+- [x] Remove pre-slice `schedule_graph_density_promotion_on_convergence_worker_v1` (`run_tenant_execution`, `dual_lane_worker`; function deleted)
+- [x] Remove event-trigger duplicate promotion (`trigger_identity_promotion_after_substrate_v1` delegates to repair slice; no call from projection)
+- [x] Remove orphan-stitch autonomous promotion (`graph_orphan_continuity`; default `CORTEX_ORPHAN_STITCHING_AUTO_SCHEDULE_PROMOTION=0`)
+- [x] `resolve_phase_03_outcome_v1` enforced on phase 03 runner path (already wired; verified in `verify_phase03_identity_projection_boundary_v1`)
+- [x] `phase_run.status` aligned with receipt via `_persist_phase_run_for_receipt_outcome_v1` (BLOCKED/FAILED/waiting for in-progress phase 03)
+- [x] Phase 04 skip blocked when identity health is degraded
+- [x] Static guards: `verify_d3_graph_promotion_on_convergence_worker_v1`, tests in `test_substrate_wave1_promotion_collapse.py`
 
 ### Wave 2 — Collapse operator paths
 

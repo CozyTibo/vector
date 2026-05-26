@@ -42,8 +42,13 @@ def verify_p2b_event_trigger_wiring_v1() -> dict[str, Any]:
     if "trigger_post_ingestion_execution_v1" not in pid_src:
         errors.append("post_ingestion_missing_trigger_post_ingestion")
     crb_src = inspect.getsource(crb.run_identity_substrate_projection_for_pipeline_v1)
-    if "trigger_identity_promotion_after_substrate_v1" not in crb_src:
-        errors.append("identity_substrate_missing_promotion_trigger")
+    if "trigger_identity_promotion_after_substrate_v1" in crb_src:
+        errors.append("identity_substrate_still_has_event_promotion_trigger")
+    from vector.domains.cortex.execution import execution_event_triggers as et_mod
+
+    et_src = inspect.getsource(et_mod.trigger_identity_promotion_after_substrate_v1)
+    if "schedule_graph_density_promotion_after_identity_substrate_v1" in et_src:
+        errors.append("event_trigger_still_schedules_autonomous_promotion")
     p04_src = inspect.getsource(pr.run_phase_04_graph_v1)
     if "trigger_graph_hash_walk_schedule_v1" not in p04_src:
         errors.append("phase04_missing_graph_hash_trigger")

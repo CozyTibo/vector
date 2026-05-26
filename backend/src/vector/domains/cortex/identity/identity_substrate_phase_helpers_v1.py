@@ -99,6 +99,9 @@ def should_skip_phase_04_after_identity_v1(phase_03_output: dict[str, Any]) -> b
     """Skip graph projection when identity substrate had zero delta (S1.6)."""
     if phase_03_output.get("skipped"):
         return False
+    health = phase_03_output.get("identity_substrate_health_after")
+    if isinstance(health, dict) and str(health.get("status") or "") in ("degraded", "broken"):
+        return False
     if not phase_03_outcome_is_completed_empty_v1(phase_03_output):
         return False
     return identity_substrate_has_zero_delta_v1(phase_03_output)

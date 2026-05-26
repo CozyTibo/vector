@@ -8,16 +8,16 @@ from typing import Any
 
 
 def evaluate_fix3_promotion_hook_v1() -> tuple[bool, str]:
-    """Fix 3: phase-03 identity substrate schedules lawful promotion inline."""
-    from vector.domains.cortex.execution.scheduling import verify_phase03_identity_projection_boundary_v1
-    from vector.domains.cortex.identity import continuity_rebuild as id_mod
+    """Fix 3 (Wave 1): lawful promotion runs only in identity substrate repair slice."""
+    from vector.domains.cortex.execution.scheduling import (
+        verify_d3_graph_promotion_on_convergence_worker_v1,
+        verify_phase03_identity_projection_boundary_v1,
+    )
 
-    errors = verify_phase03_identity_projection_boundary_v1()
+    errors = verify_phase03_identity_projection_boundary_v1() + verify_d3_graph_promotion_on_convergence_worker_v1()
     if errors:
-        return False, f"phase03_boundary:{','.join(errors)}"
-    if not callable(getattr(id_mod, "schedule_graph_density_promotion_after_identity_substrate_v1", None)):
-        return False, "missing_schedule_graph_density_promotion_after_identity_substrate_v1"
-    return True, "phase03_graph_density_promotion_hook"
+        return False, f"promotion_path:{','.join(errors)}"
+    return True, "repair_slice_only_graph_density_promotion"
 
 
 def evaluate_fix4_backfill_candidate_regen_v1() -> tuple[bool, str]:

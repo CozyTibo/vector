@@ -90,16 +90,6 @@ def run_tenant_convergence_v1(
             session.flush()
 
         bundle_id = resolve_default_bundle_id_for_stub_transform(session, tenant_id)
-        if bundle_id is not None:
-            from vector.domains.cortex.operational_runtime.graph_density_promotion import (
-                schedule_graph_density_promotion_on_convergence_worker_v1,
-            )
-
-            schedule_graph_density_promotion_on_convergence_worker_v1(
-                session,
-                tenant_id=tenant_id,
-                convergence_reason=reason,
-            )
         if bundle_id is None:
             complete_convergence_lease_v1(session, lease=lease, pipeline_run_id=pipeline_run_id)
             session.commit()

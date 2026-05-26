@@ -16,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[6]
 def test_d3_wiring_ok() -> None:
     wiring = verify_d3_graph_promotion_schedule_wiring_v1()
     assert wiring["wiring_ok"] is True
-    assert wiring["convergence_promotion_enabled"] is True
+    assert wiring["convergence_promotion_enabled"] is True  # settings flag; worker hook removed (Wave 1)
 
 
 def test_d3_proof_passes() -> None:

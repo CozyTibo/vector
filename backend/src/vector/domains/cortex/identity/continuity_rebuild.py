@@ -151,18 +151,6 @@ def run_identity_substrate_projection_for_pipeline_v1(
         bundle_id=bundle_id,
         substrate_trigger=substrate_trigger,
     )
-    from vector.domains.cortex.execution.execution_event_triggers import (
-        trigger_identity_promotion_after_substrate_v1,
-    )
-
-    substrate = out.get("identity_continuity_substrate") or {}
-    promotion_trigger = trigger_identity_promotion_after_substrate_v1(
-        db,
-        tenant_id=tenant_id,
-        substrate=substrate if isinstance(substrate, dict) else {},
-    )
-    if out.get("graph_density_promotion") is None:
-        out["graph_density_promotion"] = promotion_trigger.get("promotion")
     return out
 
 
@@ -571,11 +559,6 @@ def run_identity_continuity_rebuild(
         tenant_id=tenant_id,
         dry_run=False,
         anchor_limit=anchor_limit,
-    )
-    promotion = schedule_graph_density_promotion_after_identity_substrate_v1(
-        db,
-        tenant_id=tenant_id,
-        substrate=substrate,
     )
     backfill = {k: v for k, v in substrate.items() if k not in ("candidate_regeneration", "identity_continuity_substrate_pipeline")}
     cand = substrate.get("candidate_regeneration") or {}

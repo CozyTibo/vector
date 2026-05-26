@@ -92,32 +92,24 @@ def trigger_identity_promotion_after_substrate_v1(
     tenant_id: uuid.UUID,
     substrate: dict[str, Any],
 ) -> dict[str, Any]:
-    """Identity projection completion: bounded lawful graph-density promotion pass."""
+    """Wave 1: promotion is owned by ``run_identity_substrate_repair_slice_v1`` only."""
+    _ = substrate
     if not is_execution_event_triggers_enabled_v1():
         return {"triggered": False, "reason": "event_triggers_disabled"}
-    from vector.domains.cortex.identity.continuity_rebuild import (
-        schedule_graph_density_promotion_after_identity_substrate_v1,
-    )
-
-    promotion = schedule_graph_density_promotion_after_identity_substrate_v1(
-        session,
-        tenant_id=tenant_id,
-        substrate=substrate,
-    )
     manifest = {
         "trigger": EVENT_TRIGGER_IDENTITY_PROMOTION_V1,
-        "triggered": promotion is not None,
+        "triggered": False,
         "at": _now_iso(),
-        "promotion_scheduled": bool((promotion or {}).get("scheduled")),
-        "schedule_reason": (promotion or {}).get("reason")
-        or ((promotion or {}).get("evaluation") or {}).get("schedule_reason"),
+        "promotion_scheduled": False,
+        "schedule_reason": "delegated_to_repair_slice_v1",
+        "delegated_to": "run_identity_substrate_repair_slice_v1",
     }
     _persist_event_triggers_detail(
         session,
         tenant_id=tenant_id,
         patch={"last_identity_promotion": manifest},
     )
-    return {"trigger": EVENT_TRIGGER_IDENTITY_PROMOTION_V1, **manifest, "promotion": promotion}
+    return {"trigger": EVENT_TRIGGER_IDENTITY_PROMOTION_V1, **manifest, "promotion": None}
 
 
 def trigger_graph_hash_walk_schedule_v1(

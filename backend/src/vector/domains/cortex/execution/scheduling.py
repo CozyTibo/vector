@@ -273,25 +273,32 @@ def verify_d5_legacy_coordinator_enqueue_paths_deleted_v1() -> list[str]:
 
 
 def verify_d3_graph_promotion_on_convergence_worker_v1() -> list[str]:
-    """D3: promotion inline on convergence worker + Celery beat sweep (not legacy sidecar)."""
+    """Wave 1: promotion only in repair slice; no pre-slice convergence hook."""
     errors: list[str] = []
     errors.extend(verify_m9_dead_celery_modules_absent_v1())
     errors.extend(verify_convergence_sweep_in_celery_beat_v1())
     from vector.domains.cortex.execution import run_tenant_execution as rte_mod
 
     rte_src = inspect.getsource(rte_mod.run_tenant_convergence_v1)
-    if "schedule_graph_density_promotion_on_convergence_worker_v1" not in rte_src:
-        errors.append("run_tenant_convergence_missing_d3_promotion_hook")
+    if "schedule_graph_density_promotion_on_convergence_worker_v1" in rte_src:
+        errors.append("run_tenant_convergence_still_has_pre_slice_promotion_hook")
     from vector.domains.cortex.execution import dual_lane_worker as dl_mod
 
     dl_src = inspect.getsource(dl_mod.run_dual_lane_convergence_v1)
-    if "schedule_graph_density_promotion_on_convergence_worker_v1" not in dl_src:
-        errors.append("dual_lane_convergence_missing_d3_promotion_hook")
+    if "schedule_graph_density_promotion_on_convergence_worker_v1" in dl_src:
+        errors.append("dual_lane_convergence_still_has_pre_slice_promotion_hook")
+    from vector.domains.cortex.identity import identity_substrate_repair_v1 as repair_mod
+
+    repair_src = inspect.getsource(repair_mod.run_identity_substrate_repair_slice_v1)
+    if "schedule_graph_density_pass_v1" not in repair_src:
+        errors.append("repair_slice_missing_schedule_graph_density_pass_v1")
     from vector.domains.cortex.operational_runtime import graph_density_promotion as promo_mod
 
     promo_src = inspect.getsource(promo_mod.schedule_graph_density_pass_v1)
     if "inline_execution_slice" not in promo_src:
         errors.append("schedule_graph_density_pass_missing_inline_path")
+    if hasattr(promo_mod, "schedule_graph_density_promotion_on_convergence_worker_v1"):
+        errors.append("convergence_worker_promotion_hook_must_be_deleted")
     return errors
 
 
@@ -316,14 +323,24 @@ def verify_phase03_identity_projection_boundary_v1() -> list[str]:
         errors.append("missing_run_identity_substrate_projection_for_pipeline_v1")
     if not callable(getattr(id_mod, "build_identity_substrate_projection_receipt_v1", None)):
         errors.append("missing_build_identity_substrate_projection_receipt_v1")
+    if "resolve_phase_03_outcome_v1" not in p03:
+        errors.append("phase03_missing_resolve_phase_03_outcome_v1")
     proj = inspect.getsource(id_mod.run_identity_substrate_projection_for_pipeline_v1)
-    if (
-        "schedule_graph_density_promotion_after_identity_substrate_v1" not in proj
-        and "trigger_identity_promotion_after_substrate_v1" not in proj
+    if "trigger_identity_promotion_after_substrate_v1" in proj:
+        errors.append("phase03_still_calls_event_trigger_promotion")
+    if "schedule_graph_density_promotion_after_identity_substrate_v1" in proj:
+        errors.append("phase03_still_calls_duplicate_promotion_helper")
+    from vector.domains.cortex.execution import execution_event_triggers as et_mod
+
+    et_src = inspect.getsource(et_mod.trigger_identity_promotion_after_substrate_v1)
+    if "schedule_graph_density_promotion_after_identity_substrate_v1" in et_src:
+        errors.append("event_trigger_still_schedules_promotion")
+    from vector.domains.cortex.substrate_pipeline import phase_runner_receipt as prr_mod
+
+    if "_persist_phase_run_for_receipt_outcome_v1" not in inspect.getsource(
+        prr_mod.complete_phase_with_receipt_v1
     ):
-        errors.append("phase03_missing_graph_density_promotion_hook")
-    if not callable(getattr(id_mod, "schedule_graph_density_promotion_after_identity_substrate_v1", None)):
-        errors.append("phase03_missing_graph_density_promotion_helper")
+        errors.append("phase_receipt_missing_status_alignment_helper")
     return errors
 
 

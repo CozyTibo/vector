@@ -7,10 +7,15 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.substrate_pipeline.constants import (
+    PHASE_02_CANONICAL,
+    PHASE_03_IDENTITY,
+)
 from vector.domains.cortex.substrate_pipeline.repository import (
     complete_phase_v1,
     fail_phase_v1,
     skip_phase_v1,
+    wait_phase_v1,
 )
 from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
     PHASE_OUTCOME_BLOCKED,
@@ -22,6 +27,77 @@ from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
     build_substrate_phase_receipt_v1,
     merge_receipt_into_output,
 )
+
+
+def _persist_phase_run_for_receipt_outcome_v1(
+    session: Session,
+    *,
+    pipeline_run_id: uuid.UUID,
+    phase_id: str,
+    out: dict[str, Any],
+    outcome: str,
+    blocked_reason: str | None = None,
+) -> None:
+    """Align ``phase_run.status`` with substrate receipt outcome (Wave 1)."""
+    receipt = out.get("substrate_phase_receipt")
+    effective = str((receipt or {}).get("outcome") or outcome)
+    reason = blocked_reason or (receipt or {}).get("blocked_reason") if isinstance(receipt, dict) else blocked_reason
+    reason = str(reason)[:500] if reason else None
+
+    if effective == PHASE_OUTCOME_FAILED:
+        fail_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=phase_id,
+            error=reason or "phase_failed",
+            output=out,
+        )
+        return
+    if effective == PHASE_OUTCOME_BLOCKED:
+        wait_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=phase_id,
+            output=out,
+            waiting_reason=reason or "blocked",
+        )
+        return
+    if effective == PHASE_OUTCOME_SKIPPED_BY_POLICY:
+        skip_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=phase_id,
+            reason=reason or "skipped_by_policy",
+            output=out,
+        )
+        return
+    if effective == PHASE_OUTCOME_COMPLETED_EMPTY and phase_id == PHASE_03_IDENTITY:
+        wait_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=phase_id,
+            output=out,
+            waiting_reason=reason or "identity_substrate_no_delta",
+        )
+        return
+    if effective == PHASE_OUTCOME_COMPLETED and reason and phase_id in (
+        PHASE_02_CANONICAL,
+        PHASE_03_IDENTITY,
+    ):
+        wait_phase_v1(
+            session,
+            pipeline_run_id=pipeline_run_id,
+            phase_id=phase_id,
+            output=out,
+            waiting_reason=reason,
+        )
+        return
+    complete_phase_v1(
+        session,
+        pipeline_run_id=pipeline_run_id,
+        phase_id=phase_id,
+        output=out,
+    )
 
 
 def complete_phase_with_receipt_v1(
@@ -37,15 +113,14 @@ def complete_phase_with_receipt_v1(
     processed_count: int | None = None,
     input_epoch: str | None = None,
 ) -> dict[str, Any]:
-    if outcome == PHASE_OUTCOME_COMPLETED and (processed_count == 0 or processed_count is None):
-        proc = processed_count
-        if proc is None:
-            from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
-                infer_processed_count_v1,
-            )
+    if outcome == PHASE_OUTCOME_COMPLETED and processed_count is None and not raw_output.get("skipped"):
+        from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import (
+            infer_processed_count_v1,
+        )
 
-            proc = infer_processed_count_v1(phase_id, raw_output)
-        if proc == 0 and not raw_output.get("skipped"):
+        proc = infer_processed_count_v1(phase_id, raw_output)
+        processed_count = proc
+        if proc == 0 and phase_id not in (PHASE_03_IDENTITY,) and blocked_reason is None:
             outcome = PHASE_OUTCOME_COMPLETED_EMPTY
     receipt = build_substrate_phase_receipt_v1(
         phase_id=phase_id,
@@ -59,11 +134,13 @@ def complete_phase_with_receipt_v1(
         processed_count=processed_count,
     )
     out = merge_receipt_into_output(raw_output, receipt)
-    complete_phase_v1(
+    _persist_phase_run_for_receipt_outcome_v1(
         session,
         pipeline_run_id=pipeline_run_id,
         phase_id=phase_id,
-        output=out,
+        out=out,
+        outcome=outcome,
+        blocked_reason=blocked_reason,
     )
     return out
 
@@ -90,11 +167,13 @@ def wait_phase_with_receipt_v1(
         blocked_reason=reason[:500] if reason else None,
     )
     out = merge_receipt_into_output(raw_output, receipt)
-    complete_phase_v1(
+    _persist_phase_run_for_receipt_outcome_v1(
         session,
         pipeline_run_id=pipeline_run_id,
         phase_id=phase_id,
-        output=out,
+        out=out,
+        outcome=PHASE_OUTCOME_BLOCKED,
+        blocked_reason=reason,
     )
     return out
 

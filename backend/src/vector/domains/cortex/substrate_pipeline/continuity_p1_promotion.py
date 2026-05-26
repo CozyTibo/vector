@@ -44,7 +44,7 @@ def verify_promotion_worker_path_v1() -> dict[str, Any]:
             e for e in p03_errors if "graph_density_promotion" in e
         ],
         "legacy_celery_task_name": CELERY_GRAPH_DENSITY_PROMOTION_TASK_NAME_V1,
-        "worker_hook": "schedule_graph_density_promotion_after_identity_substrate_v1",
+        "worker_hook": "run_identity_substrate_repair_slice_v1",
         "pass_entrypoint": "schedule_graph_density_pass_v1",
         "m9_promotion_path_ok": not promotion_m9 and not any(
             "graph_density_promotion" in e for e in p03_errors

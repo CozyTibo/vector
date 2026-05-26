@@ -735,9 +735,12 @@ class Settings(BaseSettings):
         ),
     )
     cortex_orphan_stitching_auto_schedule_promotion: bool = Field(
-        default=True,
+        default=False,
         validation_alias="CORTEX_ORPHAN_STITCHING_AUTO_SCHEDULE_PROMOTION",
-        description="G-P085-ORPHAN-01: schedule graph density promotion when orphans await promotion.",
+        description=(
+            "G-P085-ORPHAN-01: deprecated — autonomous promotion runs only in "
+            "run_identity_substrate_repair_slice_v1 (Wave 1)."
+        ),
     )
     cortex_traversal_component_schedule_enabled: bool = Field(
         default=True,

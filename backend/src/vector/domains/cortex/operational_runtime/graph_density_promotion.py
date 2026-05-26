@@ -547,30 +547,6 @@ def record_graph_density_promotion_schedule_on_lease_v1(
     return manifest
 
 
-def schedule_graph_density_promotion_on_convergence_worker_v1(
-    session: Session,
-    *,
-    tenant_id: uuid.UUID,
-    convergence_reason: str = "convergence_slice",
-) -> dict[str, Any] | None:
-    """D3: inline promotion pass on each convergence worker slice when backlog exceeds threshold."""
-    if not is_graph_density_promotion_on_convergence_enabled_v1():
-        return {"scheduled": False, "reason": "convergence_promotion_disabled"}
-    out = schedule_graph_density_pass_v1(
-        tenant_id=tenant_id,
-        trigger=PROMOTION_TRIGGER_CONVERGENCE_SLICE_V1,
-        force=False,
-        session=session,
-    )
-    record_graph_density_promotion_schedule_on_lease_v1(
-        session,
-        tenant_id=tenant_id,
-        schedule_out=out,
-        convergence_reason=convergence_reason,
-    )
-    return out
-
-
 def schedule_graph_density_pass_v1(
     *,
     tenant_id: uuid.UUID,
@@ -633,7 +609,8 @@ def build_graph_density_promotion_catalog_v1() -> dict[str, Any]:
             PROMOTION_TRIGGER_CONVERGENCE_SLICE_V1,
             PROMOTION_TRIGGER_MANUAL_V1,
         ],
-        "convergence_worker_schedule_enabled": is_graph_density_promotion_on_convergence_enabled_v1(),
+        "convergence_worker_schedule_enabled": False,
+        "authoritative_promotion_path": "run_identity_substrate_repair_slice_v1",
         "max_per_pass": get_promotion_max_per_pass_v1(),
         "backlog_threshold": get_promotion_backlog_threshold_v1(),
         "require_org_link_replay_receipt": get_promotion_require_replay_receipt_v1(),

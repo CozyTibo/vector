@@ -42,13 +42,11 @@ def verify_d3_graph_promotion_schedule_wiring_v1() -> dict[str, Any]:
         errors.extend(worker_path["m9_promotion_errors"])
     from vector.domains.cortex.identity import continuity_rebuild as id_mod
 
-    proj = inspect.getsource(id_mod.run_identity_substrate_projection_for_pipeline_v1)
-    if "trigger_identity_promotion_after_substrate_v1" not in proj:
-        errors.append("phase03_missing_identity_promotion_event_trigger")
-    if not callable(
-        getattr(id_mod, "schedule_graph_density_promotion_after_identity_substrate_v1", None)
-    ):
-        errors.append("phase03_missing_schedule_graph_density_promotion_helper")
+    from vector.domains.cortex.identity import identity_substrate_repair_v1 as repair_mod
+
+    repair_src = inspect.getsource(repair_mod.run_identity_substrate_repair_slice_v1)
+    if "schedule_graph_density_pass_v1" not in repair_src:
+        errors.append("repair_slice_missing_schedule_graph_density_pass_v1")
     return {
         "wiring_ok": not errors,
         "errors": errors,
