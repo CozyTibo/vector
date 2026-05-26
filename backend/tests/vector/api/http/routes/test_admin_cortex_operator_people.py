@@ -11,7 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
-from vector.domains.cortex.identity.continuity_rebuild import REBUILD_IDENTITIES_CONFIRM_PHRASE
+from vector.domains.cortex.identity.continuity_rebuild import (
+    REBUILD_IDENTITIES_CONFIRM_PHRASE,
+    enqueue_rebuild_identities_from_anchors_v1,
+)
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
@@ -365,3 +368,26 @@ def test_operator_rebuild_identities_enqueues_async_repair(
     assert body["action"] == "rebuild_identities"
     assert body["result"]["enqueued"] is True
     mock_enqueue.assert_called_once()
+
+
+@patch(
+    "vector.domains.cortex.execution.convergence_dispatch.mark_dirty_and_enqueue_convergence_v1",
+    return_value={"scheduled": True, "path": "convergence_lease"},
+)
+@patch("app.tasks.cortex_org_link_jobs.run_org_link_replay_job_task.apply_async")
+def test_enqueue_rebuild_identities_calls_convergence_dispatch(
+    mock_apply_async: MagicMock,
+    mock_convergence: MagicMock,
+    db_session: Session,
+) -> None:
+    """Regression: enqueue path must import mark_dirty from convergence_dispatch, not enqueue."""
+    mock_apply_async.return_value = MagicMock(id="celery-task-regression")
+    tid = _tenant(db_session)
+
+    out = enqueue_rebuild_identities_from_anchors_v1(db_session, tenant_id=tid)
+
+    assert out["enqueued"] is True
+    assert out["celery_task_id"] == "celery-task-regression"
+    mock_apply_async.assert_called_once()
+    mock_convergence.assert_called_once()
+    assert mock_convergence.call_args.kwargs["reason"] == "operator:rebuild_identities_enqueued"

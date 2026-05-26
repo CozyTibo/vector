@@ -372,7 +372,7 @@ def rebuild_identities_from_anchors_v1(
         max_slices=max_slices,
     )
 
-    from vector.domains.cortex.execution.enqueue import mark_dirty_and_enqueue_convergence_v1
+    from vector.domains.cortex.execution.convergence_dispatch import mark_dirty_and_enqueue_convergence_v1
 
     convergence_dispatch = mark_dirty_and_enqueue_convergence_v1(
         tenant_id,
@@ -461,7 +461,7 @@ def enqueue_rebuild_identities_from_anchors_v1(
     job.celery_task_id = str(async_result.id)
     db.flush()
 
-    from vector.domains.cortex.execution.enqueue import mark_dirty_and_enqueue_convergence_v1
+    from vector.domains.cortex.execution.convergence_dispatch import mark_dirty_and_enqueue_convergence_v1
 
     convergence_dispatch = mark_dirty_and_enqueue_convergence_v1(
         tenant_id,
