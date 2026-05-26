@@ -39,7 +39,8 @@ def test_build_operator_overview_v1_bounded(db_session: Session) -> None:
     settings = get_settings()
     payload = build_operator_overview_v1(db_session, settings, tenant_id=tid)
     assert payload["surface_kind"] == "operator_overview_v1"
-    assert payload["query_groups_used"] == 8
+    assert payload["query_groups_used"] == 9
+    assert payload["substrate_truth"]["surface_kind"] == "substrate_truth_v1"
     assert payload["continuity_snapshot"]["available"] is False
     keys = {f["key"] for f in payload["continuity_facts"]}
     assert keys == {"ingestion", "execution", "graph", "retrieval", "synthesis"}

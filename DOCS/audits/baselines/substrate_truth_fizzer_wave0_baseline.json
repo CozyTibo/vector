@@ -1,0 +1,22 @@
+{
+  "baseline_kind": "substrate_truth_wave0",
+  "schema_version": 1,
+  "tenant_id": "c08ef32b-f89a-40f6-9566-e19b5329436f",
+  "tenant_label": "Fizzer",
+  "captured_at_utc": null,
+  "purpose": "Wave 0 substrate truth sign-off — post-deploy snapshot diff gate.",
+  "repro_commands": {
+    "substrate_truth_audit": "cd backend && python scripts/substrate_truth_audit_snapshot.py --tenant c08ef32b-f89a-40f6-9566-e19b5329436f --json",
+    "dedicated_api": "GET /admin/tenants/{tenant_id}/cortex/substrate/truth"
+  },
+  "acceptance_hints": {
+    "overall_status_prefer": ["HEALTHY", "DEGRADED"],
+    "isolated_pct_max": 90.0,
+    "promotion_rule_count_min": 3
+  },
+  "notes": [
+    "Fill captured_at_utc and substrate_truth by running substrate_truth_audit_snapshot.py --out this file against prod DB.",
+    "After Wave 0 deploy, diff overall_status, red_rules, isolated_pct, promotion_rule_count vs this baseline."
+  ],
+  "substrate_truth": null
+}

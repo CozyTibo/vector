@@ -28,6 +28,7 @@ from vector.contracts.operator_admin import (
     OperatorRetrievalLineageResponse,
     OperatorRuntimeResponse,
     OperatorSynthesisJobsResponse,
+    SubstrateTruthResponse,
 )
 from vector.domains.cortex.identity.people_directory_v1 import (
     build_people_directory_v1,
@@ -69,11 +70,24 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         return AdminBuildInfoResponse.model_validate(build_deploy_info_payload(settings=settings))
 
     op = APIRouter(prefix="/tenants/{tenant_id}/cortex/operator", tags=["cortex-operator"])
+    substrate = APIRouter(prefix="/tenants/{tenant_id}/cortex/substrate", tags=["cortex-substrate"])
 
     def _assert_tenant(db: Session, tenant_id: uuid.UUID) -> None:
         if tenancy_repo.get_tenant_by_id(db, tenant_id) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="tenant_not_found")
 
+    @substrate.get("/truth", response_model=SubstrateTruthResponse)
+    def get_substrate_truth(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> SubstrateTruthResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.substrate_pipeline.substrate_truth_v1 import build_substrate_truth_v1
+
+        with admin_request_timing(endpoint="substrate.truth", tenant_id=tenant_id):
+            raw = build_substrate_truth_v1(db, tenant_id=tenant_id, settings=settings)
+        return SubstrateTruthResponse.model_validate(raw)
 
     @op.get("/overview", response_model=OperatorOverviewResponse)
     def get_operator_overview(
@@ -369,3 +383,4 @@ def register_cortex_operator_routes(router: APIRouter) -> None:
         return OperatorPersonProfileResponse.model_validate(raw)
 
     router.include_router(op)
+    router.include_router(substrate)

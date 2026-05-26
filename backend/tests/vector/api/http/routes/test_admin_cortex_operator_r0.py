@@ -43,7 +43,8 @@ def test_operator_overview(
     body = res.json()
     assert body["surface_kind"] == "operator_overview_v1"
     assert body["tenant_id"] == str(tid)
-    assert body["query_groups_used"] == 8
+    assert body["query_groups_used"] == 9
+    assert body["substrate_truth"]["surface_kind"] == "substrate_truth_v1"
     assert len(body["continuity_facts"]) == 5
     assert "phase_07_retrieval" in body["phase_receipts"]
     assert "phase_08_synthesis" in body["phase_receipts"]

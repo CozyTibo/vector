@@ -43,10 +43,33 @@ export type OperatorSchedulerState = {
   min_gap_seconds: number;
 };
 
+export type SubstrateOverallStatus = "HEALTHY" | "DEGRADED" | "BROKEN" | "STALLED";
+
+export type SubstrateTruth = {
+  surface_kind: "substrate_truth_v1";
+  schema_version: number;
+  tenant_id: string;
+  captured_at_utc: string;
+  overall_status: SubstrateOverallStatus;
+  red_rules: string[];
+  motion: Record<string, unknown>;
+  canonical: Record<string, unknown>;
+  execution: Record<string, unknown>;
+  identity: Record<string, unknown>;
+  graph: Record<string, unknown>;
+  runtime_flags: Record<string, unknown>;
+  queue_ownership: Record<string, unknown>;
+  last_slice: Record<string, unknown> | null;
+  operator_guidance: string[];
+  primary_truth_contract?: string;
+  deprecated_for_substrate_health?: string[];
+};
+
 export type OperatorOverview = {
   surface_kind: "operator_overview_v1";
   tenant_id: string;
   generated_at_utc: string;
+  substrate_truth: SubstrateTruth;
   status_banner: OperatorStatusBanner;
   continuity_facts: OperatorContinuityFact[];
   recent_events: OperatorRecentEvent[];

@@ -24,6 +24,7 @@ from vector.domains.cortex.substrate_pipeline.constants import (
 )
 from vector.domains.cortex.pipeline.admin_continuity_snapshot import read_admin_continuity_snapshot_v1
 from vector.domains.cortex.substrate_pipeline.pipeline_receipts import build_phase_execution_receipt_v1
+from vector.domains.cortex.substrate_pipeline.substrate_truth_v1 import build_substrate_truth_v1
 from vector.infrastructure.cortex_scheduler_pause import read_scheduler_paused_flag
 from vector.infrastructure.db.models.cortex_execution_transition_log import CortexExecutionTransitionLog
 from vector.infrastructure.db.models.cortex_substrate_pipeline_run import (
@@ -136,10 +137,14 @@ def _build_operator_overview_uncached_v1(
     recent_events = _merge_recent_events_v1(recent_runs=recent_runs, transitions=transitions)
     connectors = _connector_rows_from_ingestion_v1(ingestion_overview)
 
+    substrate_truth = build_substrate_truth_v1(session, tenant_id=tenant_id, settings=settings)
+    query_groups += 1
+
     return {
         "surface_kind": "operator_overview_v1",
         "tenant_id": str(tenant_id),
         "generated_at_utc": datetime.now(UTC),
+        "substrate_truth": substrate_truth,
         "status_banner": status_banner,
         "continuity_facts": continuity_facts,
         "recent_events": recent_events,

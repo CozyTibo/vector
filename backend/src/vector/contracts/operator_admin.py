@@ -78,10 +78,38 @@ class OperatorSchedulerState(BaseModel):
     min_gap_seconds: int = 120
 
 
+class SubstrateTruthResponse(BaseModel):
+    """Wave 0 — authoritative ingest→graph substrate state (read-only)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    surface_kind: Literal["substrate_truth_v1"] = "substrate_truth_v1"
+    schema_version: int = 1
+    tenant_id: str
+    captured_at_utc: datetime
+    overall_status: Literal["HEALTHY", "DEGRADED", "BROKEN", "STALLED"]
+    red_rules: list[str] = Field(default_factory=list)
+    motion: dict[str, Any] = Field(default_factory=dict)
+    canonical: dict[str, Any] = Field(default_factory=dict)
+    execution: dict[str, Any] = Field(default_factory=dict)
+    identity: dict[str, Any] = Field(default_factory=dict)
+    graph: dict[str, Any] = Field(default_factory=dict)
+    runtime_flags: dict[str, Any] = Field(default_factory=dict)
+    queue_ownership: dict[str, Any] = Field(default_factory=dict)
+    last_slice: dict[str, Any] | None = None
+    operator_guidance: list[str] = Field(default_factory=list)
+    primary_truth_contract: str = "substrate_truth_v1"
+    deprecated_for_substrate_health: list[str] = Field(default_factory=list)
+
+
 class OperatorOverviewResponse(BaseModel):
     surface_kind: Literal["operator_overview_v1"] = "operator_overview_v1"
     tenant_id: str
     generated_at_utc: datetime
+    substrate_truth: SubstrateTruthResponse | dict[str, Any] = Field(
+        default_factory=dict,
+        description="Wave 0 authoritative substrate state — primary operator truth for ingest→graph.",
+    )
     status_banner: OperatorStatusBanner
     continuity_facts: list[OperatorContinuityFact]
     recent_events: list[OperatorRecentEvent]

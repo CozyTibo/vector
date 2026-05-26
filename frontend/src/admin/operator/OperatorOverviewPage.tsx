@@ -6,6 +6,7 @@ import { OperatorCompactActions } from "./OperatorCompactActions";
 import { OperatorConnectorsTable } from "./OperatorConnectorsTable";
 import { OperatorContinuityFactsSection } from "./OperatorContinuityFactsSection";
 import { OperatorRecentEventsSection } from "./OperatorRecentEventsSection";
+import { OperatorSubstrateTruthSection } from "./OperatorSubstrateTruthSection";
 import { OperatorStatusBannerSection } from "./OperatorStatusBannerSection";
 import { useOperatorOverview } from "./useOperatorOverview";
 
@@ -24,6 +25,12 @@ export default function OperatorOverviewPage() {
 
   return (
     <div className="space-y-6">
+      {loading ? (
+        <SectionSkeleton variant="strip" />
+      ) : data?.substrate_truth ? (
+        <OperatorSubstrateTruthSection truth={data.substrate_truth} />
+      ) : null}
+
       {loading ? (
         <SectionSkeleton variant="strip" />
       ) : data ? (
