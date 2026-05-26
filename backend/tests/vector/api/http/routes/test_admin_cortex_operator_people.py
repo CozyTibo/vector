@@ -335,16 +335,18 @@ def test_operator_people_directory_labels_notion_user_from_page_refs(
     assert person["email"] == "ada@example.com"
 
 
-@patch("vector.domains.cortex.identity.continuity_rebuild.rebuild_identities_from_anchors_v1")
-def test_operator_rebuild_identities_runs_incremental_sync(
-    mock_rebuild: MagicMock,
+@patch("vector.domains.cortex.identity.continuity_rebuild.enqueue_rebuild_identities_from_anchors_v1")
+def test_operator_rebuild_identities_enqueues_async_repair(
+    mock_enqueue: MagicMock,
     client: TestClient,
     db_session: Session,
 ) -> None:
-    mock_rebuild.return_value = {
-        "surface_kind": "identity_rebuild_from_anchors_v1",
+    mock_enqueue.return_value = {
+        "enqueued": True,
+        "job_id": "00000000-0000-4000-8000-000000000001",
+        "celery_task_id": "celery-task-123",
         "destructive_clear": False,
-        "counts_after": {"org_entities_active": 10},
+        "same_repair_as_phase_03": True,
     }
     tid = _tenant(db_session)
     db_session.commit()
@@ -360,5 +362,5 @@ def test_operator_rebuild_identities_runs_incremental_sync(
     assert res.status_code == 200
     body = res.json()
     assert body["action"] == "rebuild_identities"
-    assert body["result"]["destructive_clear"] is False
-    mock_rebuild.assert_called_once()
+    assert body["result"]["enqueued"] is True
+    mock_enqueue.assert_called_once()

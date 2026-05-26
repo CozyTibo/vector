@@ -77,6 +77,38 @@ function laneFact(lane: Record<string, unknown> | null | undefined, label: strin
   return `${label}: ${bits.join(" · ")}`;
 }
 
+function IdentitySubstrateSection({
+  health,
+  repair,
+}: {
+  health: Record<string, unknown> | null | undefined;
+  repair: Record<string, unknown> | null | undefined;
+}) {
+  if (!health && !repair) return null;
+  const metrics = (health?.metrics as Record<string, unknown> | undefined) ?? {};
+  return (
+    <section className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-5 shadow-sm">
+      <p className="text-sm font-medium text-stone-900">Identity substrate</p>
+      <p className="mt-1 text-xs text-stone-600">
+        Same repair path as phase 03 — pagination state lives on the convergence lease.
+      </p>
+      <ul className="mt-3 space-y-1 text-sm text-stone-800">
+        <li>
+          Health: <span className="font-medium">{String(health?.status ?? "—")}</span>
+        </li>
+        <li>
+          Anchor offset: {String(repair?.anchor_offset ?? 0)} / {String(repair?.anchors_total ?? "—")}
+          {repair?.anchor_backfill_exhausted ? " (exhausted)" : ""}
+        </li>
+        <li>Human actors: {String(metrics.active_human_actors ?? "—")}</li>
+        <li>Anchors: {String(metrics.identity_anchors ?? "—")}</li>
+        <li>Auth links: {String(metrics.authoritative_links ?? "—")}</li>
+        <li>Promotion rules: {String(metrics.distinct_authoritative_promotion_rules ?? "—")}</li>
+      </ul>
+    </section>
+  );
+}
+
 function DualLaneSection({ dualLane }: { dualLane: OperatorDualLane }) {
   const canonical = dualLane.canonical_lane;
   const execution = dualLane.execution_lane;
@@ -227,6 +259,13 @@ export default function OperatorRuntimePage() {
         <SectionSkeleton variant="attention" />
       ) : data ? (
         <DualLaneSection dualLane={data.dual_lane} />
+      ) : null}
+
+      {loading ? null : data ? (
+        <IdentitySubstrateSection
+          health={data.identity_substrate_health}
+          repair={data.identity_substrate_repair}
+        />
       ) : null}
 
       {loading ? (

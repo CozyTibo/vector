@@ -135,6 +135,8 @@ class OperatorRuntimeResponse(BaseModel):
     lease: OperatorRuntimeLease | None = None
     dual_lane: dict[str, Any] = Field(default_factory=dict)
     progression: dict[str, Any] = Field(default_factory=dict)
+    identity_substrate_health: dict[str, Any] | None = None
+    identity_substrate_repair: dict[str, Any] | None = None
     transitions: list[OperatorRuntimeTransition]
     transition_total: int
     transition_limit: int

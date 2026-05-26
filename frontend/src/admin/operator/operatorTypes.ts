@@ -97,6 +97,24 @@ export type OperatorDualLane = {
   execution_lane?: Record<string, unknown> | null;
 };
 
+export type IdentitySubstrateHealth = {
+  status?: string;
+  reasons?: string[];
+  metrics?: {
+    identity_anchors?: number;
+    active_human_actors?: number;
+    authoritative_links?: number;
+    distinct_authoritative_promotion_rules?: number;
+  };
+};
+
+export type IdentitySubstrateRepair = {
+  anchor_offset?: number;
+  anchor_backfill_exhausted?: boolean;
+  anchors_total?: number;
+  last_slice_entities_upserted?: number;
+};
+
 export type OperatorRuntime = {
   surface_kind: "operator_runtime_v1";
   tenant_id: string;
@@ -104,6 +122,8 @@ export type OperatorRuntime = {
   lease: OperatorRuntimeLease | null;
   dual_lane: OperatorDualLane;
   progression: Record<string, unknown>;
+  identity_substrate_health?: IdentitySubstrateHealth | null;
+  identity_substrate_repair?: IdentitySubstrateRepair | null;
   transitions: OperatorRuntimeTransition[];
   transition_total: number;
   transition_limit: number;

@@ -396,9 +396,9 @@ def enqueue_rebuild_identities_from_anchors_v1(
     *,
     tenant_id: uuid.UUID,
     anchor_limit: int = 5_000,
-    restart_downstream: bool = True,
+    restart_downstream: bool = False,
 ) -> dict[str, Any]:
-    """Enqueue anchor-only identity rebuild (clear + rescan + optional graph restart run async)."""
+    """Enqueue the same non-destructive identity repair as phase 03 (runs in Celery on ``vector`` queue)."""
     from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
     from vector.domains.cortex.identity.org_link_replay_runtime import (
         create_queued_org_link_replay_job,
@@ -443,7 +443,9 @@ def enqueue_rebuild_identities_from_anchors_v1(
         "cleared_identity": None,
         "anchor_limit_applied": anchor_limit,
         "restart_downstream": restart_downstream,
-        "hint": "Identity rebuild queued. Anchor rescan and downstream restart run in the background — watch Runtime.",
+        "hint": "Identity repair queued (same as phase 03). Watch Runtime for anchor offset / health.",
+        "same_repair_as_phase_03": True,
+        "destructive_clear": False,
     }
 
 

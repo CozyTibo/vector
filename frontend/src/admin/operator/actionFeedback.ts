@@ -177,6 +177,19 @@ export function formatActionFeedback(data: OperatorActionResponse): ActionFeedba
   }
 
   if (action === "rebuild_identities") {
+    if (result.enqueued === true) {
+      return {
+        tone: "ok",
+        title: "Identity repair queued",
+        detail: [
+          typeof result.hint === "string" ? result.hint : null,
+          "Same repair as phase 03 — open Runtime to watch anchor offset and health.",
+          result.worker_task_status_path ? `Task ${result.celery_task_id ?? ""}`.trim() : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      };
+    }
     const before = asRecord(result.counts_before);
     const after = asRecord(result.counts_after);
     const repair = asRecord(result.repair_until_exhausted);

@@ -95,6 +95,16 @@ def _build_operator_runtime_uncached_v1(
         ).all()
     )
 
+    from vector.domains.cortex.identity.identity_substrate_health_v1 import (
+        evaluate_identity_substrate_health_v1,
+    )
+    from vector.domains.cortex.identity.identity_substrate_repair_v1 import (
+        load_identity_substrate_repair_state_v1,
+    )
+
+    identity_health = evaluate_identity_substrate_health_v1(session, tenant_id=tenant_id)
+    identity_repair = load_identity_substrate_repair_state_v1(lease)
+
     return {
         "surface_kind": "operator_runtime_v1",
         "tenant_id": str(tenant_id),
@@ -102,6 +112,8 @@ def _build_operator_runtime_uncached_v1(
         "lease": _lease_payload_v1(lease, dual_lane=dual_lane),
         "dual_lane": dual_lane,
         "progression": progression,
+        "identity_substrate_health": identity_health,
+        "identity_substrate_repair": identity_repair,
         "transitions": [_transition_payload_v1(row) for row in transitions],
         "transition_total": transition_total,
         "transition_limit": transition_limit,
