@@ -3002,12 +3002,21 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexOrgLinkReplayJobRunResponse:
         """Phase 04 Step 10 — synchronous org link replay (e.g. candidate_regen)."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.identity_substrate_operator_v1 import (
+            Wave2CollapsedReplayJobKindError,
+            assert_primary_replay_job_kind_allowed_v1,
+        )
         from vector.domains.cortex.identity.org_link_replay_runtime import (
             ORG_LINK_REPLAY_SCHEMA_VERSION,
             OrgLinkReplayError,
             execute_org_link_replay_job,
             org_link_replay_job_public_dict,
         )
+
+        try:
+            assert_primary_replay_job_kind_allowed_v1(body.job_kind)
+        except Wave2CollapsedReplayJobKindError as exc:
+            raise HTTPException(status.HTTP_410_GONE, detail=str(exc)) from exc
 
         try:
             job = execute_org_link_replay_job(
@@ -3039,6 +3048,16 @@ def build_admin_router() -> APIRouter:
     ) -> AdminCortexOrgLinkReplayJobEnqueueResponse:
         """Phase 04 Step 19 — enqueue async org link replay (e.g. candidate_regen)."""
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.identity.identity_substrate_operator_v1 import (
+            Wave2CollapsedReplayJobKindError,
+            assert_primary_replay_job_kind_allowed_v1,
+        )
+
+        try:
+            assert_primary_replay_job_kind_allowed_v1(body.job_kind)
+        except Wave2CollapsedReplayJobKindError as exc:
+            raise HTTPException(status.HTTP_410_GONE, detail=str(exc)) from exc
+
         from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
         from vector.domains.cortex.identity.org_link_replay_runtime import (
             ORG_LINK_REPLAY_SCHEMA_VERSION,
@@ -4139,31 +4158,15 @@ def build_admin_router() -> APIRouter:
         body: AdminCortexIdentityBackfillFromAnchorsRequest,
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexIdentityBackfillFromAnchorsResponse:
-        """Phase 04 Step 20 — upsert org handles from Phase 03 identity anchors (+ optional candidate regen)."""
+        """Deprecated on primary surface (Wave 2) — use operator rebuild_identities or debug backfill route."""
         _assert_tenant(db, tenant_id)
-        if body.include_candidate_regen:
-            from vector.domains.cortex.identity.continuity_rebuild import (
-                run_identity_handles_and_candidates_refresh,
-            )
-
-            raw = run_identity_handles_and_candidates_refresh(
-                db,
-                tenant_id=tenant_id,
-                dry_run=body.dry_run,
-                anchor_limit=body.anchor_limit,
-            )
-        else:
-            from vector.domains.cortex.identity.backfill import run_anchor_handle_backfill
-
-            raw = run_anchor_handle_backfill(
-                db,
-                tenant_id=tenant_id,
-                dry_run=body.dry_run,
-                anchor_limit=body.anchor_limit,
-                skip_candidate_regen=True,
-            )
-        db.commit()
-        return AdminCortexIdentityBackfillFromAnchorsResponse.model_validate(raw)
+        raise HTTPException(
+            status.HTTP_410_GONE,
+            detail=(
+                "primary_backfill_route_removed_use_operator_rebuild_identities_or_"
+                "POST_.../cortex/debug/identity/backfill/from-canonical-anchors"
+            ),
+        )
 
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/backfill/runs",
@@ -5037,6 +5040,10 @@ def build_admin_router() -> APIRouter:
     from vector.api.http.routes.admin_cortex_operator import register_cortex_operator_routes
 
     register_cortex_operator_routes(r)
+
+    from vector.api.http.routes.admin_cortex_debug import register_cortex_debug_routes
+
+    register_cortex_debug_routes(r, assert_tenant=_assert_tenant)
 
     from vector.api.http.routes.admin_cortex_synthesis import register_cortex_synthesis_routes
 

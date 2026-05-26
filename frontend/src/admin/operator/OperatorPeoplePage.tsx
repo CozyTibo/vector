@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { SectionSkeleton } from "../cortex/SectionSkeleton";
 import { DeployInfoFooter } from "./DeployInfoFooter";
+import { OperatorDebugIdentityPanel } from "./OperatorDebugIdentityPanel";
 import { OperatorPeopleRebuildPanel } from "./OperatorPeopleRebuildPanel";
 import { useOperatorPeopleDirectory } from "./useOperatorPeople";
 
@@ -36,6 +37,7 @@ export default function OperatorPeoplePage() {
       </header>
 
       <OperatorPeopleRebuildPanel />
+      <OperatorDebugIdentityPanel />
 
       {directoryQ.isPending && !directoryQ.data ? (
         <SectionSkeleton variant="table" />

@@ -109,7 +109,7 @@ export function OperatorPeopleRebuildPanel() {
     onSuccess: (data) => {
       setError(null);
       setFeedback(formatActionFeedback(data));
-      setWatchRepair(data.result?.enqueued === true);
+      setWatchRepair(data.result?.no_replay_job === true || data.result?.convergence_dispatch != null);
       invalidateOperatorCaches(qc, tenantId);
       void qc.invalidateQueries({ queryKey: ["operator-people-directory", tenantId] });
     },
@@ -148,8 +148,8 @@ export function OperatorPeopleRebuildPanel() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-stone-900">Rebuild identities</p>
           <p className="mt-1 text-xs text-stone-600">
-            Incrementally rescans canonical anchors into org handles and link candidates (no destructive wipe).
-            Raw ingestion and canonical materialization are untouched. Graph downstream may restart after repair completes.
+            Resets the identity repair cursor and marks the tenant dirty so the convergence worker runs the same
+            phase-03 repair slices as automatic execution (no replay job, no one-shot exhaustive pass).
           </p>
         </div>
         <button

@@ -339,20 +339,18 @@ def test_operator_people_directory_labels_notion_user_from_page_refs(
 
 
 @patch(
-    "vector.domains.cortex.pipeline.operator_admin_actions.enqueue_rebuild_identities_from_anchors_v1",
+    "vector.domains.cortex.pipeline.operator_admin_actions.operator_rebuild_identities_v1",
 )
-def test_operator_rebuild_identities_enqueues_async_repair(
-    mock_enqueue: MagicMock,
+def test_operator_rebuild_identities_reset_and_dirty(
+    mock_rebuild: MagicMock,
     client: TestClient,
     db_session: Session,
 ) -> None:
-    mock_enqueue.return_value = {
-        "enqueued": True,
-        "job_id": "00000000-0000-4000-8000-000000000001",
-        "celery_task_id": "celery-task-123",
-        "celery_queue": "vector",
-        "destructive_clear": False,
+    mock_rebuild.return_value = {
+        "no_replay_job": True,
+        "enqueued": False,
         "same_repair_as_phase_03": True,
+        "convergence_dispatch": {"scheduled": True},
     }
     tid = _tenant(db_session)
     db_session.commit()
@@ -368,28 +366,33 @@ def test_operator_rebuild_identities_enqueues_async_repair(
     assert res.status_code == 200
     body = res.json()
     assert body["action"] == "rebuild_identities"
-    assert body["result"]["enqueued"] is True
-    mock_enqueue.assert_called_once()
+    assert body["result"]["no_replay_job"] is True
+    mock_rebuild.assert_called_once()
 
 
 @patch(
     "vector.domains.cortex.execution.convergence_dispatch.mark_dirty_and_enqueue_convergence_v1",
     return_value={"scheduled": True, "path": "convergence_lease"},
 )
-@patch("app.tasks.cortex_org_link_jobs.run_org_link_replay_job_task.apply_async")
-def test_enqueue_rebuild_identities_calls_convergence_dispatch(
-    mock_apply_async: MagicMock,
+@patch(
+    "vector.domains.cortex.identity.identity_substrate_operator_v1.reset_identity_substrate_repair_state_v1",
+    return_value={"anchor_offset": 0},
+)
+@patch(
+    "vector.domains.cortex.identity.identity_substrate_operator_v1.substrate_counts",
+    return_value={"identity_anchors": 10},
+)
+def test_enqueue_rebuild_identities_collapsed_to_reset_and_dirty(
+    _mock_counts: MagicMock,
+    _mock_reset: MagicMock,
     mock_convergence: MagicMock,
     db_session: Session,
 ) -> None:
-    """Regression: enqueue path must import mark_dirty from convergence_dispatch, not enqueue."""
-    mock_apply_async.return_value = MagicMock(id="celery-task-regression")
+    """Wave 2: public enqueue helper delegates to reset + mark dirty (no Celery replay job)."""
     tid = _tenant(db_session)
 
     out = enqueue_rebuild_identities_from_anchors_v1(db_session, tenant_id=tid)
 
-    assert out["enqueued"] is True
-    assert out["celery_task_id"] == "celery-task-regression"
-    mock_apply_async.assert_called_once()
+    assert out["no_replay_job"] is True
     mock_convergence.assert_called_once()
-    assert mock_convergence.call_args.kwargs["reason"] == "operator:rebuild_identities_enqueued"
+    assert mock_convergence.call_args.kwargs["reason"] == "operator:rebuild_identities"

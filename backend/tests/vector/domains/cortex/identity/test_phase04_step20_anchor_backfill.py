@@ -290,7 +290,7 @@ def test_admin_backfill_routes(
     db_session.commit()
 
     post = client.post(
-        f"/admin/tenants/{tid}/cortex/identity/backfill/from-canonical-anchors",
+        f"/admin/tenants/{tid}/cortex/debug/identity/backfill/from-canonical-anchors",
         auth=("admin", "integration-admin-password"),
         json={"dry_run": True, "anchor_limit": 50},
     )
@@ -300,7 +300,7 @@ def test_admin_backfill_routes(
     assert body["anchors_scanned"] == 1
 
     post2 = client.post(
-        f"/admin/tenants/{tid}/cortex/identity/backfill/from-canonical-anchors",
+        f"/admin/tenants/{tid}/cortex/debug/identity/backfill/from-canonical-anchors",
         auth=("admin", "integration-admin-password"),
         json={"dry_run": False, "anchor_limit": 50},
     )

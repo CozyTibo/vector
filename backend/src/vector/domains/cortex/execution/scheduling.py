@@ -302,6 +302,50 @@ def verify_d3_graph_promotion_on_convergence_worker_v1() -> list[str]:
     return errors
 
 
+def verify_wave2_operator_paths_v1() -> list[str]:
+    """Wave 2: rebuild_identities is reset+dirty; collapsed replay kinds blocked on primary API."""
+    errors: list[str] = []
+    from vector.domains.cortex.pipeline import operator_admin_actions as oa_mod
+
+    oa_src = inspect.getsource(oa_mod.execute_operator_action_v1)
+    if "operator_rebuild_identities_v1" not in oa_src:
+        errors.append("operator_actions_missing_operator_rebuild_identities_v1")
+    if "enqueue_rebuild_identities_from_anchors_v1" in oa_src:
+        errors.append("operator_actions_still_calls_enqueue_rebuild_identities")
+
+    from vector.domains.cortex.identity import continuity_rebuild as cr_mod
+
+    enq = inspect.getsource(cr_mod.enqueue_rebuild_identities_from_anchors_v1)
+    if "operator_rebuild_identities_v1" not in enq:
+        errors.append("enqueue_rebuild_identities_not_collapsed_to_operator_path")
+
+    from vector.domains.cortex.identity import identity_substrate_operator_v1 as op_mod
+
+    if not callable(getattr(op_mod, "operator_rebuild_identities_v1", None)):
+        errors.append("missing_operator_rebuild_identities_v1")
+
+    from vector.api.http.routes import admin as admin_mod
+
+    admin_src = inspect.getsource(admin_mod.build_admin_router)
+    if "register_cortex_debug_routes" not in admin_src:
+        errors.append("admin_router_missing_cortex_debug_routes")
+    if "assert_primary_replay_job_kind_allowed_v1" not in admin_src:
+        errors.append("primary_replay_run_missing_wave2_job_kind_guard")
+
+    from vector.domains.cortex.identity import control_plane as cp_mod
+
+    guide = str(cp_mod.OPERATIONAL_REPLAY_CANONICAL_GUIDE.get("operator_rule") or "")
+    if "identity_continuity_rebuild" in guide and "Prefer" in guide:
+        errors.append("control_plane_still_prefers_identity_continuity_rebuild")
+
+    from vector.domains.cortex.identity import debug_full_substrate_refresh_v1 as dbg_mod
+
+    if not callable(getattr(dbg_mod, "run_debug_full_substrate_refresh_v1", None)):
+        errors.append("missing_run_debug_full_substrate_refresh_v1")
+
+    return errors
+
+
 def verify_phase03_identity_projection_boundary_v1() -> list[str]:
     """Return error codes if phase 03 still enqueues identity audit replay jobs ."""
     errors: list[str] = []

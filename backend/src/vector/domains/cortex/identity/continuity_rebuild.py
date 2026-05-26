@@ -409,7 +409,22 @@ def enqueue_rebuild_identities_from_anchors_v1(
     anchor_limit: int = 5_000,
     restart_downstream: bool = False,
 ) -> dict[str, Any]:
-    """Enqueue the same non-destructive identity repair as phase 03 (Celery ``vector`` queue / substrate worker)."""
+    """Deprecated (Wave 2): use ``operator_rebuild_identities_v1`` (reset + mark dirty, no replay job)."""
+    from vector.domains.cortex.identity.identity_substrate_operator_v1 import operator_rebuild_identities_v1
+
+    _ = anchor_limit
+    _ = restart_downstream
+    return operator_rebuild_identities_v1(db, tenant_id=tenant_id)
+
+
+def _enqueue_rebuild_identities_from_anchors_legacy_celery_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    anchor_limit: int = 5_000,
+    restart_downstream: bool = False,
+) -> dict[str, Any]:
+    """Legacy Celery replay-job enqueue — retained for tests referencing old behavior."""
     from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
     from vector.domains.cortex.execution.worker_queue_roles_v1 import CELERY_SUBSTRATE_QUEUES_V1
     from vector.domains.cortex.identity.org_link_replay_runtime import (

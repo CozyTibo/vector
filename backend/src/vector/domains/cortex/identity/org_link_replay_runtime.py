@@ -234,15 +234,19 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
     job_kind = job.job_kind
     try:
         if job_kind == "identity_continuity_rebuild":
-            from vector.domains.cortex.identity.continuity_rebuild import run_identity_continuity_rebuild
+            from vector.domains.cortex.identity.debug_full_substrate_refresh_v1 import (
+                DEBUG_FULL_SUBSTRATE_REFRESH_ACK_KEY_V1,
+                run_debug_full_substrate_refresh_v1,
+            )
 
-            bundle_id = str((job.scope_json or {}).get("bundle_id") or "").strip()
+            scope = dict(job.scope_json or {})
+            bundle_id = str(scope.get("bundle_id") or "").strip()
             if not bundle_id:
                 raise OrgLinkReplayError("scope_json.bundle_id_required_for_identity_continuity_rebuild")
-            mbl = int((job.scope_json or {}).get("materialize_batch_limit") or 2000)
-            alim = int((job.scope_json or {}).get("anchor_limit") or 5000)
-            rdr = bool((job.scope_json or {}).get("run_determinism_repair", True))
-            run_identity_continuity_rebuild(
+            mbl = int(scope.get("materialize_batch_limit") or 2000)
+            alim = int(scope.get("anchor_limit") or 5000)
+            rdr = bool(scope.get("run_determinism_repair", True))
+            run_debug_full_substrate_refresh_v1(
                 db,
                 tenant_id=job.tenant_id,
                 bundle_id=bundle_id,
@@ -250,6 +254,7 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
                 anchor_limit=alim,
                 run_determinism_repair=rdr,
                 dry_run=bool(job.dry_run),
+                debug_acknowledged=bool(scope.get(DEBUG_FULL_SUBSTRATE_REFRESH_ACK_KEY_V1)),
                 replay_job=job,
             )
             sj = dict(job.summary_json or {})
@@ -265,28 +270,20 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
                 },
             )
         elif job_kind == "identity_rebuild_from_anchors":
-            from vector.domains.cortex.identity.continuity_rebuild import (
-                rebuild_identities_from_anchors_v1,
-                substrate_counts,
+            from vector.domains.cortex.identity.identity_substrate_operator_v1 import (
+                operator_rebuild_identities_v1,
             )
 
             scope = dict(job.scope_json or {})
-            alim = int(scope.get("anchor_limit") or 5000)
-            restart_downstream = bool(scope.get("restart_downstream", True))
-            counts_before = substrate_counts(db, tenant_id=job.tenant_id)
-            downstream = rebuild_identities_from_anchors_v1(
-                db,
-                tenant_id=job.tenant_id,
-                anchor_limit=alim,
-                restart_downstream=restart_downstream,
-            )
+            _ = int(scope.get("anchor_limit") or 5000)
+            downstream = operator_rebuild_identities_v1(db, tenant_id=job.tenant_id)
             job.summary_json = {
-                "surface_kind": "identity_rebuild_from_anchors_v1",
+                "surface_kind": "operator_rebuild_identities_v1",
                 "tenant_id": str(job.tenant_id),
-                "counts_before": counts_before,
-                "counts_after": downstream["counts_after"],
+                "counts_before": downstream.get("counts_before"),
+                "counts_after": None,
                 "cleared_identity": None,
-                "substrate": downstream.get("repair_until_exhausted"),
+                "substrate": downstream.get("repair_state_reset"),
                 "cleared_downstream": downstream.get("cleared_downstream"),
                 "restarted": downstream.get("restarted"),
                 "anchor_limit_applied": downstream.get("anchor_limit_applied"),
@@ -297,9 +294,9 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
                 job_id=job.id,
                 receipt_class="L0",
                 detail_json={
-                    "lane": "identity_rebuild_from_anchors",
-                    "anchor_limit_applied": alim,
-                    "restart_downstream": restart_downstream,
+                    "lane": "operator_rebuild_identities_v1",
+                    "no_replay_job": True,
+                    "convergence_dispatch": downstream.get("convergence_dispatch"),
                 },
             )
         elif job_kind == "authoritative_replay":

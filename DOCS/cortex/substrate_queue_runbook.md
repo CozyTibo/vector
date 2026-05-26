@@ -45,6 +45,20 @@ run_sync [cortex_live]
 
 ---
 
+## Operator repair (Wave 2)
+
+| Action | API | Behavior |
+|--------|-----|----------|
+| **Rebuild identities** | `POST .../cortex/operator/actions` `{ "action": "rebuild_identities", "confirmation": "REBUILD IDENTITIES FROM CANONICAL ANCHORS" }` | `reset_identity_substrate_repair_state_v1` + `mark_dirty_and_enqueue_convergence_v1` — **no** `identity_rebuild_from_anchors` replay job |
+
+Debug-only (add `?debug=1` on operator pages for panel, or call API directly):
+
+- `POST .../cortex/debug/identity/backfill/from-canonical-anchors`
+- `GET/POST .../cortex/debug/identity/replay-jobs`
+- `POST .../cortex/debug/identity/full-substrate-refresh?debug_acknowledged=true&bundle_id=...`
+
+---
+
 ## Operator truth (Wave 0)
 
 - **API:** `GET /admin/tenants/{tenant_id}/cortex/substrate/truth`

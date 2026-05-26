@@ -641,12 +641,16 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] Phase 04 skip blocked when identity health is degraded
 - [x] Static guards: `verify_d3_graph_promotion_on_convergence_worker_v1`, tests in `test_substrate_wave1_promotion_collapse.py`
 
-### Wave 2 — Collapse operator paths
+### Wave 2 — Collapse operator paths — **DONE**
 
-- `rebuild_identities` → reset cursor + mark dirty (no replay job)
-- Hide replay job UI except debug
-- Demote `identity_continuity_rebuild` to debug script
-- Remove admin backfill from primary nav
+- [x] `rebuild_identities` → `operator_rebuild_identities_v1` (reset cursor + mark dirty, no replay job)
+- [x] `enqueue_rebuild_identities_from_anchors_v1` collapsed to same path (no Celery replay)
+- [x] Primary `POST .../identity/replay-jobs/run|enqueue` returns 410 for collapsed job kinds
+- [x] Primary `POST .../identity/backfill/from-canonical-anchors` → 410; debug route under `.../cortex/debug/identity/`
+- [x] `run_debug_full_substrate_refresh_v1` wraps `identity_continuity_rebuild` (debug-only)
+- [x] Debug admin router: `admin_cortex_debug.py` (replay jobs, backfill, full-substrate-refresh)
+- [x] UI: rebuild copy updated; `OperatorDebugIdentityPanel` with `?debug=1` (no replay jobs on primary nav)
+- [x] Control plane guide updated; `verify_wave2_operator_paths_v1` + tests
 
 ### Wave 3 — Delete dead weight
 

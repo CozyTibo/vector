@@ -105,8 +105,8 @@ export function pendingActionFeedback(action: OperatorActionKind): ActionFeedbac
     case "rebuild_identities":
       return {
         tone: "pending",
-        title: "Running identity substrate repair…",
-        detail: "Same repair as automatic phase 03 — paginated anchor backfill, candidates, and promotion.",
+        title: "Resetting identity repair cursor…",
+        detail: "Marks tenant dirty; convergence worker runs phase-03 repair slices (no replay job).",
       };
     default:
       return {
@@ -177,45 +177,16 @@ export function formatActionFeedback(data: OperatorActionResponse): ActionFeedba
   }
 
   if (action === "rebuild_identities") {
-    if (result.enqueued === true) {
-      return {
-        tone: "ok",
-        title: "Identity repair queued",
-        detail: [
-          typeof result.hint === "string" ? result.hint : null,
-          result.job_id ? `Job ${result.job_id}` : null,
-          result.celery_task_id ? `Celery ${result.celery_task_id}` : null,
-          "Open Runtime for anchor offset and health.",
-        ]
-          .filter(Boolean)
-          .join(" "),
-      };
-    }
-    const before = asRecord(result.counts_before);
-    const after = asRecord(result.counts_after);
-    const repair = asRecord(result.repair_until_exhausted);
-    const lastSlice = asRecord(repair?.last_slice);
-    const audit = asRecord(lastSlice?.identity_substrate_audit);
-    const countsAfter = asRecord(audit?.counts_after) ?? after;
-    const entitiesBefore = typeof before?.org_entities_active === "number" ? before.org_entities_active : null;
-    const entitiesAfter =
-      typeof countsAfter?.org_entities_active === "number" ? countsAfter.org_entities_active : null;
-    const slicesRun = typeof repair?.slices_run === "number" ? repair.slices_run : null;
-    const countLine =
-      entitiesBefore != null && entitiesAfter != null
-        ? `Org handles: ${entitiesBefore.toLocaleString()} → ${entitiesAfter.toLocaleString()}.`
-        : null;
     const dispatch = asRecord(result.convergence_dispatch);
     const scheduled = dispatch?.scheduled === true;
+    const anchors = asRecord(result.counts_before)?.identity_anchors;
     return {
-      tone: entitiesAfter != null && entitiesAfter > 0 ? "ok" : "warn",
-      title: "Identity substrate repair finished",
+      tone: scheduled ? "ok" : "warn",
+      title: scheduled ? "Repair cursor reset — convergence scheduled" : "Repair cursor reset",
       detail: [
-        countLine,
-        slicesRun != null ? `${slicesRun} repair slice(s), same path as phase 03.` : null,
-        scheduled
-          ? "Convergence worker scheduled to continue graph and downstream phases."
-          : "Watch Runtime — convergence will continue the pipeline.",
+        typeof result.hint === "string" ? result.hint : null,
+        anchors != null ? `${Number(anchors).toLocaleString()} anchors in scope.` : null,
+        "Watch Runtime or Substrate truth for slice progress (same path as phase 03).",
       ]
         .filter(Boolean)
         .join(" "),

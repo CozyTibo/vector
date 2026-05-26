@@ -33,22 +33,22 @@ IDENTITY_CONTROL_PLANE_CONTRACT: Final[str] = "identity_control_plane_v1"
 _ORG_REPLAY_FRESHNESS_STALE_AFTER: Final[timedelta] = timedelta(hours=24)
 
 OPERATIONAL_REPLAY_CANONICAL_GUIDE: Final[dict[str, Any]] = {
-    "schema_version": "p04.operational_replay_canonical_guide.v1",
+    "schema_version": "p04.operational_replay_canonical_guide.v2_wave2",
+    "authoritative_operator_repair": {
+        "workflow": "POST .../cortex/operator/actions { action: rebuild_identities }",
+        "implementation": "reset_identity_substrate_repair_state_v1 + mark_dirty_and_enqueue_convergence_v1",
+        "does_not": ["enqueue identity_rebuild_from_anchors replay job", "run repair until exhausted in one HTTP request"],
+    },
+    "debug_full_substrate_refresh": {
+        "workflow": "POST .../cortex/debug/identity/full-substrate-refresh?debug_acknowledged=true",
+        "formerly": "identity_continuity_rebuild",
+        "warning": "Bypasses convergence-native slice repair — forensics only",
+    },
     "primary_full_substrate_refresh": {
-        "workflow": "identity_continuity_rebuild (admin) or Celery cortex flush lane when configured",
-        "rebuilds": [
-            "canonical materialization drain (bounded batch per request)",
-            "CortexCanonicalIdentityAnchor handle backfill",
-            "anchor continuity ambiguity hooks + org link candidate regeneration",
-        ],
-        "does_not_by_default": [
-            "mutate authoritative org links (separate authoritative_replay job)",
-            "infer or merge identities",
-        ],
-        "hash_semantics": {
-            "candidate_set_sha256": "Changes only if the canonical candidate row projection set changes (same inputs ⇒ same hash).",
-            "anchor_evidence_input_sha256": "Fingerprint of scanned anchors driving regen; changes when anchor rows change.",
-        },
+        "workflow": "deprecated — see authoritative_operator_repair",
+        "rebuilds": [],
+        "does_not_by_default": [],
+        "hash_semantics": {},
     },
     "narrow_candidate_regen_only": {
         "workflow": "org_link_replay_job with job_kind=candidate_regen (pinned anchor continuity semantic)",
@@ -60,7 +60,10 @@ OPERATIONAL_REPLAY_CANONICAL_GUIDE: Final[dict[str, Any]] = {
         "rebuilds": ["authoritative org link materialization / projection per job scope"],
         "does_not": ["regenerate anchor continuity candidates unless explicitly combined in a higher-level flow"],
     },
-    "operator_rule": "Prefer **identity_continuity_rebuild** when unsure; it is the single full deterministic substrate refresh entry point.",
+    "operator_rule": (
+        "Use **rebuild_identities** (reset repair cursor + mark dirty). "
+        "Debug full refresh only under .../cortex/debug/identity/ with acknowledgement."
+    ),
 }
 
 _CARD_KEYS: Final[tuple[str, ...]] = (
