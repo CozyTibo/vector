@@ -2945,6 +2945,11 @@ def build_admin_router() -> APIRouter:
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
     ) -> AdminCortexOrgLinkReplayJobListResponse:
         """Phase 04 Step 10 — list recent org link replay jobs."""
+        from vector.domains.cortex.substrate_pipeline.substrate_admin_deprecation_v1 import (
+            raise_identity_replay_jobs_primary_route_gone_v1,
+        )
+
+        raise_identity_replay_jobs_primary_route_gone_v1()
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.identity.org_link_replay_runtime import (
             ORG_LINK_REPLAY_SCHEMA_VERSION,
@@ -2969,6 +2974,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexOrgLinkReplayJobDetailResponse:
         """Phase 04 Step 10 — org link replay job + receipts."""
+        from vector.domains.cortex.substrate_pipeline.substrate_admin_deprecation_v1 import (
+            raise_identity_replay_jobs_primary_route_gone_v1,
+        )
+
+        raise_identity_replay_jobs_primary_route_gone_v1()
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.identity.org_link_replay_runtime import (
             ORG_LINK_REPLAY_SCHEMA_VERSION,
@@ -3001,6 +3011,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexOrgLinkReplayJobRunResponse:
         """Phase 04 Step 10 — synchronous org link replay (e.g. candidate_regen)."""
+        from vector.domains.cortex.substrate_pipeline.substrate_admin_deprecation_v1 import (
+            raise_identity_replay_jobs_primary_route_gone_v1,
+        )
+
+        raise_identity_replay_jobs_primary_route_gone_v1()
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.identity.identity_substrate_operator_v1 import (
             Wave2CollapsedReplayJobKindError,
@@ -3047,6 +3062,11 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexOrgLinkReplayJobEnqueueResponse:
         """Phase 04 Step 19 — enqueue async org link replay (e.g. candidate_regen)."""
+        from vector.domains.cortex.substrate_pipeline.substrate_admin_deprecation_v1 import (
+            raise_identity_replay_jobs_primary_route_gone_v1,
+        )
+
+        raise_identity_replay_jobs_primary_route_gone_v1()
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.identity.identity_substrate_operator_v1 import (
             Wave2CollapsedReplayJobKindError,
@@ -3813,16 +3833,20 @@ def build_admin_router() -> APIRouter:
     @r.get(
         "/tenants/{tenant_id}/cortex/identity/control-plane",
         response_model=AdminCortexIdentityControlPlaneResponse,
+        deprecated=True,
     )
     def admin_cortex_identity_control_plane(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
     ) -> AdminCortexIdentityControlPlaneResponse:
-        """Phase 04 Step 17 — Identity Dashboard aggregate (**identity_control_plane_v1**)."""
+        """Identity explorer aggregate — substrate health: GET .../cortex/substrate/truth (Wave 7)."""
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.identity.control_plane import build_identity_control_plane
 
         raw = build_identity_control_plane(db, tenant_id=tenant_id)
+        if isinstance(raw, dict):
+            raw["substrate_truth_contract"] = "substrate_truth_v1"
+            raw["substrate_truth_path"] = f"/admin/tenants/{tenant_id}/cortex/substrate/truth"
         return AdminCortexIdentityControlPlaneResponse.model_validate(raw)
 
     @r.get(

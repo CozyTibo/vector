@@ -12,6 +12,7 @@ from vector.domains.cortex.execution.execution_path_telemetry import (
     emit_execution_path_telemetry_v1,
 )
 from vector.domains.cortex.execution.lease import mark_tenant_dirty_v1
+from vector.domains.cortex.substrate_pipeline.substrate_contract_v1 import build_ingest_handoff_v1
 from vector.infrastructure.db.session import session_scope
 from vector.settings import Settings, get_settings
 
@@ -28,7 +29,15 @@ def mark_dirty_and_enqueue_convergence_v1(
     """Mark durable dirty obligation and enqueue convergence (sole live scheduling path)."""
     cfg = settings or get_settings()
     if not cfg.cortex_post_ingestion_substrate_refresh_enabled:
-        return {"scheduled": False, "reason": "disabled"}
+        return {
+            "scheduled": False,
+            "reason": "disabled",
+            "ingest_handoff_v1": build_ingest_handoff_v1(
+                dirty_enqueued=False,
+                obligation_epoch=None,
+                reason="disabled",
+            ),
+        }
 
     with session_scope() as session:
         dirty = mark_tenant_dirty_v1(session, tenant_id=tenant_id, reason=reason)
@@ -48,12 +57,21 @@ def mark_dirty_and_enqueue_convergence_v1(
         reason,
         dirty.get("obligation_epoch"),
     )
+    obligation_epoch = dirty.get("obligation_epoch")
+    if obligation_epoch is not None:
+        obligation_epoch = int(obligation_epoch)
     return {
         "scheduled": True,
         "path": "convergence_lease",
         "execution_path": EXECUTION_PATH_CONVERGENCE,
         "reason": reason,
         "execution_path_telemetry": telemetry,
+        "ingest_handoff_v1": build_ingest_handoff_v1(
+            dirty_enqueued=True,
+            obligation_epoch=obligation_epoch,
+            reason=reason,
+            celery_task_id=str(hint.get("celery_task_id") or "") or None,
+        ),
         **dirty,
         **hint,
     }

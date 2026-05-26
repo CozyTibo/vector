@@ -93,7 +93,9 @@ class SubstrateTruthResponse(BaseModel):
     canonical: dict[str, Any] = Field(default_factory=dict)
     execution: dict[str, Any] = Field(default_factory=dict)
     identity: dict[str, Any] = Field(default_factory=dict)
+    graph_substrate: dict[str, Any] = Field(default_factory=dict)
     graph: dict[str, Any] = Field(default_factory=dict)
+    ingest_handoff: dict[str, Any] = Field(default_factory=dict)
     runtime_flags: dict[str, Any] = Field(default_factory=dict)
     queue_ownership: dict[str, Any] = Field(default_factory=dict)
     last_slice: dict[str, Any] | None = None

@@ -14,6 +14,7 @@
 | Graph export | `identity/projection_export.py` |
 | Event triggers (hash / ingest) | `execution/execution_event_triggers.py` |
 | Operator truth | `substrate_pipeline/substrate_truth_v1.py` |
+| Contract builders | `substrate_pipeline/substrate_contract_v1.py` |
 
 ## Supporting substrate pipeline
 

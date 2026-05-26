@@ -57,6 +57,14 @@ run_sync [cortex_live]
 - `CORTEX_SUBSTRATE_SKIP_WALK_SCHEDULE_V1=true` (default): hash persisted on lease, no OCTS walk schedule from phase 04.
 - People operator UI lists **clusters** (`GET .../cortex/operator/people`) with `cluster_size` and `connector_id_count`.
 
+**Wave 7 (contract collapse):**
+
+- Authoritative read: `GET /admin/tenants/{id}/cortex/substrate/truth` (`substrate_truth_v1`).
+- Post-ingest returns `ingest_handoff_v1` on `mark_dirty_and_enqueue_convergence_v1`.
+- Graph KPIs: `graph_substrate_v1.unique_auth_pairs` (not raw `auth_edge_rows` at top level).
+- Replay jobs: debug-only (`/cortex/debug/identity/replay-jobs`); primary routes return 410.
+- Schemas: `backend/contracts/substrate_truth_v1.schema.json` (CI-validated).
+
 **Wave 6 (residue purge):**
 
 - Deleted `graph_hash_autonomous_chain` experiment and `CORTEX_GRAPH_HASH_AUTONOMOUS_CHAIN` setting.

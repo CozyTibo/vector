@@ -56,7 +56,9 @@ export type SubstrateTruth = {
   canonical: Record<string, unknown>;
   execution: Record<string, unknown>;
   identity: Record<string, unknown>;
+  graph_substrate?: Record<string, unknown>;
   graph: Record<string, unknown>;
+  ingest_handoff?: Record<string, unknown>;
   runtime_flags: Record<string, unknown>;
   queue_ownership: Record<string, unknown>;
   last_slice: Record<string, unknown> | null;

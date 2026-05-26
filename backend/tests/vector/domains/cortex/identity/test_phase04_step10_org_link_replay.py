@@ -181,7 +181,7 @@ def test_admin_org_link_replay_run_list_detail(
     db_session.commit()
 
     post = client.post(
-        f"/admin/tenants/{tenant.id}/cortex/identity/replay-jobs/run",
+        f"/admin/tenants/{tenant.id}/cortex/debug/identity/replay-jobs/run",
         auth=("admin", "integration-admin-password"),
         json={"job_kind": "authoritative_replay", "dry_run": False},
     )

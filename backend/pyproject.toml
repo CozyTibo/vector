@@ -49,6 +49,7 @@ where = ["src"]
 "vector.infrastructure.email" = ["assets/*.png", "templates/**/*.j2"]
 "vector.domains.cortex.reasoning" = ["fixtures/*.json"]
 "vector.domains.cortex.traversal" = ["schemas/*.json"]
+"vector.domains.cortex.substrate_pipeline" = ["schemas/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -18,12 +18,19 @@ import type {
   OperatorExecutionThread,
   OperatorPeopleDirectory,
   OperatorPersonProfile,
+  SubstrateTruth,
 } from "./operatorTypes";
 
 async function assertOk(res: Response, label: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`${label} ${res.status}`);
   }
+}
+
+export async function fetchSubstrateTruth(tenantId: string): Promise<SubstrateTruth> {
+  const res = await adminFetch(`/admin/tenants/${tenantId}/cortex/substrate/truth`);
+  await assertOk(res, "substrate truth");
+  return res.json();
 }
 
 export async function fetchOperatorOverview(tenantId: string): Promise<OperatorOverview> {

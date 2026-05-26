@@ -67,8 +67,21 @@ def build_identity_substrate_projection_receipt_v1(
     substrate_trigger: str,
     counts_before: dict[str, int] | None = None,
     distinct_candidate_pairs_delta: int | None = None,
+    promotion_pass: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Deterministic phase-03 receipt JSON — no org-link replay job row ."""
+    """Phase-03 audit fields — prefer ``substrate_slice_receipt_v1`` on repair slice return."""
+    from vector.domains.cortex.substrate_pipeline.substrate_contract_v1 import (
+        build_substrate_slice_receipt_v1,
+    )
+
+    slice_receipt = build_substrate_slice_receipt_v1(
+        tenant_id=str(tenant_id),
+        bundle_id=bundle_id.strip(),
+        substrate_trigger=substrate_trigger,
+        repair_slice=substrate,
+        identity_audit=None,
+        promotion_pass=promotion_pass,
+    )
     cand = substrate.get("candidate_regeneration") or {}
     auth_sha = compute_authoritative_link_set_sha256(db, tenant_id=tenant_id)
     after = substrate_counts(db, tenant_id=tenant_id)
@@ -84,6 +97,7 @@ def build_identity_substrate_projection_receipt_v1(
         "tenant_id": str(tenant_id),
         "bundle_id": bundle_id.strip(),
         "substrate_trigger": substrate_trigger,
+        "substrate_slice_receipt_v1": slice_receipt,
         "counts_before_identity_substrate": dict(counts_before) if counts_before is not None else None,
         "anchor_backfill": backfill_only,
         "candidate_regeneration": cand,

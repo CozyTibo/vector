@@ -676,6 +676,17 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] `substrate_soak_v6_v8_check.py` for 24h Fizzer soak (V6 promotion rules, V7 hash, V8 isolation)
 - [x] `verify_wave5_deploy_contract_v1` + tests in `test_substrate_wave5_deploy_contract.py`
 
+### Wave 7 — Substrate API / contract collapse — **DONE**
+
+- [x] `substrate_contract_v1` — `graph_substrate_v1`, `ingest_handoff_v1`, `substrate_slice_receipt_v1`, `validate_phase_receipt_v1`
+- [x] `build_substrate_truth_v1` embeds `graph_substrate` + `ingest_handoff`; single `unique_auth_pairs` primary metric (edge rows under `diagnostics` only)
+- [x] `mark_dirty_and_enqueue_convergence_v1` returns `ingest_handoff_v1`
+- [x] CI JSON schemas: `backend/contracts/substrate_truth_v1.schema.json`, `phase_receipt_v1.schema.json`, OpenAPI `substrate_v1.yaml`
+- [x] Legacy `GET .../cortex/identity/replay-jobs*` → **410**; debug routes under `.../cortex/debug/identity/replay-jobs`
+- [x] `GET .../identity/control-plane` deprecated; points to `.../cortex/substrate/truth`
+- [x] Frontend operator Overview uses `GET .../cortex/substrate/truth` (`useSubstrateTruth`)
+- [x] `verify_wave7_contract_collapse_v1` + `test_substrate_wave7_contract_collapse.py`
+
 ### Wave 6 — Domain residue purge — **DONE**
 
 - [x] Deleted `graph_hash_autonomous_chain.py`, `continuity_p0_graph_hash_autonomous_chain.py`, setting `CORTEX_GRAPH_HASH_AUTONOMOUS_CHAIN`

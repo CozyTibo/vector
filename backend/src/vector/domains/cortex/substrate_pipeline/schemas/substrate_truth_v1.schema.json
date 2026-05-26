@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vector.dev/contracts/substrate_truth_v1.schema.json",
+  "title": "substrate_truth_v1",
+  "type": "object",
+  "required": [
+    "surface_kind",
+    "schema_version",
+    "tenant_id",
+    "captured_at_utc",
+    "overall_status",
+    "red_rules",
+    "motion",
+    "canonical",
+    "execution",
+    "identity",
+    "graph_substrate",
+    "ingest_handoff",
+    "runtime_flags",
+    "queue_ownership",
+    "operator_guidance",
+    "primary_truth_contract"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "surface_kind": { "const": "substrate_truth_v1" },
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "tenant_id": { "type": "string" },
+    "captured_at_utc": { "type": "string" },
+    "overall_status": {
+      "type": "string",
+      "enum": ["HEALTHY", "DEGRADED", "BROKEN", "STALLED"]
+    },
+    "red_rules": { "type": "array", "items": { "type": "string" } },
+    "motion": { "type": "object" },
+    "canonical": { "type": "object" },
+    "execution": { "type": "object" },
+    "identity": { "type": "object" },
+    "graph_substrate": { "$ref": "#/$defs/graph_substrate_v1" },
+    "graph": { "$ref": "#/$defs/graph_substrate_v1" },
+    "ingest_handoff": { "$ref": "#/$defs/ingest_handoff_v1" },
+    "runtime_flags": { "type": "object" },
+    "queue_ownership": { "type": "object" },
+    "last_slice": { "type": ["object", "null"] },
+    "operator_guidance": { "type": "array", "items": { "type": "string" } },
+    "primary_truth_contract": { "const": "substrate_truth_v1" },
+    "deprecated_for_substrate_health": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "ingest_handoff_v1": {
+      "type": "object",
+      "required": ["surface_kind", "schema_version", "dirty_enqueued"],
+      "properties": {
+        "surface_kind": { "const": "ingest_handoff_v1" },
+        "schema_version": { "type": "integer" },
+        "dirty_enqueued": { "type": "boolean" },
+        "obligation_epoch": { "type": ["integer", "null"] },
+        "reason": { "type": ["string", "null"] },
+        "celery_task_id": { "type": ["string", "null"] }
+      }
+    },
+    "graph_substrate_v1": {
+      "type": "object",
+      "required": [
+        "surface_kind",
+        "schema_version",
+        "primary_metric_key",
+        "unique_auth_pairs",
+        "promotion_rule_count",
+        "isolated_pct"
+      ],
+      "properties": {
+        "surface_kind": { "const": "graph_substrate_v1" },
+        "schema_version": { "type": "integer" },
+        "primary_metric_key": { "const": "unique_auth_pairs" },
+        "unique_auth_pairs": { "type": "integer", "minimum": 0 },
+        "promotion_rule_count": { "type": "integer", "minimum": 0 },
+        "isolated_pct": { "type": "number" },
+        "dup_factor": { "type": ["number", "null"] },
+        "active_entities": { "type": "integer" },
+        "diagnostics": { "type": "object" }
+      }
+    }
+  }
+}

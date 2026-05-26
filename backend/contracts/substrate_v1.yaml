@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: Cortex substrate contracts (Wave 7)
+  version: 1.0.0
+  description: |
+    Authoritative substrate read model and collapsed operator surfaces.
+    Primary truth: GET /admin/tenants/{tenant_id}/cortex/substrate/truth
+
+paths:
+  /admin/tenants/{tenant_id}/cortex/substrate/truth:
+    get:
+      operationId: getSubstrateTruthV1
+      summary: Authoritative substrate truth (ingest → graph)
+      tags: [cortex-substrate]
+      responses:
+        "200":
+          description: substrate_truth_v1
+          content:
+            application/json:
+              schema:
+                $ref: substrate_truth_v1.schema.json
+
+  /admin/tenants/{tenant_id}/cortex/operator/overview:
+    get:
+      operationId: getOperatorOverviewV1
+      summary: Operator overview (downstream motion; substrate via /substrate/truth)
+      tags: [cortex-operator]
+      deprecated: true
+      description: |
+        Substrate health KPIs are deprecated on this payload; use GET .../substrate/truth.
+
+components:
+  schemas:
+  x-contract-files:
+    substrate_truth: substrate_truth_v1.schema.json
+    phase_receipt: phase_receipt_v1.schema.json

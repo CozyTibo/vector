@@ -45,8 +45,10 @@ def test_build_substrate_truth_v1_shape(db_session: Session) -> None:
     assert payload["overall_status"] in ("HEALTHY", "DEGRADED", "BROKEN", "STALLED")
     assert "identity" in payload
     assert "health" in payload["identity"]
-    assert "graph" in payload
-    assert payload["graph"]["primary_metric_key"] == "unique_auth_pairs"
+    assert "graph_substrate" in payload
+    assert payload["graph_substrate"]["primary_metric_key"] == "unique_auth_pairs"
+    assert payload["graph"]["surface_kind"] == "graph_substrate_v1"
+    assert payload["ingest_handoff"]["surface_kind"] == "ingest_handoff_v1"
     assert "queue_ownership" in payload
     assert payload["queue_ownership"]["dirty_owner"] == "mark_dirty_and_enqueue_convergence_v1"
     assert isinstance(payload["operator_guidance"], list)

@@ -23,7 +23,7 @@ export function OperatorSubstrateTruthSection({ truth }: { truth: SubstrateTruth
     counts?: Record<string, number>;
     repair?: Record<string, unknown>;
   };
-  const graph = truth.graph as {
+  const graph = (truth.graph_substrate ?? truth.graph) as {
     unique_auth_pairs?: number;
     isolated_pct?: number;
     promotion_rule_count?: number;

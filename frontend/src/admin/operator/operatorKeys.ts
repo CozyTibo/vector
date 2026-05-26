@@ -1,4 +1,5 @@
 export const operatorKeys = {
+  substrateTruth: (tenantId: string) => ["cortex-substrate-truth", tenantId] as const,
   overview: (tenantId: string) => ["cortex-operator-overview", tenantId] as const,
   runtime: (tenantId: string, transitionLimit: number) =>
     ["cortex-operator-runtime", tenantId, transitionLimit] as const,
@@ -20,6 +21,10 @@ export const operatorKeys = {
 
 export function invalidateOperatorOverviewKey(tenantId: string) {
   return operatorKeys.overview(tenantId);
+}
+
+export function invalidateSubstrateTruthKey(tenantId: string) {
+  return operatorKeys.substrateTruth(tenantId);
 }
 
 export function invalidateOperatorRuntimePrefix(tenantId: string) {

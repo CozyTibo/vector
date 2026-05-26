@@ -29,7 +29,10 @@ from vector.domains.cortex.identity.identity_substrate_repair_v1 import (
 from vector.domains.cortex.operational_runtime.graph_density_promotion import (
     DETAIL_KEY_GRAPH_DENSITY_PROMOTION_SCHEDULE_V1,
 )
-from vector.domains.cortex.substrate_pipeline.semantic_readiness_v1 import _query_graph_truth_v1
+from vector.domains.cortex.substrate_pipeline.substrate_contract_v1 import (
+    build_graph_substrate_v1,
+    build_ingest_handoff_v1,
+)
 from vector.settings import Settings, get_settings
 
 SUBSTRATE_TRUTH_SCHEMA_VERSION: Final[int] = 1
@@ -185,14 +188,14 @@ def build_substrate_truth_v1(
     identity_health = evaluate_identity_substrate_health_v1(session, tenant_id=tenant_id)
     repair_state = load_identity_substrate_repair_state_v1(lease)
     counts = substrate_counts(session, tenant_id=tenant_id)
-    graph = _query_graph_truth_v1(
+    graph_substrate = build_graph_substrate_v1(
         session,
         tenant_id=tenant_id,
         include_connected_components=include_connected_components,
     )
 
-    isolated_pct = round(100.0 - float(graph.get("entities_in_auth_graph_pct") or 0.0), 2)
-    promotion_rule_count = int(graph.get("promotion_rule_count") or 0)
+    isolated_pct = float(graph_substrate.get("isolated_pct") or 0.0)
+    promotion_rule_count = int(graph_substrate.get("promotion_rule_count") or 0)
     identity_status = str(identity_health.get("status") or "healthy")
 
     overall_status, red_rules = _compute_overall_status_v1(
@@ -204,18 +207,25 @@ def build_substrate_truth_v1(
     )
 
     runtime_flags = _runtime_flags_v1(cfg)
+    obligation_epoch = int(lease.obligation_epoch) if lease is not None else None
+    is_dirty = lease.status == LEASE_STATUS_DIRTY if lease is not None else False
     motion = {
         "lease_status": lease.status if lease is not None else None,
         "fsm_state": lease.fsm_state if lease is not None else None,
         "phase_cursor": lease.phase_cursor if lease is not None else None,
-        "obligation_epoch": int(lease.obligation_epoch) if lease is not None else None,
+        "obligation_epoch": obligation_epoch,
         "target_epoch": int(lease.target_epoch) if lease is not None else None,
         "block_reason_code": lease.block_reason_code if lease is not None else None,
-        "is_dirty": lease.status == LEASE_STATUS_DIRTY if lease is not None else None,
+        "is_dirty": is_dirty,
         "updated_at": lease.updated_at.isoformat() if lease and lease.updated_at else None,
         "last_canonical_outcome": detail.get("last_canonical_outcome"),
         "convergence_health": detail.get("convergence_health"),
     }
+    ingest_handoff = build_ingest_handoff_v1(
+        dirty_enqueued=is_dirty,
+        obligation_epoch=obligation_epoch,
+        reason=detail.get("last_dirty_reason") if isinstance(detail.get("last_dirty_reason"), str) else None,
+    )
 
     identity_panel = {
         "health": identity_health,
@@ -225,18 +235,6 @@ def build_substrate_truth_v1(
         "identity_healthy": identity_status == "healthy" and promotion_rule_count >= PROMOTION_RULES_DEGRADED_MIN_V1,
         "graph_healthy": isolated_pct <= ISOLATED_PCT_RED_MAX_V1 and promotion_rule_count >= PROMOTION_RULES_DEGRADED_MIN_V1,
     }
-
-    graph_panel = {
-        **graph,
-        "isolated_pct": isolated_pct,
-        "largest_component_entity_pct": None,
-    }
-    components = graph.get("connected_components") or {}
-    if isinstance(components, dict) and components.get("largest_component_size") is not None:
-        active = int(graph.get("active_entities") or 0)
-        largest = int(components["largest_component_size"])
-        if active > 0:
-            graph_panel["largest_component_entity_pct"] = round(100.0 * largest / active, 2)
 
     guidance = _operator_guidance_v1(
         overall_status=overall_status,
@@ -255,7 +253,9 @@ def build_substrate_truth_v1(
         "canonical": canonical_lane,
         "execution": execution_lane,
         "identity": identity_panel,
-        "graph": graph_panel,
+        "graph_substrate": graph_substrate,
+        "graph": graph_substrate,
+        "ingest_handoff": ingest_handoff,
         "runtime_flags": runtime_flags,
         "queue_ownership": _queue_ownership_reference_v1(),
         "last_slice": _last_slice_summary_v1(detail),

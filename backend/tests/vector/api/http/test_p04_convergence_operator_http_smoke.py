@@ -50,7 +50,11 @@ def test_p04_operator_http_smoke_core_surfaces(
     assert r1.status_code == 200
 
     r2 = client.get(f"/admin/tenants/{tid}/cortex/identity/replay-jobs", auth=auth)
-    assert r2.status_code == 200
+    assert r2.status_code == 410
+
+    r2b = client.get(f"/admin/tenants/{tid}/cortex/substrate/truth", auth=auth)
+    assert r2b.status_code == 200
+    assert r2b.json()["surface_kind"] == "substrate_truth_v1"
 
     r3 = client.get(f"/admin/tenants/{tid}/cortex/identity/org-ambiguities", auth=auth)
     assert r3.status_code == 200

@@ -50,7 +50,7 @@ def test_replay_job_enqueue_sets_celery_id_and_pollable(
     monkeypatch.setattr(run_org_link_replay_job_task, "delay", _fake_delay)
 
     post = client.post(
-        f"/admin/tenants/{tid}/cortex/identity/replay-jobs/enqueue",
+        f"/admin/tenants/{tid}/cortex/debug/identity/replay-jobs/enqueue",
         auth=("admin", "integration-admin-password"),
         json={"job_kind": "candidate_regen", "dry_run": False},
     )

@@ -6,6 +6,9 @@ info:
     Appendix B inventory for `phase-04-control-plane-doctrine.md` §15–§16 (P04-18)
     plus Step 19 worker enqueue + poll routes (P04-19).
     Base path prefix `/admin/tenants/{tenant_id}/cortex/identity`.
+    Wave 7: substrate health KPIs are authoritative on
+    `GET /admin/tenants/{tenant_id}/cortex/substrate/truth` (`substrate_truth_v1`);
+    replay jobs are debug-only under `/cortex/debug/identity/replay-jobs`.
 servers:
   - url: /admin/tenants/{tenant_id}/cortex/identity
     variables:

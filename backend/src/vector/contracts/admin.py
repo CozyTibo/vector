@@ -3053,6 +3053,8 @@ class AdminCortexIdentityControlPlaneResponse(BaseModel):
     last_continuity_rebuild_job: dict[str, Any] | None
     verification_pointer: dict[str, Any]
     continuity_substrate: dict[str, Any] = Field(default_factory=dict)
+    substrate_truth_contract: str | None = None
+    substrate_truth_path: str | None = None
 
 
 class AdminCortexIdentityContinuityRebuildRequest(BaseModel):

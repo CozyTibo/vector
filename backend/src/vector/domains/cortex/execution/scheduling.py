@@ -454,6 +454,15 @@ def verify_wave4_graph_truth_v1() -> list[str]:
     return errors
 
 
+def verify_wave7_contract_collapse_v1(*, repo_root: Path | None = None) -> list[str]:
+    """Wave 7: substrate contract schemas, ingest handoff, graph_substrate, admin collapse."""
+    from vector.domains.cortex.substrate_pipeline.substrate_contract_v1 import (
+        verify_wave7_contract_collapse_v1 as _verify,
+    )
+
+    return _verify(repo_root=repo_root)
+
+
 def verify_wave6_residue_purge_v1() -> list[str]:
     """Wave 6: dead substrate residue grep gates (graph-hash chain, fiction ids, import scope)."""
     from vector.domains.cortex.substrate_pipeline.substrate_residue_v1 import (

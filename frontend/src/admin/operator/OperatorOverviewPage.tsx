@@ -9,10 +9,12 @@ import { OperatorRecentEventsSection } from "./OperatorRecentEventsSection";
 import { OperatorSubstrateTruthSection } from "./OperatorSubstrateTruthSection";
 import { OperatorStatusBannerSection } from "./OperatorStatusBannerSection";
 import { useOperatorOverview } from "./useOperatorOverview";
+import { useSubstrateTruth } from "./useSubstrateTruth";
 
 export default function OperatorOverviewPage() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const overviewQ = useOperatorOverview();
+  const substrateTruthQ = useSubstrateTruth();
 
   if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
 
@@ -22,13 +24,17 @@ export default function OperatorOverviewPage() {
 
   const data = overviewQ.data;
   const loading = overviewQ.isPending && !data;
+  const truth = substrateTruthQ.data;
+  const truthLoading = substrateTruthQ.isPending && !truth;
 
   return (
     <div className="space-y-6">
-      {loading ? (
+      {truthLoading ? (
         <SectionSkeleton variant="strip" />
-      ) : data?.substrate_truth ? (
-        <OperatorSubstrateTruthSection truth={data.substrate_truth} />
+      ) : truth ? (
+        <OperatorSubstrateTruthSection truth={truth} />
+      ) : substrateTruthQ.isError ? (
+        <p className="text-sm text-red-700">{(substrateTruthQ.error as Error).message}</p>
       ) : null}
 
       {loading ? (

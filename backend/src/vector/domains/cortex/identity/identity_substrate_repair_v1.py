@@ -189,12 +189,15 @@ def run_identity_substrate_repair_slice_v1(
         substrate_trigger=substrate_trigger,
         counts_before=counts_before,
         distinct_candidate_pairs_delta=distinct_candidate_pairs_delta,
+        promotion_pass=promotion,
     )
+    slice_receipt = audit.get("substrate_slice_receipt_v1")
     health_after = evaluate_identity_substrate_health_v1(session, tenant_id=tenant_id)
 
     return {
         "identity_continuity_substrate": substrate,
         "identity_substrate_audit": audit,
+        "substrate_slice_receipt_v1": slice_receipt,
         "identity_substrate_health_before": health_before,
         "identity_substrate_health_after": health_after,
         "graph_density_promotion": promotion,
