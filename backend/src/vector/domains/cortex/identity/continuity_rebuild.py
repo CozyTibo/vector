@@ -310,6 +310,29 @@ def _run_rebuild_identities_substrate_v1(
     )
 
 
+def supersede_queued_identity_rebuild_jobs_v1(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    reason: str = "superseded_by_new_enqueue_v1",
+) -> int:
+    """Mark stale Celery-queued rebuild rows failed before issuing a fresh async job."""
+    from sqlalchemy import update
+
+    from vector.infrastructure.db.models.cortex_org_link_replay_job import CortexOrgLinkReplayJob
+
+    result = db.execute(
+        update(CortexOrgLinkReplayJob)
+        .where(
+            CortexOrgLinkReplayJob.tenant_id == tenant_id,
+            CortexOrgLinkReplayJob.job_kind == "identity_rebuild_from_anchors",
+            CortexOrgLinkReplayJob.status == "queued",
+        )
+        .values(status="failed", error_detail=reason)
+    )
+    return int(result.rowcount or 0)
+
+
 def rebuild_identities_from_anchors_v1(
     db: Session,
     *,
@@ -398,12 +421,14 @@ def enqueue_rebuild_identities_from_anchors_v1(
     anchor_limit: int = 5_000,
     restart_downstream: bool = False,
 ) -> dict[str, Any]:
-    """Enqueue the same non-destructive identity repair as phase 03 (runs in Celery on ``vector`` queue)."""
+    """Enqueue the same non-destructive identity repair as phase 03 (Celery ``vector`` queue / substrate worker)."""
     from app.tasks.cortex_org_link_jobs import run_org_link_replay_job_task
+    from vector.domains.cortex.execution.worker_queue_roles_v1 import CELERY_SUBSTRATE_QUEUES_V1
     from vector.domains.cortex.identity.org_link_replay_runtime import (
         create_queued_org_link_replay_job,
     )
 
+    superseded = supersede_queued_identity_rebuild_jobs_v1(db, tenant_id=tenant_id)
     counts_before = substrate_counts(db, tenant_id=tenant_id)
     scope_json: dict[str, Any] = {
         "anchor_limit": anchor_limit,
@@ -417,20 +442,33 @@ def enqueue_rebuild_identities_from_anchors_v1(
         scope_json=scope_json,
         engine_build_ref=CONTINUITY_REBUILD_ENGINE_BUILD_REF,
     )
+    substrate_queue = CELERY_SUBSTRATE_QUEUES_V1[0]
     try:
-        async_result = run_org_link_replay_job_task.delay(
-            str(tenant_id),
-            "identity_rebuild_from_anchors",
-            None,
-            False,
-            scope_json,
-            str(job.id),
+        async_result = run_org_link_replay_job_task.apply_async(
+            args=[
+                str(tenant_id),
+                "identity_rebuild_from_anchors",
+                None,
+                False,
+                scope_json,
+                str(job.id),
+            ],
+            queue=substrate_queue,
         )
     except Exception as exc:
         msg = f"celery_enqueue_failed:{exc}"
         raise RuntimeError(msg) from exc
     job.celery_task_id = str(async_result.id)
     db.flush()
+
+    from vector.domains.cortex.execution.enqueue import mark_dirty_and_enqueue_convergence_v1
+
+    convergence_dispatch = mark_dirty_and_enqueue_convergence_v1(
+        tenant_id,
+        reason="operator:rebuild_identities_enqueued",
+        telemetry_trigger="operator:rebuild_identities_enqueued",
+    )
+
     worker_path = f"/admin/tenants/{tenant_id}/cortex/identity/worker-tasks/{async_result.id}"
     return {
         "surface_kind": "identity_rebuild_from_anchors_enqueue_v1",
@@ -438,12 +476,18 @@ def enqueue_rebuild_identities_from_anchors_v1(
         "enqueued": True,
         "job_id": str(job.id),
         "celery_task_id": str(async_result.id),
+        "celery_queue": substrate_queue,
         "worker_task_status_path": worker_path,
+        "superseded_queued_jobs": superseded,
         "counts_before": counts_before,
         "cleared_identity": None,
         "anchor_limit_applied": anchor_limit,
         "restart_downstream": restart_downstream,
-        "hint": "Identity repair queued (same as phase 03). Watch Runtime for anchor offset / health.",
+        "convergence_dispatch": convergence_dispatch,
+        "hint": (
+            "Identity repair queued on the substrate worker (vector queue). "
+            "Requires vector-substrate-worker-service — watch Runtime for anchor offset / job status."
+        ),
         "same_repair_as_phase_03": True,
         "destructive_clear": False,
     }

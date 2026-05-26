@@ -104,16 +104,12 @@ export function OperatorPeopleRebuildPanel() {
           action: "rebuild_identities",
           confirmation: REBUILD_IDENTITIES_CONFIRM_PHRASE,
         },
-        { timeoutMs: 60_000 },
+        { timeoutMs: 30_000 },
       ),
     onSuccess: (data) => {
       setError(null);
       setFeedback(formatActionFeedback(data));
-      const enqueued = data.result?.enqueued === true;
-      setWatchRepair(enqueued);
-      if (!enqueued) {
-        setWatchRepair(false);
-      }
+      setWatchRepair(data.result?.enqueued === true);
       invalidateOperatorCaches(qc, tenantId);
       void qc.invalidateQueries({ queryKey: ["operator-people-directory", tenantId] });
     },

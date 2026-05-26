@@ -1,9 +1,9 @@
 {
-  "family": "vector-worker",
+  "family": "vector-substrate-worker",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
-  "cpu": "256",
-  "memory": "512",
+  "cpu": "512",
+  "memory": "1024",
   "executionRoleArn": "arn:aws:iam::884953290372:role/ecsTaskExecutionRole",
   "taskRoleArn": "arn:aws:iam::884953290372:role/ecsTaskRole",
   "containerDefinitions": [
@@ -21,30 +21,18 @@
         "2",
         "--prefetch-multiplier=1",
         "-Q",
-        "cortex_live,cortex_replay"
+        "vector"
       ],
       "environment": [
         {
           "name": "ENV",
           "value": "production"
-        },
-        {
-          "name": "CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO",
-          "value": "10"
-        },
-        {
-          "name": "CORTEX_GITHUB_PR_FETCH_MAX_REPOS",
-          "value": "16"
-        },
-        {
-          "name": "CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS",
-          "value": "120"
         }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/vector-worker",
+          "awslogs-group": "/ecs/vector-substrate-worker",
           "awslogs-region": "eu-west-1",
           "awslogs-stream-prefix": "worker",
           "awslogs-create-group": "true"

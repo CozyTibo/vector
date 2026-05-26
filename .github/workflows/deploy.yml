@@ -13,6 +13,8 @@ env:
   ECS_TASK_DEFINITION: vector-backend
   ECS_WORKER_SERVICE: vector-worker-service
   ECS_WORKER_TASK_DEFINITION: vector-backend-worker
+  ECS_SUBSTRATE_WORKER_SERVICE: vector-substrate-worker-service
+  ECS_SUBSTRATE_WORKER_TASK_DEFINITION: vector-substrate-worker
   ECS_CONTAINER_NAME: backend
   S3_FRONTEND_BUCKET: vector-frontend-prod
 
@@ -219,6 +221,9 @@ jobs:
           )' worker-task-def.json > clean-worker-task-def.json
           python backend/scripts/ecs_align_github_ingest_caps.py \
             clean-worker-task-def.json worker-task-def-caps.json
+          python backend/scripts/ecs_align_worker_queue_roles.py \
+            worker-task-def-caps.json worker-ingestion-task-def.json worker-substrate-task-def.json \
+            --substrate-family "$ECS_SUBSTRATE_WORKER_TASK_DEFINITION"
           jq --arg IMAGE "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
              --arg GIT_SHA "$IMAGE_TAG" \
              '.containerDefinitions[0].image = $IMAGE |
@@ -226,7 +231,7 @@ jobs:
                 ((.containerDefinitions[0].environment // []) | map(select(.name != "VECTOR_GIT_SHA"))) +
                 [{name: "VECTOR_GIT_SHA", value: $GIT_SHA}]
               )' \
-            worker-task-def-caps.json > new-worker-task-def.json
+            worker-ingestion-task-def.json > new-worker-task-def.json
           REGISTERED_WORKER_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-worker-task-def.json \
             --region "$AWS_REGION" \
@@ -238,12 +243,54 @@ jobs:
             --task-definition "$REGISTERED_WORKER_TASK_DEFINITION_ARN" \
             --force-new-deployment \
             --region "$AWS_REGION"
+          jq --arg IMAGE "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
+             --arg GIT_SHA "$IMAGE_TAG" \
+             '.containerDefinitions[0].image = $IMAGE |
+              .containerDefinitions[0].environment = (
+                ((.containerDefinitions[0].environment // []) | map(select(.name != "VECTOR_GIT_SHA"))) +
+                [{name: "VECTOR_GIT_SHA", value: $GIT_SHA}]
+              )' \
+            worker-substrate-task-def.json > new-substrate-worker-task-def.json
+          REGISTERED_SUBSTRATE_WORKER_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-substrate-worker-task-def.json \
+            --region "$AWS_REGION" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          SUBSTRATE_SVC=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SUBSTRATE_WORKER_SERVICE" \
+            --region "$AWS_REGION" \
+            --query 'services[0].status' \
+            --output text 2>/dev/null || echo "MISSING")
+          if [ "$SUBSTRATE_SVC" = "ACTIVE" ]; then
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$ECS_SUBSTRATE_WORKER_SERVICE" \
+              --task-definition "$REGISTERED_SUBSTRATE_WORKER_TASK_DEFINITION_ARN" \
+              --force-new-deployment \
+              --region "$AWS_REGION"
+          else
+            NETCFG=$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_WORKER_SERVICE" \
+              --region "$AWS_REGION" \
+              --query 'services[0].networkConfiguration' \
+              --output json)
+            aws ecs create-service \
+              --cluster "$ECS_CLUSTER" \
+              --service-name "$ECS_SUBSTRATE_WORKER_SERVICE" \
+              --task-definition "$REGISTERED_SUBSTRATE_WORKER_TASK_DEFINITION_ARN" \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "$NETCFG" \
+              --region "$AWS_REGION"
+          fi
 
       - name: Wait for API and worker ECS rollouts
         run: |
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
-            --services "$ECS_SERVICE" "$ECS_WORKER_SERVICE" \
+            --services "$ECS_SERVICE" "$ECS_WORKER_SERVICE" "$ECS_SUBSTRATE_WORKER_SERVICE" \
             --region "$AWS_REGION"
 
       - name: Verify prod image tags match deploy SHA

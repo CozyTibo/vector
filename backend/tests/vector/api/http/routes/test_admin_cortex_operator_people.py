@@ -345,6 +345,7 @@ def test_operator_rebuild_identities_enqueues_async_repair(
         "enqueued": True,
         "job_id": "00000000-0000-4000-8000-000000000001",
         "celery_task_id": "celery-task-123",
+        "celery_queue": "vector",
         "destructive_clear": False,
         "same_repair_as_phase_03": True,
     }

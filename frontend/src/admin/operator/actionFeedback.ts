@@ -183,8 +183,9 @@ export function formatActionFeedback(data: OperatorActionResponse): ActionFeedba
         title: "Identity repair queued",
         detail: [
           typeof result.hint === "string" ? result.hint : null,
-          "Same repair as phase 03 — open Runtime to watch anchor offset and health.",
-          result.worker_task_status_path ? `Task ${result.celery_task_id ?? ""}`.trim() : null,
+          result.job_id ? `Job ${result.job_id}` : null,
+          result.celery_task_id ? `Celery ${result.celery_task_id}` : null,
+          "Open Runtime for anchor offset and health.",
         ]
           .filter(Boolean)
           .join(" "),
