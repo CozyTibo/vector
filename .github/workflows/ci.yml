@@ -38,6 +38,7 @@ jobs:
             tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave5_deploy_contract.py \
             tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave6_residue_purge.py \
             tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave7_contract_collapse.py \
+            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave8_operational_simplicity.py \
             tests/vector/domains/cortex/substrate_pipeline/test_dead_topology_cleanup_s2.py \
             tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d5_legacy_coordinator_enqueue_deletion.py \
             tests/vector/domains/cortex/execution/test_phase04_graph_projection_export_boundary.py \

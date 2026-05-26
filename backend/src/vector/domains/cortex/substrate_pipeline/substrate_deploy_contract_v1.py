@@ -33,6 +33,7 @@ def verify_substrate_coherence_ci_gates_v1() -> list[str]:
         verify_wave4_graph_truth_v1,
         verify_wave6_residue_purge_v1,
         verify_wave7_contract_collapse_v1,
+        verify_wave8_operational_simplicity_v1,
     )
 
     errors: list[str] = []
@@ -44,6 +45,7 @@ def verify_substrate_coherence_ci_gates_v1() -> list[str]:
     errors.extend(verify_wave4_graph_truth_v1())
     errors.extend(verify_wave6_residue_purge_v1())
     errors.extend(verify_wave7_contract_collapse_v1())
+    errors.extend(verify_wave8_operational_simplicity_v1())
     return errors
 
 

@@ -157,6 +157,34 @@ def _persist_dual_lane_slice_manifest_v1(
     lease.detail_json = detail
 
 
+def _return_dual_lane_slice_v1(
+    *,
+    tenant_id: uuid.UUID,
+    lease: CortexTenantConvergenceLease,
+    pipeline_run_id: uuid.UUID,
+    manifest: dict[str, Any],
+    outcome: str,
+) -> dict[str, Any]:
+    from vector.domains.cortex.substrate_pipeline.substrate_operational_simplicity_v1 import (
+        emit_substrate_slice_complete_v1,
+    )
+
+    emit_substrate_slice_complete_v1(
+        tenant_id=tenant_id,
+        lease=lease,
+        manifest=manifest,
+        outcome=outcome,
+    )
+    return {
+        "tenant_id": str(tenant_id),
+        "acquired": True,
+        "outcome": outcome,
+        "dual_lane": manifest,
+        "pipeline_run_id": str(pipeline_run_id),
+        "fsm_state": lease.fsm_state,
+    }
+
+
 def _store_canonical_outcome(
     session: Session,
     lease: CortexTenantConvergenceLease,
@@ -581,14 +609,13 @@ def run_dual_lane_convergence_v1(
             _persist_dual_lane_slice_manifest_v1(lease, manifest=manifest)
             session.commit()
             enqueue_tenant_convergence_v1(tenant_id, reason="dual_lane_canonical_continue")
-            return {
-                "tenant_id": str(tenant_id),
-                "acquired": True,
-                "outcome": canon_outcome,
-                "dual_lane": manifest,
-                "pipeline_run_id": str(pipeline_run_id),
-                "fsm_state": lease.fsm_state,
-            }
+            return _return_dual_lane_slice_v1(
+                tenant_id=tenant_id,
+                lease=lease,
+                pipeline_run_id=pipeline_run_id,
+                manifest=manifest,
+                outcome=canon_outcome,
+            )
 
     exec_start = max(exec_start, time.monotonic())
     exec_deadline = exec_start + float(exec_budget)
@@ -611,34 +638,32 @@ def run_dual_lane_convergence_v1(
         outcome = str(exec_result.get("outcome") or WORKER_OUTCOME_DUAL_LANE_SLICE_V1)
         if outcome == WORKER_OUTCOME_WAITING_TCRE:
             session.commit()
-            return {
-                "tenant_id": str(tenant_id),
-                "acquired": True,
-                "outcome": WORKER_OUTCOME_WAITING_TCRE,
-                "dual_lane": manifest,
-                "pipeline_run_id": str(pipeline_run_id),
-                "fsm_state": lease.fsm_state,
-            }
+            return _return_dual_lane_slice_v1(
+                tenant_id=tenant_id,
+                lease=lease,
+                pipeline_run_id=pipeline_run_id,
+                manifest=manifest,
+                outcome=WORKER_OUTCOME_WAITING_TCRE,
+            )
         if outcome == WORKER_OUTCOME_BLOCKED_RETRIEVAL:
             session.commit()
-            return {
-                "tenant_id": str(tenant_id),
-                "acquired": True,
-                "outcome": WORKER_OUTCOME_BLOCKED_RETRIEVAL,
-                "dual_lane": manifest,
-                "pipeline_run_id": str(pipeline_run_id),
-                "fsm_state": lease.fsm_state,
-            }
+            return _return_dual_lane_slice_v1(
+                tenant_id=tenant_id,
+                lease=lease,
+                pipeline_run_id=pipeline_run_id,
+                manifest=manifest,
+                outcome=WORKER_OUTCOME_BLOCKED_RETRIEVAL,
+            )
         if outcome == WORKER_OUTCOME_TIME_BUDGET:
             session.commit()
             enqueue_tenant_convergence_v1(tenant_id, reason="dual_lane_time_budget")
-            return {
-                "tenant_id": str(tenant_id),
-                "acquired": True,
-                "outcome": WORKER_OUTCOME_TIME_BUDGET,
-                "dual_lane": manifest,
-                "pipeline_run_id": str(pipeline_run_id),
-            }
+            return _return_dual_lane_slice_v1(
+                tenant_id=tenant_id,
+                lease=lease,
+                pipeline_run_id=pipeline_run_id,
+                manifest=manifest,
+                outcome=WORKER_OUTCOME_TIME_BUDGET,
+            )
         if outcome == "converged_slice":
             if bool(getattr(cfg, "cortex_execution_heartbeat_reset_cursor_to_phase05", True)):
                 _set_phase_cursor_fsm(
@@ -659,13 +684,13 @@ def run_dual_lane_convergence_v1(
                 enqueue_tenant_convergence_v1(tenant_id, reason="epoch_behind")
             else:
                 enqueue_tenant_convergence_v1(tenant_id, reason="heartbeat_continue")
-            return {
-                "tenant_id": str(tenant_id),
-                "acquired": True,
-                "outcome": "converged_slice",
-                "dual_lane": manifest,
-                "pipeline_run_id": str(pipeline_run_id),
-            }
+            return _return_dual_lane_slice_v1(
+                tenant_id=tenant_id,
+                lease=lease,
+                pipeline_run_id=pipeline_run_id,
+                manifest=manifest,
+                outcome="converged_slice",
+            )
 
     manifest["execution_phase_cursor_after"] = lease.phase_cursor
     _persist_dual_lane_slice_manifest_v1(lease, manifest=manifest)
@@ -673,11 +698,10 @@ def run_dual_lane_convergence_v1(
     session.commit()
     if schedule["canonical_lane_owed"] or schedule["execution_lane_owed"]:
         enqueue_tenant_convergence_v1(tenant_id, reason="dual_lane_continue")
-    return {
-        "tenant_id": str(tenant_id),
-        "acquired": True,
-        "outcome": WORKER_OUTCOME_DUAL_LANE_SLICE_V1,
-        "dual_lane": manifest,
-        "pipeline_run_id": str(pipeline_run_id),
-        "fsm_state": lease.fsm_state,
-    }
+    return _return_dual_lane_slice_v1(
+        tenant_id=tenant_id,
+        lease=lease,
+        pipeline_run_id=pipeline_run_id,
+        manifest=manifest,
+        outcome=WORKER_OUTCOME_DUAL_LANE_SLICE_V1,
+    )

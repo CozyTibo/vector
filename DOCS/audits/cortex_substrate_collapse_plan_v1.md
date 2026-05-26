@@ -676,6 +676,16 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] `substrate_soak_v6_v8_check.py` for 24h Fizzer soak (V6 promotion rules, V7 hash, V8 isolation)
 - [x] `verify_wave5_deploy_contract_v1` + tests in `test_substrate_wave5_deploy_contract.py`
 
+### Wave 8 — Operational simplicity — **DONE**
+
+- [x] `substrate_operational_simplicity_v1` — mutator registry, `predict_next_mutation_hint`, `build_operational_panel_v1`
+- [x] `substrate_truth_v1.operational` — `next_retry_at`, topology gate, dual-lane R1 transparency
+- [x] One log line per slice: `substrate_slice_complete` in `run_dual_lane_convergence_v1`
+- [x] Slack channel apply: no bare `mark_tenant_dirty` (dirty via sync complete only)
+- [x] Failure remediation blocks collapsed substrate replay job kinds
+- [x] Runbook ≤3 pages with full mutator table (`DOCS/cortex/substrate_queue_runbook.md`)
+- [x] `verify_wave8_operational_simplicity_v1` + org-link promotion scope gate + `test_substrate_wave8_operational_simplicity.py`
+
 ### Wave 7 — Substrate API / contract collapse — **DONE**
 
 - [x] `substrate_contract_v1` — `graph_substrate_v1`, `ingest_handoff_v1`, `substrate_slice_receipt_v1`, `validate_phase_receipt_v1`

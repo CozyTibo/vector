@@ -357,6 +357,31 @@ def validate_org_remediation(
         }
 
     job_kind = str(payload.get("job_kind") or "")
+    from vector.domains.cortex.substrate_pipeline.substrate_operational_simplicity_v1 import (
+        is_substrate_replay_job_kind_collapsed_v1,
+    )
+
+    if is_substrate_replay_job_kind_collapsed_v1(job_kind):
+        row = _append_org_remediation_validation(
+            session,
+            tenant_id=tenant_id,
+            failure_case_gap_id=failure_case_gap_id,
+            remediation_class=remediation_class,
+            dry_run=dry_run,
+            confirm_execution=confirm_execution,
+            payload_json=dict(payload),
+            result_status="failed",
+            result_detail_json={
+                "reason": "substrate_replay_job_collapsed",
+                "replacement": "POST .../cortex/operator/actions rebuild_identities",
+            },
+        )
+        return {
+            "tenant_id": str(tenant_id),
+            "remediation_class": remediation_class,
+            "validation": org_remediation_validation_public_dict(row),
+        }
+
     if job_kind not in ("authoritative_replay", "candidate_regen"):
         row = _append_org_remediation_validation(
             session,

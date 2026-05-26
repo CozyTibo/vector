@@ -43,6 +43,7 @@
     "queue_ownership": { "type": "object" },
     "last_slice": { "type": ["object", "null"] },
     "operator_guidance": { "type": "array", "items": { "type": "string" } },
+    "operational": { "$ref": "#/$defs/substrate_operational_v1" },
     "primary_truth_contract": { "const": "substrate_truth_v1" },
     "deprecated_for_substrate_health": { "type": "array", "items": { "type": "string" } }
   },
@@ -79,6 +80,20 @@
         "dup_factor": { "type": ["number", "null"] },
         "active_entities": { "type": "integer" },
         "diagnostics": { "type": "object" }
+      }
+    },
+    "substrate_operational_v1": {
+      "type": "object",
+      "required": ["surface_kind", "schema_version", "next_mutation_hint"],
+      "properties": {
+        "surface_kind": { "const": "substrate_operational_v1" },
+        "schema_version": { "type": "integer" },
+        "next_mutation_hint": { "type": "string" },
+        "next_retry_at": { "type": ["string", "null"] },
+        "canonical_topology_gate": { "type": "object" },
+        "dual_lane": { "type": "object" },
+        "execution_lane_status": { "type": ["string", "null"] },
+        "canonical_lane_status": { "type": ["string", "null"] }
       }
     }
   }

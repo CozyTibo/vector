@@ -1,4 +1,11 @@
-"""Paginated identity substrate repair — owned by phase 03 / convergence (no separate orchestrator)."""
+"""Paginated identity substrate repair — owned by phase 03 / convergence (no separate orchestrator).
+
+OWNER: run_identity_substrate_repair_slice_v1
+TRIGGER: slice
+MUTATES: org_entities, link_candidates, lease repair cursor
+OBSERVABLE: identity_substrate_repair_v1 on lease, substrate_slice_receipt_v1
+IDEMPOTENT: yes — anchor_offset cursor
+"""
 
 from __future__ import annotations
 

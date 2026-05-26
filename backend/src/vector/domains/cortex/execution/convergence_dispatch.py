@@ -1,4 +1,11 @@
-"""Single authoritative entry: mark tenant dirty + enqueue convergence worker."""
+"""Single authoritative entry: mark tenant dirty + enqueue convergence worker.
+
+OWNER: mark_dirty_and_enqueue_convergence_v1
+TRIGGER: ingest | operator_reset
+MUTATES: cortex_tenant_convergence_leases
+OBSERVABLE: lease.obligation_epoch, ingest_handoff_v1
+IDEMPOTENT: yes — obligation_epoch monotonic
+"""
 
 from __future__ import annotations
 

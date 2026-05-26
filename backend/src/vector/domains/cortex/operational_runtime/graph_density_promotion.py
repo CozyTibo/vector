@@ -414,7 +414,7 @@ def _finalize_lawful_promotion_replay_job_v1(
     session.flush()
 
 
-def run_graph_density_promotion_pass_v1(
+def run_graph_density_promotion_pass_v1(  # OWNER: promote | TRIGGER: slice | MUTATES: cortex_org_links | OBSERVABLE: promotion_rule_count
     session: Session,
     *,
     tenant_id: uuid.UUID,

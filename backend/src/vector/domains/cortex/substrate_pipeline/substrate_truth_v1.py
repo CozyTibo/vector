@@ -33,6 +33,9 @@ from vector.domains.cortex.substrate_pipeline.substrate_contract_v1 import (
     build_graph_substrate_v1,
     build_ingest_handoff_v1,
 )
+from vector.domains.cortex.substrate_pipeline.substrate_operational_simplicity_v1 import (
+    build_operational_panel_v1,
+)
 from vector.settings import Settings, get_settings
 
 SUBSTRATE_TRUTH_SCHEMA_VERSION: Final[int] = 1
@@ -241,6 +244,14 @@ def build_substrate_truth_v1(
         red_rules=red_rules,
         runtime_flags=runtime_flags,
     )
+    operational = build_operational_panel_v1(
+        session,
+        tenant_id=tenant_id,
+        lease=lease,
+        canonical_lane=canonical_lane,
+        execution_lane=execution_lane,
+        runtime_flags=runtime_flags,
+    )
 
     return {
         "surface_kind": SUBSTRATE_TRUTH_SURFACE_KIND,
@@ -256,6 +267,7 @@ def build_substrate_truth_v1(
         "graph_substrate": graph_substrate,
         "graph": graph_substrate,
         "ingest_handoff": ingest_handoff,
+        "operational": operational,
         "runtime_flags": runtime_flags,
         "queue_ownership": _queue_ownership_reference_v1(),
         "last_slice": _last_slice_summary_v1(detail),

@@ -1,6 +1,8 @@
-# Cortex substrate coherence modules (Wave 6)
+# Cortex substrate coherence modules (Wave 6–8)
 
 **Purpose:** Onboarding map of the **authoritative** substrate path and the modules that implement it. Count: **18** production modules (target &lt;20).
+
+**Wave 8:** Operator motion is on `substrate_truth_v1.operational` (`substrate_operational_simplicity_v1`); slice telemetry is one log line `substrate_slice_complete` per dual-lane return. See [substrate_queue_runbook.md](./substrate_queue_runbook.md).
 
 ## Authoritative motion
 
@@ -14,6 +16,7 @@
 | Graph export | `identity/projection_export.py` |
 | Event triggers (hash / ingest) | `execution/execution_event_triggers.py` |
 | Operator truth | `substrate_pipeline/substrate_truth_v1.py` |
+| Operational panel (Wave 8) | `substrate_pipeline/substrate_operational_simplicity_v1.py` |
 | Contract builders | `substrate_pipeline/substrate_contract_v1.py` |
 
 ## Supporting substrate pipeline
@@ -39,8 +42,8 @@
 ## Verification
 
 ```bash
-cd backend && python -m pytest tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave6_residue_purge.py -q
-python backend/scripts/substrate_ci_gates.py
+cd backend && PYTHONPATH=src python scripts/substrate_ci_gates.py
+python -m pytest tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave8_operational_simplicity.py -q
 ```
 
 See also: [substrate_queue_runbook.md](./substrate_queue_runbook.md), [cortex_substrate_collapse_plan_v1.md](../audits/cortex_substrate_collapse_plan_v1.md).
