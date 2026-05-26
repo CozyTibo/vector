@@ -127,15 +127,6 @@ def get_orphan_stitching_run_anchor_regen_v1() -> bool:
         return True
 
 
-def get_orphan_stitching_auto_schedule_promotion_v1() -> bool:
-    try:
-        from vector.settings import get_settings
-
-        return bool(get_settings().cortex_orphan_stitching_auto_schedule_promotion)
-    except Exception:  # noqa: BLE001
-        return True
-
-
 def _entity_intentionally_excluded_v1(meta: dict[str, Any]) -> bool:
     if str(meta.get("cesp_orphan_class") or "").strip() == ORPHAN_CLASS_INTENTIONALLY_EXCLUDED_V1:
         return True
@@ -409,7 +400,7 @@ def run_continuity_stitching_pass_v1(
     trigger: str = STITCH_TRIGGER_MANUAL_V1,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Classify orphans, stitch anchor continuity candidates, enqueue promotion when lawful."""
+    """Classify orphans and optionally run anchor continuity regen (no autonomous promotion — Wave 3)."""
     classification = classify_tenant_graph_orphans_v1(session, tenant_id=tenant_id)
     counts = dict(classification["counts_by_class"])
     awaiting = int(counts.get(ORPHAN_CLASS_AWAITING_PROMOTION_V1, 0))
@@ -418,7 +409,6 @@ def run_continuity_stitching_pass_v1(
     excluded = int(counts.get(ORPHAN_CLASS_INTENTIONALLY_EXCLUDED_V1, 0))
 
     anchor_regen_summary: dict[str, Any] | None = None
-    promotion_schedule: dict[str, Any] | None = None
     documented = 0
 
     ctx = build_orphan_stitching_context_v1(session, tenant_id=tenant_id)
@@ -466,11 +456,11 @@ def run_continuity_stitching_pass_v1(
         "classification": classification,
         "actions_taken": {
             "anchor_continuity_regeneration": anchor_regen_summary is not None,
-            "promotion_scheduled": bool(promotion_schedule and promotion_schedule.get("scheduled")),
+            "promotion_scheduled": False,
             "intentionally_excluded_documented": documented,
         },
         "anchor_continuity_regeneration": anchor_regen_summary,
-        "promotion_schedule": promotion_schedule,
+        "promotion_schedule": None,
         "ret_skip_hints": ret_skip_hints,
     }
 
@@ -491,7 +481,8 @@ def build_graph_orphan_continuity_catalog_v1() -> dict[str, Any]:
         "celery_task_name": CELERY_ORPHAN_CONTINUITY_STITCH_TASK_NAME_V1,
         "sample_limit": get_orphan_stitching_sample_limit_v1(),
         "run_anchor_regen_on_stitch": get_orphan_stitching_run_anchor_regen_v1(),
-        "auto_schedule_promotion": get_orphan_stitching_auto_schedule_promotion_v1(),
+        "auto_schedule_promotion": False,
+        "autonomous_promotion_removed_wave3": True,
         "runtime_package": "vector.domains.cortex.operational_runtime.graph_orphan_continuity",
         "stitch_entrypoint": "run_continuity_stitching_pass_v1",
     }

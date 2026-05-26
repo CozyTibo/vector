@@ -652,12 +652,14 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] UI: rebuild copy updated; `OperatorDebugIdentityPanel` with `?debug=1` (no replay jobs on primary nav)
 - [x] Control plane guide updated; `verify_wave2_operator_paths_v1` + tests
 
-### Wave 3 — Delete dead weight
+### Wave 3 — Delete dead weight — **DONE**
 
-- Unregister legacy Celery regen/replay tasks
-- Delete orphan stitch autonomous promotion
-- Remove orphaned debounce settings
-- Archive references in control plane guide
+- [x] Unregister legacy Celery `regenerate_link_candidates` / `replay_authoritative_links` (`cortex_org_link_jobs.py`; M9 tombstone names)
+- [x] `candidate_regen` replay lane uses anchor continuity only (`org_link_replay_runtime.py`)
+- [x] Delete orphan-stitch autonomous promotion (`graph_orphan_continuity`; setting removed)
+- [x] Remove orphaned post-ingest debounce settings (`settings.py`; `resolve_post_ingestion_debounce_countdown_v1` → immediate handoff)
+- [x] Archive dead paths in control plane guide + link ledger metadata (`control_plane.py`, `link_ledger_metadata.py`)
+- [x] `verify_wave3_dead_weight_v1` + tests in `test_substrate_wave3_dead_weight.py`
 
 ### Wave 4 — Graph truth
 

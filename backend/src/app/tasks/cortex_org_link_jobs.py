@@ -1,4 +1,4 @@
-"""Phase 04 Step 5 — Celery entrypoints for link candidate regen + authoritative replay receipts."""
+"""Phase 04 Step 19 — Celery entrypoint for org-link replay jobs (Wave 3: legacy regen/replay tasks removed)."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ import uuid
 from typing import Any
 
 from app.celery_app import celery_app
-from vector.domains.cortex.identity.anchor_continuity_candidates import run_anchor_continuity_candidate_regeneration
-from vector.domains.cortex.identity.link_ledger import compute_authoritative_link_set_sha256, list_org_links
 from vector.domains.cortex.identity.org_link_replay_runtime import (
     execute_org_link_replay_job,
     run_org_link_replay_job_for_row,
@@ -18,34 +16,13 @@ from vector.infrastructure.db.session import session_scope
 
 _LOGGER = logging.getLogger("app")
 
-_TASK_REGEN = "vector.cortex.identity.regenerate_link_candidates"
-_TASK_REPLAY = "vector.cortex.identity.replay_authoritative_links"
 _TASK_ORG_LINK_REPLAY_JOB = "vector.cortex.identity.run_org_link_replay_job"
 
-CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES = _TASK_REGEN
-CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS = _TASK_REPLAY
 CELERY_TASK_NAME_RUN_ORG_LINK_REPLAY_JOB = _TASK_ORG_LINK_REPLAY_JOB
 
-
-@celery_app.task(name=_TASK_REGEN)
-def regenerate_link_candidates_task(tenant_id: str, rule_version: str) -> dict[str, Any]:
-    """Persist anchor-driven candidate batches (deterministic join keys + continuity fixtures)."""
-    tid = uuid.UUID(tenant_id)
-    _LOGGER.info("link_candidate_regen_start tenant_id=%s rule_version=%s", tenant_id, rule_version)
-    with session_scope() as session:
-        out = run_anchor_continuity_candidate_regeneration(session, tenant_id=tid)
-    _LOGGER.info("link_candidate_regen_done tenant_id=%s out=%s", tenant_id, out)
-    return out
-
-
-@celery_app.task(name=_TASK_REPLAY)
-def replay_authoritative_links_task(tenant_id: str) -> dict[str, Any]:
-    """Compute authoritative link set hash for operator replay receipts."""
-    tid = uuid.UUID(tenant_id)
-    with session_scope() as session:
-        sha = compute_authoritative_link_set_sha256(session, tenant_id=tid)
-        n = len(list_org_links(session, tenant_id=tid, limit=50_000, link_authority="authoritative"))
-    return {"tenant_id": tenant_id, "authoritative_set_sha256": sha, "authoritative_link_count": n}
+# Wave 3 tombstone names — must not be registered (see scheduling.M9_DEAD_CELERY_TASK_NAMES_V1).
+CELERY_TASK_NAME_REGENERATE_LINK_CANDIDATES = "vector.cortex.identity.regenerate_link_candidates"
+CELERY_TASK_NAME_REPLAY_AUTHORITATIVE_LINKS = "vector.cortex.identity.replay_authoritative_links"
 
 
 @celery_app.task(name=_TASK_ORG_LINK_REPLAY_JOB, queue="vector")
@@ -57,7 +34,7 @@ def run_org_link_replay_job_task(
     scope_json: dict[str, Any] | None = None,
     job_id: str | None = None,
 ) -> dict[str, Any]:
-    """Phase 04 Step 10 + Step 19 — org link replay job (sync create+run, or async row bound by ``job_id``)."""
+    """Org link replay job (sync create+run, or async row bound by ``job_id``)."""
     tid = uuid.UUID(tenant_id)
     if job_id:
         jid = uuid.UUID(job_id.strip())
@@ -89,10 +66,11 @@ def run_org_link_replay_job_task(
         "graph_projection_export",
         "identity_continuity_rebuild",
         "identity_rebuild_from_anchors",
+        "lawful_edge_promotion",
     ):
         msg = (
-            "job_kind must be authoritative_replay, candidate_regen, "
-            "graph_projection_export, identity_continuity_rebuild, or identity_rebuild_from_anchors"
+            "job_kind must be authoritative_replay, candidate_regen, graph_projection_export, "
+            "identity_continuity_rebuild, identity_rebuild_from_anchors, or lawful_edge_promotion"
         )
         raise ValueError(msg)
     _LOGGER.info(

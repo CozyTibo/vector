@@ -148,7 +148,6 @@ def build_policy_thresholds_payload_v1() -> dict[str, Any]:
         get_operational_maturity_thresholds_v1,
     )
     from vector.domains.cortex.operational_runtime.substrate_runtime_economics import (
-        get_post_ingestion_backpressure_extra_debounce_seconds_v1,
         get_substrate_pipeline_max_concurrent_per_tenant_v1,
         get_vector_queue_backpressure_threshold_v1,
     )
@@ -179,9 +178,7 @@ def build_policy_thresholds_payload_v1() -> dict[str, Any]:
                 get_substrate_pipeline_max_concurrent_per_tenant_v1(),
             ),
             "vector_queue_backpressure_threshold": int(get_vector_queue_backpressure_threshold_v1()),
-            "post_ingestion_backpressure_extra_debounce_seconds": int(
-                get_post_ingestion_backpressure_extra_debounce_seconds_v1(),
-            ),
+            "post_ingestion_debounce_removed_wave3": True,
             "tcre_saturation_jobs_per_hour": int(get_tcre_saturation_jobs_per_hour_v1()),
             "tcre_saturation_pass_max_jobs": int(get_tcre_saturation_pass_max_jobs_v1()),
             "traversal_max_walks_per_pass": int(get_traversal_max_walks_per_pass_v1()),
@@ -611,7 +608,9 @@ def _watchdog_in_celery_beat_v1() -> tuple[bool, list[str]]:
             if not dispatch_path.is_file():
                 return False, ["post_ingestion_dispatch_missing"]
             dispatch_text = dispatch_path.read_text(encoding="utf-8")
-            if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_text:
+            if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_text and (
+                "trigger_post_ingestion_execution_v1" not in dispatch_text
+            ):
                 return False, ["convergence_dirty_mark_missing"]
         return True, []
 

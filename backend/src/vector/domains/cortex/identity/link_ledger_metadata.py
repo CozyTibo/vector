@@ -16,8 +16,12 @@ def build_link_ledger_pointer_section() -> dict[str, Any]:
         "link_temporal_timeline_route": "GET /admin/tenants/{tenant_id}/cortex/identity/links/timeline",
         "link_hint_bucket_route": "GET /admin/tenants/{tenant_id}/cortex/identity/links/hints",
         "link_candidate_queue_route": "GET /admin/tenants/{tenant_id}/cortex/identity/link-candidates",
-        "celery_task_regenerate_link_candidates": "vector.cortex.identity.regenerate_link_candidates",
-        "celery_task_replay_authoritative_links": "vector.cortex.identity.replay_authoritative_links",
+        "celery_task_regenerate_link_candidates": None,
+        "celery_task_replay_authoritative_links": None,
+        "legacy_celery_tasks_removed_wave3": [
+            "vector.cortex.identity.regenerate_link_candidates",
+            "vector.cortex.identity.replay_authoritative_links",
+        ],
         "link_ledger_runtime_doctrine_anchors": [
             "DOCS/cortex/04-identity/phase-04-link-ledger-doctrine.md",
             "DOCS/cortex/04-identity/phase-04-candidate-vs-authoritative-linkage-doctrine.md",

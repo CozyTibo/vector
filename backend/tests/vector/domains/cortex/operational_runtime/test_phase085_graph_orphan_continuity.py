@@ -237,7 +237,6 @@ def test_stitch_pass_promotes_after_classification(
         ],
     )
     monkeypatch.setenv("CORTEX_ORPHAN_STITCHING_RUN_ANCHOR_REGEN", "false")
-    monkeypatch.setenv("CORTEX_ORPHAN_STITCHING_AUTO_SCHEDULE_PROMOTION", "false")
 
     pol = create_promotion_policy(db_session, tenant_id=tenant.id, policy_ref="p085.orphan.manual.v1")
     from vector.domains.cortex.operational_runtime.graph_density_promotion import (

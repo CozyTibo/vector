@@ -12,11 +12,7 @@ from typing import Any, Final, Literal
 from sqlalchemy import func, nullslast, select
 from sqlalchemy.orm import Session, selectinload
 
-from vector.domains.cortex.identity.candidate_generation import (
-    CANDIDATE_GENERATION_ENGINE_BUILD_REF,
-    compute_candidate_set_sha256,
-    regenerate_link_candidates,
-)
+from vector.domains.cortex.identity.candidate_generation import compute_candidate_set_sha256
 from vector.domains.cortex.identity.link_ledger import compute_authoritative_link_set_sha256
 from vector.infrastructure.db.models.cortex_org_link_replay_job import CortexOrgLinkReplayJob
 from vector.infrastructure.db.models.cortex_org_link_replay_job_receipt import CortexOrgLinkReplayJobReceipt
@@ -350,36 +346,14 @@ def run_org_link_replay_job_for_row(db: Session, job: CortexOrgLinkReplayJob) ->
                 )
             else:
                 from vector.domains.cortex.identity.anchor_continuity_candidates import (
-                    ANCHOR_CONTINUITY_RULE_SEMANTIC,
                     run_anchor_continuity_candidate_regeneration,
                 )
-                from vector.domains.cortex.identity.linkage_rules import get_active_link_rule_version_by_semantic
 
-                rv_str = (job.pinned_rule_version or "").strip()
-                scope = dict(job.scope_json or {})
-                use_anchor_continuity = bool(
-                    scope.get("use_anchor_continuity") is True or rv_str == ANCHOR_CONTINUITY_RULE_SEMANTIC
-                )
-                if use_anchor_continuity:
-                    out = run_anchor_continuity_candidate_regeneration(db, tenant_id=job.tenant_id)
-                else:
-                    ver_row = (
-                        get_active_link_rule_version_by_semantic(db, tenant_id=job.tenant_id, semantic_version=rv_str)
-                        if rv_str
-                        else None
-                    )
-                    link_vid = ver_row.id if ver_row is not None else None
-                    out = regenerate_link_candidates(
-                        db,
-                        tenant_id=job.tenant_id,
-                        rule_version=rv_str,
-                        engine_build_ref=CANDIDATE_GENERATION_ENGINE_BUILD_REF,
-                        link_rule_version_id=link_vid,
-                    )
+                out = run_anchor_continuity_candidate_regeneration(db, tenant_id=job.tenant_id)
                 job.summary_json = {
                     **out,
                     "org_link_replay_schema_version": ORG_LINK_REPLAY_SCHEMA_VERSION,
-                    "replay_lane": "anchor_continuity" if use_anchor_continuity else "legacy_rule_rows",
+                    "replay_lane": "anchor_continuity",
                 }
                 _append_receipt(
                     db,

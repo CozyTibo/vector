@@ -33,7 +33,19 @@ IDENTITY_CONTROL_PLANE_CONTRACT: Final[str] = "identity_control_plane_v1"
 _ORG_REPLAY_FRESHNESS_STALE_AFTER: Final[timedelta] = timedelta(hours=24)
 
 OPERATIONAL_REPLAY_CANONICAL_GUIDE: Final[dict[str, Any]] = {
-    "schema_version": "p04.operational_replay_canonical_guide.v2_wave2",
+    "schema_version": "p04.operational_replay_canonical_guide.v3_wave3",
+    "archived_wave3_dead_celery": {
+        "removed_task_names": [
+            "vector.cortex.identity.regenerate_link_candidates",
+            "vector.cortex.identity.replay_authoritative_links",
+        ],
+        "replacement": "mark_dirty_and_enqueue_convergence_v1 → run_identity_substrate_repair_slice_v1",
+        "org_link_replay_job_retained": "vector.cortex.identity.run_org_link_replay_job (debug / narrow scopes only)",
+    },
+    "archived_wave3_orphan_stitch": {
+        "autonomous_promotion": False,
+        "note": "run_continuity_stitching_pass_v1 may classify orphans and run anchor regen only; no promotion enqueue.",
+    },
     "authoritative_operator_repair": {
         "workflow": "POST .../cortex/operator/actions { action: rebuild_identities }",
         "implementation": "reset_identity_substrate_repair_state_v1 + mark_dirty_and_enqueue_convergence_v1",

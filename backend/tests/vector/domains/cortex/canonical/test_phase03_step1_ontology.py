@@ -197,7 +197,8 @@ def test_public_document_shape_and_sorted_ids() -> None:
     assert doc["merge_governance_runtime_doctrine_anchors"]
     assert "links/hints" in doc["link_hint_bucket_route"]
     assert "link-candidates" in doc["link_candidate_queue_route"]
-    assert "regenerate_link_candidates" in doc["celery_task_regenerate_link_candidates"]
+    assert doc["celery_task_regenerate_link_candidates"] is None
+    assert "vector.cortex.identity.regenerate_link_candidates" in doc["legacy_celery_tasks_removed_wave3"]
 
 
 def test_is_known_object_kind() -> None:

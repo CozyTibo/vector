@@ -30,8 +30,9 @@ from vector.domains.cortex.identity.org_entities import upsert_org_entity
 
 
 def test_celery_registers_link_identity_tasks() -> None:
-    assert "vector.cortex.identity.regenerate_link_candidates" in celery_app.tasks
-    assert "vector.cortex.identity.replay_authoritative_links" in celery_app.tasks
+    assert "vector.cortex.identity.regenerate_link_candidates" not in celery_app.tasks
+    assert "vector.cortex.identity.replay_authoritative_links" not in celery_app.tasks
+    assert "vector.cortex.identity.run_org_link_replay_job" in celery_app.tasks
 
 
 def test_verify_gp04_04_and_gp04_05_static_gates() -> None:

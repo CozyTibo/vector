@@ -237,7 +237,9 @@ def verify_gp085_watch01_static() -> dict[str, Any]:
         from vector.domains.cortex.ingestion import post_ingestion_refresh_dispatch as pid
 
         dispatch_src = inspect.getsource(pid.schedule_post_ingestion_substrate_refresh)
-        if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_src:
+        if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_src and (
+            "trigger_post_ingestion_execution_v1" not in dispatch_src
+        ):
             errors.append("post_ingestion_missing_convergence_dirty_mark")
     else:
         from app.celery_app import celery_app

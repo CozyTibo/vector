@@ -67,13 +67,6 @@ def get_vector_queue_backpressure_threshold_v1() -> int:
         return 64
 
 
-def get_post_ingestion_backpressure_extra_debounce_seconds_v1() -> int:
-    try:
-        return max(0, int(get_settings().cortex_post_ingestion_backpressure_extra_debounce_seconds))
-    except Exception:  # noqa: BLE001
-        return 300
-
-
 def get_synthesis_pipeline_max_scopes_v1() -> int:
     try:
         return max(1, int(get_settings().cortex_synthesis_pipeline_max_scopes))
@@ -111,9 +104,6 @@ def build_runtime_economics_knobs_v1(settings: Settings | None = None) -> dict[s
         ),
         "CORTEX_VECTOR_QUEUE_BACKPRESSURE_THRESHOLD": int(
             cfg.cortex_vector_queue_backpressure_threshold
-        ),
-        "CORTEX_POST_INGESTION_BACKPRESSURE_EXTRA_DEBOUNCE_SECONDS": int(
-            cfg.cortex_post_ingestion_backpressure_extra_debounce_seconds
         ),
     }
 
@@ -219,19 +209,19 @@ def resolve_post_ingestion_debounce_countdown_v1(
     *,
     base_debounce_seconds: int | None = None,
 ) -> dict[str, Any]:
-    """Resolve effective debounce for post-ingestion / substrate pipeline schedule."""
+    """Wave 3: post-ingest uses immediate mark_dirty (debounce settings removed)."""
+    _ = base_debounce_seconds
     cfg = settings or get_settings()
-    base = max(30, int(base_debounce_seconds or cfg.cortex_post_ingestion_substrate_refresh_debounce_seconds))
     bp = evaluate_vector_queue_backpressure_v1(cfg)
-    extra = 0
-    if bp.get("backpressure_active"):
-        extra = get_post_ingestion_backpressure_extra_debounce_seconds_v1()
-    effective = base + extra
     return {
-        "base_debounce_seconds": base,
-        "extra_debounce_seconds": extra,
-        "effective_countdown_seconds": effective,
+        "handoff_mode": "mark_dirty_and_enqueue_convergence_v1",
+        "debounce_removed_wave3": True,
+        "legacy_effective_countdown_seconds": 0,
+        "base_debounce_seconds": 0,
+        "extra_debounce_seconds": 0,
+        "effective_countdown_seconds": 0,
         "backpressure": bp,
+        "note": "Ingest handoff is immediate; queue backpressure is advisory only.",
     }
 
 
@@ -373,7 +363,9 @@ def verify_gp085_econ01_static() -> dict[str, Any]:
     from vector.domains.cortex.ingestion import post_ingestion_refresh_dispatch as pid
 
     dispatch_src = inspect.getsource(pid.schedule_post_ingestion_substrate_refresh)
-    if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_src:
+    if "mark_dirty_and_enqueue_convergence_v1" not in dispatch_src and (
+        "trigger_post_ingestion_execution_v1" not in dispatch_src
+    ):
         errors.append("post_ingestion_dispatch_not_wired")
     if "schedule_substrate_pipeline_v1" in dispatch_src:
         errors.append("post_ingestion_dispatch_legacy_coordinator_present")

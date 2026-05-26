@@ -348,26 +348,6 @@ class Settings(BaseSettings):
             "False = raw-only ingestion."
         ),
     )
-    cortex_post_ingestion_substrate_refresh_debounce_seconds: int = Field(
-        default=300,
-        ge=30,
-        le=3600,
-        validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_DEBOUNCE_SECONDS",
-        description=(
-            "Seconds after the last sync completion (or scheduler tick) before substrate refresh runs. "
-            "Repeated syncs coalesce into one dirty obligation without resetting this window (legacy coordinator removed D5)."
-        ),
-    )
-    cortex_post_ingestion_substrate_refresh_max_wait_seconds: int = Field(
-        default=900,
-        ge=60,
-        le=7200,
-        validation_alias="CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_MAX_WAIT_SECONDS",
-        description=(
-            "Maximum seconds from the first post-ingestion schedule in a burst before convergence "
-            "must run. Prevents perpetual debounce starvation during continuous incremental ingestion."
-        ),
-    )
     cortex_post_ingestion_canonical_batch_limit: int = Field(
         default=400,
         ge=1,
@@ -395,16 +375,6 @@ class Settings(BaseSettings):
         description=(
             "G-P085-ECON-01: when vector queue depth exceeds this threshold (θ_queue), "
             "defer post-ingestion substrate refresh countdown."
-        ),
-    )
-    cortex_post_ingestion_backpressure_extra_debounce_seconds: int = Field(
-        default=300,
-        ge=0,
-        le=3600,
-        validation_alias="CORTEX_POST_INGESTION_BACKPRESSURE_EXTRA_DEBOUNCE_SECONDS",
-        description=(
-            "G-P085-ECON-01: additional countdown seconds applied when vector queue backpressure "
-            "is active."
         ),
     )
     cortex_convergence_sweeper_enabled: bool = Field(
@@ -732,14 +702,6 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_ORPHAN_STITCHING_RUN_ANCHOR_REGEN",
         description=(
             "G-P085-ORPHAN-01: run anchor continuity candidate regeneration during stitch pass."
-        ),
-    )
-    cortex_orphan_stitching_auto_schedule_promotion: bool = Field(
-        default=False,
-        validation_alias="CORTEX_ORPHAN_STITCHING_AUTO_SCHEDULE_PROMOTION",
-        description=(
-            "G-P085-ORPHAN-01: deprecated — autonomous promotion runs only in "
-            "run_identity_substrate_repair_slice_v1 (Wave 1)."
         ),
     )
     cortex_traversal_component_schedule_enabled: bool = Field(

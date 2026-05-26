@@ -47,14 +47,12 @@ def test_upstream_cap_omission_shape() -> None:
     assert om["omission_class"] == OPERATIONAL_OMISSION_SD_UPSTREAM_CAP_V1
 
 
-def test_backpressure_extends_debounce(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_post_ingestion_debounce_removed_wave3(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(
         "DATABASE_URL",
         "postgresql+psycopg://test:test@localhost:5432/vector_test",
     )
-    monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_DEBOUNCE_SECONDS", "120")
     monkeypatch.setenv("CORTEX_VECTOR_QUEUE_BACKPRESSURE_THRESHOLD", "10")
-    monkeypatch.setenv("CORTEX_POST_INGESTION_BACKPRESSURE_EXTRA_DEBOUNCE_SECONDS", "180")
 
     from vector.settings import get_settings
 
@@ -66,20 +64,21 @@ def test_backpressure_extends_debounce(monkeypatch: pytest.MonkeyPatch) -> None:
             lambda **_k: {"depth": 99, "queue_name": "vector"},
         )
         resolved = resolve_post_ingestion_debounce_countdown_v1()
-        assert resolved["base_debounce_seconds"] == 120
-        assert resolved["extra_debounce_seconds"] == 180
-        assert resolved["effective_countdown_seconds"] == 300
+        assert resolved["debounce_removed_wave3"] is True
+        assert resolved["handoff_mode"] == "mark_dirty_and_enqueue_convergence_v1"
+        assert resolved["effective_countdown_seconds"] == 0
         assert resolved["backpressure"]["backpressure_active"] is True
     finally:
         get_settings.cache_clear()
 
 
-def test_backpressure_inactive_debounce(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_post_ingestion_debounce_zero_when_backpressure_inactive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv(
         "DATABASE_URL",
         "postgresql+psycopg://test:test@localhost:5432/vector_test",
     )
-    monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_DEBOUNCE_SECONDS", "120")
     monkeypatch.setenv("CORTEX_VECTOR_QUEUE_BACKPRESSURE_THRESHOLD", "1000")
 
     from vector.settings import get_settings
@@ -92,8 +91,9 @@ def test_backpressure_inactive_debounce(monkeypatch: pytest.MonkeyPatch) -> None
             lambda **_k: {"depth": 2, "queue_name": "vector"},
         )
         resolved = resolve_post_ingestion_debounce_countdown_v1()
-        assert resolved["effective_countdown_seconds"] == 120
+        assert resolved["effective_countdown_seconds"] == 0
         assert resolved["extra_debounce_seconds"] == 0
+        assert resolved["backpressure"]["backpressure_active"] is False
     finally:
         get_settings.cache_clear()
 

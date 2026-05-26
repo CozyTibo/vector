@@ -74,26 +74,20 @@ def test_worker_task_unknown_returns_404(
     assert r.status_code == 404
 
 
-def test_legacy_regenerate_async_registers_dispatch(
+def test_legacy_regenerate_async_collapsed_on_primary(
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
     db_session: Session,
 ) -> None:
     monkeypatch.setenv("ADMIN_PASSWORD", "integration-admin-password")
     tid = _tenant_with_owner(db_session)
-    fake_id = "00000000-0000-4000-8000-0000000000aa"
-
-    from app.tasks.cortex_org_link_jobs import regenerate_link_candidates_task
-
-    monkeypatch.setattr(regenerate_link_candidates_task, "delay", lambda *_a, **_k: SimpleNamespace(id=fake_id))
 
     post = client.post(
         f"/admin/tenants/{tid}/cortex/identity/link-candidates/regenerate-async",
         auth=("admin", "integration-admin-password"),
         json={"rule_version": "1.0.0-test"},
     )
-    assert post.status_code == 410
-    assert "execution/restart" in post.json()["detail"]["replacement"]
+    assert post.status_code == 404
 
 
 def test_projection_export_run_enqueues_graph_job(

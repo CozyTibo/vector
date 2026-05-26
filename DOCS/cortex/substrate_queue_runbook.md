@@ -51,6 +51,12 @@ run_sync [cortex_live]
 |--------|-----|----------|
 | **Rebuild identities** | `POST .../cortex/operator/actions` `{ "action": "rebuild_identities", "confirmation": "REBUILD IDENTITIES FROM CANONICAL ANCHORS" }` | `reset_identity_substrate_repair_state_v1` + `mark_dirty_and_enqueue_convergence_v1` — **no** `identity_rebuild_from_anchors` replay job |
 
+**Wave 3 (removed dead paths):**
+
+- Celery tasks `vector.cortex.identity.regenerate_link_candidates` and `replay_authoritative_links` are **not registered** (use convergence + repair slice).
+- Orphan stitch does **not** auto-schedule promotion.
+- Post-ingest debounce settings removed — handoff is immediate `mark_dirty_and_enqueue_convergence_v1`.
+
 Debug-only (add `?debug=1` on operator pages for panel, or call API directly):
 
 - `POST .../cortex/debug/identity/backfill/from-canonical-anchors`

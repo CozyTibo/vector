@@ -164,6 +164,8 @@ M9_DEAD_CELERY_TASK_NAMES_V1: Final[tuple[str, ...]] = (
     "vector.cortex.substrate_pipeline.coordinator",
     "vector.cortex.substrate_pipeline.phase",
     "vector.cortex.substrate_pipeline.phase_08_synthesis",
+    "vector.cortex.identity.regenerate_link_candidates",
+    "vector.cortex.identity.replay_authoritative_links",
 )
 
 
@@ -342,6 +344,58 @@ def verify_wave2_operator_paths_v1() -> list[str]:
 
     if not callable(getattr(dbg_mod, "run_debug_full_substrate_refresh_v1", None)):
         errors.append("missing_run_debug_full_substrate_refresh_v1")
+
+    return errors
+
+
+def verify_wave3_dead_weight_v1() -> list[str]:
+    """Wave 3: legacy Celery regen/replay unregistered; orphan auto-promotion and debounce settings removed."""
+    errors: list[str] = []
+    errors.extend(verify_m9_dead_celery_modules_absent_v1())
+
+    from vector.domains.cortex.operational_runtime import graph_orphan_continuity as orphan_mod
+
+    if hasattr(orphan_mod, "get_orphan_stitching_auto_schedule_promotion_v1"):
+        errors.append("orphan_auto_schedule_promotion_helper_still_present")
+    stitch_src = inspect.getsource(orphan_mod.run_continuity_stitching_pass_v1)
+    if "schedule_graph_density_pass_v1" in stitch_src:
+        errors.append("orphan_stitch_still_schedules_promotion")
+
+    from vector.settings import Settings
+
+    removed_settings = (
+        "cortex_post_ingestion_substrate_refresh_debounce_seconds",
+        "cortex_post_ingestion_substrate_refresh_max_wait_seconds",
+        "cortex_post_ingestion_backpressure_extra_debounce_seconds",
+        "cortex_orphan_stitching_auto_schedule_promotion",
+    )
+    for field in removed_settings:
+        if field in Settings.model_fields:
+            errors.append(f"wave3_setting_still_present:{field}")
+
+    import app.tasks.cortex_org_link_jobs as jobs_mod
+
+    jobs_src = inspect.getsource(jobs_mod)
+    if "def regenerate_link_candidates_task" in jobs_src:
+        errors.append("cortex_org_link_jobs_still_registers_regenerate_task")
+    if "def replay_authoritative_links_task" in jobs_src:
+        errors.append("cortex_org_link_jobs_still_registers_replay_task")
+    if "run_org_link_replay_job_task" not in jobs_src:
+        errors.append("cortex_org_link_jobs_missing_run_org_link_replay_job_task")
+
+    from vector.domains.cortex.identity import link_ledger_metadata as llm
+
+    ptr = llm.build_link_ledger_pointer_section()
+    if ptr.get("celery_task_regenerate_link_candidates") is not None:
+        errors.append("link_ledger_metadata_still_points_at_regenerate_celery_task")
+    if not ptr.get("legacy_celery_tasks_removed_wave3"):
+        errors.append("link_ledger_metadata_missing_wave3_tombstone_list")
+
+    from vector.domains.cortex.operational_runtime import substrate_runtime_economics as econ_mod
+
+    deb_src = inspect.getsource(econ_mod.resolve_post_ingestion_debounce_countdown_v1)
+    if "debounce_removed_wave3" not in deb_src:
+        errors.append("post_ingestion_debounce_not_marked_removed")
 
     return errors
 
