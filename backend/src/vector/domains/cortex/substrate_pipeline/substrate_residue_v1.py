@@ -157,6 +157,7 @@ def verify_graph_density_schedule_scope_v1() -> list[str]:
         "execution/scheduling.py",
         "substrate_pipeline/continuity_p",
         "substrate_pipeline/substrate_residue_v1.py",
+        "substrate_pipeline/substrate_final_domain_shape_v1.py",
     )
     token = "schedule_graph_density_pass_v1"
     for path in _iter_scanned_py_files_v1():

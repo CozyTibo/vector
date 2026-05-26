@@ -17,7 +17,7 @@ from vector.domains.cortex.canonical.forward_progress.deferral_store import (
 from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
 from vector.domains.cortex.execution.lease import get_tenant_execution_lease_v1
 from vector.domains.cortex.ingestion.exhaust_coverage_registry import build_admin_exhaust_coverage_payload
-from vector.domains.cortex.unlock.step12_track_b_p3 import (
+from vector.domains.cortex.ingestion.github_ingest_caps_ecs import (
     FIX6_RECOMMENDED_GITHUB_CAPS_V1,
     snapshot_fix6_github_ingest_caps_v1,
 )

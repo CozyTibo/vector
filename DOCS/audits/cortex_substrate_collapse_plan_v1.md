@@ -676,6 +676,15 @@ Keep: `run_org_link_replay_job` **only** if reduced to audit export debug.
 - [x] `substrate_soak_v6_v8_check.py` for 24h Fizzer soak (V6 promotion rules, V7 hash, V8 isolation)
 - [x] `verify_wave5_deploy_contract_v1` + tests in `test_substrate_wave5_deploy_contract.py`
 
+### Wave 9 — Final domain shape — **DONE**
+
+- [x] `substrate_final_domain_shape_v1` — five-verb ownership map, ≤40 critical module allowlist, laws L10–L13
+- [x] `DOCS/cortex/substrate_onboarding_v1.md` — 2-minute operator/engineer onboarding
+- [x] L10: no `unlock` imports in `execution` or `identity`; GitHub Fix-6 caps moved to `ingestion/github_ingest_caps_ecs`
+- [x] `unlock/` package marked ARCHIVED; `identity_continuity_rebuild` runtime scoped to debug/tests only
+- [x] OpenAPI `substrate_v1.yaml` documents Wave 9 final shape
+- [x] `verify_wave9_final_domain_shape_v1` wired into CI + `test_substrate_wave9_final_domain_shape.py`
+
 ### Wave 8 — Operational simplicity — **DONE**
 
 - [x] `substrate_operational_simplicity_v1` — mutator registry, `predict_next_mutation_hint`, `build_operational_panel_v1`

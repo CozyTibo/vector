@@ -454,6 +454,15 @@ def verify_wave4_graph_truth_v1() -> list[str]:
     return errors
 
 
+def verify_wave9_final_domain_shape_v1(*, repo_root: Path | None = None) -> list[str]:
+    """Wave 9: final five-verb domain shape, module budget, laws L10–L13, onboarding doc."""
+    from vector.domains.cortex.substrate_pipeline.substrate_final_domain_shape_v1 import (
+        verify_wave9_final_domain_shape_v1 as _verify,
+    )
+
+    return _verify(repo_root=repo_root)
+
+
 def verify_wave8_operational_simplicity_v1(*, repo_root: Path | None = None) -> list[str]:
     """Wave 8: mutator registry, runbook, org-link write scope, slice logging."""
     from vector.domains.cortex.substrate_pipeline.substrate_operational_simplicity_v1 import (

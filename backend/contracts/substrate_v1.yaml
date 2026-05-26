@@ -1,10 +1,12 @@
 openapi: 3.1.0
 info:
-  title: Cortex substrate contracts (Wave 7)
+  title: Cortex substrate contracts (Wave 9)
   version: 1.0.0
   description: |
-    Authoritative substrate read model and collapsed operator surfaces.
+    Authoritative substrate read model and collapsed operator surfaces (final domain shape).
     Primary truth: GET /admin/tenants/{tenant_id}/cortex/substrate/truth
+    Onboarding: DOCS/cortex/substrate_onboarding_v1.md
+    substrate_domain_shape: five verbs INGEST→EXPORT + TRUTH read model
 
 paths:
   /admin/tenants/{tenant_id}/cortex/substrate/truth:

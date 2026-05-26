@@ -1,8 +1,10 @@
-# Cortex substrate coherence modules (Wave 6–8)
+# Cortex substrate coherence modules (Wave 6–9)
 
-**Purpose:** Onboarding map of the **authoritative** substrate path and the modules that implement it. Count: **18** production modules (target &lt;20).
+**Purpose:** Onboarding map of the **authoritative** substrate path. Critical path: **34 modules** (allowlist in `substrate_final_domain_shape_v1`, max 40).
 
-**Wave 8:** Operator motion is on `substrate_truth_v1.operational` (`substrate_operational_simplicity_v1`); slice telemetry is one log line `substrate_slice_complete` per dual-lane return. See [substrate_queue_runbook.md](./substrate_queue_runbook.md).
+**Wave 9:** Five verbs INGEST→EXPORT + TRUTH — see [substrate_onboarding_v1.md](./substrate_onboarding_v1.md). `unlock/` is archived; do not import from execution/identity.
+
+**Wave 8:** Operator motion on `substrate_truth_v1.operational`; slice log `substrate_slice_complete`. See [substrate_queue_runbook.md](./substrate_queue_runbook.md).
 
 ## Authoritative motion
 
@@ -43,7 +45,7 @@
 
 ```bash
 cd backend && PYTHONPATH=src python scripts/substrate_ci_gates.py
-python -m pytest tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave8_operational_simplicity.py -q
+python -m pytest tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave9_final_domain_shape.py -q
 ```
 
 See also: [substrate_queue_runbook.md](./substrate_queue_runbook.md), [cortex_substrate_collapse_plan_v1.md](../audits/cortex_substrate_collapse_plan_v1.md).

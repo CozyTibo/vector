@@ -26,6 +26,30 @@ GITHUB_CAP_LEGACY_LOW_VALUES_V1: dict[str, int] = {
     "CORTEX_GITHUB_REPO_TIME_BUDGET_SECONDS": 25,
 }
 
+# War-room recommended minimums (Fix-6 trio) — used by deferral monitoring, not substrate motion.
+FIX6_RECOMMENDED_GITHUB_CAPS_V1: dict[str, tuple[int, int]] = {
+    "cortex_github_prs_max_pages_per_repo": (10, 200),
+    "cortex_github_pr_fetch_max_repos": (16, 200),
+    "cortex_github_repo_time_budget_seconds": (120, 600),
+}
+
+
+def snapshot_fix6_github_ingest_caps_v1(*, settings: Any | None = None) -> dict[str, Any]:
+    """Operator snapshot of Fix-6 GitHub ingest caps vs recommended minimums."""
+    caps: dict[str, Any] = {}
+    for field, (recommended_min, ceiling) in FIX6_RECOMMENDED_GITHUB_CAPS_V1.items():
+        if settings is not None:
+            value = int(getattr(settings, field))
+        else:
+            value = int(GITHUB_CAP_CODE_DEFAULTS_V1[field])
+        caps[field] = {
+            "value": value,
+            "recommended_min": recommended_min,
+            "ceiling": ceiling,
+            "meets_recommended": value >= recommended_min,
+        }
+    return caps
+
 
 def github_cap_ecs_environment_entries_v1() -> list[dict[str, str]]:
     return [

@@ -11,12 +11,10 @@ from vector.settings import Settings
 
 TRACK_B_SOAK_HOURS_REQUIRED_V1 = 24
 
-# War-room recommended GitHub ingest caps (Fix 6) — raise in prod env for true orphan closure.
-FIX6_RECOMMENDED_GITHUB_CAPS_V1: dict[str, tuple[int, int]] = {
-    "cortex_github_prs_max_pages_per_repo": (10, 200),
-    "cortex_github_pr_fetch_max_repos": (16, 200),
-    "cortex_github_repo_time_budget_seconds": (120, 600),
-}
+from vector.domains.cortex.ingestion.github_ingest_caps_ecs import (
+    FIX6_RECOMMENDED_GITHUB_CAPS_V1,
+    snapshot_fix6_github_ingest_caps_v1,
+)
 
 FIX6_ENV_ALIASES_V1: dict[str, tuple[str, int]] = {
     "cortex_github_prs_max_pages_per_repo": ("CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO", 10),
@@ -25,23 +23,6 @@ FIX6_ENV_ALIASES_V1: dict[str, tuple[str, int]] = {
 }
 
 _FORBIDDEN_SYNTHESIS_LEGALITY_V1: frozenset[str] = frozenset({"synthesis_forbidden"})
-
-
-def snapshot_fix6_github_ingest_caps_v1(*, settings: Settings | None = None) -> dict[str, Any]:
-    caps: dict[str, Any] = {}
-    for field, (recommended_min, ceiling) in FIX6_RECOMMENDED_GITHUB_CAPS_V1.items():
-        if settings is not None:
-            value = int(getattr(settings, field))
-        else:
-            env_key, default = FIX6_ENV_ALIASES_V1[field]
-            value = int(os.environ.get(env_key, default))
-        caps[field] = {
-            "value": value,
-            "recommended_min": recommended_min,
-            "ceiling": ceiling,
-            "meets_recommended": value >= recommended_min,
-        }
-    return caps
 
 
 def evaluate_fix6_github_ingest_caps_v1(
