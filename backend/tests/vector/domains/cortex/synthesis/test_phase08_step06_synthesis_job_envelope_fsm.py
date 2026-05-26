@@ -27,10 +27,10 @@ from vector.domains.cortex.synthesis.synthesis_orchestrator import (
     SYNTHESIS_ORCHESTRATOR_BUILD_ID_V1,
     SynthesisOrchestratorError,
     execute_synthesis_job_envelope_v1,
-    find_idempotent_synthesis_job_v1,
     verify_gp08_fsm01_synthesis_phase_order_static,
     verify_gp08_schema01_synthesis_job_envelope_execution_static,
 )
+from vector.domains.cortex.synthesis.synthesis_repository import find_idempotent_synthesis_job_v1
 from vector.infrastructure.db.models.cortex_synthesis_job import CortexSynthesisJob
 from vector.infrastructure.db.models.cortex_synthesis_job_receipt import CortexSynthesisJobReceipt
 from vector.infrastructure.db.models.membership import TenantMembership
@@ -59,7 +59,13 @@ def _legal_retrieval_stub() -> dict[str, object]:
     return {
         "retrieval_legality_class": "retrieval_replay_safe",
         PHASE07_REPLAY_IDENTITY_FIELD_V1: "rqid:p08-fsm",
-        "retrieval_evidence_hits": [],
+        "retrieval_evidence_hits": [
+            {
+                "retrieval_lookup_id": "sha256:" + "e" * 64,
+                "source_artifact_kind": "materialization",
+                "evidence_legality_class": "replay_safe",
+            },
+        ],
         "retrieval_omission_rows": [],
         "retrieval_policy_pack_digest": retrieval_policy_pack_digest_v1(),
         "retrieval_query_receipt": {"receipt_digest": "sha256:00"},

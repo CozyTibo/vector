@@ -23,9 +23,16 @@ ORG_LINK_INDEX_KIND_V1: Final[str] = "org_link"
 
 
 class SynthesisExecutionGroundingError(ValueError):
-    def __init__(self, code: str, *, detail: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        *,
+        detail: dict[str, Any] | None = None,
+        http_status: int = 422,
+    ) -> None:
         self.code = code
         self.detail = dict(detail or {})
+        self.http_status = http_status
         super().__init__(code)
 
 
@@ -137,6 +144,8 @@ def enforce_execution_grounding_before_llm_v1(
         hits=retrieval_hits,
         index_epoch=index_epoch,
     )
+    if int(audit.get("hit_count") or 0) == 0:
+        return {"ok": True, "skipped": True, "reason": "lawful_empty_retrieval_scope", "grounding_audit": audit}
     if audit["org_link_only_scope"]:
         raise SynthesisExecutionGroundingError(
             FAILURE_CODE_ORG_LINK_ONLY_SCOPE_V1,
