@@ -105,8 +105,8 @@ export function pendingActionFeedback(action: OperatorActionKind): ActionFeedbac
     case "rebuild_identities":
       return {
         tone: "pending",
-        title: "Rebuilding identities from canonical anchors…",
-        detail: "Clears org handles and link candidates, then rescans anchors. Graph phases restart after.",
+        title: "Running identity substrate repair…",
+        detail: "Same repair as automatic phase 03 — paginated anchor backfill, candidates, and promotion.",
       };
     default:
       return {
@@ -177,37 +177,31 @@ export function formatActionFeedback(data: OperatorActionResponse): ActionFeedba
   }
 
   if (action === "rebuild_identities") {
-    const enqueued = result.enqueued === true;
-    if (enqueued) {
-      return {
-        tone: "ok",
-        title: "Identity rebuild queued",
-        detail:
-          typeof result.hint === "string"
-            ? result.hint
-            : "Anchor rescan runs in the background. Watch Runtime for downstream progress.",
-      };
-    }
     const before = asRecord(result.counts_before);
     const after = asRecord(result.counts_after);
-    const substrate = asRecord(result.substrate);
+    const repair = asRecord(result.repair_until_exhausted);
+    const lastSlice = asRecord(repair?.last_slice);
+    const audit = asRecord(lastSlice?.identity_substrate_audit);
+    const countsAfter = asRecord(audit?.counts_after) ?? after;
     const entitiesBefore = typeof before?.org_entities_active === "number" ? before.org_entities_active : null;
-    const entitiesAfter = typeof after?.org_entities_active === "number" ? after.org_entities_active : null;
-    const upserted = typeof substrate?.entities_upserted === "number" ? substrate.entities_upserted : null;
-    const restarted = asRecord(result.restarted);
-    const reran = restarted?.reran === true || restarted?.restarted === true;
+    const entitiesAfter =
+      typeof countsAfter?.org_entities_active === "number" ? countsAfter.org_entities_active : null;
+    const slicesRun = typeof repair?.slices_run === "number" ? repair.slices_run : null;
     const countLine =
       entitiesBefore != null && entitiesAfter != null
         ? `Org handles: ${entitiesBefore.toLocaleString()} → ${entitiesAfter.toLocaleString()}.`
-        : upserted != null
-          ? `${upserted.toLocaleString()} handles upserted from anchors.`
-          : null;
+        : null;
+    const dispatch = asRecord(result.convergence_dispatch);
+    const scheduled = dispatch?.scheduled === true;
     return {
-      tone: "ok",
-      title: "Identities rebuilt from canonical anchors",
+      tone: entitiesAfter != null && entitiesAfter > 0 ? "ok" : "warn",
+      title: "Identity substrate repair finished",
       detail: [
         countLine,
-        reran ? "Graph and downstream phases restarted — watch Runtime for progress." : null,
+        slicesRun != null ? `${slicesRun} repair slice(s), same path as phase 03.` : null,
+        scheduled
+          ? "Convergence worker scheduled to continue graph and downstream phases."
+          : "Watch Runtime — convergence will continue the pipeline.",
       ]
         .filter(Boolean)
         .join(" "),

@@ -315,9 +315,13 @@ def rebuild_identities_from_anchors_v1(
     *,
     tenant_id: uuid.UUID,
     anchor_limit: int = 5_000,
-    restart_downstream: bool = True,
+    restart_downstream: bool = False,
 ) -> dict[str, Any]:
-    """Non-destructive identity rebuild: paginated backfill until anchors exhausted (+ optional graph restart)."""
+    """Manual trigger for the same phase-03 identity repair the convergence worker runs (all slices in one request).
+
+    Does not clear identity tables. By default does not wipe graph downstream — marks the tenant dirty
+    so the normal dual-lane worker continues from identity/graph with the repaired substrate.
+    """
     from vector.domains.cortex.canonical.transform_runtime import resolve_default_bundle_id_for_stub_transform
     from vector.domains.cortex.identity.identity_substrate_repair_v1 import (
         identity_repair_anchor_batch_size_v1,
@@ -343,6 +347,14 @@ def rebuild_identities_from_anchors_v1(
         bundle_id=bundle_id,
         substrate_trigger="operator:rebuild_identities_incremental",
         max_slices=max_slices,
+    )
+
+    from vector.domains.cortex.execution.enqueue import mark_dirty_and_enqueue_convergence_v1
+
+    convergence_dispatch = mark_dirty_and_enqueue_convergence_v1(
+        tenant_id,
+        reason="operator:rebuild_identities_complete",
+        telemetry_trigger="operator:rebuild_identities_complete",
     )
 
     restarted: dict[str, Any] | None = None
@@ -374,6 +386,8 @@ def rebuild_identities_from_anchors_v1(
         "anchor_limit_applied": identity_repair_anchor_batch_size_v1(),
         "repair_until_exhausted": repair,
         "destructive_clear": False,
+        "convergence_dispatch": convergence_dispatch,
+        "same_repair_as_phase_03": True,
     }
 
 
