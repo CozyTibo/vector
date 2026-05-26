@@ -1,4 +1,4 @@
-import React, { type ReactNode, useEffect, useRef, useState } from "react";
+import React, { type ReactNode, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import "../../styles/vector-landing-scoped.css";
@@ -391,8 +391,8 @@ type ImpactBlock = (typeof IMPACT_BLOCKS)[number];
 
 function AnimatedImpactColumn({ block }: { block: ImpactBlock }) {
   const colRef = useRevealInViewRef();
-  const [displayed, setDisplayed] = useState("0");
-  const [animated, setAnimated] = useState(false);
+  const [displayed, setDisplayed] = React.useState("0");
+  const [animated, setAnimated] = React.useState(false);
 
   useEffect(() => {
     const el = colRef.current;
