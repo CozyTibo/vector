@@ -209,7 +209,7 @@
 #vector-landing .hero h1 {
   /* Tuned for two short lines beside the hero chat (wide glyphs + narrow column used to force 4+ wraps). */
   font-size: clamp(30px, 2.85vw + 10px, 48px);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.05;
   color: #0f172a;
@@ -927,11 +927,6 @@
   margin: 0;
   text-align: center;
   min-width: 0;
-  border-right: 1px solid #F0F0F0;
-  padding: 0 48px;
-}
-#vector-landing .impact-strip__col:last-child {
-  border-right: none;
 }
 #vector-landing .impact-strip__stat {
   margin: 0;
@@ -986,7 +981,7 @@
 #vector-landing .timeline-contrast__header h2 {
   margin: 0;
   text-align: center;
-  font-size: var(--section-title);
+  font-size: clamp(2rem, 2vw + 1.4rem, 3.35rem);
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: -0.03em;
@@ -2312,7 +2307,7 @@
 }
 #vector-landing .faq-strip__header h2 {
   margin: 0;
-  font-size: var(--section-title);
+  font-size: clamp(2rem, 2vw + 1.4rem, 3.35rem);
   font-weight: 700;
   line-height: 1.08;
   letter-spacing: -0.03em;
@@ -2459,7 +2454,7 @@
   max-width: 900px;
   margin-left: auto;
   margin-right: auto;
-  padding-top: 80px;
+  padding-top: 48px;
   gap: 48px;
 }
 
@@ -2487,9 +2482,8 @@
 }
 
 #vector-landing .wrap.hero .hero-sub.hero-sub--centered {
-  max-width: 560px;
+  max-width: 640px;
   font-size: var(--section-body);
-  font-weight: 400;
   text-align: center;
   line-height: 1.65;
   margin-left: auto;
@@ -2588,7 +2582,7 @@
   height: calc(100% - 160px);
   pointer-events: all;
   overflow: hidden;
-  opacity: 0.3;
+  opacity: 0.2;
   z-index: 0;
   clip-path: inset(0 0 0 0);
 }
@@ -2619,36 +2613,21 @@
   /* Hero headline — allow wrapping on mobile */
   .hero-copy--centered h1 {
     white-space: normal;
-    font-size: clamp(1.875rem, 3.6vw + 1rem, 3.15rem);
+    font-size: clamp(24px, 7vw, 38px);
     text-align: center;
-    word-break: break-word;
-  }
-
-  .hero-headline-line {
-    display: block;
-  }
-  .hero-copy--centered h1 .hero-headline-line:first-child {
-    display: block;
-    width: 100%;
   }
 
   /* Hero subline — full width on mobile */
   .hero-sub--centered {
     max-width: 100%;
-    font-size: 13px;
-    padding: 0 32px;
+    font-size: 15px;
+    padding: 0 16px;
     margin-bottom: 48px;
-    line-height: 1.55;
-  }
-
-  #vector-landing h2 {
-    font-size: clamp(1.6rem, 3.2vw + 0.9rem, 2.8rem);
   }
 
   /* Hero centered shell — add padding */
   .hero-centered-shell {
     padding: 0 20px;
-    padding-top: 48px;
   }
 
   /* FAQ — stack vertically on mobile */
