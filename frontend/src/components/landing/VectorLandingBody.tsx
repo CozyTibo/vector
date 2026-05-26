@@ -142,12 +142,17 @@ function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string;
           style={{
             display: "flex",
             gap: "8px",
-            marginBottom: "16px",
+            marginBottom: "0px",
             padding: "16px",
             border: "1px solid #F0F0F0",
             borderRadius: "10px",
             background: "#FAFAFA",
             fontSize: "11px",
+            flex: "1",
+            height: "180px",
+            minHeight: "180px",
+            maxHeight: "180px",
+            overflow: "hidden",
           }}
         >
           <div style={{ flex: 1 }}>
@@ -220,7 +225,7 @@ function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string;
               }}
             >
               <span style={{ color: "#E878BE" }}>@marie</span>
-              {" "}honestly the retry logic is getting messy, let's just standardize on 3 attempts across all services
+              {" "}retry logic is a mess, let's cap at 3 attempts across all services
             </div>
           </div>
         </div>
@@ -230,12 +235,17 @@ function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string;
       visual: (
         <div
           style={{
-            marginBottom: "16px",
+            marginBottom: "0px",
             padding: "16px",
             border: "1px solid #F0F0F0",
             borderRadius: "10px",
             background: "#FAFAFA",
             fontSize: "11px",
+            flex: "1",
+            height: "180px",
+            minHeight: "180px",
+            maxHeight: "180px",
+            overflow: "hidden",
           }}
         >
           <div
@@ -274,10 +284,11 @@ function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string;
               padding: "8px 10px",
               color: "#333",
               lineHeight: 1.5,
+              fontSize: "11px",
             }}
           >
-            Decided in{" "}
-            <span style={{ color: "#E878BE" }}>#backend-arch</span>, February 2026. @alex and @thomas aligned after the deploy incident.
+            Decided during an engineering call in{" "}
+            <span style={{ color: "#E878BE" }}>#backend-arch</span>, February 2026, effective on GitHub in March 2026. @alex, @thomas and @marie aligned.
           </div>
         </div>
       ),
@@ -286,15 +297,19 @@ function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string;
       visual: (
         <div
           style={{
-            marginBottom: "16px",
+            marginBottom: "0px",
             padding: "16px",
             border: "1px solid #F0F0F0",
             borderRadius: "10px",
             background: "#FAFAFA",
-            height: "120px",
+            height: "180px",
+            minHeight: "180px",
+            maxHeight: "180px",
+            overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
+            flex: "1",
           }}
         >
           <svg viewBox="0 0 300 80" width="100%" height="70" preserveAspectRatio="none">
@@ -379,6 +394,10 @@ function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string;
             borderRadius: "12px",
             padding: "24px",
             background: "#ffffff",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-start",
+            gap: "8px",
           }}
         >
           {cards[i]?.visual}
@@ -389,6 +408,7 @@ function ValuePillarCapabilityGrid({ items }: { items: readonly { title: string;
               fontSize: "15px",
               color: "#111111",
               marginBottom: "8px",
+              marginTop: "0",
             }}
           >
             {item.title}
@@ -914,7 +934,21 @@ function HeroGraphBackground() {
   );
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState(
+    () => window.innerWidth <= 767
+  );
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 767);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
+
 export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyProps) {
+  const isMobile = useIsMobile();
+
   return (
     <div id="vector-landing">
       <div className="page-bg" aria-hidden="true">
@@ -980,19 +1014,8 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
 
         <section className="section" id="meet-vector" aria-labelledby="meet-vector-heading">
           <div className="container">
-            <div className="meet-vector-layout" style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              textAlign: "center",
-              gap: "40px",
-            }}>
-              <div className="meet-vector-copy" style={{
-                textAlign: "center",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}>
+            <div className="meet-vector-layout">
+              <div className="meet-vector-copy">
                 <h2 id="meet-vector-heading">
                   Meet <span className="accent">Vector</span>
                 </h2>
@@ -1067,9 +1090,8 @@ export function VectorLandingBody({ signedInWorkspaceCta }: VectorLandingBodyPro
               </h2>
             </header>
             <div
+              className="security-grid"
               style={{
-                display: "grid",
-                gridTemplateColumns: "5fr 3fr",
                 gap: "24px",
                 maxWidth: "860px",
                 margin: "0 auto",
