@@ -13,6 +13,7 @@ from vector.domains.cortex.synthesis.synthesis_job_lifecycle import (
     snapshot_synthesis_hygiene_v1,
     verify_synthesis_job_terminal_transition_invariant_v1,
 )
+from vector.domains.cortex.synthesis.synthesis_replay_equivalence import SYNTHESIS_ORCHESTRATOR_BUILD_ID_V1
 from vector.infrastructure.db.models.cortex_synthesis_job import CortexSynthesisJob
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.tenant import Tenant
@@ -42,12 +43,17 @@ def test_s4_reconcile_all_stale_jobs_dry_run(db_session: Session) -> None:
     db_session.flush()
     tenant_id = tenant.id
 
-    stale_at = datetime.now(UTC) - timedelta(hours=2)
+    stale_at = datetime.now(UTC) - timedelta(hours=48)
     job = CortexSynthesisJob(
         tenant_id=tenant_id,
         status="running",
         envelope_digest=f"sha256:{'a' * 64}",
         envelope_json={"synthesis_workload_class": "degradation_brief"},
+        synthesis_workload_class="degradation_brief",
+        synthesis_intent="inspect",
+        execution_partition="authoritative",
+        synthesis_policy_pack_id="SynthesisPolicyPackV1_Default",
+        synthesis_orchestrator_build_id=SYNTHESIS_ORCHESTRATOR_BUILD_ID_V1,
         created_at=stale_at,
         started_at=stale_at,
     )

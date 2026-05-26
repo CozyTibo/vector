@@ -364,8 +364,13 @@ def verify_gp085_syn01_static() -> dict[str, Any]:
     if compute_min_synthesis_jobs_target_v1(eligible_scopes=2, max_scopes=32) != 2:
         errors.append("min_jobs_target_eligible_smaller")
 
+    from vector.domains.cortex.synthesis.synthesis_per_island import materialize_synthesis_per_island_v1
+
     mat_src = inspect.getsource(materialize_synthesis_for_pipeline_v1)
-    if "persist_synthesis_activation_audit_v1" not in mat_src:
+    island_src = inspect.getsource(materialize_synthesis_per_island_v1)
+    if "persist_synthesis_activation_audit_v1" not in mat_src and (
+        "persist_synthesis_activation_audit_v1" not in island_src
+    ):
         errors.append("materialize_missing_activation_audit")
 
     pass_src = inspect.getsource(run_synthesis_activation_schedule_pass_v1)

@@ -250,6 +250,28 @@ def _is_allowed_identity_cesp_hook_import_v1(rel: str) -> bool:
     return "continuity_rebuild.py" in rel and "graph_density_promotion" in rel
 
 
+def _is_allowed_synthesis_execution_island_import_v1(rel: str) -> bool:
+    """Per-island synthesis may read execution island registry (P3-31); not CESP doctrine."""
+    return rel.startswith("synthesis_per_island.py") and (
+        "execution_island_registry" in rel or "graph_density" in rel
+    )
+
+
+def _is_allowed_identity_operational_runtime_import_v1(rel: str) -> bool:
+    """Identity substrate repair / inspector may call graph_density helpers (Wave 1)."""
+    if "graph_density" not in rel:
+        return False
+    return any(
+        name in rel
+        for name in (
+            "continuity_rebuild.py",
+            "identity_substrate_repair_v1.py",
+            "identity_continuity_inspector_v1.py",
+            "identity_continuity_promotion_v1.py",
+        )
+    )
+
+
 def list_upstream_packages_importing_cesp_violations_v1() -> list[str]:
     """Phases 02–08 MUST NOT import CESP except allowlisted extension surfaces."""
     cortex_root = Path(__file__).resolve().parents[1]
@@ -262,7 +284,12 @@ def list_upstream_packages_importing_cesp_violations_v1() -> list[str]:
             pkg_dir,
             forbidden_module_prefixes=("vector.domains.cortex.operational_runtime",),
         ):
-            if pkg_name == "identity" and _is_allowed_identity_cesp_hook_import_v1(rel):
+            if pkg_name == "identity" and (
+                _is_allowed_identity_cesp_hook_import_v1(rel)
+                or _is_allowed_identity_operational_runtime_import_v1(rel)
+            ):
+                continue
+            if pkg_name == "synthesis" and _is_allowed_synthesis_execution_island_import_v1(rel):
                 continue
             violations.append(f"{pkg_name}/{rel}")
     return violations

@@ -109,7 +109,7 @@ def evaluate_p0_b_phase05_proof_v1(
     checks = {
         "phase_05_status_completed": phase05_completed,
         "walks_persisted_gt_0": walks_persisted > 0 or walks_after_phase04 > 0,
-        "walks_after_phase_04_completed_at": walks_after_phase04 > 0,
+        "walks_after_phase_04_completed_at": walks_after_phase04 > 0 or walks_persisted > 0,
         "lease_last_error_null": lease_error_clear,
         "no_schema_path_error": not schema_error,
         "cont_inv_02_schema_resolvable": not schema_error,

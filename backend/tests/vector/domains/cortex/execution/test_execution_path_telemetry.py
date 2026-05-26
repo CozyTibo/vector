@@ -79,10 +79,15 @@ def test_post_ingestion_convergence_dispatch_includes_execution_path() -> None:
         },
     )()
     with patch(
-        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_dirty_and_enqueue_convergence_v1",
+        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch."
+        "trigger_post_ingestion_execution_v1",
         return_value={
-            "execution_path": EXECUTION_PATH_CONVERGENCE,
-            "execution_path_telemetry": {"execution_path": EXECUTION_PATH_CONVERGENCE},
+            "triggered": True,
+            "dispatch": {
+                "scheduled": True,
+                "execution_path": EXECUTION_PATH_CONVERGENCE,
+                "execution_path_telemetry": {"execution_path": EXECUTION_PATH_CONVERGENCE},
+            },
         },
     ):
         out = schedule_post_ingestion_substrate_refresh(

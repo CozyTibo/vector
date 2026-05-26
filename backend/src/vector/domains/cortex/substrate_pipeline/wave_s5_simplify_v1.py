@@ -31,16 +31,30 @@ OPERATOR_ENV_VARS_V1: Final[tuple[dict[str, str], ...]] = (
 
 
 def count_archived_continuity_proofs_v1(*, repo_root: Path | None = None) -> int:
-    root = repo_root or Path(__file__).resolve().parents[6]
-    archive = root / ARCHIVED_PROOFS_DIR_V1
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+        resolve_backend_scripts_dir_v1,
+        resolve_repo_relative_path_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
+    archive = resolve_repo_relative_path_v1(root, ARCHIVED_PROOFS_DIR_V1)
+    if not archive.is_dir():
+        archive = resolve_backend_scripts_dir_v1(repo_root=root) / "archive" / "continuity_proofs"
     if not archive.is_dir():
         return 0
     return len(list(archive.glob("continuity_*_proof.py")))
 
 
 def verify_s5_2_simplify_contract_v1(*, repo_root: Path | None = None) -> dict[str, Any]:
-    root = repo_root or Path(__file__).resolve().parents[6]
-    scripts = root / "backend" / "scripts"
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+        resolve_backend_scripts_dir_v1,
+        resolve_repo_relative_path_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
+    scripts = resolve_backend_scripts_dir_v1(repo_root=root)
     errors: list[str] = []
     live_proofs = list(scripts.glob("continuity_*_proof.py"))
     if live_proofs:

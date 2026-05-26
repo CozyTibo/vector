@@ -245,7 +245,11 @@ def verify_cleanup_freeze_wiring_v1(*, repo_root: Path | None = None) -> dict[st
     import inspect
 
     errors: list[str] = []
-    root = repo_root or Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
 
     from vector.domains.cortex.substrate_pipeline import continuity_proof_panel as panel_mod
     from vector.domains.cortex.substrate_pipeline import continuity_audit_snapshot as snap_mod
@@ -279,7 +283,11 @@ def verify_cleanup_freeze_wiring_v1(*, repo_root: Path | None = None) -> dict[st
     if "sync on publish" not in reg_src.lower() and "B3" not in reg_src:
         errors.append("island_registry_inspect_missing_publish_only_doc")
 
-    scripts_dir = root / "backend" / "scripts"
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        resolve_backend_scripts_dir_v1,
+    )
+
+    scripts_dir = resolve_backend_scripts_dir_v1(repo_root=root)
     for script in BANNED_WEDGE_SCRIPT_NAMES_V1:
         path = scripts_dir / script
         if not path.is_file():

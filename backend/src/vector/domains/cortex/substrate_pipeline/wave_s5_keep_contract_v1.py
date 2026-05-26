@@ -65,7 +65,12 @@ def _module_importable(module: str) -> bool:
 
 
 def verify_s5_3_keep_contract_v1(*, repo_root: Path | None = None) -> dict[str, Any]:
-    root = repo_root or Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        discover_repo_root_v1,
+        resolve_repo_relative_path_v1,
+    )
+
+    root = repo_root or discover_repo_root_v1() or Path(__file__).resolve().parents[6]
     errors: list[str] = []
     checked: list[dict[str, Any]] = []
 
@@ -80,27 +85,22 @@ def verify_s5_3_keep_contract_v1(*, repo_root: Path | None = None) -> dict[str, 
             if not ok:
                 errors.append(f"missing_module:{key}")
         elif "path" in item:
-            path = root / item["path"]
+            path = resolve_repo_relative_path_v1(root, item["path"])
             ok = path.is_file()
             detail["path"] = item["path"]
             if not ok:
                 errors.append(f"missing_script:{key}")
         elif "route" in item:
             route_module = item.get("route_module", "admin_cortex_pipeline.py")
-            route_file = (
-                root
-                / "backend"
-                / "src"
-                / "vector"
-                / "api"
-                / "http"
-                / "routes"
-                / (
+            route_rel = (
+                "backend/src/vector/api/http/routes/"
+                + (
                     "admin_cortex_operator.py"
                     if item["route"].startswith("operator/")
                     else route_module
                 )
             )
+            route_file = resolve_repo_relative_path_v1(root, route_rel)
             needle = item["route"].split("/")[-1]
             ok = route_file.is_file() and needle in route_file.read_text(encoding="utf-8")
             detail["route"] = item["route"]
@@ -111,7 +111,10 @@ def verify_s5_3_keep_contract_v1(*, repo_root: Path | None = None) -> dict[str, 
         checked.append(detail)
 
     # Dual-lane must remain wired into run_tenant execution.
-    rte = root / "backend" / "src" / "vector" / "domains" / "cortex" / "execution" / "run_tenant_execution.py"
+    rte = resolve_repo_relative_path_v1(
+        root,
+        "backend/src/vector/domains/cortex/execution/run_tenant_execution.py",
+    )
     if rte.is_file():
         rte_src = rte.read_text(encoding="utf-8")
         if "run_dual_lane_convergence_v1" not in rte_src:

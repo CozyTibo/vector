@@ -41,7 +41,12 @@ DEFAULT_TENANT_ID = uuid.UUID("c08ef32b-f89a-40f6-9566-e19b5329436f")
 
 
 def verify_d2_github_caps_align_wiring_v1(*, repo_root: Path | None = None) -> dict[str, Any]:
-    root = repo_root or Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+        resolve_backend_scripts_dir_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
     errors: list[str] = []
 
     defaults = settings_defaults_match_code_v1()
@@ -62,7 +67,7 @@ def verify_d2_github_caps_align_wiring_v1(*, repo_root: Path | None = None) -> d
         if "Align GitHub ingest caps" not in wf:
             errors.append("deploy_workflow_missing_github_cap_align_label")
 
-    align_script = root / "backend" / "scripts" / "ecs_align_github_ingest_caps.py"
+    align_script = resolve_backend_scripts_dir_v1(repo_root=root) / "ecs_align_github_ingest_caps.py"
     if not align_script.is_file():
         errors.append("missing_ecs_align_github_ingest_caps_script")
 

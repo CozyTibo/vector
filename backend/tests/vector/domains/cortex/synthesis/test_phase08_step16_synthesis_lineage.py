@@ -55,7 +55,13 @@ def _retrieval_ingress(*, lookup_id: str, replay: str) -> dict[str, object]:
     return {
         "retrieval_legality_class": "retrieval_replay_safe",
         PHASE07_REPLAY_IDENTITY_FIELD_V1: replay,
-        "retrieval_evidence_hits": [{"retrieval_lookup_id": lookup_id, "evidence_legality_class": "replay_safe"}],
+        "retrieval_evidence_hits": [
+            {
+                "retrieval_lookup_id": lookup_id,
+                "index_kind": "causal_chain",
+                "evidence_legality_class": "replay_safe",
+            }
+        ],
         "retrieval_omission_rows": [],
         "retrieval_policy_pack_digest": retrieval_policy_pack_digest_v1(),
         "retrieval_query_receipt": {"receipt_digest": "sha256:00"},
@@ -189,6 +195,8 @@ def test_orchestrator_artifact_lineage_digest(db_session: Session) -> None:
     )
     db_session.flush()
     body = _minimal_envelope(tenant_id)
+    body["retrieval_pins"] = {"index_epoch": epoch}
+    body["retrieval_scope"] = {"retrieval_lookup_id": lookup_id}
     body["pinned_retrieval_receipt"] = {
         "retrieval_response": _retrieval_ingress(lookup_id=lookup_id, replay=replay),
     }

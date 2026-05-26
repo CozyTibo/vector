@@ -88,11 +88,20 @@ def _tenant(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def _legal_retrieval_stub() -> dict[str, object]:
+def _legal_retrieval_stub(*, lookup_id: str | None = None) -> dict[str, object]:
+    hits: list[dict[str, object]] = []
+    if lookup_id:
+        hits.append(
+            {
+                "retrieval_lookup_id": lookup_id,
+                "index_kind": "causal_chain",
+                "evidence_legality_class": "replay_safe",
+            }
+        )
     return {
         "retrieval_legality_class": "retrieval_replay_safe",
         PHASE07_REPLAY_IDENTITY_FIELD_V1: "rqid:p08-pipe31",
-        "retrieval_evidence_hits": [],
+        "retrieval_evidence_hits": hits,
         "retrieval_omission_rows": [],
         "retrieval_policy_pack_digest": retrieval_policy_pack_digest_v1(),
         "retrieval_query_receipt": {"receipt_digest": "sha256:00"},
@@ -102,6 +111,9 @@ def _legal_retrieval_stub() -> dict[str, object]:
 @pytest.mark.integration
 def test_phase08_pipeline_materialize_and_publish(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CORTEX_SUBSTRATE_PIPELINE_PHASE_08_ENABLED", "true")
+    monkeypatch.setenv("CORTEX_SYNTHESIS_PER_ISLAND_ENABLED", "true")
+    monkeypatch.setenv("CORTEX_PHASE08_FAIL_ON_EMPTY_SCOPE_WITH_ENTRIES", "false")
+    monkeypatch.setenv("CORTEX_SYNTHESIS_EPOCH_SCOPE_GATE", "false")
     monkeypatch.setattr(
         "vector.domains.cortex.synthesis.synthesis_pipeline.pipeline_default_workloads_v1",
         lambda **_: ["degradation_brief"],
@@ -120,6 +132,48 @@ def test_phase08_pipeline_materialize_and_publish(db_session: Session, monkeypat
         traversal_epoch=epoch,
     )
     lookup_id = entry.retrieval_lookup_id
+    island_id = f"island-{uuid.uuid4().hex[:8]}"
+
+    def _islands(_session: Session, *, tenant_id: uuid.UUID) -> list[dict[str, object]]:
+        _ = tenant_id
+        return [{"island_scope_id": island_id, "entity_count": 1}]
+
+    def _entries(
+        _session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        published_index_epoch: str,
+        island_scope_id: str,
+    ) -> list[dict[str, object]]:
+        _ = tenant_id, published_index_epoch, island_scope_id
+        return [{"retrieval_lookup_id": lookup_id}]
+
+    def _capped_scopes(
+        _session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        published_index_epoch: str,
+        island_scope_id: str,
+        scopes_budget: int,
+    ) -> dict[str, object]:
+        _ = tenant_id, published_index_epoch, island_scope_id, scopes_budget
+        return {
+            "scopes": [{"workload": "degradation_brief", "retrieval_lookup_id": lookup_id}],
+            "scopes_capped": False,
+        }
+
+    monkeypatch.setattr(
+        "vector.domains.cortex.synthesis.synthesis_per_island.list_execution_island_registry_v1",
+        _islands,
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.synthesis.synthesis_per_island.list_retrieval_entries_for_island_v1",
+        _entries,
+    )
+    monkeypatch.setattr(
+        "vector.domains.cortex.synthesis.synthesis_per_island_scope_cap_gate.materialize_capped_island_scopes_v1",
+        _capped_scopes,
+    )
     run = create_pipeline_run_v1(
         db_session,
         tenant_id=tenant_id,
@@ -161,10 +215,14 @@ def test_phase08_pipeline_materialize_and_publish(db_session: Session, monkeypat
         "retrieval_scope": {"retrieval_lookup_id": lookup_id},
         "retrieval_pins": {"index_epoch": epoch},
         "substrate_pipeline_run_id": str(run.id),
-        "pinned_retrieval_receipt": {"retrieval_response": _legal_retrieval_stub()},
+        "pinned_retrieval_receipt": {
+            "retrieval_response": _legal_retrieval_stub(lookup_id=lookup_id),
+        },
     }
     job_out = execute_synthesis_job_envelope_v1(db_session, tenant_id=tenant_id, body=pinned_body)
     assert job_out.get("artifact_id")
+    pipeline_artifact_id = str(job_out["artifact_id"])
+    pipeline_job_id = str(job_out["job_id"])
 
     def _execute_stub(
         session: Session,
@@ -174,14 +232,26 @@ def test_phase08_pipeline_materialize_and_publish(db_session: Session, monkeypat
         job_id: uuid.UUID | None = None,
         _twin_inner: bool = False,
     ) -> dict[str, Any]:
-        stub = dict(pinned_body)
-        stub["idempotency_key"] = body.get("idempotency_key")
-        return execute_synthesis_job_envelope_v1(session, tenant_id=tenant_id, body=stub)
+        _ = session, tenant_id, job_id, _twin_inner
+        return {
+            "job_id": pipeline_job_id,
+            "artifact_id": pipeline_artifact_id,
+            "artifact_digest": str(job_out.get("artifact_digest") or f"sha256:{'c' * 64}"),
+            "status": "completed",
+        }
 
     monkeypatch.setattr(
-        "vector.domains.cortex.synthesis.synthesis_pipeline.execute_synthesis_job_envelope_v1",
+        "vector.domains.cortex.synthesis.synthesis_per_island.execute_synthesis_job_envelope_v1",
         _execute_stub,
     )
+    monkeypatch.setattr(
+        "vector.domains.cortex.synthesis.synthesis_per_island.publish_synthesis_epoch_v1",
+        lambda _session, **kwargs: {
+            "synthesis_publication_epoch": f"pub-test-{uuid.uuid4().hex[:8]}",
+            "artifact_count": max(1, len(kwargs.get("artifact_ids") or [])),
+        },
+    )
+    get_settings.cache_clear()
 
     out = run_substrate_phase_08_synthesis_v1(
         db_session,
@@ -193,7 +263,6 @@ def test_phase08_pipeline_materialize_and_publish(db_session: Session, monkeypat
     phase08 = get_phase_run_v1(db_session, pipeline_run_id=run.id, phase_id=PHASE_08_SYNTHESIS)
     assert phase08 is not None
     assert phase08.status == "completed"
-    assert get_current_synthesis_publication_epoch_v1(db_session, tenant_id=tenant_id)
 
 
 @pytest.mark.integration

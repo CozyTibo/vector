@@ -12,7 +12,12 @@ PROBE_SYMBOL: Final[str] = "probe_prod_ecs_deploy_v1"
 
 
 def verify_s5_6_deploy_align_wiring_v1(*, repo_root: Path | None = None) -> dict[str, Any]:
-    root = repo_root or Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+        resolve_repo_relative_path_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
     errors: list[str] = []
     workflow = root / ".github" / "workflows" / "deploy.yml"
     if not workflow.is_file():
@@ -25,7 +30,10 @@ def verify_s5_6_deploy_align_wiring_v1(*, repo_root: Path | None = None) -> dict
             errors.append("deploy_workflow_missing_worker_sha_verify")
         if "VECTOR_GIT_SHA" not in wf:
             errors.append("deploy_workflow_missing_vector_git_sha_env")
-    baseline = root / "backend" / "src" / "vector" / "domains" / "cortex" / "substrate_pipeline" / "continuity_p0_baseline.py"
+    baseline = resolve_repo_relative_path_v1(
+        root,
+        "backend/src/vector/domains/cortex/substrate_pipeline/continuity_p0_baseline.py",
+    )
     if not baseline.is_file() or PROBE_SYMBOL not in baseline.read_text(encoding="utf-8"):
         errors.append("missing_probe_prod_ecs_deploy_v1_implementation")
     return {

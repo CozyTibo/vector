@@ -11,12 +11,52 @@ DEFAULT_BASELINE_PATH: Final[str] = "DOCS/audits/baselines/substrate_truth_fizze
 
 
 def discover_repo_root_v1(start: Path | None = None) -> Path | None:
-    """Walk up from ``start`` until GitHub workflow dir is found (full monorepo checkout)."""
+    """Walk up from ``start`` until monorepo or Docker ``/app`` layout is found."""
     anchor = start or Path(__file__).resolve()
     for candidate in (anchor, *anchor.parents):
         if (candidate / ".github" / "workflows" / "ci.yml").is_file():
             return candidate
+        if (candidate / "infra" / "ecs" / "backend-task.json").is_file():
+            return candidate
+        if (candidate / "src" / "vector").is_dir() and (candidate / "DOCS").is_dir():
+            return candidate
     return None
+
+
+def resolve_backend_scripts_dir_v1(*, repo_root: Path | None = None) -> Path:
+    """``backend/scripts`` in monorepo; ``scripts`` at repo root in Docker ``/app``."""
+    root = repo_root or discover_repo_root_v1() or Path(__file__).resolve().parents[6]
+    for scripts in (root / "backend" / "scripts", root / "scripts"):
+        if scripts.is_dir():
+            return scripts
+    return root / "backend" / "scripts"
+
+
+def default_repo_root_v1() -> Path:
+    """Monorepo root or Docker ``/app`` when CI marker is absent."""
+    discovered = discover_repo_root_v1()
+    if discovered is not None:
+        return discovered
+    here = Path(__file__).resolve()
+    backend_pkg = here.parents[5]
+    if (backend_pkg / "pyproject.toml").is_file() and (backend_pkg / "src" / "vector").is_dir():
+        monorepo = backend_pkg.parent
+        if (monorepo / "infra").is_dir() or (monorepo / ".github").is_dir():
+            return monorepo
+        return backend_pkg
+    return here.parents[6]
+
+
+def resolve_repo_relative_path_v1(repo_root: Path, rel: str) -> Path:
+    """Resolve ``backend/...`` paths in monorepo or flattened Docker tree."""
+    primary = repo_root / rel
+    if primary.is_file():
+        return primary
+    if rel.startswith("backend/"):
+        alt = repo_root / rel[len("backend/") :]
+        if alt.is_file():
+            return alt
+    return primary
 
 SOAK_CHECK_V6_PROMOTION_RULES_MIN_V1: Final[int] = 3
 SOAK_CHECK_V8_ISOLATED_PCT_MAX_V1: Final[float] = 90.0
@@ -83,7 +123,7 @@ def verify_wave5_deploy_contract_wiring_v1(*, repo_root: Path | None = None) -> 
         "backend/scripts/substrate_post_deploy_gate.py",
         "backend/scripts/substrate_soak_v6_v8_check.py",
     ):
-        if not (root / rel).is_file():
+        if not resolve_repo_relative_path_v1(root, rel).is_file():
             errors.append(f"missing_script:{rel}")
 
     baseline = root / DEFAULT_BASELINE_PATH

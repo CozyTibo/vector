@@ -10,6 +10,10 @@ from vector.domains.cortex.substrate_pipeline.wave_s5_deploy_align_v1 import (
 
 
 def test_s5_6_deploy_workflow_wires_ecs_probe() -> None:
-    root = Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    root = default_repo_root_v1()
     result = verify_s5_6_deploy_align_wiring_v1(repo_root=root)
     assert result["s5_6_ok"] is True, result["errors"]

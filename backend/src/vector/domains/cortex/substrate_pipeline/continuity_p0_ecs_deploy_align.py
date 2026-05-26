@@ -27,12 +27,21 @@ REPO_ROOT_HINT = "vector"
 
 def verify_a2_ecs_deploy_align_wiring_v1(*, repo_root: Path | None = None) -> dict[str, Any]:
     """Static wiring: deploy workflow + local prod deploy script + post-deploy verify."""
-    root = repo_root
-    if root is None:
-        root = Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+        resolve_backend_scripts_dir_v1,
+        resolve_repo_relative_path_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
     errors: list[str] = []
     workflow = root / ".github" / "workflows" / "deploy.yml"
-    deploy_sh = root / "backend" / "scripts" / "prod_deploy_backend_worker.sh"
+    deploy_sh = resolve_backend_scripts_dir_v1(repo_root=root) / "prod_deploy_backend_worker.sh"
+    if not deploy_sh.is_file():
+        deploy_sh = resolve_repo_relative_path_v1(
+            root,
+            "backend/scripts/prod_deploy_backend_worker.sh",
+        )
     if not workflow.is_file():
         errors.append("missing_deploy_workflow")
     else:

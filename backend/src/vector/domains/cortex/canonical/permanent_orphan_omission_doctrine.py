@@ -33,8 +33,13 @@ OPERATOR_COPY_SUMMARY_V1: Final[str] = (
 
 
 def runbook_path_v1(*, repo_root: Path | None = None) -> Path:
-    root = repo_root or Path(__file__).resolve().parents[5]
-    return root / RUNBOOK_REL_PATH_V1
+    if repo_root is not None:
+        return repo_root / RUNBOOK_REL_PATH_V1
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    return default_repo_root_v1() / RUNBOOK_REL_PATH_V1
 
 
 def is_permanent_orphan_omission_doc_enabled_v1() -> bool:

@@ -172,7 +172,11 @@ def validate_baseline_prod_signoff_steps_v1(
 
 
 def _proof_script_paths_v1(repo_root: Path) -> list[Path]:
-    scripts = repo_root / "backend" / "scripts"
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        resolve_backend_scripts_dir_v1,
+    )
+
+    scripts = resolve_backend_scripts_dir_v1(repo_root=repo_root)
     patterns = (
         "continuity_p0_phase_a*_proof.py",
         "continuity_p0_phase_b*_proof.py",
@@ -181,12 +185,20 @@ def _proof_script_paths_v1(repo_root: Path) -> list[Path]:
     out: list[Path] = []
     for pat in patterns:
         out.extend(sorted(scripts.glob(pat)))
+    archive = scripts / "archive" / "continuity_proofs"
+    if archive.is_dir():
+        for pat in patterns:
+            out.extend(sorted(archive.glob(pat)))
     return out
 
 
 def verify_a5_trace_only_ban_wiring_v1(*, repo_root: Path | None = None) -> dict[str, Any]:
     """Static wiring: proof scripts use shared policy helpers."""
-    root = repo_root or Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
     errors: list[str] = []
     required_import = "continuity_p0_trace_only_policy"
     required_calls = (

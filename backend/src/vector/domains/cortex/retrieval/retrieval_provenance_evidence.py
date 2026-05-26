@@ -317,10 +317,13 @@ def build_retrieval_evidence_hit_v1(
         index_epoch=row.traversal_epoch,
     )
     validate_retrieval_provenance_envelope_v1(provenance)
+    index_kind = str(getattr(row, "index_kind", "") or "").strip()
     return {
         "retrieval_lookup_id": format_retrieval_lookup_id_v1(retrieval_lookup_id)
         if not str(retrieval_lookup_id).startswith("sha256:")
         else str(retrieval_lookup_id),
+        "index_kind": index_kind,
+        "source_artifact_kind": index_kind,
         "upstream_digest": upstream.get("retrieval_index_entry_digest", ""),
         "evidence_legality_class": evidence_class,
         "provenance": provenance,

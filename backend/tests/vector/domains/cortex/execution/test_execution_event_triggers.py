@@ -91,6 +91,11 @@ def test_trigger_graph_hash_detects_change_without_db(monkeypatch: pytest.Monkey
         "is_execution_event_triggers_enabled_v1",
         lambda: True,
     )
+    monkeypatch.setattr(
+        "vector.domains.cortex.execution.execution_event_triggers."
+        "is_substrate_walk_schedule_skipped_v1",
+        lambda: False,
+    )
     session = type("S", (), {"flush": lambda *_a, **_k: None})()
     tenant_id = uuid.uuid4()
     out = trigger_graph_hash_walk_schedule_v1(

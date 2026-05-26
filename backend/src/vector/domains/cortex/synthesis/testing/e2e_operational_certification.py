@@ -57,23 +57,27 @@ SYNTHESIS_E2E_SCENARIOS_V1: Final[tuple[str, ...]] = (
 )
 
 SYNTHESIS_E2E_TEST_MODULES_V1: Final[tuple[str, ...]] = (
-    "test_phase08_e2e_pipeline_default.py",
-    "test_phase08_e2e_degraded_upstream.py",
-    "test_phase08_e2e_replay_twin.py",
-    "test_phase08_e2e_pipeline_idempotency.py",
+    "test_phase08_step34_synthesis_e2e_operational.py",
 )
 
 
 def _synthesis_e2e_tests_dir_v1() -> Path:
-    """Locate pytest E2E tree (monorepo ``backend/tests`` or compose ``/app/tests``)."""
+    """Locate synthesis acceptance pytest modules (monorepo ``backend/tests`` or compose ``/app/tests``)."""
     here = Path(__file__).resolve()
-    rel = Path("vector") / "domains" / "cortex" / "synthesis" / "e2e"
+    rel = Path("vector") / "domains" / "cortex" / "synthesis"
+    seen: set[Path] = set()
     for root in [here, *here.parents]:
         for prefix in (root / "tests", root / "backend" / "tests"):
-            candidate = prefix / rel
+            candidate = (prefix / rel).resolve()
+            if candidate in seen:
+                continue
+            seen.add(candidate)
             if candidate.is_dir():
                 return candidate
-    msg = "synthesis e2e tests dir not found"
+    docker_candidate = (Path("/app/tests") / rel).resolve()
+    if docker_candidate.is_dir():
+        return docker_candidate
+    msg = "synthesis acceptance tests dir not found"
     raise RuntimeError(msg)
 
 

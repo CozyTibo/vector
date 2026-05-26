@@ -11,7 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.execution.blocked import clear_execution_block_for_rerun_v1
-from vector.domains.cortex.execution.enqueue import enqueue_tenant_convergence_v1
+from vector.domains.cortex.execution.enqueue import (
+    enqueue_execution_slice_at_phase_v1,
+    enqueue_tenant_convergence_v1,
+)
 from vector.domains.cortex.execution.fsm import apply_fsm_transition_v1, fsm_state_for_phase_cursor_v1
 from vector.domains.cortex.execution.execution_path_telemetry import (
     EXECUTION_PATH_ADMIN_BYPASS,
@@ -227,9 +230,11 @@ def _attach_lease_and_enqueue_v1(
     )
     enqueue: dict[str, Any] = {"enqueued": False, "reason": "enqueue_skipped"}
     if enqueue_celery:
-        enqueue = enqueue_tenant_convergence_v1(
-            tenant_id,
-            reason=f"{CONTINUITY_P0_RECOVER_TRIGGER_V1}:{phase_cursor}",
+        enqueue = enqueue_execution_slice_at_phase_v1(
+            tenant_id=tenant_id,
+            pipeline_run_id=pipeline_run_id,
+            phase_cursor=phase_cursor,
+            reason=CONTINUITY_P0_RECOVER_TRIGGER_V1,
         )
     else:
         enqueue = {

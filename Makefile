@@ -42,8 +42,8 @@ help:
 	@echo "  make db-psql         psql on dev DB"
 	@echo "  make db-psql-test    psql on test DB"
 	@echo "  make db-drop         DROP + recreate empty dev DB $(POSTGRES_DB), then run make migrate"
-	@echo "  make test            rebuild backend image if needed, migrate-test, pytest"
-	@echo "  make test-fast       pytest excluding integration + e2e (quick local loop)"
+	@echo "  make test            rebuild backend image if needed, migrate-test, pytest (unit + acceptance)"
+	@echo "  make test-fast       pytest excluding integration (quick local loop)"
 	@echo "  make test-unit       rebuild backend image if needed, pytest (no integration)"
 	@echo "  make mypy / lint / fmt   (mypy checks src/vector + tests per pyproject)"
 	@echo "  make check           mypy + lint + test"
@@ -164,13 +164,13 @@ shell: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) bash
 
 test: $(DOTENV) migrate-test
-	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) python -m pytest -q
+	$(COMPOSE) run --rm -e DATABASE_URL=$(TEST_DB_URL) $(BACKEND_SERVICE) python -m pytest -q -m "not e2e"
 
 test-fast: $(DOTENV) build-backend
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration and not e2e"
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration"
 
 test-unit: $(DOTENV) build-backend
-	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration and not e2e"
+	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m pytest -q -m "not integration"
 
 mypy: $(DOTENV)
 	$(COMPOSE) run --rm $(BACKEND_SERVICE) python -m mypy

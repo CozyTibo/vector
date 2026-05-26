@@ -15,7 +15,11 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_phase_d4_permanent_o
     verify_d4_permanent_orphan_omission_wiring_v1,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[6]
+from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+    default_repo_root_v1,
+)
+
+REPO_ROOT = default_repo_root_v1()
 
 
 def test_d4_wiring_ok() -> None:

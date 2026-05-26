@@ -8,7 +8,11 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_signoff import (
     verify_p0_d_ci_gates_v1,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[6]
+from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+    default_repo_root_v1,
+)
+
+REPO_ROOT = default_repo_root_v1()
 
 
 def test_p0_d_ci_gates_present_in_repo() -> None:

@@ -42,8 +42,10 @@ def verify_a6_synthesis_terminal_transitions_wiring_v1() -> dict[str, Any]:
         errors.append("materialize_missing_pre_reconcile")
     from vector.domains.cortex.synthesis import synthesis_job_lifecycle as _lifecycle
 
-    if "reconcile_stale_queued_synthesis_jobs_v1" not in inspect.getsource(
-        _lifecycle.maybe_reconcile_synthesis_jobs_on_materialize_v1
+    maybe_src = inspect.getsource(_lifecycle.maybe_reconcile_synthesis_jobs_on_materialize_v1)
+    if (
+        "reconcile_stale_queued_synthesis_jobs_v1" not in maybe_src
+        and "reconcile_all_stale_synthesis_jobs_v1" not in maybe_src
     ):
         errors.append("materialize_reconcile_missing_queued_stale")
     return {"wiring_ok": not errors, "errors": errors}

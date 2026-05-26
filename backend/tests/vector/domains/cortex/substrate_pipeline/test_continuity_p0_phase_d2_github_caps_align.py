@@ -10,7 +10,11 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_phase_d2_github_caps
     verify_d2_github_caps_align_wiring_v1,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[6]
+from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+    default_repo_root_v1,
+)
+
+REPO_ROOT = default_repo_root_v1()
 
 
 def test_d2_wiring_ok() -> None:

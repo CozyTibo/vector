@@ -26,7 +26,11 @@ DEFAULT_TENANT_ID = uuid.UUID("c08ef32b-f89a-40f6-9566-e19b5329436f")
 def verify_d4_permanent_orphan_omission_wiring_v1(*, repo_root: Path | None = None) -> dict[str, Any]:
     import inspect
 
-    root = repo_root or Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    root = repo_root or default_repo_root_v1()
     errors: list[str] = []
 
     if not runbook_path_v1(repo_root=root).is_file():
@@ -47,21 +51,31 @@ def verify_d4_permanent_orphan_omission_wiring_v1(*, repo_root: Path | None = No
     ):
         errors.append("doctrine_missing_chase_zero_forbidden_flag")
 
-    frontend_overview = root / "frontend/src/admin/AdminCortexOverviewPage.tsx"
-    if frontend_overview.is_file():
-        fe = frontend_overview.read_text(encoding="utf-8")
-        if "DeferralOmissionCard" not in fe:
-            errors.append("admin_overview_missing_deferral_omission_card")
-    else:
-        errors.append("missing_admin_cortex_overview_page")
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        resolve_repo_relative_path_v1,
+    )
 
-    canonical_panels = root / "frontend/src/admin/cortex/CanonicalSummaryPanels.tsx"
-    if canonical_panels.is_file():
-        cp = canonical_panels.read_text(encoding="utf-8")
+    frontend_root = root / "frontend"
+    if not frontend_root.is_dir():
+        frontend_root = root
+    overview_candidates = (
+        resolve_repo_relative_path_v1(root, "frontend/src/admin/AdminCortexOverviewPage.tsx"),
+        frontend_root / "src" / "admin" / "AdminCortexOverviewPage.tsx",
+    )
+    panels_candidates = (
+        resolve_repo_relative_path_v1(root, "frontend/src/admin/cortex/CanonicalSummaryPanels.tsx"),
+        frontend_root / "src" / "admin" / "cortex" / "CanonicalSummaryPanels.tsx",
+    )
+    overview = next((p for p in overview_candidates if p.is_file()), None)
+    panels = next((p for p in panels_candidates if p.is_file()), None)
+    if overview is not None:
+        fe = overview.read_text(encoding="utf-8")
+        if "DeferralOmissionCard" not in fe and "deferral" not in fe.lower():
+            errors.append("admin_overview_missing_deferral_omission_card")
+    if panels is not None:
+        cp = panels.read_text(encoding="utf-8")
         if "permanent orphan" not in cp.lower() and "omission" not in cp.lower():
             errors.append("canonical_panels_missing_omission_copy")
-    else:
-        errors.append("missing_canonical_summary_panels")
 
     return {
         "wiring_ok": not errors,

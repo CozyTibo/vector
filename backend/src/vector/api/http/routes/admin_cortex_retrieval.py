@@ -31,6 +31,9 @@ from vector.domains.cortex.retrieval.retrieval_ingress import (
     validate_retrieval_ingress_artifact_kind_v1,
 )
 from vector.domains.cortex.retrieval.retrieval_legality_projection import RetrievalLegalityError
+from vector.domains.cortex.retrieval.retrieval_index_row_inspector_v1 import (
+    build_retrieval_index_row_inspector_v1,
+)
 from vector.domains.cortex.retrieval.retrieval_observability import build_retrieval_runtime_health_v1
 from vector.domains.cortex.retrieval.retrieval_operator_workflows import (
     list_remediation_links_for_omissions_v1,
@@ -151,6 +154,15 @@ def register_cortex_retrieval_routes(router: APIRouter) -> None:
         return verify_traversal_replay_equivalence_v1(
             db, tenant_id=tenant_id, replay_identity=replay_identity
         )
+
+    @r.get("/index-row-inspector", response_model=None)
+    def get_retrieval_index_row_inspector(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: int = Query(200, ge=1, le=2000),
+    ) -> JSONResponse | dict[str, Any]:
+        _assert_tenant(db, tenant_id)
+        return build_retrieval_index_row_inspector_v1(db, tenant_id=tenant_id, limit=limit)
 
     @r.get("/continuity-topology")
     def get_continuity_topology(

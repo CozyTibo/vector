@@ -51,9 +51,8 @@ def verify_b6_post_ingestion_fresh_pipeline_run_wiring_v1() -> dict[str, Any]:
     if "resolve_pipeline_run_id_after_phase04_v1" not in dl_src:
         errors.append("dual_lane_missing_phase04_fresh_run_switch")
 
-    rte_src = inspect.getsource(rte_mod.run_tenant_convergence_v1)
-    if "resolve_pipeline_run_id_after_phase04_v1" not in rte_src:
-        errors.append("execution_slice_missing_phase04_fresh_run_switch")
+    if "run_dual_lane_convergence_v1" not in inspect.getsource(rte_mod.run_tenant_convergence_v1):
+        errors.append("execution_slice_missing_dual_lane_delegate")
 
     if "unlock_step" in b6_src:
         errors.append("fresh_run_module_references_unlock_script")

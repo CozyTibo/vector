@@ -36,13 +36,15 @@ def test_schedule_always_uses_convergence_lease(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED", "true")
 
     tenant_id = uuid.uuid4()
+    dispatch_payload = {
+        "scheduled": True,
+        "path": "convergence_lease",
+        "execution_path": "convergence",
+    }
     with patch(
-        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch.mark_dirty_and_enqueue_convergence_v1",
-        return_value={
-            "scheduled": True,
-            "path": "convergence_lease",
-            "execution_path": "convergence",
-        },
+        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch."
+        "trigger_post_ingestion_execution_v1",
+        return_value={"triggered": True, "dispatch": dispatch_payload},
     ) as dispatch:
         from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
             schedule_post_ingestion_substrate_refresh,
@@ -58,9 +60,4 @@ def test_schedule_always_uses_convergence_lease(monkeypatch: pytest.MonkeyPatch)
     assert out["scheduled"] is True
     assert out["path"] == "convergence_lease"
     assert out["execution_path"] == "convergence"
-    dispatch.assert_called_once_with(
-        tenant_id=tenant_id,
-        settings=None,
-        reason="sync_done",
-        telemetry_trigger="post_ingestion:sync_done",
-    )
+    dispatch.assert_called_once_with(tenant_id=tenant_id, reason="sync_done")

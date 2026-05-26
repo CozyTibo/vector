@@ -730,8 +730,8 @@ def verify_execution_hot_path_no_cesp_imports_boundary_v1() -> list[str]:
 
     exec_mod = importlib.import_module("vector.domains.cortex.execution.run_tenant_execution")
     exec_src = inspect.getsource(exec_mod)
-    if "execution.phase06_contract" not in exec_src:
-        errors.append("run_tenant_execution_missing_phase06_contract_import")
+    if "run_dual_lane_convergence_v1" not in exec_src:
+        errors.append("run_tenant_execution_missing_dual_lane_entry")
 
     return errors
 
@@ -910,13 +910,20 @@ def verify_execution_hot_path_no_continuation_boundary_v1() -> list[str]:
     if "mark_continuation_completed_v1" in p08 or "pipeline_continuation" in p08:
         errors.append("phase08_runner_still_writes_pipeline_continuation")
 
+    from vector.domains.cortex.execution import dual_lane_worker as dlw_mod
+
     exec_src = inspect.getsource(exec_mod.run_tenant_convergence_v1)
     if "pipeline_continuation" in exec_src or "mark_pipeline_waiting_on_tcre_v1" in exec_src:
         errors.append("execution_worker_still_writes_pipeline_continuation")
-    if "mark_tenant_waiting_v1" not in exec_src:
-        errors.append("execution_worker_missing_mark_tenant_waiting_on_tcre")
+    if "run_dual_lane_convergence_v1" not in exec_src:
+        errors.append("execution_worker_missing_dual_lane_entry")
 
-    if "assert_pipe085_chain_after_phase06_legal_v1" not in exec_src:
+    dlw_src = inspect.getsource(dlw_mod)
+    if "pipeline_continuation" in dlw_src or "mark_pipeline_waiting_on_tcre_v1" in dlw_src:
+        errors.append("dual_lane_worker_still_writes_pipeline_continuation")
+    if "mark_tenant_waiting_v1" not in dlw_src:
+        errors.append("execution_worker_missing_mark_tenant_waiting_on_tcre")
+    if "assert_pipe085_chain_after_phase06_legal_v1" not in dlw_src:
         errors.append("execution_worker_missing_pipe085_lease_assert_after_phase06")
     return errors
 
@@ -1013,9 +1020,9 @@ def verify_execution_truth_unification_v1() -> list[str]:
 def verify_execution_blocked_semantics_v1() -> list[str]:
     """Return error codes if execution worker lacks receipt-driven stop semantics."""
     errors: list[str] = []
-    from vector.domains.cortex.execution import run_tenant_execution as exec_mod
+    from vector.domains.cortex.execution import dual_lane_worker as dlw_mod
 
-    src = inspect.getsource(exec_mod.run_tenant_convergence_v1)
+    src = inspect.getsource(dlw_mod)
     for sym in (
         "store_last_phase_receipt_on_lease_v1",
         "WORKER_OUTCOME_WAITING_TCRE",

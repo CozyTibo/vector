@@ -206,7 +206,11 @@ def verify_wave7_contract_collapse_v1(*, repo_root: Path | None = None) -> list[
         if not (contracts / name).is_file():
             errors.append(f"missing_contract_file:{name}")
     if root is not None:
-        yaml_path = root / "backend/contracts/substrate_v1.yaml"
+        from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+            resolve_repo_relative_path_v1,
+        )
+
+        yaml_path = resolve_repo_relative_path_v1(root, "backend/contracts/substrate_v1.yaml")
         if not yaml_path.is_file():
             errors.append("missing_contract_file:substrate_v1.yaml")
 
@@ -222,7 +226,14 @@ def verify_wave7_contract_collapse_v1(*, repo_root: Path | None = None) -> list[
     if "graph_substrate" not in truth_src or "ingest_handoff" not in truth_src:
         errors.append("substrate_truth_missing_wave7_fields")
 
-    admin_path = (root / "backend/src/vector/api/http/routes/admin.py") if root else None
+    if root is not None:
+        from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+            resolve_repo_relative_path_v1,
+        )
+
+        admin_path = resolve_repo_relative_path_v1(root, "backend/src/vector/api/http/routes/admin.py")
+    else:
+        admin_path = None
     if admin_path and admin_path.is_file():
         admin_src = admin_path.read_text(encoding="utf-8")
         if "raise_identity_replay_jobs_primary_route_gone_v1" not in admin_src:

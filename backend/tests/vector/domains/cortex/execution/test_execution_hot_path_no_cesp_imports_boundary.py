@@ -21,9 +21,13 @@ def test_phase06_imports_execution_contract_not_cesp() -> None:
 
 
 def test_run_tenant_execution_imports_execution_contract_not_cesp() -> None:
-    src = inspect.getsource(exec_mod.run_tenant_execution_v1)
-    assert "execution.phase06_contract" in src
-    assert "operational_runtime" not in src
+    from vector.domains.cortex.execution import dual_lane_worker as dlw_mod
+
+    src = inspect.getsource(dlw_mod)
+    assert "assert_pipe085_chain_after_phase06_legal_v1" in src
+    rte = inspect.getsource(exec_mod.run_tenant_convergence_v1)
+    assert "run_dual_lane_convergence_v1" in rte
+    assert "operational_runtime" not in rte
 
 
 def test_phase08_synthesis_imports_activation_gate_not_cesp() -> None:

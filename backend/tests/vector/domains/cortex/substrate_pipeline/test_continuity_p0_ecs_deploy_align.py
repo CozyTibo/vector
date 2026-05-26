@@ -11,7 +11,11 @@ from vector.domains.cortex.substrate_pipeline.continuity_p0_ecs_deploy_align imp
 
 
 def test_a2_wiring_static() -> None:
-    root = Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    root = default_repo_root_v1()
     wiring = verify_a2_ecs_deploy_align_wiring_v1(repo_root=root)
     assert wiring["wiring_ok"] is True
 

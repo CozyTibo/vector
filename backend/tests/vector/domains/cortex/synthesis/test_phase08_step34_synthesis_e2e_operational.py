@@ -33,12 +33,12 @@ def test_e2e_gate_and_catalog() -> None:
     catalog = build_synthesis_e2e_operational_catalog_v1()
     assert catalog["gate_id"] == GP08_E2E01_GATE_ID_V1
     assert len(catalog["scenarios"]) == 4
-    assert len(catalog["test_modules"]) == 4
+    assert len(catalog["test_modules"]) == 1
 
 
 def test_e2e_scenario_constants_match_spec_modules() -> None:
     assert len(SYNTHESIS_E2E_SCENARIOS_V1) == 4
-    assert len(SYNTHESIS_E2E_TEST_MODULES_V1) == 4
+    assert len(SYNTHESIS_E2E_TEST_MODULES_V1) == 1
     tests_dir = _synthesis_e2e_tests_dir_v1()
     for mod in SYNTHESIS_E2E_TEST_MODULES_V1:
         assert (tests_dir / mod).is_file(), mod

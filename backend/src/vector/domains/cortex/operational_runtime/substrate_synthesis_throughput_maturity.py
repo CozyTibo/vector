@@ -143,8 +143,12 @@ def verify_gp085_syn03_static() -> dict[str, Any]:
 
     from vector.domains.cortex.synthesis import synthesis_pipeline as sp
 
-    if "persist_synthesis_activation_audit_v1" not in inspect.getsource(
-        sp.materialize_synthesis_for_pipeline_v1
+    from vector.domains.cortex.synthesis.synthesis_per_island import materialize_synthesis_per_island_v1
+
+    mat_src = inspect.getsource(sp.materialize_synthesis_for_pipeline_v1)
+    island_src = inspect.getsource(materialize_synthesis_per_island_v1)
+    if "persist_synthesis_activation_audit_v1" not in mat_src and (
+        "persist_synthesis_activation_audit_v1" not in island_src
     ):
         errors.append("materialize_missing_activation_audit")
 

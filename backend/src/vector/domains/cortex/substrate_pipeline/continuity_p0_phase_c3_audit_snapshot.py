@@ -21,8 +21,13 @@ from vector.domains.cortex.substrate_pipeline.continuity_proof_deprecation impor
 
 
 def verify_c3_audit_snapshot_wiring_v1(*, repo_root: Path) -> dict[str, Any]:
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        resolve_backend_scripts_dir_v1,
+        resolve_repo_relative_path_v1,
+    )
+
     errors: list[str] = []
-    script_path = repo_root / "backend" / "scripts" / CANONICAL_AUDIT_SNAPSHOT_SCRIPT_V1
+    script_path = resolve_backend_scripts_dir_v1(repo_root=repo_root) / CANONICAL_AUDIT_SNAPSHOT_SCRIPT_V1
     if not script_path.is_file():
         errors.append("missing_canonical_script")
 
@@ -44,7 +49,7 @@ def verify_c3_audit_snapshot_wiring_v1(*, repo_root: Path) -> dict[str, Any]:
         if "format_continuity_audit_snapshot_text_v1" not in script_src:
             errors.append("canonical_script_missing_text_formatter")
 
-    prod_queries = repo_root / "backend" / "scripts" / "prod_substrate_proof_queries.py"
+    prod_queries = resolve_backend_scripts_dir_v1(repo_root=repo_root) / "prod_substrate_proof_queries.py"
     if prod_queries.is_file():
         pq_src = prod_queries.read_text(encoding="utf-8")
         if "build_substrate_sql_snapshot_v1" not in pq_src:

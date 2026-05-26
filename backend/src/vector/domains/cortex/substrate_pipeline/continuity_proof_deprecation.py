@@ -20,7 +20,14 @@ _DEPRECATION_EXEMPT_SCRIPT_NAMES_V1: Final[frozenset[str]] = frozenset(
 
 def deprecated_continuity_proof_script_names_v1(*, scripts_dir: Path | None = None) -> tuple[str, ...]:
     """All ``continuity_*_proof.py`` CLI scripts except the canonical audit snapshot."""
-    root = scripts_dir or Path(__file__).resolve().parents[6] / "backend" / "scripts"
+    if scripts_dir is not None:
+        root = scripts_dir
+    else:
+        from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+            resolve_backend_scripts_dir_v1,
+        )
+
+        root = resolve_backend_scripts_dir_v1()
     names: list[str] = []
     for search_root in (root, root / "archive" / "continuity_proofs"):
         if not search_root.is_dir():

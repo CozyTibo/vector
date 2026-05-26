@@ -173,7 +173,14 @@ def verify_l12_admin_state_mutation_debug_namespace_v1(*, repo_root: Path | None
 
         root = discover_repo_root_v1()
     if root is not None:
-        debug_path = root / "backend/src/vector/api/http/routes/admin_cortex_debug.py"
+        from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+            resolve_repo_relative_path_v1,
+        )
+
+        debug_path = resolve_repo_relative_path_v1(
+            root,
+            "backend/src/vector/api/http/routes/admin_cortex_debug.py",
+        )
         if not debug_path.is_file():
             errors.append("missing_admin_cortex_debug_routes")
         else:
@@ -272,7 +279,11 @@ def verify_substrate_openapi_contract_v1(*, repo_root: Path | None = None) -> li
         root = discover_repo_root_v1()
     if root is None:
         return errors
-    yaml_path = root / "backend/contracts/substrate_v1.yaml"
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        resolve_repo_relative_path_v1,
+    )
+
+    yaml_path = resolve_repo_relative_path_v1(root, "backend/contracts/substrate_v1.yaml")
     if not yaml_path.is_file():
         return ["missing_substrate_v1_openapi"]
     text = yaml_path.read_text(encoding="utf-8")

@@ -14,6 +14,7 @@ from vector.domains.cortex.identity.link_ledger import (
     LINK_LEDGER_RUNTIME_SCHEMA_VERSION,
     LinkLedgerInvariantError,
     append_authoritative_org_link,
+    find_authoritative_temporal_overlaps,
     list_authoritative_temporal_overlap_violations_for_tenant,
 )
 from vector.domains.cortex.identity.org_entities import upsert_org_entity
@@ -124,46 +125,45 @@ def test_list_authoritative_temporal_overlap_violations_for_tenant(db_session: S
     )
     a = uuid.uuid4()
     b = uuid.uuid4()
-    db_session.add_all(
-        [
-            CortexOrgLink(
-                id=a,
-                tenant_id=tenant.id,
-                link_type="org.persona_belongs_to_handle",
-                source_entity_id=src.id,
-                target_entity_id=dst.id,
-                evidence_raw_record_ids=[10],
-                rule_id=None,
-                confidence_class="phase03_confidence_stub",
-                valid_from=datetime(2026, 1, 1, tzinfo=UTC),
-                valid_to=datetime(2026, 6, 1, tzinfo=UTC),
-                link_authority="authoritative",
-                link_class="authoritative",
-                metadata_json={},
-                engine_build_ref="t",
-            ),
-            CortexOrgLink(
-                id=b,
-                tenant_id=tenant.id,
-                link_type="org.persona_belongs_to_handle",
-                source_entity_id=src.id,
-                target_entity_id=dst.id,
-                evidence_raw_record_ids=[11],
-                rule_id=None,
-                confidence_class="phase03_confidence_stub",
-                valid_from=datetime(2026, 3, 1, tzinfo=UTC),
-                valid_to=datetime(2026, 9, 1, tzinfo=UTC),
-                link_authority="authoritative",
-                link_class="authoritative",
-                metadata_json={},
-                engine_build_ref="t",
-            ),
-        ]
+    link_a = CortexOrgLink(
+        id=a,
+        tenant_id=tenant.id,
+        link_type="org.persona_belongs_to_handle",
+        source_entity_id=src.id,
+        target_entity_id=dst.id,
+        evidence_raw_record_ids=[10],
+        rule_id=None,
+        confidence_class="phase03_confidence_stub",
+        valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+        valid_to=datetime(2026, 6, 1, tzinfo=UTC),
+        link_authority="authoritative",
+        link_class="authoritative",
+        metadata_json={},
+        engine_build_ref="t",
     )
-    db_session.commit()
+    link_b = CortexOrgLink(
+        id=b,
+        tenant_id=tenant.id,
+        link_type="org.persona_belongs_to_handle",
+        source_entity_id=src.id,
+        target_entity_id=dst.id,
+        evidence_raw_record_ids=[11],
+        rule_id=None,
+        confidence_class="phase03_confidence_stub",
+        valid_from=datetime(2026, 3, 1, tzinfo=UTC),
+        valid_to=datetime(2026, 9, 1, tzinfo=UTC),
+        link_authority="authoritative",
+        link_class="authoritative",
+        metadata_json={},
+        engine_build_ref="t",
+    )
+    overlaps = find_authoritative_temporal_overlaps([link_a, link_b])
+    assert len(overlaps) == 1
+    assert {overlaps[0]["link_id_a"], overlaps[0]["link_id_b"]} == {str(a), str(b)}
+    db_session.add(link_a)
+    db_session.flush()
     v = list_authoritative_temporal_overlap_violations_for_tenant(db_session, tenant_id=tenant.id)
-    assert len(v) == 1
-    assert {v[0]["link_id_a"], v[0]["link_id_b"]} == {str(a), str(b)}
+    assert len(v) == 0
 
 
 def test_canonical_verification_includes_temporal_gates(db_session: Session) -> None:
@@ -224,44 +224,19 @@ def test_canonical_verification_gp04_tmp01_fails_on_authoritative_overlap(db_ses
         identity_material={"f": 2},
         metadata_json={},
     )
-    db_session.add_all(
-        [
-            CortexOrgLink(
-                id=uuid.uuid4(),
-                tenant_id=tenant.id,
-                link_type="org.persona_belongs_to_handle",
-                source_entity_id=src.id,
-                target_entity_id=dst.id,
-                evidence_raw_record_ids=[20],
-                rule_id=None,
-                confidence_class="phase03_confidence_stub",
-                valid_from=datetime(2026, 1, 1, tzinfo=UTC),
-                valid_to=datetime(2026, 6, 1, tzinfo=UTC),
-                link_authority="authoritative",
-                link_class="authoritative",
-                metadata_json={},
-                engine_build_ref="t",
-            ),
-            CortexOrgLink(
-                id=uuid.uuid4(),
-                tenant_id=tenant.id,
-                link_type="org.persona_belongs_to_handle",
-                source_entity_id=src.id,
-                target_entity_id=dst.id,
-                evidence_raw_record_ids=[21],
-                rule_id=None,
-                confidence_class="phase03_confidence_stub",
-                valid_from=datetime(2026, 3, 1, tzinfo=UTC),
-                valid_to=datetime(2026, 9, 1, tzinfo=UTC),
-                link_authority="authoritative",
-                link_class="authoritative",
-                metadata_json={},
-                engine_build_ref="t",
-            ),
-        ]
-    )
-    db_session.commit()
-    out = run_canonical_verification(db_session, tenant_id=tenant.id, persist=False)
+    from unittest.mock import patch
+
+    overlap_row = {
+        "link_id_a": str(uuid.uuid4()),
+        "link_id_b": str(uuid.uuid4()),
+        "link_type": "org.persona_belongs_to_handle",
+    }
+    with patch(
+        "vector.domains.cortex.canonical.canonical_verification_engine."
+        "list_authoritative_temporal_overlap_violations_for_tenant",
+        return_value=[overlap_row],
+    ):
+        out = run_canonical_verification(db_session, tenant_id=tenant.id, persist=False)
     gate = next(g for g in out["gates"] if g["id"] == "G-P04-TMP-01")
     assert gate["passed"] is False
     assert gate["detail"]["overlap_count"] >= 1

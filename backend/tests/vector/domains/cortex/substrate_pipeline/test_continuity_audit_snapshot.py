@@ -15,7 +15,11 @@ from vector.domains.cortex.substrate_pipeline.continuity_audit_snapshot import (
 
 
 def test_summarize_baseline_steps_reads_step_keys() -> None:
-    repo = Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    repo = default_repo_root_v1()
     rollup = summarize_p0_baseline_steps_v1(repo_root=repo, baseline_date="2026-05-22")
     assert rollup["baseline_present"] is True
     assert rollup["step_count"] >= 5

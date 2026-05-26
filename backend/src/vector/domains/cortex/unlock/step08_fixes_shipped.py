@@ -29,9 +29,13 @@ def evaluate_fix4_backfill_candidate_regen_v1() -> tuple[bool, str]:
         return False, "missing_include_candidate_regen_field"
     if fields["include_candidate_regen"].default is not True:
         return False, "include_candidate_regen_default_not_true"
-    admin_mod = importlib.import_module("vector.api.http.routes.admin")
-    src = inspect.getsource(admin_mod.build_admin_router)
-    if "run_identity_handles_and_candidates_refresh" not in src:
+    admin_src = inspect.getsource(
+        importlib.import_module("vector.api.http.routes.admin").build_admin_router
+    )
+    debug_src = inspect.getsource(
+        importlib.import_module("vector.api.http.routes.admin_cortex_debug").register_cortex_debug_routes
+    )
+    if "run_identity_handles_and_candidates_refresh" not in admin_src + debug_src:
         return False, "backfill_route_missing_candidates_refresh"
     return True, "backfill_include_candidate_regen"
 

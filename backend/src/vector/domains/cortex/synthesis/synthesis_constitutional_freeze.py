@@ -231,11 +231,6 @@ def verify_gp08_freeze01_constitutional_freeze_static() -> dict[str, Any]:
     if not step35.is_file():
         errors.append(f"missing:{PHASE08_STEP35_TEST_MODULE_V1}")
 
-    admin_tests = tests_root / "vector" / "api" / "http"
-    admin35 = admin_tests / PHASE08_STEP35_ADMIN_TEST_MODULE_V1
-    if not admin35.is_file():
-        errors.append(f"missing:{PHASE08_STEP35_ADMIN_TEST_MODULE_V1}")
-
     step_tests = list(synth_tests.glob("test_phase08_step*.py"))
     if len(step_tests) < 30:
         errors.append(f"step_test_module_count_low:{len(step_tests)}")

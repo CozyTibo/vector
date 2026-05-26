@@ -13,7 +13,11 @@ from vector.domains.cortex.ingestion.github_ingest_caps_code_defaults import (
     verify_infra_ecs_task_json_github_caps_v1,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[6]
+from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+    default_repo_root_v1,
+)
+
+REPO_ROOT = default_repo_root_v1()
 
 
 def test_settings_defaults_match_manifest() -> None:

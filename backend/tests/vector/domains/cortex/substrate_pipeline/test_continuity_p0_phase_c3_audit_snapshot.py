@@ -35,7 +35,11 @@ def _snapshot() -> dict:
 
 
 def test_c3_wiring_ok() -> None:
-    repo = Path(__file__).resolve().parents[6]
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        default_repo_root_v1,
+    )
+
+    repo = default_repo_root_v1()
     wiring = verify_c3_audit_snapshot_wiring_v1(repo_root=repo)
     assert wiring["wiring_ok"] is True
 

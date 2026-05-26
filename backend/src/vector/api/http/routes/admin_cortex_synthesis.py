@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from vector.api.http.deps import get_db
 from vector.contracts.admin import AdminCortexSynthesisRuntimeHealthResponse
 from vector.domains.cortex.synthesis.synthesis_observability import build_synthesis_runtime_health_v1
+from vector.domains.cortex.synthesis.synthesis_job_inspector_v1 import (
+    build_synthesis_job_inspector_v1,
+)
 from vector.domains.cortex.synthesis.synthesis_operator_workflows import (
     SynthesisOperatorWorkflowsError,
     build_synthesis_job_debugger_v1,
@@ -74,6 +77,21 @@ def register_cortex_synthesis_routes(router: APIRouter) -> None:
         _assert_tenant(db, tenant_id)
         try:
             return build_synthesis_job_debugger_v1(db, tenant_id=tenant_id, job_id=job_id)
+        except SynthesisOrchestratorError as exc:
+            return JSONResponse(
+                status_code=exc.http_status,
+                content={"error": exc.code, "detail": exc.detail},
+            )
+
+    @sr.get("/jobs/{job_id}/inspector", response_model=None)
+    def get_synthesis_job_inspector(
+        tenant_id: uuid.UUID,
+        job_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> JSONResponse | dict[str, Any]:
+        _assert_tenant(db, tenant_id)
+        try:
+            return build_synthesis_job_inspector_v1(db, tenant_id=tenant_id, job_id=job_id)
         except SynthesisOrchestratorError as exc:
             return JSONResponse(
                 status_code=exc.http_status,

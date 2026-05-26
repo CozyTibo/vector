@@ -37,7 +37,17 @@ from vector.domains.cortex.substrate_pipeline.repository import (
 from vector.domains.cortex.substrate_pipeline.substrate_phase_receipt import utc_now_iso_v1
 from vector.infrastructure.db.models.cortex_retrieval_index_entry import CortexRetrievalIndexEntry
 from vector.infrastructure.db.models.cortex_substrate_pipeline_run import CortexSubstratePipelineRun
+from vector.domains.cortex.synthesis.synthesis_orchestrator import execute_synthesis_job_envelope_v1
 from vector.settings import Settings, get_settings
+
+__all__ = [
+    "build_pipeline_synthesis_job_envelope_v1",
+    "build_pipeline_synthesis_panel_v1",
+    "execute_synthesis_job_envelope_v1",
+    "materialize_synthesis_for_pipeline_v1",
+    "run_substrate_phase_08_synthesis_v1",
+    "synthesis_pipeline_max_scopes_v1",
+]
 
 
 def synthesis_pipeline_max_scopes_v1(*, settings: Settings | None = None) -> int:

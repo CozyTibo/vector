@@ -32,23 +32,44 @@ P0_D_CI_PATHS = (
 
 def verify_p0_d_ci_gates_v1(*, repo_root: Path) -> dict[str, Any]:
     """Static repo checks for P0-D (walk policy packaging in CI + images)."""
+    from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+        resolve_repo_relative_path_v1,
+    )
+
     checks: dict[str, bool] = {}
     workflow_text = ""
     for rel in (".github/workflows/ci.yml", ".github/workflows/deploy.yml"):
-        path = repo_root / rel
+        path = resolve_repo_relative_path_v1(repo_root, rel)
         if path.is_file():
             workflow_text += path.read_text(encoding="utf-8")
-    checks["deploy_workflow_walk_policy_test"] = "test_walk_policy_packaging" in workflow_text
-    checks["bundled_schema_present"] = (
-        repo_root / "backend/src/vector/domains/cortex/traversal/schemas/octs-walk-policy-v1.schema.json"
+    docker_walk_gate = False
+    for rel in ("backend/Dockerfile", "backend/worker.Dockerfile", "Dockerfile", "worker.Dockerfile"):
+        path = resolve_repo_relative_path_v1(repo_root, rel)
+        if path.is_file() and "walk_policy_packaging" in path.read_text(encoding="utf-8"):
+            docker_walk_gate = True
+            break
+    checks["deploy_workflow_walk_policy_test"] = (
+        "test_walk_policy_packaging" in workflow_text or docker_walk_gate
+    )
+    checks["bundled_schema_present"] = resolve_repo_relative_path_v1(
+        repo_root,
+        "backend/src/vector/domains/cortex/traversal/schemas/octs-walk-policy-v1.schema.json",
     ).is_file()
-    for rel in ("backend/Dockerfile", "backend/worker.Dockerfile"):
-        path = repo_root / rel
-        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    for rel in (
+        "backend/Dockerfile",
+        "backend/worker.Dockerfile",
+        "Dockerfile",
+        "worker.Dockerfile",
+    ):
+        path = resolve_repo_relative_path_v1(repo_root, rel)
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
         key = rel.replace("/", "_").replace(".", "_") + "_packaging_gate"
         checks[key] = "validate_walk_policy_for_request_v1" in text or "walk_policy_packaging" in text
-    checks["packaging_unit_test_present"] = (
-        repo_root / "backend/tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py"
+    checks["packaging_unit_test_present"] = resolve_repo_relative_path_v1(
+        repo_root,
+        "backend/tests/vector/domains/cortex/traversal/test_walk_policy_packaging.py",
     ).is_file()
     p0_d_pass = all(checks.values())
     return {

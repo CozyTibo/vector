@@ -116,7 +116,11 @@ def test_schedule_octs_walks_runs_inline(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(
         "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."
         "run_octs_walk_schedule_pass_v1",
-        lambda *_a, **_k: {"gate_id": "G-P085-WALK-01", "scheduled": True},
+        lambda *_a, **_k: {
+            "gate_id": "G-P085-WALK-01",
+            "scheduled": True,
+            "materialization": {"walks_persisted": 1, "walk_ids": ["walk-test-1"]},
+        },
     )
     monkeypatch.setattr(
         "vector.domains.cortex.operational_runtime.substrate_traversal_scheduling."

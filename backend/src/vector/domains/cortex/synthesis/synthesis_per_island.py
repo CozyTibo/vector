@@ -475,7 +475,9 @@ def materialize_synthesis_per_island_v1(
         "per_island_scope_cap_audit": per_island_cap_audit,
         "per_island_scope_cap_budget": cap_budget,
         "orchestrator_fail_loud_enabled": True,
-        "outside_island_scope_entity_count": global_brief.get("outside_island_scope_entity_count"),
+        "outside_island_scope_entity_count": (global_brief or {}).get(
+            "outside_island_scope_entity_count"
+        ),
     }
 
     from vector.domains.cortex.synthesis.synthesis_activation_audit import (

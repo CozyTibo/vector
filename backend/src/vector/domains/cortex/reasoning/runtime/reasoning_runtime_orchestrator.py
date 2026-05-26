@@ -26,6 +26,7 @@ from vector.domains.cortex.reasoning.runtime.causal_chain_runtime_reducer import
 from vector.domains.cortex.reasoning.runtime.causal_edge_runtime_reducer import (
     reduce_causal_edges_v1,
 )
+from vector.domains.cortex.reasoning.runtime.runtime_scope import TCRE_RUNTIME_SLICE_MAX_LIMIT
 from vector.domains.cortex.reasoning.runtime.edge_expansion_runtime import (
     merge_edge_rows_deterministic_v1,
     reduce_all_expanded_edges_v1,

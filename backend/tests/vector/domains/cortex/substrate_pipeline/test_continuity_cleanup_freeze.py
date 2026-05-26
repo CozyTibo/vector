@@ -16,7 +16,11 @@ from vector.domains.cortex.substrate_pipeline.continuity_proof_panel import (
     evaluate_aa7_no_wedge_scripts_v1,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[6]
+from vector.domains.cortex.substrate_pipeline.substrate_deploy_contract_v1 import (
+    default_repo_root_v1,
+)
+
+REPO_ROOT = default_repo_root_v1()
 
 
 def test_cleanup_freeze_wiring_ok() -> None:
@@ -26,9 +30,7 @@ def test_cleanup_freeze_wiring_ok() -> None:
 
 
 def test_deprecated_catalog_excludes_canonical_snapshot() -> None:
-    names = deprecated_continuity_proof_script_names_v1(
-        scripts_dir=REPO_ROOT / "backend" / "scripts"
-    )
+    names = deprecated_continuity_proof_script_names_v1()
     assert CANONICAL_AUDIT_SNAPSHOT_SCRIPT_V1 not in names
     assert "continuity_p0_phase_d5_legacy_coordinator_enqueue_deletion_proof.py" in names
 

@@ -594,7 +594,8 @@ def run_identity_continuity_rebuild(
         "determinism_repair": repair,
         "anchor_backfill": backfill,
         "identity_continuity_substrate_pipeline": substrate.get("identity_continuity_substrate_pipeline"),
-        "graph_density_promotion": promotion,
+        "graph_density_promotion": substrate.get("graph_density_promotion")
+        or {"delegated_to": "run_identity_substrate_repair_slice_v1"},
         "candidate_regeneration": cand,
         "authoritative_set_sha256": auth_sha,
         "ambiguity_opened_total": int(cand.get("ambiguity_opened_email_slack_multiplicity") or 0)
