@@ -83,7 +83,7 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
-from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
+from vector.domains.cortex.ingestion.stream_checkpoint import derive_exhaust_depth, ensure_stream_introduced_at
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -225,6 +225,7 @@ def run_slack_connector_sync(
         iter_conversations_members_pages,
         iter_conversations_replies_pages,
         iter_users_list_pages,
+        list_channel_pins,
     )
 
     n_ins = 0
@@ -267,13 +268,27 @@ def run_slack_connector_sync(
     )
     conversations_list_complete = False
     channel_member_rows = 0
+    pin_rows = 0
+    users_existing = (
+        slack_existing.get("users") if isinstance(slack_existing, dict) else {}
+    )
+    users_existing = users_existing if isinstance(users_existing, dict) else {}
+    user_list_cursor_raw = users_existing.get("next_cursor")
+    user_list_cursor = (
+        user_list_cursor_raw if isinstance(user_list_cursor_raw, str) and user_list_cursor_raw.strip() else None
+    )
+    users_list_complete = False
     try:
-        for members in iter_users_list_pages(
+        for members, next_user_cursor in iter_users_list_pages(
             token,
             api_base=slack_api_base,
             max_pages=settings.cortex_slack_users_max_pages,
+            start_cursor=user_list_cursor,
         ):
             user_pages += 1
+            user_list_cursor = next_user_cursor
+            if not next_user_cursor:
+                users_list_complete = True
             for m in members:
                 uid = m.get("id")
                 if not isinstance(uid, str) or not uid:
@@ -436,6 +451,44 @@ def run_slack_connector_sync(
                             channel_member_rows += 1
             except SlackWebApiError:
                 continue
+
+        for c in selected_channels[:6]:
+            cid = str(c["id"])
+            try:
+                pins = list_channel_pins(token, channel=cid, api_base=slack_api_base)
+            except SlackWebApiError:
+                pins = []
+            for idx, pin in enumerate(pins):
+                message = pin.get("message") if isinstance(pin.get("message"), dict) else pin
+                ts = message.get("ts") if isinstance(message, dict) else pin.get("ts")
+                ext = f"{cid}:pin:{ts or idx}"[:512]
+                if append_raw(
+                    session,
+                    ctx=ctx,
+                    tenant_id=tenant_id,
+                    connection_id=connection_id,
+                    connector=CONNECTION_PROVIDER_SLACK,
+                    run_id=run_id,
+                    source_trigger=source_trigger,
+                    resource_type="slack.pin",
+                    external_id=ext,
+                    api_endpoint=f"{slack_api_base}/pins.list",
+                    query_params={"channel": cid},
+                    payload_body={
+                        **core_envelope_fields(
+                            connector=CONNECTION_PROVIDER_SLACK,
+                            connection_id=connection_id,
+                            source_object_type="slack.pin",
+                            source_object_id=ext,
+                        ),
+                        "channel_id": cid,
+                        "pin": pin,
+                    },
+                    http_status=200,
+                    idempotency_key=idem_key(ctx, run_id, f"slack:pin:{ext}"),
+                ):
+                    n_ins += 1
+                    pin_rows += 1
 
         for c in selected_channels:
             cid = str(c["id"])
@@ -900,12 +953,17 @@ def run_slack_connector_sync(
                     "users": ensure_stream_introduced_at(
                         {
                             "cursor_owner": "slack.user",
+                            "next_cursor": user_list_cursor,
                             "pages_fetched_last_run": user_pages,
                             "rows_seen_last_run": user_members,
-                            "backfill_complete": bool(
-                                ctx.backfill_lane
-                                and user_pages < settings.cortex_slack_users_max_pages
-                            ),
+                            "backfill_complete": bool(ctx.backfill_lane and users_list_complete),
+                            "last_ok_at": utc_now().isoformat(),
+                        },
+                    ),
+                    "pins": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "slack.pin",
+                            "rows_seen_last_run": pin_rows,
                         },
                     ),
                     "conversations": ensure_stream_introduced_at(
@@ -949,6 +1007,19 @@ def run_slack_connector_sync(
                     "resume_required": budget_exhausted,
                     "time_budget_seconds": settings.cortex_slack_channel_time_budget_seconds,
                 }
+            },
+            "meta": {
+                "exhaust_depth": derive_exhaust_depth(
+                    {
+                        "users": {"cursor_owner": "slack.user", "backfill_complete": users_list_complete},
+                        "conversations": {
+                            "cursor_owner": "slack.conversation",
+                            "backfill_complete": conversations_list_complete,
+                        },
+                        "channel_members": {"cursor_owner": "slack.channel_member"},
+                        "pins": {"cursor_owner": "slack.pin"},
+                    },
+                ),
             },
         },
         sync_mode=ctx.checkpoint_sync_mode,

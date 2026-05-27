@@ -74,7 +74,10 @@ export default function AdminCortexIngestionPage() {
         overviewQ.isPending && !overviewQ.data ? (
           <SectionSkeleton variant="table" />
         ) : (
-          <IngestionConnectorsTable connectors={overviewQ.data?.connectors ?? []} />
+          <IngestionConnectorsTable
+            connectors={overviewQ.data?.connectors ?? []}
+            loading={overviewQ.isFetching}
+          />
         )
       ) : tab === "beats" ? (
         <IngestionBeatHistoryTab />

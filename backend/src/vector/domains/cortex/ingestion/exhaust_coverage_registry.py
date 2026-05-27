@@ -162,7 +162,15 @@ def _slack() -> dict[str, Any]:
             notes="Message-embedded reactions ingested from conversations.history pages.",
         ),
         _row("edits", coverage="none", historical="none", replay="no", canonicalization="none", status="missing"),
-        _row("pins", coverage="none", historical="none", replay="no", canonicalization="none", status="missing"),
+        _row(
+            "slack.pin",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="pins.list for ring-selected channels (requires pins:read).",
+        ),
         _row(
             "slack.file",
             coverage="partial",

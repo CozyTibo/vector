@@ -22,7 +22,7 @@ Legend: **Coverage** `none` | `partial` | `full` · **Historical** `none` | `par
 | `slack.message_reply` | partial | partial | partial | none | in_progress | `conversations.replies` ingested for discovered thread roots; per-thread checkpoint cursors |
 | `slack.reaction`       | partial     | partial       | partial     | none  | in_progress     | Message-embedded reactions captured from history pages |
 | edits           | none     | none       | no     | none  | missing     | |
-| pins              | none     | none       | no     | none  | missing     | |
+| `slack.pin` | partial | partial | partial | none | in_progress | `pins.list` per ring channel (requires `pins:read`) |
 | `slack.file`      | partial     | partial       | partial     | none  | in_progress     | Message-embedded file metadata captured from history pages |
 | scope_ping (health) | partial | n/a       | partial| none  | in_progress | Only when Slack detail / bot token missing |
 

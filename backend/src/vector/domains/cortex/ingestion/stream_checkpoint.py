@@ -16,6 +16,29 @@ def utc_now_iso() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
+def derive_exhaust_depth(connector_streams: dict[str, Any]) -> str:
+    """Simple operator label: shallow | deepening | mature."""
+    if not connector_streams:
+        return "shallow"
+    complete = 0
+    total = 0
+    for key, blob in connector_streams.items():
+        if key.endswith("__reset") or key in ("resume_required", "time_budget_seconds", "channel_ring_index", "repo_ring_index", "conversation_types", "channels", "repos"):
+            continue
+        if not isinstance(blob, dict):
+            continue
+        if blob.get("cursor_owner") is None and "rows_seen" not in blob and "rows_seen_last_run" not in blob:
+            continue
+        total += 1
+        if blob.get("backfill_complete") is True:
+            complete += 1
+    if total > 0 and complete >= total:
+        return "mature"
+    if complete > 0:
+        return "deepening"
+    return "shallow"
+
+
 def ensure_stream_introduced_at(stream_patch: dict[str, Any], *, introduced_at: str | None = None) -> dict[str, Any]:
     """Set ``introduced_at`` once when a stream first ships."""
     out = deepcopy(stream_patch)

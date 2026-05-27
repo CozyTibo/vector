@@ -69,8 +69,10 @@ def iter_users_list_pages(
     api_base: str | None = None,
     limit: int = 200,
     max_pages: int,
-) -> Iterator[list[dict[str, Any]]]:
-    cursor: str | None = None
+    start_cursor: str | None = None,
+) -> Iterator[tuple[list[dict[str, Any]], str | None]]:
+    """Yield ``(members, next_cursor)``; final ``next_cursor`` is ``None`` when list is complete."""
+    cursor: str | None = start_cursor.strip() if isinstance(start_cursor, str) and start_cursor.strip() else None
     for _ in range(max_pages):
         body: dict[str, Any] = {"limit": min(limit, 200)}
         if cursor:
@@ -80,16 +82,35 @@ def iter_users_list_pages(
             raise SlackWebApiError(str(data.get("error", "users.list_failed")))
         raw = data.get("members")
         members = [x for x in raw if isinstance(x, dict)] if isinstance(raw, list) else []
-        yield members
         meta = data.get("response_metadata")
-        next_c = None
+        next_c: str | None = None
         if isinstance(meta, dict):
             nc = meta.get("next_cursor")
             if isinstance(nc, str) and nc.strip():
                 next_c = nc.strip()
+        yield members, next_c
         if not next_c:
-            break
+            return
         cursor = next_c
+
+
+def list_channel_pins(
+    token: str,
+    *,
+    channel: str,
+    api_base: str | None = None,
+) -> list[dict[str, Any]]:
+    """``pins.list`` for one channel (requires ``pins:read`` when not granted, may error)."""
+    data = slack_web_api_post(
+        token,
+        "pins.list",
+        json_body={"channel": channel},
+        api_base=api_base,
+    )
+    if not data.get("ok"):
+        raise SlackWebApiError(str(data.get("error", "pins.list_failed")))
+    raw = data.get("items")
+    return [x for x in raw if isinstance(x, dict)] if isinstance(raw, list) else []
 
 
 def conversations_info(
