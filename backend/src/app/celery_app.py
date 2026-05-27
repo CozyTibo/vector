@@ -66,6 +66,8 @@ celery_app = Celery(
         "app.tasks.cortex_ingestion_sync",
         "app.tasks.cortex_ingestion_scheduler",
         "app.tasks.cortex_ingestion_verify",
+        "app.tasks.cortex_canon_sync",
+        "app.tasks.cortex_canon_scheduler",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -80,22 +82,33 @@ celery_app.conf.imports = (
     "app.tasks.cortex_ingestion_sync",
     "app.tasks.cortex_ingestion_scheduler",
     "app.tasks.cortex_ingestion_verify",
+    "app.tasks.cortex_canon_sync",
+    "app.tasks.cortex_canon_scheduler",
 )
 
 # Phase 01 Step 2–3: live lane vs replay lane (orchestration-model.md, replay-strategy.md).
 celery_app.conf.task_routes = {
     "vector.cortex.ingestion.run_sync": {"queue": "cortex_live"},
     "vector.cortex.ingestion.run_sync_replay": {"queue": "cortex_replay"},
+    "vector.cortex.canon.run_pass": {"queue": "cortex_canon"},
 }
 
 # Ingestion-only Beat: no other periodic tasks belong in this schedule.
 _tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "120"))
 _tick_seconds = max(60, _tick_seconds)
 
+_canon_tick_seconds = int(os.environ.get("CORTEX_CANON_SCHEDULER_INTERVAL_SECONDS", "300"))
+_canon_tick_seconds = max(60, _canon_tick_seconds)
+
 celery_app.conf.beat_schedule = {
     "cortex-ingestion-beat-tick": {
         "task": "vector.cortex.ingestion.scheduler_tick",
         "schedule": timedelta(seconds=_tick_seconds),
+        "options": {"queue": "vector"},
+    },
+    "cortex-canon-beat-tick": {
+        "task": "vector.cortex.canon.scheduler_tick",
+        "schedule": timedelta(seconds=_canon_tick_seconds),
         "options": {"queue": "vector"},
     },
 }
@@ -108,6 +121,10 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
+    importlib.import_module("app.tasks.cortex_canon_sync")
+    importlib.import_module("app.tasks.cortex_canon_scheduler")
+    importlib.import_module("app.tasks.cortex_canon_sync")
+    importlib.import_module("app.tasks.cortex_canon_scheduler")
 
 
 _register_tasks()
@@ -121,3 +138,5 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
+    importlib.import_module("app.tasks.cortex_canon_sync")
+    importlib.import_module("app.tasks.cortex_canon_scheduler")

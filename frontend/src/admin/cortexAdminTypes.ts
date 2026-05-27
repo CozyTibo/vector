@@ -69,6 +69,7 @@ export type CanonEntityDetail = CanonEntityItem & {
     source_revision_key: string;
     observed_at: string;
     is_latest: boolean;
+    payload_preview?: Record<string, unknown>;
   }>;
 };
 

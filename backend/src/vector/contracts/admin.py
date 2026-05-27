@@ -4773,3 +4773,41 @@ class AdminCanonTriggerPassResponse(BaseModel):
     tenant_id: uuid.UUID
 
 
+class AdminCanonEntityListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminCanonEntityDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    entity_type: str
+    entity_key: str
+    display_label: str
+    connector: str
+    connection_id: str
+    materialized_at: str
+    mapper_version: int
+    attrs_json: dict[str, Any] = Field(default_factory=dict)
+    sources: list[dict[str, Any]] = Field(default_factory=list)
+    author_entity_id: str | None = None
+    conversation_entity_id: str | None = None
+    parent_message_entity_id: str | None = None
+    repository_entity_id: str | None = None
+    assignee_entity_id: str | None = None
+    parent_document_entity_id: str | None = None
+    work_item_entity_id: str | None = None
+
+
+class AdminCanonRegistryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    mapper_version: int
+    rows: list[dict[str, str | None]]
+
+

@@ -52,7 +52,12 @@ from vector.contracts.admin import (
     AdminCortexSchedulerPauseResponse,
     AdminCanonPassRunItem,
     AdminCanonReadinessResponse,
+    AdminCanonEntityDetailResponse,
+    AdminCanonEntityListResponse,
+    AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
+    AdminCanonTriggerPassRequest,
+    AdminCanonTriggerPassResponse,
     CortexIngestionConnectorId,
     AdminHardDeleteOrphanUserRequest,
     AdminHardDeleteOrphanUserResponse,
@@ -104,10 +109,16 @@ from vector.domains.cortex.connectors.notion.oauth_flow import start_notion_oaut
 from vector.domains.cortex.connectors.runtime import runtime_by_id
 from vector.domains.cortex.connectors.slack.errors import SlackConnectorNotConfiguredError
 from vector.domains.cortex.connectors.slack.oauth_flow import start_slack_oauth_url
+from vector.domains.cortex.canon.admin_entities import (
+    MANUAL_CANON_PASS_CONFIRMATION,
+    get_canon_entity_detail,
+    list_canon_entities,
+)
 from vector.domains.cortex.canon.admin_readiness import (
     build_canon_admin_readiness,
     list_recent_canon_pass_runs,
 )
+from vector.domains.cortex.canon.resource_type_registry import registry_rows
 from vector.domains.cortex.ingestion.admin_overview import build_cortex_ingestion_admin_overview
 from vector.domains.cortex.ingestion.admin_recent_raw import (
     aggregate_raw_ingestion_stats,
@@ -1615,6 +1626,82 @@ def build_admin_router() -> APIRouter:
             offset=offset,
             limit=limit,
         )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canon/entities",
+        response_model=AdminCanonEntityListResponse,
+    )
+    def admin_cortex_canon_entities(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+        entity_type: Annotated[str | None, Query()] = None,
+        search: Annotated[str | None, Query()] = None,
+    ) -> AdminCanonEntityListResponse:
+        _assert_tenant(db, tenant_id)
+        items, total = list_canon_entities(
+            db,
+            tenant_id,
+            limit=limit,
+            offset=offset,
+            entity_type=entity_type,
+            search=search,
+        )
+        return AdminCanonEntityListResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canon/entities/{entity_id}",
+        response_model=AdminCanonEntityDetailResponse,
+    )
+    def admin_cortex_canon_entity_detail(
+        tenant_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCanonEntityDetailResponse:
+        _assert_tenant(db, tenant_id)
+        raw = get_canon_entity_detail(db, tenant_id, entity_id)
+        if raw is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Canon entity not found.")
+        return AdminCanonEntityDetailResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canon/registry",
+        response_model=AdminCanonRegistryResponse,
+    )
+    def admin_cortex_canon_registry(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCanonRegistryResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canon.mapper_version import CANON_MAPPER_VERSION
+
+        return AdminCanonRegistryResponse(mapper_version=CANON_MAPPER_VERSION, rows=registry_rows())
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/canon/actions/trigger-pass",
+        response_model=AdminCanonTriggerPassResponse,
+    )
+    def admin_cortex_canon_trigger_pass(
+        tenant_id: uuid.UUID,
+        body: AdminCanonTriggerPassRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCanonTriggerPassResponse:
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != MANUAL_CANON_PASS_CONFIRMATION:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation must be exactly: {MANUAL_CANON_PASS_CONFIRMATION}",
+            )
+        from app.tasks.cortex_canon_sync import run_cortex_canon_pass_task
+
+        run_cortex_canon_pass_task.delay(str(tenant_id), source_trigger="manual_admin")
+        return AdminCanonTriggerPassResponse(tenant_id=tenant_id)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/ingestion/connectors/{connector}/raw-records",
