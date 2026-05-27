@@ -194,14 +194,19 @@ These are **normalized execution entities**, not graph nodes.
 | **work_item** | `linear.issue`, `github.issue` |
 | **pull_request** | `github.pull_request` |
 | **commit** | `github.commit` |
-| **project** | `linear.project`, `linear.cycle`, `linear.initiative`; `notion.database` (as project-like container) |
+| **project** | `linear.project`; `notion.database` (as project-like container) |
+| **team** | `linear.team` |
+| **cycle** | `linear.cycle` |
+| **label** | `linear.issue_label` |
+| **initiative** | `linear.initiative` |
+| **issue_relation** | `linear.issue_relation` (provider link between issues; attrs + optional `work_item_ref`) |
 | **document** | `notion.page`, `notion.block`, `notion.database_row` |
 | **release** | `github.release` |
 | **deployment** | `github.deployment`, `github.workflow_run` (mapper policy: separate or folded per contract) |
 
 **Explicitly out of v1 substrate design:**
 
-- `linear.issue_relation` as a graph edge system → store relation ids **on work_item attrs** or skip until a later phase
+- `linear.issue_relation` as a separate **graph edge store** → v1 uses `issue_relation` entities with attrs + `work_item_ref`, not `canon_edges`
 - Cross-tool “execution intelligence” or traversal
 
 ---

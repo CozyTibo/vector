@@ -23,6 +23,17 @@ def test_slack_reaction_skipped() -> None:
     assert entity_type_for_resource_type("slack.reaction") is None
 
 
+def test_linear_org_types_map() -> None:
+    dispositions = disposition_by_resource_type()
+    assert dispositions["linear.team"] == "map"
+    assert dispositions["linear.cycle"] == "map"
+    assert dispositions["linear.issue_label"] == "map"
+    assert dispositions["linear.initiative"] == "map"
+    assert dispositions["linear.issue_relation"] == "map"
+    assert entity_type_for_resource_type("linear.team") == "team"
+    assert entity_type_for_resource_type("linear.issue_relation") == "issue_relation"
+
+
 def test_disposition_covers_known_ingest_types() -> None:
     dispositions = disposition_by_resource_type()
     assert dispositions["linear.issue"] == "map"
