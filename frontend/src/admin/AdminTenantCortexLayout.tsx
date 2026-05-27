@@ -33,7 +33,7 @@ export default function AdminTenantCortexLayout() {
           to={`/admin/tenants/${tenantId}/cortex/canon`}
           className={({ isActive }) => tabCls(isActive)}
         >
-          Canon
+          Canonical
         </NavLink>
       </nav>
 

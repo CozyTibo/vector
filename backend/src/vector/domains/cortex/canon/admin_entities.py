@@ -21,11 +21,15 @@ def list_canon_entities(
     *,
     limit: int = 50,
     offset: int = 0,
+    connector: str | None = None,
     entity_type: str | None = None,
     search: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     stmt = select(CanonEntity).where(CanonEntity.tenant_id == tenant_id)
     count_stmt = select(func.count()).select_from(CanonEntity).where(CanonEntity.tenant_id == tenant_id)
+    if connector:
+        stmt = stmt.where(CanonEntity.connector == connector)
+        count_stmt = count_stmt.where(CanonEntity.connector == connector)
     if entity_type:
         stmt = stmt.where(CanonEntity.entity_type == entity_type)
         count_stmt = count_stmt.where(CanonEntity.entity_type == entity_type)

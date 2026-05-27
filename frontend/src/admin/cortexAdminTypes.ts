@@ -58,6 +58,50 @@ export type CanonEntityItem = {
   work_item_entity_id: string | null;
 };
 
+export type CanonCoverageResourceType = {
+  resource_type: string;
+  disposition: string;
+  entity_type: string | null;
+  raw_row_count: number;
+  canon_entity_count: number;
+  gap: string | null;
+};
+
+export type CanonCoverageConnector = {
+  connector: string;
+  raw_row_count: number;
+  canon_entity_count: number;
+  unmaterialized_raw_rows: number;
+  unknown_type_raw_rows: number;
+  resource_types: CanonCoverageResourceType[];
+};
+
+export type CanonCoverage = {
+  tenant_id: string;
+  registry_row_count: number;
+  connectors: CanonCoverageConnector[];
+};
+
+export type CanonEntityStatRow = {
+  connector: string;
+  entity_type: string;
+  row_count: number;
+  newest_materialized_at: string | null;
+  oldest_materialized_at: string | null;
+};
+
+export type CanonEntityStats = {
+  tenant_id: string;
+  resources: CanonEntityStatRow[];
+};
+
+export type CanonEntityList = {
+  items: CanonEntityItem[];
+  total_count: number;
+  offset: number;
+  limit: number;
+};
+
 export type CanonEntityDetail = CanonEntityItem & {
   attrs_json: Record<string, unknown>;
   sources: Array<{

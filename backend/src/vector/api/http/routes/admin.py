@@ -52,8 +52,10 @@ from vector.contracts.admin import (
     AdminCortexSchedulerPauseResponse,
     AdminCanonPassRunItem,
     AdminCanonReadinessResponse,
+    AdminCanonCoverageResponse,
     AdminCanonEntityDetailResponse,
     AdminCanonEntityListResponse,
+    AdminCanonEntityStatsResponse,
     AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
     AdminCanonTriggerPassRequest,
@@ -109,6 +111,10 @@ from vector.domains.cortex.connectors.notion.oauth_flow import start_notion_oaut
 from vector.domains.cortex.connectors.runtime import runtime_by_id
 from vector.domains.cortex.connectors.slack.errors import SlackConnectorNotConfiguredError
 from vector.domains.cortex.connectors.slack.oauth_flow import start_slack_oauth_url
+from vector.domains.cortex.canon.admin_coverage import (
+    aggregate_canon_entity_stats,
+    build_canon_coverage_payload,
+)
 from vector.domains.cortex.canon.admin_entities import (
     MANUAL_CANON_PASS_CONFIRMATION,
     get_canon_entity_detail,
@@ -1628,6 +1634,42 @@ def build_admin_router() -> APIRouter:
         )
 
     @r.get(
+        "/tenants/{tenant_id}/cortex/canon/coverage",
+        response_model=AdminCanonCoverageResponse,
+    )
+    def admin_cortex_canon_coverage(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCanonCoverageResponse:
+        """Per-connector canon coverage and raw→entity gaps."""
+        _assert_tenant(db, tenant_id)
+        raw = build_canon_coverage_payload(db, tenant_id)
+        return AdminCanonCoverageResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canon/stats",
+        response_model=AdminCanonEntityStatsResponse,
+    )
+    def admin_cortex_canon_stats(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        connector: Annotated[str | None, Query()] = None,
+        entity_type: Annotated[str | None, Query()] = None,
+    ) -> AdminCanonEntityStatsResponse:
+        """Canon entity counts by connector and entity_type (for listing filters)."""
+        _assert_tenant(db, tenant_id)
+        rows = aggregate_canon_entity_stats(
+            db,
+            tenant_id,
+            connector=connector,
+            entity_type=entity_type,
+        )
+        return AdminCanonEntityStatsResponse(
+            tenant_id=tenant_id,
+            resources=rows,
+        )
+
+    @r.get(
         "/tenants/{tenant_id}/cortex/canon/entities",
         response_model=AdminCanonEntityListResponse,
     )
@@ -1636,6 +1678,7 @@ def build_admin_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+        connector: Annotated[str | None, Query()] = None,
         entity_type: Annotated[str | None, Query()] = None,
         search: Annotated[str | None, Query()] = None,
     ) -> AdminCanonEntityListResponse:
@@ -1645,6 +1688,7 @@ def build_admin_router() -> APIRouter:
             tenant_id,
             limit=limit,
             offset=offset,
+            connector=connector,
             entity_type=entity_type,
             search=search,
         )

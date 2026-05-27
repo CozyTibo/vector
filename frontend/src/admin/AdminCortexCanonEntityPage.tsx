@@ -1,4 +1,4 @@
-import { CanonEntityDetailView } from "./cortex/CanonEntitiesTab";
+import { CanonEntityDetailView } from "./cortex/CanonEntityDetailView";
 
 export default function AdminCortexCanonEntityPage() {
   return <CanonEntityDetailView />;

@@ -4811,3 +4811,28 @@ class AdminCanonRegistryResponse(BaseModel):
     rows: list[dict[str, str | None]]
 
 
+class AdminCanonCoverageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: str
+    registry_row_count: int
+    connectors: list[dict[str, Any]]
+
+
+class AdminCanonEntityStatRow(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    connector: str
+    entity_type: str
+    row_count: int
+    newest_materialized_at: str | None = None
+    oldest_materialized_at: str | None = None
+
+
+class AdminCanonEntityStatsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    resources: list[AdminCanonEntityStatRow]
+
+
