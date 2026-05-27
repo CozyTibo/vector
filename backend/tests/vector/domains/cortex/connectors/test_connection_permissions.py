@@ -26,11 +26,12 @@ def test_slack_warns_when_history_scopes_missing() -> None:
 
 
 def test_slack_ok_when_ingest_scopes_granted() -> None:
+    full_ingest = "channels:read,channels:history,groups:history,users:read,users:read.email"
     snap = slack_permission_snapshot(
         _settings_stub(),
-        granted_scope="channels:read,channels:history,groups:history,users:read",
+        granted_scope=full_ingest,
         connected=True,
-        requested_scopes_override="channels:read,channels:history,groups:history,users:read",
+        requested_scopes_override=full_ingest,
     )
     assert snap.ingest_health == "ok"
     assert snap.missing_recommended == []

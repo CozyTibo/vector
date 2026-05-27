@@ -11,7 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "backend" / "src"))
 
-from vector.domains.cortex.execution.worker_queue_roles_v1 import (  # noqa: E402
+from vector.domains.cortex.ingestion.worker_queue_roles_v1 import (  # noqa: E402
     apply_worker_role_to_task_definition_v1,
 )
 

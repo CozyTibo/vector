@@ -119,7 +119,13 @@ def test_linear_people_plane_ingests_users_and_teams(
         lambda *_a, **_k: (200, {"data": {"viewer": {"id": "v1"}}}),
     )
 
-    execute_connector_sync(db_session, get_settings(), tenant_id=tid, connector="linear", source_trigger="test")
+    execute_connector_sync(
+        db_session,
+        get_settings(),
+        tenant_id=tid,
+        connector_id="linear",
+        source_trigger="test",
+    )
     db_session.commit()
 
     types = {
