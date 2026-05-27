@@ -83,6 +83,7 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
+from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -462,29 +463,39 @@ def run_calls_connector_sync(
             "calls_recordings_written": recordings_written,
             "streams": {
                 "calls": {
-                    "events": {
-                        "cursor_owner": "calls.meeting",
-                        "next_cursor": next_cursor,
-                        "pages_fetched_last_run": pages_fetched,
-                        "rows_seen_last_run": meetings_written,
-                        "updated_watermark": max_seen_updated,
-                    },
-                    "participants": {
-                        "cursor_owner": "calls.participant",
-                        "rows_seen_last_run": participants_written,
-                    },
-                    "transcripts": {
-                        "cursor_owner": "calls.transcript",
-                        "rows_seen_last_run": transcripts_written,
-                    },
-                    "transcript_segments": {
-                        "cursor_owner": "calls.transcript_segment",
-                        "rows_seen_last_run": transcript_segments_written,
-                    },
-                    "recordings": {
-                        "cursor_owner": "calls.recording",
-                        "rows_seen_last_run": recordings_written,
-                    },
+                    "events": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "calls.meeting",
+                            "next_cursor": next_cursor,
+                            "pages_fetched_last_run": pages_fetched,
+                            "rows_seen_last_run": meetings_written,
+                            "updated_watermark": max_seen_updated,
+                        },
+                    ),
+                    "participants": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "calls.participant",
+                            "rows_seen_last_run": participants_written,
+                        },
+                    ),
+                    "transcripts": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "calls.transcript",
+                            "rows_seen_last_run": transcripts_written,
+                        },
+                    ),
+                    "transcript_segments": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "calls.transcript_segment",
+                            "rows_seen_last_run": transcript_segments_written,
+                        },
+                    ),
+                    "recordings": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "calls.recording",
+                            "rows_seen_last_run": recordings_written,
+                        },
+                    ),
                     "scope_ping": {
                         "cursor_owner": "calls.scope_ping",
                         "provider_email": link.detail.provider_email,
