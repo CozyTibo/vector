@@ -316,18 +316,16 @@ jobs:
           test "$worker_tag" = "$IMAGE_TAG"
           test "$substrate_tag" = "$IMAGE_TAG"
 
-      - name: Substrate post-deploy gate (probe + baseline diff)
+      - name: Post-deploy gate (ECS image probe)
         env:
-          VECTOR_SETTINGS_SKIP_DOTENV: "1"
-          DB_PROD_HOST: ${{ secrets.DB_PROD_HOST }}
-          DB_PROD_PORT: ${{ secrets.DB_PROD_PORT }}
-          DB_PROD_USER: ${{ secrets.DB_PROD_USER }}
-          DB_PROD_PASSWORD: ${{ secrets.DB_PROD_PASSWORD }}
-          DB_PROD_DATABASE: ${{ secrets.DB_PROD_DATABASE }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECS_CLUSTER: ${{ env.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ env.ECS_SERVICE }}
+          ECS_WORKER_SERVICE: ${{ env.ECS_WORKER_SERVICE }}
+          ECS_SUBSTRATE_WORKER_SERVICE: ${{ env.ECS_SUBSTRATE_WORKER_SERVICE }}
         run: |
           set -euo pipefail
           cd backend
-          pip install -q -r requirements.txt
           PYTHONPATH=src python scripts/substrate_post_deploy_gate.py \
             --expected-sha "$IMAGE_TAG" \
             --json
