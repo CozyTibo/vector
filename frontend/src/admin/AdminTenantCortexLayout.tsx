@@ -16,9 +16,9 @@ export default function AdminTenantCortexLayout() {
     <div className="space-y-5">
       <header className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Cortex</p>
-        <h1 className="mt-1 text-xl font-semibold text-stone-900">Ingestion</h1>
+        <h1 className="mt-1 text-xl font-semibold text-stone-900">Cortex</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Connectors, raw event store, and scheduled sync for this workspace.
+          Raw ingestion and deterministic canon materialization for this workspace.
         </p>
       </header>
 
@@ -28,6 +28,12 @@ export default function AdminTenantCortexLayout() {
           className={({ isActive }) => tabCls(isActive)}
         >
           Ingestion
+        </NavLink>
+        <NavLink
+          to={`/admin/tenants/${tenantId}/cortex/canon`}
+          className={({ isActive }) => tabCls(isActive)}
+        >
+          Canon
         </NavLink>
       </nav>
 

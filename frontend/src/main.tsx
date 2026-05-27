@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import AdminLayout from "./admin/AdminLayout.tsx";
+import AdminCortexCanonPage from "./admin/AdminCortexCanonPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
@@ -78,6 +79,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="cortex" element={<AdminTenantCortexLayout />}>
                 <Route index element={<Navigate to="ingestion" replace />} />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
+                <Route path="canon" element={<AdminCortexCanonPage />} />
                 <Route path="overview" element={<Navigate to="ingestion" replace />} />
                 <Route path="runtime" element={<Navigate to="ingestion" replace />} />
                 <Route path="queues" element={<Navigate to="ingestion" replace />} />

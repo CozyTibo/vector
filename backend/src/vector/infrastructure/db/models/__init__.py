@@ -1,6 +1,8 @@
 """ORM models — import side effects register metadata."""
 
 from vector.infrastructure.db.models.calls_connection_detail import CallsConnectionDetail
+from vector.infrastructure.db.models.canon_materialization_cursor import CanonMaterializationCursor
+from vector.infrastructure.db.models.canon_pass_run import CanonPassRun
 from vector.infrastructure.db.models.cortex_admin_continuity_snapshot import CortexAdminContinuitySnapshot
 from vector.infrastructure.db.models.cortex_admin_graph_component_snapshot import (
     CortexAdminGraphComponentSnapshot,
@@ -34,6 +36,8 @@ from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.models.user import User
 
 __all__ = [
+    "CanonMaterializationCursor",
+    "CanonPassRun",
     "CallsConnectionDetail",
     "ConnectorSyncState",
     "CortexAdminContinuitySnapshot",

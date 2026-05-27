@@ -308,6 +308,24 @@ class Settings(BaseSettings):
             "(uses connector_sync_state.last_incremental_at)."
         ),
     )
+    cortex_canon_scheduler_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_CANON_SCHEDULER_ENABLED",
+        description="Cortex canon v1 Beat: enqueue tenant materialization passes on schedule.",
+    )
+    cortex_canon_scheduler_interval_seconds: int = Field(
+        default=300,
+        ge=60,
+        validation_alias="CORTEX_CANON_SCHEDULER_INTERVAL_SECONDS",
+        description="Canon materialization Beat cadence (seconds). Default 300.",
+    )
+    cortex_canon_batch_raw_limit: int = Field(
+        default=500,
+        ge=1,
+        le=5000,
+        validation_alias="CORTEX_CANON_BATCH_RAW_LIMIT",
+        description="Max raw rows processed per canon pass batch.",
+    )
     cortex_ingestion_verify_after_sync: bool = Field(
         default=True,
         validation_alias="CORTEX_INGESTION_VERIFY_AFTER_SYNC",

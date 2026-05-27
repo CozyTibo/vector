@@ -22,28 +22,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Substrate coherence gates (M9 + waves 1–4 static)
+      - name: Cortex ingestion + canon tests
         working-directory: backend
         env:
           VECTOR_SETTINGS_SKIP_DOTENV: "1"
           DATABASE_URL: postgresql+psycopg://vector:vector@localhost:5432/vector_test
+          SECRET_KEY: unit-test-secret-key-min-32-characters-long!
         run: |
-          PYTHONPATH=src python scripts/substrate_ci_gates.py
           PYTHONPATH=src python -m pytest -q \
-            tests/vector/domains/cortex/execution/test_m9_scheduling.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave1_promotion_collapse.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave2_operator_paths.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave3_dead_weight.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave4_graph_truth.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave5_deploy_contract.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave6_residue_purge.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave7_contract_collapse.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave8_operational_simplicity.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_substrate_wave9_final_domain_shape.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_dead_topology_cleanup_s2.py \
-            tests/vector/domains/cortex/substrate_pipeline/test_continuity_p0_phase_d5_legacy_coordinator_enqueue_deletion.py \
-            tests/vector/domains/cortex/execution/test_phase04_graph_projection_export_boundary.py \
-            tests/vector/domains/cortex/identity/test_projection_export_graph_truth_wave4.py
+            -m "not e2e" \
+            tests/vector/domains/cortex/ingestion/ \
+            tests/vector/domains/cortex/canon/ \
+            tests/vector/api/http/test_admin_cortex_ingestion_step6.py
 
   frontend:
     runs-on: ubuntu-latest

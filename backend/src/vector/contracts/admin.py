@@ -4721,3 +4721,55 @@ class AdminCortexIdentityContinuityEntityCandidatesResponse(BaseModel):
     promotion_lineage: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AdminCanonReadinessResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: str
+    company_name: str
+    mapper_version: int
+    raw_inventory: dict[str, Any]
+    materialization_lag: dict[str, Any]
+    resource_type_classification: dict[str, Any]
+    dirty_queue_depth: int = 0
+    latest_pass_run: dict[str, Any] | None = None
+    scheduler: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminCanonPassRunItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    status: str
+    source_trigger: str
+    started_at: str
+    finished_at: str | None = None
+    error_summary: str | None = None
+    stats: dict[str, Any] | None = None
+
+
+class AdminCanonRecentPassRunsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[AdminCanonPassRunItem]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminCanonTriggerPassRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match the server phrase for manual canon pass.",
+    )
+
+
+class AdminCanonTriggerPassResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    enqueued: bool = True
+    queue: Literal["cortex_canon"] = "cortex_canon"
+    tenant_id: uuid.UUID
+
+

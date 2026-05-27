@@ -50,6 +50,9 @@ from vector.contracts.admin import (
     AdminCortexRawMemoryTrustStateResponse,
     AdminCortexSchedulerPauseRequest,
     AdminCortexSchedulerPauseResponse,
+    AdminCanonPassRunItem,
+    AdminCanonReadinessResponse,
+    AdminCanonRecentPassRunsResponse,
     CortexIngestionConnectorId,
     AdminHardDeleteOrphanUserRequest,
     AdminHardDeleteOrphanUserResponse,
@@ -101,6 +104,10 @@ from vector.domains.cortex.connectors.notion.oauth_flow import start_notion_oaut
 from vector.domains.cortex.connectors.runtime import runtime_by_id
 from vector.domains.cortex.connectors.slack.errors import SlackConnectorNotConfiguredError
 from vector.domains.cortex.connectors.slack.oauth_flow import start_slack_oauth_url
+from vector.domains.cortex.canon.admin_readiness import (
+    build_canon_admin_readiness,
+    list_recent_canon_pass_runs,
+)
 from vector.domains.cortex.ingestion.admin_overview import build_cortex_ingestion_admin_overview
 from vector.domains.cortex.ingestion.admin_recent_raw import (
     aggregate_raw_ingestion_stats,
@@ -1570,6 +1577,43 @@ def build_admin_router() -> APIRouter:
                 )
                 for item in raw["items"]
             ],
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canon",
+        response_model=AdminCanonReadinessResponse,
+    )
+    def admin_cortex_canon_readiness(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCanonReadinessResponse:
+        """Canon v1 readiness — raw inventory, lag, mapper coverage (read-only)."""
+        _assert_tenant(db, tenant_id)
+        try:
+            raw = build_canon_admin_readiness(db, settings, tenant_id)
+        except ValueError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+        return AdminCanonReadinessResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/canon/recent-passes",
+        response_model=AdminCanonRecentPassRunsResponse,
+    )
+    def admin_cortex_canon_recent_passes(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+    ) -> AdminCanonRecentPassRunsResponse:
+        """Recent canon materialization passes (read-only)."""
+        _assert_tenant(db, tenant_id)
+        rows, total = list_recent_canon_pass_runs(db, tenant_id, limit=limit, offset=offset)
+        return AdminCanonRecentPassRunsResponse(
+            items=[AdminCanonPassRunItem.model_validate(x) for x in rows],
+            total_count=total,
+            offset=offset,
+            limit=limit,
         )
 
     @r.get(

@@ -1,4 +1,76 @@
-/** Cortex admin types — ingestion-only surface. */
+/** Cortex admin types — ingestion + canon surfaces. */
+
+export type CanonReadiness = {
+  tenant_id: string;
+  company_name: string;
+  mapper_version: number;
+  raw_inventory: {
+    resource_type_counts: Record<string, number>;
+    total_live_rows: number;
+    max_live_raw_id: number;
+    lineage_identity_count: number;
+  };
+  materialization_lag: {
+    scope_key: string;
+    last_raw_id: number;
+    max_live_raw_id: number;
+    pending_raw_rows_estimate: number;
+    mapper_version: number;
+    expected_mapper_version: number;
+    mapper_version_current: boolean;
+  };
+  resource_type_classification: {
+    mapped: string[];
+    skipped: string[];
+    deferred: string[];
+    unknown: string[];
+  };
+  dirty_queue_depth: number;
+  latest_pass_run: Record<string, unknown> | null;
+  scheduler: { enabled: boolean; interval_seconds: number };
+};
+
+export type CanonPassRunItem = {
+  id: string;
+  status: string;
+  source_trigger: string;
+  started_at: string;
+  finished_at: string | null;
+  error_summary: string | null;
+  stats: Record<string, unknown> | null;
+};
+
+export type CanonEntityItem = {
+  id: string;
+  entity_type: string;
+  entity_key: string;
+  display_label: string;
+  connector: string;
+  connection_id: string;
+  materialized_at: string;
+  mapper_version: number;
+  author_entity_id: string | null;
+  conversation_entity_id: string | null;
+  parent_message_entity_id: string | null;
+  repository_entity_id: string | null;
+  assignee_entity_id: string | null;
+  parent_document_entity_id: string | null;
+  work_item_entity_id: string | null;
+};
+
+export type CanonEntityDetail = CanonEntityItem & {
+  attrs_json: Record<string, unknown>;
+  sources: Array<{
+    raw_id: number;
+    connector: string;
+    resource_type: string;
+    external_id: string;
+    source_identity_key: string;
+    source_revision_key: string;
+    observed_at: string;
+    is_latest: boolean;
+  }>;
+};
 
 export type CortexConnectorId = "calls" | "github" | "linear" | "notion" | "slack";
 
