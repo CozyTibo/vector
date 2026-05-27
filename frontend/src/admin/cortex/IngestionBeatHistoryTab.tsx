@@ -15,7 +15,7 @@ function statusBadge(status: string): string {
   if (status === "completed") return "bg-emerald-100 text-emerald-900";
   if (status === "failed") return "bg-red-100 text-red-900";
   if (status === "running") return "bg-amber-100 text-amber-900";
-  if (status === "pending") return "bg-stone-100 text-stone-700";
+  if (status === "queued" || status === "not_enqueued") return "bg-stone-100 text-stone-700";
   return "bg-stone-100 text-stone-800";
 }
 

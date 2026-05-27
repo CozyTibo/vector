@@ -552,6 +552,7 @@ class AdminCortexConnectorIngestionRow(BaseModel):
     queue_lane_live: str = Field(default="cortex_live")
     queue_lane_replay: str = Field(default="cortex_replay")
     checkpoint_last_incremental_at: str | None = None
+    checkpoint_exhaust_depth: str | None = None
     checkpoint_streams: list[AdminCortexCheckpointStreamSummary] = Field(default_factory=list)
     raw_resource_stats: list[AdminCortexConnectorRawResourceStat] = Field(default_factory=list)
     ingested_row_count: int = 0
@@ -597,6 +598,15 @@ class AdminCortexDuplicatePreventionMetric(BaseModel):
     detail: str | None = None
 
 
+class AdminCortexSlackUserEmailPresence(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    sampled_rows: int = 0
+    with_email: int = 0
+    email_presence_pct: float | None = None
+    capped_sample: bool = False
+
+
 class AdminCortexIngestionDigest(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -604,6 +614,7 @@ class AdminCortexIngestionDigest(BaseModel):
     bottleneck_hint: str
     confidence_note: str
     recommended_actions: list[str]
+    slack_user_email_presence: AdminCortexSlackUserEmailPresence | None = None
 
 
 class AdminCortexIngestionOverviewResponse(BaseModel):

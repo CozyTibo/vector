@@ -177,6 +177,12 @@ export function IngestionConnectorsTable({ connectors, loading }: Props) {
                     {isOpen ? (
                       <tr className="border-b border-stone-100 bg-stone-50/80">
                         <td colSpan={6} className="px-4 py-3">
+                          {row.checkpoint_exhaust_depth ? (
+                            <p className="text-xs text-stone-600">
+                              Exhaust depth:{" "}
+                              <span className="font-medium">{row.checkpoint_exhaust_depth}</span>
+                            </p>
+                          ) : null}
                           <StreamCheckpointTable streams={streams} />
                           <RawStatsSummary row={row} />
                         </td>

@@ -37,6 +37,44 @@ def _dt_key(v: datetime | None) -> str | None:
     return v.isoformat() if v is not None else None
 
 
+def slack_user_email_presence_v1(session: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
+    """Admin read: % of ``slack.user`` rows with a non-empty email in stored payload."""
+    stmt = (
+        select(RawIngestionRecord.payload_body)
+        .where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            RawIngestionRecord.connector == "slack",
+            RawIngestionRecord.resource_type == "slack.user",
+        )
+        .limit(5000)
+    )
+    rows = session.scalars(stmt).all()
+    total = 0
+    with_email = 0
+    for body in rows:
+        if not isinstance(body, dict):
+            continue
+        total += 1
+        member = body.get("member")
+        if not isinstance(member, dict):
+            continue
+        profile = member.get("profile")
+        email = None
+        if isinstance(profile, dict):
+            email = profile.get("email")
+        if email is None:
+            email = member.get("email")
+        if isinstance(email, str) and email.strip():
+            with_email += 1
+    rate = round(100.0 * with_email / total, 1) if total else None
+    return {
+        "sampled_rows": total,
+        "with_email": with_email,
+        "email_presence_pct": rate,
+        "capped_sample": total >= 5000,
+    }
+
+
 def aggregate_raw_ingestion_stats(
     session: Session,
     tenant_id: uuid.UUID,

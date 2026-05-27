@@ -145,7 +145,7 @@ def _connector_debrief_row(
             "connector": connector,
             "enqueued": enqueued,
             "run_id": None,
-            "status": "pending",
+            "status": "queued" if enqueued else "not_enqueued",
             "records_written": None,
             "resource_breakdown": [],
             "error_summary": None,

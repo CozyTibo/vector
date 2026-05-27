@@ -39,6 +39,7 @@ export type CortexIngestionConnectorRow = {
   connection_status: string | null;
   cortex_routed: boolean;
   checkpoint_last_incremental_at: string | null;
+  checkpoint_exhaust_depth?: string | null;
   checkpoint_streams?: CortexCheckpointStreamSummary[];
   raw_resource_stats?: CortexConnectorRawResourceStat[];
   ingested_row_count: number;

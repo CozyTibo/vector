@@ -16,7 +16,10 @@ from vector.domains.cortex.connectors.cortex_ingestion_policy import (
     SUPPORTED_CONNECTOR_IDS,
     should_route_ingestion_to_cortex,
 )
-from vector.domains.cortex.ingestion.admin_recent_raw import aggregate_raw_ingestion_stats
+from vector.domains.cortex.ingestion.admin_recent_raw import (
+    aggregate_raw_ingestion_stats,
+    slack_user_email_presence_v1,
+)
 from vector.domains.cortex.ingestion.checkpoint_contract import checkpoint_last_incremental_at
 from vector.domains.cortex.ingestion.stream_checkpoint import summarize_connector_streams
 from vector.domains.cortex.ingestion.sync_context import SCOPE_DEFAULT
@@ -400,6 +403,7 @@ def _build_cortex_ingestion_admin_overview_uncached(
         latest = None
         ck_at: str | None = None
         ck_streams: list[dict[str, Any]] = []
+        ck_exhaust_depth: str | None = None
         if tc is not None:
             latest = latest_runs.get((tc.id, connector))
             ck = _checkpoint_row(
@@ -414,6 +418,11 @@ def _build_cortex_ingestion_admin_overview_uncached(
                 if isinstance(raw_ts, str) and raw_ts.strip():
                     ck_at = raw_ts.strip()
                 ck_streams = summarize_connector_streams(ck_state, connector)
+                meta = ck_state.get("meta")
+                if isinstance(meta, dict):
+                    depth = meta.get("exhaust_depth")
+                    if isinstance(depth, str) and depth.strip():
+                        ck_exhaust_depth = depth.strip()
         connector_rows.append(
             {
                 "connector": connector,
@@ -423,6 +432,7 @@ def _build_cortex_ingestion_admin_overview_uncached(
                 "queue_lane_live": "cortex_live",
                 "queue_lane_replay": "cortex_replay",
                 "checkpoint_last_incremental_at": ck_at,
+                "checkpoint_exhaust_depth": ck_exhaust_depth,
                 "checkpoint_streams": ck_streams,
                 "raw_resource_stats": [
                     {
@@ -467,11 +477,17 @@ def _build_cortex_ingestion_admin_overview_uncached(
             "Scheduled Beat enqueue is off or paused; manual sync remains available when routed."
         )
 
+    slack_email = (
+        {}
+        if lite
+        else slack_user_email_presence_v1(session, tenant_id)
+    )
     digest = {
         "objective": (
             "Safely pull connector data into Cortex raw ingestion with checkpoints "
             "and replay isolation."
         ),
+        "slack_user_email_presence": slack_email,
         "bottleneck_hint": bottleneck,
         "confidence_note": (
             "Use the verification checklist after changes; replay jobs use the "

@@ -32,10 +32,10 @@ def test_tenant_jobs_from_tick_filters_by_tenant() -> None:
     assert jobs[0]["connector_id"] == "slack"
 
 
-def test_connector_debrief_row_pending_without_run() -> None:
+def test_connector_debrief_row_queued_without_run() -> None:
     session = MagicMock()
     row = _connector_debrief_row(session, connector="linear", run=None, enqueued=True)
-    assert row["status"] == "pending"
+    assert row["status"] == "queued"
     assert row["records_written"] is None
     assert row["enqueued"] is True
 
