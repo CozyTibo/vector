@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { CanonConnectorsCoverageTab } from "./cortex/CanonConnectorsCoverageTab";
 import { CanonEntitiesListingTab } from "./cortex/CanonEntitiesListingTab";
+import { CanonRunsTab } from "./cortex/CanonRunsTab";
 import { CanonSchedulerPanel } from "./cortex/CanonSchedulerPanel";
 import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
 import { useCanonReadiness } from "./cortex/useCanonReadiness";
@@ -9,15 +10,17 @@ import { useCanonReadiness } from "./cortex/useCanonReadiness";
 export default function AdminCortexCanonPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab = tabParam === "entities" ? "entities" : "connectors";
+  const tab =
+    tabParam === "entities" ? "entities" : tabParam === "runs" ? "runs" : "connectors";
   const readinessQ = useCanonReadiness();
 
-  const setTab = (next: "connectors" | "entities") => {
+  const setTab = (next: "connectors" | "runs" | "entities") => {
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
       if (next === "connectors") params.delete("tab");
       else params.set("tab", next);
       params.delete("canon_page");
+      params.delete("page");
       return params;
     });
   };
@@ -50,6 +53,7 @@ export default function AdminCortexCanonPage() {
         {(
           [
             ["connectors", "Per connector"],
+            ["runs", "Runs"],
             ["entities", "Entities by type"],
           ] as const
         ).map(([key, label]) => (
@@ -69,7 +73,13 @@ export default function AdminCortexCanonPage() {
         ))}
       </nav>
 
-      {tab === "connectors" ? <CanonConnectorsCoverageTab /> : <CanonEntitiesListingTab />}
+      {tab === "connectors" ? (
+        <CanonConnectorsCoverageTab />
+      ) : tab === "runs" ? (
+        <CanonRunsTab />
+      ) : (
+        <CanonEntitiesListingTab />
+      )}
     </div>
   );
 }
