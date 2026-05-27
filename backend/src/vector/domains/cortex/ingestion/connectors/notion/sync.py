@@ -234,6 +234,41 @@ def run_notion_connector_sync(
     )
     latest_edited = search_watermark
 
+    def _append_notion_row(
+        *,
+        resource_type: str,
+        external_id: str,
+        api_endpoint: str,
+        query_params: dict[str, Any],
+        source_object_type: str,
+        payload_key: str,
+        payload_value: dict[str, Any],
+    ) -> bool:
+        return append_raw(
+            session,
+            ctx=ctx,
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+            connector=CONNECTION_PROVIDER_NOTION,
+            run_id=run_id,
+            source_trigger=source_trigger,
+            resource_type=resource_type,
+            external_id=external_id[:512],
+            api_endpoint=api_endpoint[:512],
+            query_params=query_params,
+            payload_body={
+                **core_envelope_fields(
+                    connector=CONNECTION_PROVIDER_NOTION,
+                    connection_id=connection_id,
+                    source_object_type=source_object_type,
+                    source_object_id=external_id[:512],
+                ),
+                payload_key: payload_value,
+            },
+            http_status=200,
+            idempotency_key=idem_key(ctx, run_id, f"notion:{resource_type}:{external_id}"),
+        )
+
     users_state = _state_map(notion_existing, "users")
     user_cursor_raw = users_state.get("next_cursor")
     user_cursor = user_cursor_raw if isinstance(user_cursor_raw, str) and user_cursor_raw.strip() else None
@@ -301,41 +336,6 @@ def run_notion_connector_sync(
     pages_discovered: set[str] = set()
     database_patch_map: dict[str, Any] = {}
     block_parent_patch_map: dict[str, Any] = {}
-
-    def _append_notion_row(
-        *,
-        resource_type: str,
-        external_id: str,
-        api_endpoint: str,
-        query_params: dict[str, Any],
-        source_object_type: str,
-        payload_key: str,
-        payload_value: dict[str, Any],
-    ) -> bool:
-        return append_raw(
-            session,
-            ctx=ctx,
-            tenant_id=tenant_id,
-            connection_id=connection_id,
-            connector=CONNECTION_PROVIDER_NOTION,
-            run_id=run_id,
-            source_trigger=source_trigger,
-            resource_type=resource_type,
-            external_id=external_id[:512],
-            api_endpoint=api_endpoint[:512],
-            query_params=query_params,
-            payload_body={
-                **core_envelope_fields(
-                    connector=CONNECTION_PROVIDER_NOTION,
-                    connection_id=connection_id,
-                    source_object_type=source_object_type,
-                    source_object_id=external_id[:512],
-                ),
-                payload_key: payload_value,
-            },
-            http_status=200,
-            idempotency_key=idem_key(ctx, run_id, f"notion:{resource_type}:{external_id}"),
-        )
 
     if settings.vector_use_mock_connectors:
         notion_payload = _mock_notion_payload()
