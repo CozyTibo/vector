@@ -14,12 +14,33 @@ export type CortexIngestionRunSummary = {
   raw_rows_written: number | null;
 };
 
+export type CortexCheckpointStreamSummary = {
+  stream_key: string;
+  cursor_owner?: string | null;
+  next_cursor?: string | null;
+  backfill_complete?: boolean;
+  introduced_at?: string | null;
+  last_ok_at?: string | null;
+  pages_fetched_last_run?: number | null;
+  rows_seen_last_run?: number | null;
+  connector_exhaust_depth?: string | null;
+};
+
+export type CortexConnectorRawResourceStat = {
+  resource_type: string;
+  row_count: number;
+  oldest_fetched_at: string | null;
+  newest_fetched_at: string | null;
+};
+
 export type CortexIngestionConnectorRow = {
   connector: string;
   connection_id: string | null;
   connection_status: string | null;
   cortex_routed: boolean;
   checkpoint_last_incremental_at: string | null;
+  checkpoint_streams?: CortexCheckpointStreamSummary[];
+  raw_resource_stats?: CortexConnectorRawResourceStat[];
   ingested_row_count: number;
   latest_run: CortexIngestionRunSummary | null;
 };
@@ -74,6 +95,49 @@ export type CortexSchedulerBeats = {
   tenant_id: string;
   items: CortexSchedulerBeatItem[];
   limit: number;
+};
+
+export type CortexRawIngestionRecord = {
+  id: number;
+  run_id: string;
+  resource_type: string;
+  external_id: string;
+  api_endpoint: string;
+  query_params: Record<string, unknown>;
+  payload_body: Record<string, unknown>;
+  http_status: number;
+  fetched_at: string;
+  idempotency_key: string | null;
+  source_identity_key: string | null;
+  source_revision_key: string | null;
+  replay_job_id: string | null;
+  replay_version: number | null;
+};
+
+export type CortexRawIngestionRecords = {
+  tenant_id: string;
+  connector: CortexConnectorId;
+  items: CortexRawIngestionRecord[];
+  total_count: number;
+  offset: number;
+  limit: number;
+  truncated: boolean;
+};
+
+export type CortexRawIngestionStats = {
+  tenant_id: string;
+  resources: Array<{
+    connector: string;
+    resource_type: string;
+    row_count: number;
+    oldest_fetched_at: string | null;
+    newest_fetched_at: string | null;
+  }>;
+  connector_rollups?: Array<{
+    connector: string;
+    row_count: number;
+    resource_types: Array<{ resource_type: string; row_count: number }>;
+  }>;
 };
 
 export type CortexRecentRuns = {

@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { IngestionBeatHistoryTab } from "./cortex/IngestionBeatHistoryTab";
 import { IngestionConnectorsTable } from "./cortex/IngestionConnectorsTable";
+import { IngestionRawDataTab } from "./cortex/IngestionRawDataTab";
 import { IngestionRunsTab } from "./cortex/IngestionRunsTab";
 import { IngestionSchedulerPanel } from "./cortex/IngestionSchedulerPanel";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
@@ -11,10 +12,16 @@ export default function AdminCortexIngestionPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab =
-    tabParam === "runs" ? "runs" : tabParam === "beats" ? "beats" : "connectors";
+    tabParam === "runs"
+      ? "runs"
+      : tabParam === "beats"
+        ? "beats"
+        : tabParam === "raw"
+          ? "raw"
+          : "connectors";
   const overviewQ = useCortexIngestionOverview();
 
-  const setTab = (next: "connectors" | "runs" | "beats") => {
+  const setTab = (next: "connectors" | "runs" | "beats" | "raw") => {
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
       if (next === "connectors") params.delete("tab");
@@ -44,6 +51,7 @@ export default function AdminCortexIngestionPage() {
             ["connectors", "Connectors"],
             ["beats", "Beat history"],
             ["runs", "Runs"],
+            ["raw", "Raw data"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -70,6 +78,8 @@ export default function AdminCortexIngestionPage() {
         )
       ) : tab === "beats" ? (
         <IngestionBeatHistoryTab />
+      ) : tab === "raw" ? (
+        <IngestionRawDataTab />
       ) : (
         <IngestionRunsTab />
       )}

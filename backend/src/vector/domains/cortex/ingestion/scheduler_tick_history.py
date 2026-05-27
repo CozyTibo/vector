@@ -61,10 +61,10 @@ def build_tenant_scheduler_beat_history_v1(
     session: Session,
     *,
     tenant_id: uuid.UUID,
-    limit: int = 40,
+    limit: int = 20,
 ) -> dict[str, Any]:
     """Recent ingestion Beat ticks that enqueued or ran work for this tenant."""
-    limit = max(1, min(limit, 100))
+    limit = max(1, min(limit, 20))
     ticks = list(
         session.scalars(
             select(IngestionSchedulerTick)

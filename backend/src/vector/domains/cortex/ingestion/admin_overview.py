@@ -16,7 +16,9 @@ from vector.domains.cortex.connectors.cortex_ingestion_policy import (
     SUPPORTED_CONNECTOR_IDS,
     should_route_ingestion_to_cortex,
 )
+from vector.domains.cortex.ingestion.admin_recent_raw import aggregate_raw_ingestion_stats
 from vector.domains.cortex.ingestion.checkpoint_contract import checkpoint_last_incremental_at
+from vector.domains.cortex.ingestion.stream_checkpoint import summarize_connector_streams
 from vector.domains.cortex.ingestion.sync_context import SCOPE_DEFAULT
 from vector.infrastructure.cortex_scheduler_pause import read_scheduler_paused_flag
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
@@ -377,6 +379,15 @@ def _build_cortex_ingestion_admin_overview_uncached(
         if lite
         else _raw_row_counts_by_connector(session, tenant_id)
     )
+    raw_stats_rows = (
+        []
+        if lite
+        else aggregate_raw_ingestion_stats(session, tenant_id, include_health_rows=False)
+    )
+    raw_stats_by_connector: dict[str, list[dict[str, Any]]] = {}
+    for row in raw_stats_rows:
+        conn = str(row.get("connector") or "")
+        raw_stats_by_connector.setdefault(conn, []).append(row)
 
     paused_redis = read_scheduler_paused_flag(settings)
     redis_ok = bool(settings.redis_url.strip())
@@ -388,6 +399,7 @@ def _build_cortex_ingestion_admin_overview_uncached(
         routed = should_route_ingestion_to_cortex(settings, connector, tenant_id)
         latest = None
         ck_at: str | None = None
+        ck_streams: list[dict[str, Any]] = []
         if tc is not None:
             latest = latest_runs.get((tc.id, connector))
             ck = _checkpoint_row(
@@ -397,9 +409,11 @@ def _build_cortex_ingestion_admin_overview_uncached(
                 connector=connector,
             )
             if ck is not None:
-                raw_ts = checkpoint_last_incremental_at(dict(ck.state))
+                ck_state = dict(ck.state) if isinstance(ck.state, dict) else {}
+                raw_ts = checkpoint_last_incremental_at(ck_state)
                 if isinstance(raw_ts, str) and raw_ts.strip():
                     ck_at = raw_ts.strip()
+                ck_streams = summarize_connector_streams(ck_state, connector)
         connector_rows.append(
             {
                 "connector": connector,
@@ -409,6 +423,16 @@ def _build_cortex_ingestion_admin_overview_uncached(
                 "queue_lane_live": "cortex_live",
                 "queue_lane_replay": "cortex_replay",
                 "checkpoint_last_incremental_at": ck_at,
+                "checkpoint_streams": ck_streams,
+                "raw_resource_stats": [
+                    {
+                        "resource_type": str(r.get("resource_type") or ""),
+                        "row_count": int(r.get("row_count") or 0),
+                        "oldest_fetched_at": r.get("oldest_fetched_at"),
+                        "newest_fetched_at": r.get("newest_fetched_at"),
+                    }
+                    for r in raw_stats_by_connector.get(connector, [])
+                ],
                 "ingested_row_count": int(ingested_by_connector.get(connector, 0)),
                 "latest_run": _run_summary_dict(latest) if latest else None,
             },

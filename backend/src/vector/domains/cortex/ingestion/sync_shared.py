@@ -401,6 +401,42 @@ def resolve_connection(
     return session.scalar(stmt)
 
 
+def replace_checkpoint_state(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    connector: str,
+    state: dict[str, Any],
+    scope_key: str = SCOPE_DEFAULT,
+) -> None:
+    """Write full checkpoint state (used for operator stream reset — not deep-merge patches)."""
+    from vector.domains.cortex.ingestion.checkpoint_contract import migrate_checkpoint_state
+
+    normalized, _ = migrate_checkpoint_state(state)
+    row = session.get(
+        ConnectorSyncState,
+        {
+            "tenant_id": tenant_id,
+            "connection_id": connection_id,
+            "connector": connector,
+            "scope_key": scope_key,
+        },
+    )
+    if row is None:
+        session.add(
+            ConnectorSyncState(
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+                connector=connector,
+                scope_key=scope_key,
+                state=normalized,
+            )
+        )
+    else:
+        row.state = normalized
+
+
 def upsert_checkpoint(
     session: Session,
     *,

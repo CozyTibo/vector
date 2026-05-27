@@ -29,6 +29,8 @@ from vector.contracts.admin import (
     AdminCortexIngestionSchedulerBeatConnectorDebrief,
     AdminCortexIngestionSchedulerBeatItem,
     AdminCortexIngestionSchedulerBeatsResponse,
+    AdminCortexIngestionResetStreamRequest,
+    AdminCortexIngestionResetStreamResponse,
     AdminCortexIngestionTriggerReplayRequest,
     AdminCortexIngestionTriggerReplayResponse,
     AdminCortexIngestionTriggerSyncRequest,
@@ -160,6 +162,7 @@ CORTEX_SCHEDULER_RESUME_CONFIRM_PHRASE = "RESUME ALL SCHEDULED CORTEX INGESTION"
 CORTEX_RAW_MEMORY_DELETE_CONFIRM_PHRASE = "APPLY RAW MEMORY RETENTION DELETION"
 CORTEX_MANUAL_SYNC_CONFIRM_PHRASE = "RUN MANUAL CORTEX INGESTION SYNC"
 CORTEX_REPLAY_CONFIRM_PHRASE = "RUN CORTEX INGESTION REPLAY JOB"
+CORTEX_RESET_STREAM_CONFIRM_PHRASE = "RESET CORTEX INGESTION STREAM CHECKPOINT"
 
 def _enqueue_cortex_poll_sync(connector_id: str) -> Callable[..., None]:
     """Enqueue Phase 01 Celery sync when flags route this connector×tenant to Cortex."""
@@ -1537,7 +1540,7 @@ def build_admin_router() -> APIRouter:
     def admin_cortex_ingestion_scheduler_beats(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
-        limit: Annotated[int, Query(ge=1, le=100)] = 40,
+        limit: Annotated[int, Query(ge=1, le=20)] = 20,
     ) -> AdminCortexIngestionSchedulerBeatsResponse:
         """Ingestion-only Beat history with per-connector debrief (pulled / added)."""
         _assert_tenant(db, tenant_id)
@@ -1577,7 +1580,7 @@ def build_admin_router() -> APIRouter:
         tenant_id: uuid.UUID,
         connector: CortexIngestionConnectorId,
         db: Annotated[Session, Depends(get_db)],
-        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        limit: Annotated[int, Query(ge=1, le=50)] = 50,
         offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
         resource_type: Annotated[str | None, Query()] = None,
         fetched_after: Annotated[datetime | None, Query()] = None,
@@ -1921,6 +1924,71 @@ def build_admin_router() -> APIRouter:
             connection_id=tc.id,
             tenant_id=tenant_id,
             sync_mode=body.sync_mode,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/ingestion/actions/reset-stream",
+        response_model=AdminCortexIngestionResetStreamResponse,
+    )
+    def admin_cortex_ingestion_reset_stream(
+        tenant_id: uuid.UUID,
+        body: AdminCortexIngestionResetStreamRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexIngestionResetStreamResponse:
+        """Clear one stream checkpoint path in the live default scope (raw rows unchanged)."""
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != CORTEX_RESET_STREAM_CONFIRM_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        tc = _active_cortex_routed_connection(
+            db,
+            settings,
+            tenant_id=tenant_id,
+            connector_id=body.connector,
+            connection_id=body.connection_id,
+        )
+        from vector.domains.cortex.ingestion.admin_overview import (
+            invalidate_cortex_ingestion_admin_caches_v1,
+        )
+        from vector.domains.cortex.ingestion.stream_checkpoint import apply_stream_reset_to_db_state
+        from vector.domains.cortex.ingestion.sync_context import SCOPE_DEFAULT
+        from vector.domains.cortex.ingestion.sync_shared import (
+            read_checkpoint_state,
+            replace_checkpoint_state,
+        )
+
+        existing = read_checkpoint_state(
+            db,
+            tenant_id=tenant_id,
+            connection_id=tc.id,
+            connector=body.connector,
+            scope_key=SCOPE_DEFAULT,
+        )
+        merged = apply_stream_reset_to_db_state(
+            existing,
+            connector=body.connector,
+            stream_key=body.stream_key.strip(),
+        )
+        if merged != existing:
+            replace_checkpoint_state(
+                db,
+                tenant_id=tenant_id,
+                connection_id=tc.id,
+                connector=body.connector,
+                state=merged,
+                scope_key=SCOPE_DEFAULT,
+            )
+            db.commit()
+        invalidate_cortex_ingestion_admin_caches_v1(tenant_id)
+        return AdminCortexIngestionResetStreamResponse(
+            tenant_id=tenant_id,
+            connector=body.connector,
+            connection_id=tc.id,
+            stream_key=body.stream_key.strip(),
+            reset_applied=bool(merged != existing),
         )
 
     @r.post(

@@ -519,6 +519,29 @@ class AdminCortexIngestionRunSummary(BaseModel):
     raw_rows_written: int | None = None
 
 
+class AdminCortexCheckpointStreamSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    stream_key: str
+    cursor_owner: str | None = None
+    next_cursor: str | None = None
+    backfill_complete: bool = False
+    introduced_at: str | None = None
+    last_ok_at: str | None = None
+    pages_fetched_last_run: int | None = None
+    rows_seen_last_run: int | None = None
+    connector_exhaust_depth: str | None = None
+
+
+class AdminCortexConnectorRawResourceStat(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    resource_type: str
+    row_count: int
+    oldest_fetched_at: datetime | None = None
+    newest_fetched_at: datetime | None = None
+
+
 class AdminCortexConnectorIngestionRow(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -529,6 +552,8 @@ class AdminCortexConnectorIngestionRow(BaseModel):
     queue_lane_live: str = Field(default="cortex_live")
     queue_lane_replay: str = Field(default="cortex_replay")
     checkpoint_last_incremental_at: str | None = None
+    checkpoint_streams: list[AdminCortexCheckpointStreamSummary] = Field(default_factory=list)
+    raw_resource_stats: list[AdminCortexConnectorRawResourceStat] = Field(default_factory=list)
     ingested_row_count: int = 0
     latest_run: AdminCortexIngestionRunSummary | None = None
 
@@ -615,6 +640,28 @@ class AdminCortexIngestionTriggerSyncResponse(BaseModel):
     tenant_id: uuid.UUID
     sync_mode: Literal["incremental", "backfill"] = "incremental"
     source_trigger: str = "manual_admin"
+
+
+class AdminCortexIngestionResetStreamRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    connector: CortexIngestionConnectorId
+    connection_id: uuid.UUID | None = None
+    stream_key: str = Field(..., min_length=1, max_length=128)
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match the server phrase for stream checkpoint reset.",
+    )
+
+
+class AdminCortexIngestionResetStreamResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    connector: str
+    connection_id: uuid.UUID
+    stream_key: str
+    reset_applied: bool
 
 
 class AdminCortexIngestionTriggerReplayRequest(BaseModel):

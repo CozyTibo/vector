@@ -26,7 +26,7 @@ export function IngestionBeatHistoryTab() {
     queryKey: ["admin-cortex-ingestion-beats", tenantId],
     queryFn: () =>
       adminJson<CortexSchedulerBeats>(
-        `/admin/tenants/${tenantId}/cortex/ingestion/scheduler-beats?limit=40`,
+        `/admin/tenants/${tenantId}/cortex/ingestion/scheduler-beats?limit=20`,
       ),
     enabled: Boolean(tenantId),
     refetchInterval: 30_000,
@@ -39,8 +39,8 @@ export function IngestionBeatHistoryTab() {
       <div>
         <h2 className="text-base font-semibold text-stone-900">Ingestion Beat history</h2>
         <p className="text-sm text-stone-600">
-          Celery Beat ticks (ingestion-only, every ~2 minutes) with a per-connector debrief of what
-          was enqueued and raw rows added.
+          Last 20 Celery Beat ticks (ingestion-only, every ~2 minutes) with a per-connector debrief
+          of what was enqueued and raw rows added.
         </p>
       </div>
 
