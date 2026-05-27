@@ -56,7 +56,7 @@ export default function AdminTenantLayout() {
         <NavLink to={`/admin/tenants/${tenantId}/integrations`} className={tabCls}>
           Integrations
         </NavLink>
-        <NavLink to={`/admin/tenants/${tenantId}/cortex/overview`} className={tabCls}>
+        <NavLink to={`/admin/tenants/${tenantId}/cortex/ingestion`} className={tabCls}>
           Cortex
         </NavLink>
       </nav>

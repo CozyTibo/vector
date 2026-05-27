@@ -66,12 +66,6 @@ celery_app = Celery(
         "app.tasks.cortex_ingestion_sync",
         "app.tasks.cortex_ingestion_scheduler",
         "app.tasks.cortex_ingestion_verify",
-        "app.tasks.cortex_org_link_jobs",
-        "app.tasks.cortex_tcre_reconstruction_jobs",
-        "app.tasks.cortex_synthesis_jobs",
-        "app.tasks.cortex_convergence",
-        "app.tasks.cortex_execution",
-        "app.tasks.cortex_admin_snapshot",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -86,12 +80,6 @@ celery_app.conf.imports = (
     "app.tasks.cortex_ingestion_sync",
     "app.tasks.cortex_ingestion_scheduler",
     "app.tasks.cortex_ingestion_verify",
-    "app.tasks.cortex_org_link_jobs",
-    "app.tasks.cortex_tcre_reconstruction_jobs",
-    "app.tasks.cortex_synthesis_jobs",
-    "app.tasks.cortex_convergence",
-    "app.tasks.cortex_execution",
-    "app.tasks.cortex_admin_snapshot",
 )
 
 # Phase 01 Step 2–3: live lane vs replay lane (orchestration-model.md, replay-strategy.md).
@@ -102,24 +90,11 @@ celery_app.conf.task_routes = {
 
 _tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "1800"))
 _tick_seconds = max(60, _tick_seconds)
-_convergence_sweep_seconds = int(os.environ.get("CORTEX_CONVERGENCE_SWEEPER_INTERVAL_SECONDS", "120"))
-_convergence_sweep_seconds = max(30, _convergence_sweep_seconds)
-_admin_snapshot_sweep_seconds = int(os.environ.get("CORTEX_ADMIN_SNAPSHOT_SWEEP_INTERVAL_SECONDS", "600"))
-_admin_snapshot_sweep_seconds = max(60, _admin_snapshot_sweep_seconds)
 
-# M3: substrate progression is convergence lease + sweeper only (no legacy watchdog/progression beat).
 celery_app.conf.beat_schedule = {
     "cortex-ingestion-scheduler-tick": {
         "task": "vector.cortex.ingestion.scheduler_tick",
         "schedule": timedelta(seconds=_tick_seconds),
-    },
-    "cortex-convergence-sweep": {
-        "task": "vector.cortex.convergence.sweep",
-        "schedule": timedelta(seconds=_convergence_sweep_seconds),
-    },
-    "cortex-admin-continuity-snapshot-sweep": {
-        "task": "vector.cortex.admin.refresh_continuity_snapshots_sweep",
-        "schedule": timedelta(seconds=_admin_snapshot_sweep_seconds),
     },
 }
 
@@ -131,12 +106,6 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
-    importlib.import_module("app.tasks.cortex_org_link_jobs")
-    importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
-    importlib.import_module("app.tasks.cortex_synthesis_jobs")
-    importlib.import_module("app.tasks.cortex_convergence")
-    importlib.import_module("app.tasks.cortex_execution")
-    importlib.import_module("app.tasks.cortex_admin_snapshot")
 
 
 _register_tasks()
@@ -150,9 +119,3 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_ingestion_sync")
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
-    importlib.import_module("app.tasks.cortex_org_link_jobs")
-    importlib.import_module("app.tasks.cortex_tcre_reconstruction_jobs")
-    importlib.import_module("app.tasks.cortex_synthesis_jobs")
-    importlib.import_module("app.tasks.cortex_convergence")
-    importlib.import_module("app.tasks.cortex_execution")
-    importlib.import_module("app.tasks.cortex_admin_snapshot")

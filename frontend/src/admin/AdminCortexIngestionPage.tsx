@@ -1,16 +1,15 @@
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
+import { IngestionConnectorsTable } from "./cortex/IngestionConnectorsTable";
 import { IngestionRunsTab } from "./cortex/IngestionRunsTab";
+import { IngestionSchedulerPanel } from "./cortex/IngestionSchedulerPanel";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
-import { DeployInfoFooter } from "./operator/DeployInfoFooter";
-import { OperatorConnectorsTable } from "./operator/OperatorConnectorsTable";
-import { useOperatorOverview } from "./operator/useOperatorOverview";
+import { useCortexIngestionOverview } from "./cortex/useCortexIngestionOverview";
 
 export default function AdminCortexIngestionPage() {
-  const { tenantId = "" } = useParams<{ tenantId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "runs" ? "runs" : "connectors";
-  const overviewQ = useOperatorOverview();
+  const overviewQ = useCortexIngestionOverview();
 
   const setTab = (next: "connectors" | "runs") => {
     setSearchParams((prev) => {
@@ -22,23 +21,19 @@ export default function AdminCortexIngestionPage() {
     });
   };
 
-  if (!tenantId) return <p className="text-sm text-red-700">Missing tenant.</p>;
-
   return (
     <div className="space-y-6">
       <header className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold text-stone-900">Ingestion</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Connector sync and raw ingestion history. Pipeline actions live on{" "}
-          <Link
-            to={`/admin/tenants/${tenantId}/cortex/overview`}
-            className="font-medium text-indigo-700 no-underline hover:underline"
-          >
-            Overview
-          </Link>
-          .
+          Connector sync, raw storage, and ingestion scheduler for this workspace.
         </p>
+        {overviewQ.data?.digest?.bottleneck ? (
+          <p className="mt-2 text-sm text-amber-800">{overviewQ.data.digest.bottleneck}</p>
+        ) : null}
       </header>
+
+      <IngestionSchedulerPanel overview={overviewQ.data} />
 
       <nav className="flex gap-2 border-b border-stone-200 pb-2">
         {(
@@ -67,13 +62,11 @@ export default function AdminCortexIngestionPage() {
         overviewQ.isPending && !overviewQ.data ? (
           <SectionSkeleton variant="table" />
         ) : (
-          <OperatorConnectorsTable connectors={overviewQ.data?.connectors ?? []} />
+          <IngestionConnectorsTable connectors={overviewQ.data?.connectors ?? []} />
         )
       ) : (
         <IngestionRunsTab />
       )}
-
-      <DeployInfoFooter />
     </div>
   );
 }

@@ -1,5 +1,0 @@
-{
-  "hub_walk_worst_case_cost_ms": 50000,
-  "node_out_degrees": [1, 1, 64],
-  "projection_content_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-}

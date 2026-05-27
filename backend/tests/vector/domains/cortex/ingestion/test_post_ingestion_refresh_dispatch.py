@@ -1,9 +1,8 @@
-"""Post-ingestion substrate refresh scheduling (convergence lease only, M2)."""
+"""Post-ingestion substrate refresh scheduling (ingestion-only: no-op)."""
 
 from __future__ import annotations
 
 import uuid
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -28,36 +27,22 @@ def test_schedule_noops_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
         get_settings.cache_clear()
 
 
-def test_schedule_always_uses_convergence_lease(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schedule_noops_when_enabled_substrate_removed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(
         "DATABASE_URL",
         "postgresql+psycopg://test:test@localhost:5432/vector_test",
     )
     monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED", "true")
 
-    tenant_id = uuid.uuid4()
-    dispatch_payload = {
-        "scheduled": True,
-        "path": "convergence_lease",
-        "execution_path": "convergence",
-    }
-    with patch(
-        "vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch."
-        "trigger_post_ingestion_execution_v1",
-        return_value={"triggered": True, "dispatch": dispatch_payload},
-    ) as dispatch:
-        from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
-            schedule_post_ingestion_substrate_refresh,
-        )
-        from vector.settings import get_settings
+    from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
+        schedule_post_ingestion_substrate_refresh,
+    )
+    from vector.settings import get_settings
 
+    get_settings.cache_clear()
+    try:
+        out = schedule_post_ingestion_substrate_refresh(tenant_id=uuid.uuid4(), reason="sync_done")
+    finally:
         get_settings.cache_clear()
-        try:
-            out = schedule_post_ingestion_substrate_refresh(tenant_id=tenant_id, reason="sync_done")
-        finally:
-            get_settings.cache_clear()
 
-    assert out["scheduled"] is True
-    assert out["path"] == "convergence_lease"
-    assert out["execution_path"] == "convergence"
-    dispatch.assert_called_once_with(tenant_id=tenant_id, reason="sync_done")
+    assert out == {"scheduled": False, "reason": "substrate_pipeline_removed"}

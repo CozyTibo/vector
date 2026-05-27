@@ -1,6 +1,49 @@
-/** Shared admin types retained after R7 operator frontend cleanup. */
+/** Cortex admin types — ingestion-only surface. */
 
 export type CortexConnectorId = "calls" | "github" | "linear" | "notion" | "slack";
+
+export type CortexIngestionRunSummary = {
+  run_id: string;
+  status: string;
+  replay_mode: boolean;
+  sync_mode: string | null;
+  source_trigger: string;
+  started_at: string;
+  finished_at: string | null;
+  error_summary: string | null;
+  raw_rows_written: number | null;
+};
+
+export type CortexIngestionConnectorRow = {
+  connector: string;
+  connection_id: string | null;
+  connection_status: string | null;
+  cortex_routed: boolean;
+  checkpoint_last_incremental_at: string | null;
+  ingested_row_count: number;
+  latest_run: CortexIngestionRunSummary | null;
+};
+
+export type CortexIngestionOverview = {
+  tenant_id: string;
+  company_name: string;
+  global_scheduler: {
+    env_scheduler_enabled: boolean;
+    beat_interval_seconds: number;
+    min_gap_seconds: number;
+    verify_after_sync: boolean;
+    paused_via_redis: boolean;
+    operator_mode_label: string;
+  };
+  worker_telemetry: Record<string, unknown>;
+  duplicate_prevention: Record<string, unknown>;
+  digest: {
+    bottleneck: string;
+    routed_any: boolean;
+    has_active_connection: boolean;
+  };
+  connectors: CortexIngestionConnectorRow[];
+};
 
 export type CortexRecentRuns = {
   items: Array<{

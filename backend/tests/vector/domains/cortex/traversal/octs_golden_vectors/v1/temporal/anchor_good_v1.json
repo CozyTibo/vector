@@ -1,8 +1,0 @@
-{
-  "tenant_id": "00000000-0000-0000-0000-000000000001",
-  "export_id": "00000000-0000-0000-0000-000000000002",
-  "export_sequence": 1,
-  "projection_content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "snapshot_unix_ns": { "unix_ns": 1700000000000000000 },
-  "graph_as_of_unix_ns": { "unix_ns": 1700000000000000000 }
-}

@@ -1,9 +1,0 @@
-{
-  "golden_corpus_case_count": 1,
-  "last_reasoning_gate_bundle_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
-  "org_graph_reasoning_slice_schema_version": 1,
-  "phase06_program_freeze_version": 1,
-  "reasoning_gp06_gate_bundle_queue_depth_proxy": 0,
-  "tenant_id": "00000000-0000-0000-0000-000000000000",
-  "verification_run_id": null
-}
