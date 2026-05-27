@@ -40,6 +40,7 @@ SLACK_OPTIONAL_INGEST_SCOPES: frozenset[str] = frozenset(
         "im:history",
         "mpim:history",
         "usergroups:read",
+        "pins:read",
     }
 )
 
