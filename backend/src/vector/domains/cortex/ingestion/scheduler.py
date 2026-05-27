@@ -15,6 +15,7 @@ from vector.domains.cortex.connectors.cortex_ingestion_policy import (
 )
 from vector.domains.cortex.ingestion.checkpoint_contract import checkpoint_last_incremental_at
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
+from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.settings import Settings
 
@@ -39,6 +40,30 @@ def _parse_last_incremental_at(state: dict[str, object]) -> datetime | None:
         return dt.astimezone(UTC)
     except ValueError:
         return None
+
+
+_RUNNING_STATUSES = frozenset({"running", "RUNNING"})
+
+
+def _has_running_ingestion_run(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    connector_id: str,
+) -> bool:
+    """Skip enqueue when a scheduled sync is already in flight for this connection."""
+    row = session.scalar(
+        select(IngestionRun.id)
+        .where(
+            IngestionRun.tenant_id == tenant_id,
+            IngestionRun.connection_id == connection_id,
+            IngestionRun.connector == connector_id,
+            IngestionRun.status.in_(tuple(sorted(_RUNNING_STATUSES))),
+        )
+        .limit(1),
+    )
+    return row is not None
 
 
 def _past_min_gap(
@@ -85,6 +110,13 @@ def iter_routed_live_sync_jobs(session: Session, settings: Settings) -> list[Rou
         if not _past_min_gap(
             session,
             settings,
+            tenant_id=tc.tenant_id,
+            connection_id=tc.id,
+            connector_id=tc.provider,
+        ):
+            continue
+        if _has_running_ingestion_run(
+            session,
             tenant_id=tc.tenant_id,
             connection_id=tc.id,
             connector_id=tc.provider,

@@ -280,36 +280,45 @@ NOT: ingestion_runs.status == completed alone
 
 ## 10. Phased roadmap
 
-### Phase 0 — Docs & admin read path (1 week)
+**Implementation status (2026-05):** Phases 0–4 shipped on `main` (see git history `231bda9`…`1b20e4b` and completion commits). Guardrails: [ingestion_scaling_doctrine.md](./ingestion_scaling_doctrine.md), [ingestion_surface_freeze.md](./ingestion_surface_freeze.md).
+
+### Phase 0 — Docs & admin read path (1 week) — **done**
 
 - Minimal doctrine + this plan aligned (done in docs).
 - Admin: expose checkpoint `streams` slice + SQL aggregates on ingestion overview.
-- Optional: `reset_stream_checkpoint()` helper (no new package).
+- `reset_stream_checkpoint()` helper + admin `reset-stream` action.
+- Beat history (last 20 ticks); connector checkpoint expand UI; `slack_user_email_presence` on overview digest.
 
 **Exit:** Operator can see cursors and counts without new streams.
 
-### Phase 1 — People streams (2–3 weeks) **priority**
+### Phase 1 — People streams (2–3 weeks) **priority** — **done**
 
-Slack (user cursor, members, email scope) → Linear → Notion → GitHub; Calls `introduced_at` only.
+Slack (user cursor, members, email scope) → Linear → Notion → GitHub; Calls `introduced_at` on streams.
 
 Each PR: one connector file + matrix + registry + tests. **No** new shared framework module.
 
 **Exit:** `*.user` rows exist for connected tenants; `introduced_at` set.
 
-### Phase 2 — Call order + structure closure (2 weeks)
+### Phase 2 — Call order + structure closure (2 weeks) — **done**
 
 - Refactor each `run_*_connector_sync` to people → structure → activity.
-- Finish `backfill_complete` on list enumerators (Slack channels, GitHub install repos, etc.).
+- `backfill_complete` when pagination exhausted (incremental or backfill lane) via `stream_backfill_complete()`.
+- List enumerators: Slack users/conversations, Notion users, GitHub install repos, Calls events calendar pages.
 
-### Phase 3 — Activity depth (ongoing)
+### Phase 3 — Activity depth (ongoing) — **done (baseline)**
 
-- Slack pins / message_changed where history provides it.
-- GitHub/env cap tuning.
-- Notion block continuation via existing queues.
+- Slack: pins, `message_changed`, user list cursor, channel ring prefers incomplete history.
+- GitHub: repo ring prefers incomplete PR backfill (existing sort).
+- Notion: `notion.block` `introduced_at`; checkpoint `meta.exhaust_depth`.
+- Connector `meta.exhaust_depth` on Slack, GitHub, Linear, Notion.
 
-### Phase 4 — Freeze ingestion surface (ongoing rule)
+**Ongoing:** env cap tuning per large tenant; matrix rows still `in_progress` until ops mature.
 
-- New exhaust code only in `connectors/`* + allowed helpers per doctrine.
+### Phase 4 — Freeze ingestion surface (ongoing rule) — **done**
+
+- [ingestion_surface_freeze.md](./ingestion_surface_freeze.md) — allowed modules + forbidden patterns.
+- [ingestion_scaling_doctrine.md](./ingestion_scaling_doctrine.md) — scale the loop, not a platform.
+- Scheduler: skip enqueue when `ingestion_runs.status=running` for same connection×connector.
 - Downstream domains consume raw SQL/API; ingestion does not grow intelligence.
 
 ---
