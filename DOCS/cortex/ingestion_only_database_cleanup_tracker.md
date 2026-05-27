@@ -1,6 +1,6 @@
 # Cortex ingestion-only — database cleanup tracker
 
-**Status:** Code removed (substrate phases 02–08). **No migrations applied yet** — tables and ORM models remain until a dedicated drop migration.
+**Status:** Code removed (substrate phases 02–08). **Migration `20260528_0097`** drops unused substrate tables; ORM models removed except phase-09 admin snapshots.
 
 ## Keep (ingestion + raw store + connectors)
 
