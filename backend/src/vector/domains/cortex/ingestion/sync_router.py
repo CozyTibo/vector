@@ -49,6 +49,7 @@ def execute_connector_sync(
     source_trigger: str,
     ingestion_sync_context: IngestionSyncContext | None = None,
     connection_id: uuid.UUID | None = None,
+    scheduler_tick_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Create an ingestion run, fetch normalized snapshots, persist raw rows, update checkpoint."""
     ctx = ingestion_sync_context or IngestionSyncContext.live_incremental()
@@ -76,6 +77,9 @@ def execute_connector_sync(
 
     run_id = uuid.uuid4()
     started = utc_now()
+    initial_stats: dict[str, Any] | None = None
+    if scheduler_tick_id is not None:
+        initial_stats = {"scheduler_tick_id": str(scheduler_tick_id)}
     run = IngestionRun(
         id=run_id,
         tenant_id=tenant_id,
@@ -88,6 +92,7 @@ def execute_connector_sync(
         replay_version=ctx.replay_version,
         status=RUN_RUNNING,
         started_at=started,
+        stats=initial_stats,
     )
     session.add(run)
     session.flush()
@@ -178,6 +183,7 @@ def execute_connector_sync(
         run.status = RUN_COMPLETED
         run.finished_at = finished
         run.stats = {
+            **(run.stats if isinstance(run.stats, dict) else {}),
             "records_written": records_written,
             "sync_mode": ctx.sync_mode,
             "checkpoint_lane": ctx.checkpoint_sync_mode,

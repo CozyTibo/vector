@@ -46,9 +46,11 @@ def run_cortex_connector_sync_task(
     source_trigger: str = "scheduled",
     sync_mode: str = "incremental",
     connection_id: str | None = None,
+    scheduler_tick_id: str | None = None,
 ) -> dict[str, object]:
     """Execute one incremental sync for a tenant connection (runs + raw rows)."""
     tid = uuid.UUID(tenant_id)
+    tick_id = uuid.UUID(scheduler_tick_id) if scheduler_tick_id else None
     ctx = (
         IngestionSyncContext.backfill()
         if sync_mode == "backfill"
@@ -64,6 +66,7 @@ def run_cortex_connector_sync_task(
             source_trigger=source_trigger,
             ingestion_sync_context=ctx,
             connection_id=uuid.UUID(connection_id) if connection_id else None,
+            scheduler_tick_id=tick_id,
         )
     _maybe_enqueue_post_ingestion_substrate_refresh(
         tenant_id=tid,

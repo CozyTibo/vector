@@ -46,7 +46,8 @@ export function IngestionSchedulerPanel({ overview }: Props) {
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-stone-900">Scheduler</h2>
       <p className="mt-1 text-sm text-stone-600">
-        Beat interval {sched.beat_interval_seconds}s · min gap {sched.min_gap_seconds}s · mode{" "}
+        Ingestion-only Beat every {sched.beat_interval_seconds}s (default 120s) · min gap{" "}
+        {sched.min_gap_seconds}s · mode{" "}
         <span className="font-medium text-stone-800">{label}</span>
       </p>
       <div className="mt-3 flex flex-wrap gap-2">

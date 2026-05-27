@@ -88,13 +88,15 @@ celery_app.conf.task_routes = {
     "vector.cortex.ingestion.run_sync_replay": {"queue": "cortex_replay"},
 }
 
-_tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "1800"))
+# Ingestion-only Beat: no other periodic tasks belong in this schedule.
+_tick_seconds = int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "120"))
 _tick_seconds = max(60, _tick_seconds)
 
 celery_app.conf.beat_schedule = {
-    "cortex-ingestion-scheduler-tick": {
+    "cortex-ingestion-beat-tick": {
         "task": "vector.cortex.ingestion.scheduler_tick",
         "schedule": timedelta(seconds=_tick_seconds),
+        "options": {"queue": "vector"},
     },
 }
 

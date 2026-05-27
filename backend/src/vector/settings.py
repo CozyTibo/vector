@@ -277,12 +277,12 @@ class Settings(BaseSettings):
         description="Optional comma-separated tenant UUID allowlist; empty = all tenants.",
     )
     cortex_ingestion_scheduler_enabled: bool = Field(
-        default=False,
+        default=True,
         validation_alias="CORTEX_INGESTION_SCHEDULER_ENABLED",
         description=(
-            "Phase 01 Step 2: Celery Beat dispatches scheduled sync ticks when true (requires worker "
-            "listening on cortex_live queue + migration flags routing tenants). "
-            "Default is false — set true in production when Beat + cortex_live workers are ready."
+            "Cortex ingestion-only Beat: dispatches scheduled sync ticks every "
+            "cortex_ingestion_scheduler_interval_seconds when true (requires celery-beat + "
+            "cortex_live workers + migration flags routing tenants)."
         ),
     )
     vector_git_sha: str = Field(
@@ -291,12 +291,12 @@ class Settings(BaseSettings):
         description="Git commit SHA injected at deploy time (Settings footer / build-info endpoint).",
     )
     cortex_ingestion_scheduler_interval_seconds: int = Field(
-        default=1800,
+        default=120,
         ge=60,
         validation_alias="CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS",
         description=(
-            "Beat cadence for scheduler ticks (seconds). Restart celery-beat after changing; mirrors "
-            "beat_schedule in celery_app when env is set at process start."
+            "Cortex ingestion-only Beat cadence (seconds). Default 120 (2 minutes). Restart "
+            "celery-beat after changing; mirrors beat_schedule in celery_app at process start."
         ),
     )
     cortex_ingestion_min_gap_seconds: int = Field(

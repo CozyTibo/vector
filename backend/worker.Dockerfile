@@ -15,7 +15,7 @@ COPY src ./src
 
 ENV PYTHONPATH=/app/src
 
-RUN python -c "from app.tasks.cortex_ingestion_sync import run_cortex_connector_sync_task; from app.tasks.cortex_ingestion_scheduler import cortex_ingestion_scheduler_tick; print('cortex_ingestion_worker_packaging_ok')"
+RUN python -c "from app.tasks.cortex_ingestion_sync import run_cortex_connector_sync_task; from app.tasks.cortex_ingestion_scheduler import tick_cortex_ingestion_scheduler; print('cortex_ingestion_worker_packaging_ok')"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 

@@ -752,6 +752,52 @@ class AdminCortexIngestionRecentRunsResponse(BaseModel):
     limit: int
 
 
+class AdminCortexIngestionSchedulerBeatResourceStat(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    resource_type: str
+    count: int
+
+
+class AdminCortexIngestionSchedulerBeatConnectorDebrief(BaseModel):
+    """Per-connector outcome for one ingestion-only Beat tick."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    connector: str
+    enqueued: bool
+    run_id: uuid.UUID | None = None
+    status: str
+    records_written: int | None = None
+    resource_breakdown: list[AdminCortexIngestionSchedulerBeatResourceStat]
+    error_summary: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
+class AdminCortexIngestionSchedulerBeatItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tick_id: uuid.UUID
+    started_at: datetime
+    completed_at: datetime | None = None
+    outcome: str
+    beat_interval_seconds: int
+    skip_reason: str | None = None
+    global_enqueued_count: int
+    global_candidate_count: int
+    tenant_enqueued_count: int
+    connectors: list[AdminCortexIngestionSchedulerBeatConnectorDebrief]
+
+
+class AdminCortexIngestionSchedulerBeatsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: uuid.UUID
+    items: list[AdminCortexIngestionSchedulerBeatItem]
+    limit: int
+
+
 class AdminCortexConnectorRawRecordItem(BaseModel):
     """One raw ingestion row for a connector (append-only store)."""
 

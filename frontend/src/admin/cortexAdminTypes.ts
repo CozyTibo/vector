@@ -45,6 +45,37 @@ export type CortexIngestionOverview = {
   connectors: CortexIngestionConnectorRow[];
 };
 
+export type CortexSchedulerBeatConnector = {
+  connector: string;
+  enqueued: boolean;
+  run_id: string | null;
+  status: string;
+  records_written: number | null;
+  resource_breakdown: Array<{ resource_type: string; count: number }>;
+  error_summary: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+};
+
+export type CortexSchedulerBeatItem = {
+  tick_id: string;
+  started_at: string;
+  completed_at: string | null;
+  outcome: string;
+  beat_interval_seconds: number;
+  skip_reason: string | null;
+  global_enqueued_count: number;
+  global_candidate_count: number;
+  tenant_enqueued_count: number;
+  connectors: CortexSchedulerBeatConnector[];
+};
+
+export type CortexSchedulerBeats = {
+  tenant_id: string;
+  items: CortexSchedulerBeatItem[];
+  limit: number;
+};
+
 export type CortexRecentRuns = {
   items: Array<{
     run_id: string;

@@ -111,6 +111,7 @@ from vector.infrastructure.db.models.cortex_mapping_bundle_pin import CortexMapp
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.github_connection_detail import GithubConnectionDetail
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
+from vector.infrastructure.db.models.ingestion_scheduler_tick import IngestionSchedulerTick
 from vector.infrastructure.db.models.identity import UserIdentity
 from vector.infrastructure.db.models.linear_connection_detail import LinearConnectionDetail
 from vector.infrastructure.db.models.membership import TenantMembership
@@ -212,6 +213,7 @@ __all__ = [
     "RawMemoryTrustTransition",
     "GithubConnectionDetail",
     "IngestionRun",
+    "IngestionSchedulerTick",
     "LinearConnectionDetail",
     "SlackConnectionDetail",
     "Tenant",

@@ -26,6 +26,9 @@ from vector.contracts.admin import (
     AdminCortexIngestionOverviewResponse,
     AdminCortexIngestionRecentRunItem,
     AdminCortexIngestionRecentRunsResponse,
+    AdminCortexIngestionSchedulerBeatConnectorDebrief,
+    AdminCortexIngestionSchedulerBeatItem,
+    AdminCortexIngestionSchedulerBeatsResponse,
     AdminCortexIngestionTriggerReplayRequest,
     AdminCortexIngestionTriggerReplayResponse,
     AdminCortexIngestionTriggerSyncRequest,
@@ -45,6 +48,7 @@ from vector.contracts.admin import (
     AdminCortexRawMemoryTrustStateResponse,
     AdminCortexSchedulerPauseRequest,
     AdminCortexSchedulerPauseResponse,
+    CortexIngestionConnectorId,
     AdminHardDeleteOrphanUserRequest,
     AdminHardDeleteOrphanUserResponse,
     AdminHardDeleteTenantRequest,
@@ -1524,6 +1528,45 @@ def build_admin_router() -> APIRouter:
             total_count=total_count,
             offset=offset,
             limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/ingestion/scheduler-beats",
+        response_model=AdminCortexIngestionSchedulerBeatsResponse,
+    )
+    def admin_cortex_ingestion_scheduler_beats(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=100)] = 40,
+    ) -> AdminCortexIngestionSchedulerBeatsResponse:
+        """Ingestion-only Beat history with per-connector debrief (pulled / added)."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.ingestion.scheduler_tick_history import (
+            build_tenant_scheduler_beat_history_v1,
+        )
+
+        raw = build_tenant_scheduler_beat_history_v1(db, tenant_id=tenant_id, limit=limit)
+        return AdminCortexIngestionSchedulerBeatsResponse(
+            tenant_id=tenant_id,
+            limit=int(raw["limit"]),
+            items=[
+                AdminCortexIngestionSchedulerBeatItem(
+                    tick_id=item["tick_id"],
+                    started_at=item["started_at"],
+                    completed_at=item.get("completed_at"),
+                    outcome=item["outcome"],
+                    beat_interval_seconds=item["beat_interval_seconds"],
+                    skip_reason=item.get("skip_reason"),
+                    global_enqueued_count=item["global_enqueued_count"],
+                    global_candidate_count=item["global_candidate_count"],
+                    tenant_enqueued_count=item["tenant_enqueued_count"],
+                    connectors=[
+                        AdminCortexIngestionSchedulerBeatConnectorDebrief.model_validate(c)
+                        for c in item["connectors"]
+                    ],
+                )
+                for item in raw["items"]
+            ],
         )
 
     @r.get(

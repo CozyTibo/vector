@@ -13,7 +13,15 @@ from vector.domains.cortex.ingestion.github_ingest_caps_code_defaults import (
     verify_infra_ecs_task_json_github_caps_v1,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[6]
+def _repo_root() -> Path:
+    start = Path(__file__).resolve()
+    for root in (start, *start.parents):
+        if (root / "infra/ecs/backend-task.json").is_file():
+            return root
+    raise RuntimeError("repo root not found (infra/ecs/backend-task.json)")
+
+
+REPO_ROOT = _repo_root()
 
 
 def test_settings_defaults_match_manifest() -> None:
