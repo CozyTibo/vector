@@ -81,13 +81,28 @@ def derive_source_identity_key(*, connector: str, resource_type: str, external_i
     return f"{connector}:{resource_type}:sha256:{digest}"[:255]
 
 
+def _extraction_version(body: dict[str, Any]) -> int | None:
+    ing = body.get("ingestion_version")
+    if not isinstance(ing, dict):
+        return None
+    raw = ing.get("extraction")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def derive_source_revision_key(body: dict[str, Any]) -> str:
     segment = canonical_source_payload_segment(body)
     token = _find_revision_token(segment)
     if token:
         norm = token[:96]
         return f"provider:{norm}"[:128]
-    return f"hash:{canonical_payload_hash(body)}"[:128]
+    extraction = _extraction_version(body)
+    digest = canonical_payload_hash(body)
+    if extraction is not None and extraction > 0:
+        return f"extract:{extraction}:hash:{digest}"[:128]
+    return f"hash:{digest}"[:128]
 
 
 def derive_logical_idempotency_key(*, source_identity_key: str, source_revision_key: str) -> str:
