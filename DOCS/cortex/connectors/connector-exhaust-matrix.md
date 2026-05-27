@@ -15,7 +15,9 @@ Legend: **Coverage** `none` | `partial` | `full` · **Historical** `none` | `par
 | Resource type   | Coverage | Historical | Replay | Canon | Status      | Notes |
 | --------------- | -------- | ---------- | ------ | ----- | ----------- | ----- |
 | `slack.user`    | partial  | partial    | partial| none  | in_progress | `users.list` cursor pages (env `CORTEX_SLACK_USERS_MAX_PAGES`) |
+| `slack.channel_member` | partial | partial | partial | none | in_progress | `conversations.members` for ring-selected channels (capped) |
 | `slack.conversation` | partial | partial | partial | none | in_progress | `conversations.list` public+private (env `CORTEX_SLACK_CONVERSATIONS_MAX_PAGES`) |
+| `slack.message_changed` | partial | partial | partial | none | in_progress | History rows with `subtype=message_changed` |
 | `slack.message` | full | partial    | partial| none  | in_progress | `conversations.history` paginated with per-channel checkpoint cursors (`CORTEX_SLACK_HISTORY_MAX_PAGES_PER_CHANNEL`) and round-robin channel resume |
 | `slack.message_reply` | partial | partial | partial | none | in_progress | `conversations.replies` ingested for discovered thread roots; per-thread checkpoint cursors |
 | `slack.reaction`       | partial     | partial       | partial     | none  | in_progress     | Message-embedded reactions captured from history pages |
@@ -28,6 +30,9 @@ Legend: **Coverage** `none` | `partial` | `full` · **Historical** `none` | `par
 
 | Resource type        | Coverage | Historical | Replay | Canon | Status      | Notes |
 | -------------------- | -------- | ---------- | ------ | ----- | ----------- | ----- |
+| `github.user` | partial | partial | partial | none | in_progress | `GET /orgs/{org}/members` for Organization installations |
+| `github.team` | partial | partial | partial | none | in_progress | `GET /orgs/{org}/teams` |
+| `github.team_membership` | partial | partial | partial | none | in_progress | `GET /orgs/{org}/teams/{slug}/members` |
 | `github.installation_repositories` (API list) | partial  | partial    | partial| none  | in_progress | Paginated `page`+`per_page` up to `CORTEX_GITHUB_INSTALLATION_REPOS_MAX_PAGES` per sync |
 | `github.repository` (per-repo raw row) | partial  | partial    | partial| none  | in_progress | One row per repo returned across paginated installation scan |
 | `github.pull_request` | full | partial    | partial | none | in_progress | Paginated `/pulls` with per-repo checkpoint page continuity; bounded by `CORTEX_GITHUB_PRS_MAX_PAGES_PER_REPO` |
@@ -46,7 +51,10 @@ Legend: **Coverage** `none` | `partial` | `full` · **Historical** `none` | `par
 
 | Resource type   | Coverage | Historical | Replay | Canon | Status      | Notes |
 | --------------- | -------- | ---------- | ------ | ----- | ----------- | ----- |
-| `linear.issue`  | full     | partial    | partial| none  | in_progress | GraphQL issues paginated with `pageInfo.endCursor` + incremental `updatedAt` watermark checkpoints |
+| `linear.user` | partial | partial | partial | none | in_progress | GraphQL `users` connection (people plane) |
+| `linear.team` | partial | partial | partial | none | in_progress | GraphQL `teams` + memberships |
+| `linear.team_membership` | partial | partial | partial | none | in_progress | Team member edges from teams query |
+| `linear.issue`  | full     | partial    | partial| none  | in_progress | GraphQL issues paginated with `pageInfo.endCursor` + incremental `updatedAt` watermark checkpoints; assignee/creator on query |
 | `linear.comment` | partial | partial | partial | none | in_progress | GraphQL comments connection, checkpoint cursor continuity |
 | `linear.project` | partial | partial | partial | none | in_progress | GraphQL projects connection |
 | `linear.cycle` | partial | partial | partial | none | in_progress | GraphQL cycles connection |
@@ -61,6 +69,7 @@ Legend: **Coverage** `none` | `partial` | `full` · **Historical** `none` | `par
 
 | Resource type   | Coverage | Historical | Replay | Canon | Status      | Notes |
 | --------------- | -------- | ---------- | ------ | ----- | ----------- | ----- |
+| `notion.user` | partial | partial | partial | none | in_progress | `GET /v1/users` before search/structure |
 | `notion.search_result` | partial | partial | partial | none | in_progress | Paginated `/search` traversal with checkpointed `next_cursor` and incremental watermark |
 | `notion.page` | partial | partial | partial | none | in_progress | Pages discovered via search and database row scans |
 | `notion.database` | partial | partial | partial | none | in_progress | Database metadata from `/databases/{id}` for discovered databases |
