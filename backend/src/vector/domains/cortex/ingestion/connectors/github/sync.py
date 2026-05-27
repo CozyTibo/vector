@@ -86,7 +86,11 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
-from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
+from vector.domains.cortex.ingestion.stream_checkpoint import (
+    derive_exhaust_depth,
+    ensure_stream_introduced_at,
+    stream_backfill_complete,
+)
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -229,7 +233,7 @@ def _sync_github_people_plane(
             "cursor_owner": "github.user",
             "last_page": last_user_page if user_rows else users_state.get("last_page"),
             "rows_seen_last_run": user_rows,
-            "backfill_complete": bool(ctx.backfill_lane and users_complete),
+            "backfill_complete": stream_backfill_complete(pagination_exhausted=users_complete),
             "last_ok_at": utc_now().isoformat(),
         },
     )
@@ -331,7 +335,7 @@ def _sync_github_people_plane(
             "last_page": last_team_page if team_rows else teams_state.get("last_page"),
             "rows_seen_last_run": team_rows,
             "membership_rows_seen_last_run": membership_rows,
-            "backfill_complete": bool(ctx.backfill_lane and teams_complete),
+            "backfill_complete": stream_backfill_complete(pagination_exhausted=teams_complete),
             "last_ok_at": utc_now().isoformat(),
         },
     )
@@ -582,7 +586,7 @@ def run_github_connector_sync(
                             {
                                 "cursor_owner": "github.installation_repositories",
                                 "last_page": pages_fetched,
-                                "backfill_complete": bool(ctx.backfill_lane and install_complete),
+                                "backfill_complete": stream_backfill_complete(pagination_exhausted=install_complete),
                             },
                         ),
                     }
@@ -1768,7 +1772,7 @@ def run_github_connector_sync(
             "pull_requests": {
                 "cursor_owner": "github.pull_request",
                 "next_page": current_pulls_page,
-                "backfill_complete": bool(ctx.backfill_lane and pulls_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=pulls_complete),
                 "pages_fetched_last_run": pull_pages_fetched,
                 "rows_seen_last_run": repo_pr_rows,
             },
@@ -1787,7 +1791,7 @@ def run_github_connector_sync(
             "commits": {
                 "cursor_owner": "github.commit",
                 "next_page": commit_page,
-                "backfill_complete": bool(ctx.backfill_lane and commits_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=commits_complete),
                 "pages_fetched_last_run": commit_pages_fetched,
                 "rows_seen_last_run": repo_commit_rows,
             },
@@ -1798,14 +1802,14 @@ def run_github_connector_sync(
             "workflow_runs": {
                 "cursor_owner": "github.workflow_run",
                 "next_page": workflow_page,
-                "backfill_complete": bool(ctx.backfill_lane and workflow_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=workflow_complete),
                 "pages_fetched_last_run": workflow_pages_fetched,
                 "rows_seen_last_run": repo_workflow_rows,
             },
             "deployments": {
                 "cursor_owner": "github.deployment",
                 "next_page": deployment_page,
-                "backfill_complete": bool(ctx.backfill_lane and deployment_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=deployment_complete),
                 "pages_fetched_last_run": deployment_pages_fetched,
                 "rows_seen_last_run": repo_deploy_rows,
                 "status_rows_seen_last_run": repo_deploy_status_rows,
@@ -1813,14 +1817,14 @@ def run_github_connector_sync(
             "branches": {
                 "cursor_owner": "github.branch",
                 "next_page": branch_page,
-                "backfill_complete": bool(ctx.backfill_lane and branch_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=branch_complete),
                 "pages_fetched_last_run": branch_pages_fetched,
                 "rows_seen_last_run": repo_branch_rows,
             },
             "tags": {
                 "cursor_owner": "github.tag",
                 "next_page": tag_page,
-                "backfill_complete": bool(ctx.backfill_lane and tag_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=tag_complete),
                 "pages_fetched_last_run": tag_pages_fetched,
                 "rows_seen_last_run": repo_tag_rows,
             },
@@ -1831,21 +1835,21 @@ def run_github_connector_sync(
             "commit_comments": {
                 "cursor_owner": "github.commit_comment",
                 "next_page": cc_page,
-                "backfill_complete": bool(ctx.backfill_lane and cc_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=cc_complete),
                 "pages_fetched_last_run": cc_pages_fetched,
                 "rows_seen_last_run": repo_commit_comment_rows,
             },
             "releases": {
                 "cursor_owner": "github.release",
                 "next_page": rel_page,
-                "backfill_complete": bool(ctx.backfill_lane and rel_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=rel_complete),
                 "pages_fetched_last_run": rel_pages_fetched,
                 "rows_seen_last_run": repo_release_rows,
             },
             "issues": {
                 "cursor_owner": "github.issue",
                 "next_page": iss_page,
-                "backfill_complete": bool(ctx.backfill_lane and iss_complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=iss_complete),
                 "pages_fetched_last_run": iss_pages_fetched,
                 "rows_seen_last_run": repo_issue_rows,
             },
@@ -1902,7 +1906,7 @@ def run_github_connector_sync(
                         {
                             "cursor_owner": "github.installation_repositories",
                             "last_page": pages_fetched,
-                            "backfill_complete": bool(ctx.backfill_lane and install_complete),
+                            "backfill_complete": stream_backfill_complete(pagination_exhausted=install_complete),
                         },
                     ),
                     "pull_requests": {
@@ -1944,6 +1948,19 @@ def run_github_connector_sync(
                     "resume_required": budget_exhausted,
                     "time_budget_seconds": settings.cortex_github_repo_time_budget_seconds,
                 }
+            },
+            "meta": {
+                "exhaust_depth": derive_exhaust_depth(
+                    {
+                        "users": people_patch.get("users", {}),
+                        "installation_repositories": {
+                            "cursor_owner": "github.repository",
+                            "backfill_complete": stream_backfill_complete(
+                                pagination_exhausted=install_complete,
+                            ),
+                        },
+                    },
+                ),
             },
         },
         sync_mode=ctx.checkpoint_sync_mode,

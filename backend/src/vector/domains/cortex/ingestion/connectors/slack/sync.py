@@ -83,7 +83,11 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
-from vector.domains.cortex.ingestion.stream_checkpoint import derive_exhaust_depth, ensure_stream_introduced_at
+from vector.domains.cortex.ingestion.stream_checkpoint import (
+    derive_exhaust_depth,
+    ensure_stream_introduced_at,
+    stream_backfill_complete,
+)
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -405,6 +409,24 @@ def run_slack_connector_sync(
                         }
                     )
                     listed_ids.add(missing_id)
+
+        def _channel_history_incomplete(ch: dict[str, Any]) -> bool:
+            cid = ch.get("id")
+            if not isinstance(cid, str):
+                return True
+            per_ch = channel_patch_map.get(cid)
+            if not isinstance(per_ch, dict) and isinstance(channels_existing, dict):
+                per_ch = channels_existing.get(cid)
+            if not isinstance(per_ch, dict):
+                return True
+            history = per_ch.get("history")
+            if isinstance(history, dict) and history.get("backfill_complete") is True:
+                return False
+            return True
+
+        candidates.sort(
+            key=lambda ch: (not _channel_history_incomplete(ch), str(ch.get("id") or "")),
+        )
 
         selected_channels, next_ring_index = pick_slack_channels_round_robin(
             candidates,
@@ -956,7 +978,9 @@ def run_slack_connector_sync(
                             "next_cursor": user_list_cursor,
                             "pages_fetched_last_run": user_pages,
                             "rows_seen_last_run": user_members,
-                            "backfill_complete": bool(ctx.backfill_lane and users_list_complete),
+                            "backfill_complete": stream_backfill_complete(
+                                pagination_exhausted=users_list_complete,
+                            ),
                             "last_ok_at": utc_now().isoformat(),
                         },
                     ),
@@ -971,7 +995,9 @@ def run_slack_connector_sync(
                             "cursor_owner": "slack.conversation",
                             "pages_fetched_last_run": channel_pages,
                             "rows_seen_last_run": channel_rows,
-                            "backfill_complete": bool(ctx.backfill_lane and conversations_list_complete),
+                            "backfill_complete": stream_backfill_complete(
+                                pagination_exhausted=conversations_list_complete,
+                            ),
                         },
                     ),
                     "channel_members": ensure_stream_introduced_at(

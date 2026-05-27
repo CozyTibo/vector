@@ -39,6 +39,11 @@ def derive_exhaust_depth(connector_streams: dict[str, Any]) -> str:
     return "shallow"
 
 
+def stream_backfill_complete(*, pagination_exhausted: bool) -> bool:
+    """``backfill_complete`` when this run finished paging (incremental or backfill lane)."""
+    return bool(pagination_exhausted)
+
+
 def ensure_stream_introduced_at(stream_patch: dict[str, Any], *, introduced_at: str | None = None) -> dict[str, Any]:
     """Set ``introduced_at`` once when a stream first ships."""
     out = deepcopy(stream_patch)

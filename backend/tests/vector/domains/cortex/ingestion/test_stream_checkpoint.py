@@ -4,10 +4,27 @@ from __future__ import annotations
 
 from vector.domains.cortex.ingestion.stream_checkpoint import (
     apply_stream_reset_to_db_state,
+    derive_exhaust_depth,
     ensure_stream_introduced_at,
     reset_stream_checkpoint,
+    stream_backfill_complete,
     summarize_connector_streams,
 )
+
+
+def test_stream_backfill_complete_when_pagination_done() -> None:
+    assert stream_backfill_complete(pagination_exhausted=True) is True
+    assert stream_backfill_complete(pagination_exhausted=False) is False
+
+
+def test_derive_exhaust_depth_mature_when_all_complete() -> None:
+    depth = derive_exhaust_depth(
+        {
+            "users": {"cursor_owner": "slack.user", "backfill_complete": True},
+            "channels": {"cursor_owner": "slack.conversation", "backfill_complete": True},
+        },
+    )
+    assert depth == "mature"
 
 
 def test_ensure_stream_introduced_at_sets_once() -> None:

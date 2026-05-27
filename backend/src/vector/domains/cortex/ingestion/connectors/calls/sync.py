@@ -83,7 +83,10 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
-from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
+from vector.domains.cortex.ingestion.stream_checkpoint import (
+    ensure_stream_introduced_at,
+    stream_backfill_complete,
+)
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -419,6 +422,8 @@ def run_calls_connector_sync(
             budget_exhausted = True
             break
 
+    events_pagination_exhausted = next_cursor is None
+
     provider_label = link.detail.provider_email or link.detail.provider_user_id or "calls_connected"
     if append_raw(
         session,
@@ -470,6 +475,9 @@ def run_calls_connector_sync(
                             "pages_fetched_last_run": pages_fetched,
                             "rows_seen_last_run": meetings_written,
                             "updated_watermark": max_seen_updated,
+                            "backfill_complete": stream_backfill_complete(
+                                pagination_exhausted=events_pagination_exhausted,
+                            ),
                         },
                     ),
                     "participants": ensure_stream_introduced_at(
@@ -503,6 +511,12 @@ def run_calls_connector_sync(
                     "resume_required": budget_exhausted,
                     "time_budget_seconds": settings.cortex_calls_time_budget_seconds,
                 }
+            },
+            "meta": {
+                "ingest_policy": {
+                    "calendar_id": calendar_id,
+                    "provider_email": link.detail.provider_email,
+                },
             },
         },
         sync_mode=ctx.checkpoint_sync_mode,

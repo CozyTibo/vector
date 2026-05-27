@@ -83,7 +83,11 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
-from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
+from vector.domains.cortex.ingestion.stream_checkpoint import (
+    derive_exhaust_depth,
+    ensure_stream_introduced_at,
+    stream_backfill_complete,
+)
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -501,7 +505,7 @@ def _sync_linear_people_plane(
                 "next_cursor": cursor,
                 "pages_fetched_last_run": pages,
                 "rows_seen_last_run": rows,
-                "backfill_complete": bool(ctx.backfill_lane and complete),
+                "backfill_complete": stream_backfill_complete(pagination_exhausted=complete),
                 "last_ok_at": utc_now().isoformat(),
             },
         )
@@ -927,7 +931,7 @@ def run_linear_connector_sync(
             "pages_fetched_last_run": comment_pages,
             "rows_seen_last_run": comment_rows,
             "comment_thread_rows_seen_last_run": linear_comment_thread_rows,
-            "backfill_complete": bool(ctx.backfill_lane and comments_backfill_complete),
+            "backfill_complete": stream_backfill_complete(pagination_exhausted=comments_backfill_complete),
         }
     }
     stream_counts: dict[str, int] = {"linear.comment": comment_rows, "linear.comment_thread": linear_comment_thread_rows}
@@ -995,7 +999,7 @@ def run_linear_connector_sync(
             "next_cursor": cursor,
             "pages_fetched_last_run": pages_fetched,
             "rows_seen_last_run": rows,
-            "backfill_complete": bool(ctx.backfill_lane and complete),
+            "backfill_complete": stream_backfill_complete(pagination_exhausted=complete),
         }
 
     status, payload = linear_graphql_ping(settings, token)
@@ -1059,7 +1063,7 @@ def run_linear_connector_sync(
                         "next_cursor": issue_cursor,
                         "pages_fetched_last_run": issue_pages,
                         "issues_updated_at_watermark": latest_issue_updated_at,
-                        "backfill_complete": bool(ctx.backfill_lane and issues_backfill_complete),
+                        "backfill_complete": stream_backfill_complete(pagination_exhausted=issues_backfill_complete),
                         },
                     ),
                     "comments": stream_patch.get("comments", {"cursor_owner": "linear.comment"}),
@@ -1085,6 +1089,20 @@ def run_linear_connector_sync(
                     "resume_required": budget_exhausted,
                     "time_budget_seconds": settings.cortex_linear_time_budget_seconds,
                 }
+            },
+            "meta": {
+                "exhaust_depth": derive_exhaust_depth(
+                    {
+                        "users": people_patch.get("users", {}),
+                        "teams": people_patch.get("teams", {}),
+                        "issues": {
+                            "cursor_owner": "linear.issue",
+                            "backfill_complete": stream_backfill_complete(
+                                pagination_exhausted=issues_backfill_complete,
+                            ),
+                        },
+                    },
+                ),
             },
         },
         sync_mode=ctx.checkpoint_sync_mode,

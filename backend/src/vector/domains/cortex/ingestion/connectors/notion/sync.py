@@ -83,7 +83,11 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
-from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
+from vector.domains.cortex.ingestion.stream_checkpoint import (
+    derive_exhaust_depth,
+    ensure_stream_introduced_at,
+    stream_backfill_complete,
+)
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -327,7 +331,7 @@ def run_notion_connector_sync(
             "next_cursor": user_cursor,
             "pages_fetched_last_run": user_pages,
             "rows_seen_last_run": user_rows,
-            "backfill_complete": bool(ctx.backfill_lane and users_complete),
+            "backfill_complete": stream_backfill_complete(pagination_exhausted=users_complete),
             "last_ok_at": utc_now().isoformat(),
         },
     )
@@ -792,12 +796,14 @@ def run_notion_connector_sync(
                         "pages_fetched_last_run": db_query_pages,
                         "databases": database_patch_map,
                     },
-                    "blocks": {
-                        "cursor_owner": "notion.block",
-                        "rows_seen_last_run": block_rows,
-                        "pages_fetched_last_run": block_pages,
-                        "parents": block_parent_patch_map,
-                    },
+                    "blocks": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "notion.block",
+                            "rows_seen_last_run": block_rows,
+                            "pages_fetched_last_run": block_pages,
+                            "parents": block_parent_patch_map,
+                        },
+                    ),
                     "scope_ping": {
                         "cursor_owner": "notion.scope_ping",
                         "workspace": ws,
@@ -805,6 +811,14 @@ def run_notion_connector_sync(
                     "resume_required": budget_exhausted,
                     "time_budget_seconds": settings.cortex_notion_time_budget_seconds,
                 }
+            },
+            "meta": {
+                "exhaust_depth": derive_exhaust_depth(
+                    {
+                        "users": users_patch,
+                        "blocks": {"cursor_owner": "notion.block"},
+                    },
+                ),
             },
         },
         sync_mode=ctx.checkpoint_sync_mode,
