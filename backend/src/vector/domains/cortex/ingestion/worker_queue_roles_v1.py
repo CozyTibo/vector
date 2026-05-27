@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Final
 
-# Ingestion lane: connector sync (high volume).
-CELERY_INGESTION_QUEUES_V1: Final[tuple[str, ...]] = ("cortex_live", "cortex_replay")
+# Ingestion lane: connector sync (high volume) + canon materialization passes.
+CELERY_INGESTION_QUEUES_V1: Final[tuple[str, ...]] = (
+    "cortex_live",
+    "cortex_replay",
+    "cortex_canon",
+)
 # Default lane: Beat scheduler tick, email, onboarding, verify (must not starve behind sync).
 CELERY_DEFAULT_WORKER_QUEUES_V1: Final[tuple[str, ...]] = ("vector",)
 
