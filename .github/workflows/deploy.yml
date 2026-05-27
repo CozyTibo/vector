@@ -259,14 +259,10 @@ jobs:
           python backend/scripts/ecs_align_worker_queue_roles.py \
             worker-task-def-caps.json worker-ingestion-task-def.json worker-substrate-task-def.json \
             --substrate-family "$ECS_SUBSTRATE_WORKER_TASK_DEFINITION"
-          jq --arg IMAGE "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
-             --arg GIT_SHA "$IMAGE_TAG" \
-             '.containerDefinitions[0].image = $IMAGE |
-              .containerDefinitions[0].environment = (
-                ((.containerDefinitions[0].environment // []) | map(select(.name != "VECTOR_GIT_SHA"))) +
-                [{name: "VECTOR_GIT_SHA", value: $GIT_SHA}]
-              )' \
-            worker-ingestion-task-def.json > new-worker-task-def.json
+          python backend/scripts/ecs_set_worker_task_images.py \
+            worker-ingestion-task-def.json new-worker-task-def.json \
+            --image "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
+            --git-sha "$IMAGE_TAG"
           REGISTERED_WORKER_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-worker-task-def.json \
             --region "$AWS_REGION" \
@@ -278,14 +274,10 @@ jobs:
             --task-definition "$REGISTERED_WORKER_TASK_DEFINITION_ARN" \
             --force-new-deployment \
             --region "$AWS_REGION"
-          jq --arg IMAGE "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
-             --arg GIT_SHA "$IMAGE_TAG" \
-             '.containerDefinitions[0].image = $IMAGE |
-              .containerDefinitions[0].environment = (
-                ((.containerDefinitions[0].environment // []) | map(select(.name != "VECTOR_GIT_SHA"))) +
-                [{name: "VECTOR_GIT_SHA", value: $GIT_SHA}]
-              )' \
-            worker-substrate-task-def.json > new-substrate-worker-task-def.json
+          python backend/scripts/ecs_set_worker_task_images.py \
+            worker-substrate-task-def.json new-substrate-worker-task-def.json \
+            --image "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
+            --git-sha "$IMAGE_TAG"
           REGISTERED_SUBSTRATE_WORKER_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-substrate-worker-task-def.json \
             --region "$AWS_REGION" \
@@ -339,17 +331,17 @@ jobs:
             --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
           api_tag=$(aws ecs describe-task-definition --task-definition "$api_img" --region "$AWS_REGION" \
             --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
-          worker_tag=$(aws ecs describe-task-definition --task-definition "$worker_img" --region "$AWS_REGION" \
-            --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
-          substrate_tag=$(aws ecs describe-task-definition --task-definition "$substrate_img" --region "$AWS_REGION" \
-            --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
+          worker_tags=$(aws ecs describe-task-definition --task-definition "$worker_img" --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[*].image' --output text | tr '\t' '\n' | awk -F: '{print $NF}')
+          substrate_tags=$(aws ecs describe-task-definition --task-definition "$substrate_img" --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[*].image' --output text | tr '\t' '\n' | awk -F: '{print $NF}')
           echo "API image tag: $api_tag"
-          echo "Worker image tag: $worker_tag"
-          echo "Substrate worker image tag: $substrate_tag"
+          echo "Worker image tags: $worker_tags"
+          echo "Substrate worker image tags: $substrate_tags"
           echo "Expected: $IMAGE_TAG"
           test "$api_tag" = "$IMAGE_TAG"
-          test "$worker_tag" = "$IMAGE_TAG"
-          test "$substrate_tag" = "$IMAGE_TAG"
+          for tag in $worker_tags; do test "$tag" = "$IMAGE_TAG"; done
+          for tag in $substrate_tags; do test "$tag" = "$IMAGE_TAG"; done
 
       - name: Post-deploy gate (ECS image probe)
         env:

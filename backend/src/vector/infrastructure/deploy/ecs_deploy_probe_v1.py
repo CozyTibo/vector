@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from datetime import UTC, datetime
@@ -18,13 +19,13 @@ def _tag_matches_deploy(tag: str, sha: str) -> bool:
     return tag == sha or tag.startswith(sha[:12])
 
 
-def _service_image(
+def _service_task_definition(
     *,
     aws_region: str,
     ecs_cluster: str,
     service_name: str,
-) -> tuple[str, str]:
-    raw = subprocess.check_output(
+) -> str:
+    return subprocess.check_output(
         [
             "aws",
             "ecs",
@@ -42,23 +43,55 @@ def _service_image(
         ],
         text=True,
     ).strip()
-    image = subprocess.check_output(
+
+
+def _task_container_images(
+    *,
+    aws_region: str,
+    task_definition: str,
+) -> list[str]:
+    raw = subprocess.check_output(
         [
             "aws",
             "ecs",
             "describe-task-definition",
             "--task-definition",
-            raw,
+            task_definition,
             "--region",
             aws_region,
             "--query",
-            "taskDefinition.containerDefinitions[0].image",
+            "taskDefinition.containerDefinitions[*].image",
             "--output",
-            "text",
+            "json",
         ],
         text=True,
     ).strip()
+    images = json.loads(raw or "[]")
+    return [str(i) for i in images]
+
+
+def _service_image(
+    *,
+    aws_region: str,
+    ecs_cluster: str,
+    service_name: str,
+) -> tuple[str, str]:
+    """Return task definition ARN and primary (first) container image."""
+    raw = _service_task_definition(
+        aws_region=aws_region,
+        ecs_cluster=ecs_cluster,
+        service_name=service_name,
+    )
+    images = _task_container_images(aws_region=aws_region, task_definition=raw)
+    image = images[0] if images else ""
     return raw, image
+
+
+def _all_container_tags_match(*, images: list[str], expected_sha: str) -> bool:
+    if not images:
+        return False
+    tags = [_image_tag(i) for i in images]
+    return all(_tag_matches_deploy(t, expected_sha) for t in tags)
 
 
 def probe_prod_ecs_deploy_v1(
@@ -81,24 +114,26 @@ def probe_prod_ecs_deploy_v1(
     ).strip()
 
     api_td, api_image = _service_image(aws_region=region, ecs_cluster=cluster, service_name=api_svc)
-    worker_td, worker_image = _service_image(
-        aws_region=region,
-        ecs_cluster=cluster,
-        service_name=worker_svc,
-    )
-    substrate_td, substrate_image = _service_image(
+    worker_td = _service_task_definition(aws_region=region, ecs_cluster=cluster, service_name=worker_svc)
+    worker_images = _task_container_images(aws_region=region, task_definition=worker_td)
+    substrate_td = _service_task_definition(
         aws_region=region,
         ecs_cluster=cluster,
         service_name=substrate_svc,
     )
+    substrate_images = _task_container_images(aws_region=region, task_definition=substrate_td)
+    worker_image = worker_images[0] if worker_images else ""
+    substrate_image = substrate_images[0] if substrate_images else ""
 
     api_tag = _image_tag(api_image)
     worker_tag = _image_tag(worker_image)
     substrate_tag = _image_tag(substrate_image)
     api_ok = _tag_matches_deploy(api_tag, expected_sha)
-    worker_ok = _tag_matches_deploy(worker_tag, expected_sha)
-    substrate_ok = _tag_matches_deploy(substrate_tag, expected_sha)
-    same_tag = api_tag == worker_tag == substrate_tag
+    worker_ok = _all_container_tags_match(images=worker_images, expected_sha=expected_sha)
+    substrate_ok = _all_container_tags_match(images=substrate_images, expected_sha=expected_sha)
+    worker_tags = [_image_tag(i) for i in worker_images]
+    substrate_tags = [_image_tag(i) for i in substrate_images]
+    same_tag = api_tag == worker_tag == substrate_tag and len(set(worker_tags)) <= 1 and len(set(substrate_tags)) <= 1
     closure_ok = api_ok and worker_ok and substrate_ok and same_tag
 
     return {
@@ -116,19 +151,25 @@ def probe_prod_ecs_deploy_v1(
             "task_definition": worker_td,
             "image": worker_image,
             "image_tag": worker_tag,
+            "container_images": worker_images,
+            "container_image_tags": worker_tags,
         },
         "substrate_worker": {
             "service": substrate_svc,
             "task_definition": substrate_td,
             "image": substrate_image,
             "image_tag": substrate_tag,
+            "container_images": substrate_images,
+            "container_image_tags": substrate_tags,
         },
         "git_sha_full": expected_sha,
         "git_sha_short": expected_sha[:12],
         "verification": {
             "api_image_matches_closure_sha": api_ok,
             "worker_image_matches_closure_sha": worker_ok,
+            "worker_all_containers_match_closure_sha": worker_ok,
             "substrate_worker_image_matches_closure_sha": substrate_ok,
+            "substrate_worker_all_containers_match_closure_sha": substrate_ok,
             "all_services_on_same_tag": same_tag,
             "deploy_matches_closure_sha": closure_ok,
         },
