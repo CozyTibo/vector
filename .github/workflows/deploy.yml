@@ -15,6 +15,8 @@ env:
   ECS_WORKER_TASK_DEFINITION: vector-backend-worker
   ECS_SUBSTRATE_WORKER_SERVICE: vector-substrate-worker-service
   ECS_SUBSTRATE_WORKER_TASK_DEFINITION: vector-substrate-worker
+  ECS_CANON_WORKER_SERVICE: vector-canon-worker-service
+  ECS_CANON_WORKER_TASK_DEFINITION: vector-canon-worker
   ECS_CONTAINER_NAME: backend
   S3_FRONTEND_BUCKET: vector-frontend-prod
 
@@ -258,7 +260,9 @@ jobs:
             clean-worker-task-def.json worker-task-def-caps.json
           python backend/scripts/ecs_align_worker_queue_roles.py \
             worker-task-def-caps.json worker-ingestion-task-def.json worker-substrate-task-def.json \
-            --substrate-family "$ECS_SUBSTRATE_WORKER_TASK_DEFINITION"
+            worker-canon-task-def.json \
+            --substrate-family "$ECS_SUBSTRATE_WORKER_TASK_DEFINITION" \
+            --canon-family "$ECS_CANON_WORKER_TASK_DEFINITION"
           python backend/scripts/ecs_set_worker_task_images.py \
             worker-ingestion-task-def.json new-worker-task-def.json \
             --image "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
@@ -312,12 +316,50 @@ jobs:
               --network-configuration "$NETCFG" \
               --region "$AWS_REGION"
           fi
+          python backend/scripts/ecs_set_worker_task_images.py \
+            worker-canon-task-def.json new-canon-worker-task-def.json \
+            --image "$ECR_REGISTRY/$WORKER_REPOSITORY:$IMAGE_TAG" \
+            --git-sha "$IMAGE_TAG"
+          REGISTERED_CANON_WORKER_TASK_DEFINITION_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-canon-worker-task-def.json \
+            --region "$AWS_REGION" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          CANON_SVC=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_CANON_WORKER_SERVICE" \
+            --region "$AWS_REGION" \
+            --query 'services[0].status' \
+            --output text 2>/dev/null || echo "MISSING")
+          if [ "$CANON_SVC" = "ACTIVE" ]; then
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$ECS_CANON_WORKER_SERVICE" \
+              --task-definition "$REGISTERED_CANON_WORKER_TASK_DEFINITION_ARN" \
+              --force-new-deployment \
+              --region "$AWS_REGION"
+          else
+            NETCFG=$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_WORKER_SERVICE" \
+              --region "$AWS_REGION" \
+              --query 'services[0].networkConfiguration' \
+              --output json)
+            aws ecs create-service \
+              --cluster "$ECS_CLUSTER" \
+              --service-name "$ECS_CANON_WORKER_SERVICE" \
+              --task-definition "$REGISTERED_CANON_WORKER_TASK_DEFINITION_ARN" \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "$NETCFG" \
+              --region "$AWS_REGION"
+          fi
 
       - name: Wait for API and worker ECS rollouts
         run: |
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
-            --services "$ECS_SERVICE" "$ECS_WORKER_SERVICE" "$ECS_SUBSTRATE_WORKER_SERVICE" \
+            --services "$ECS_SERVICE" "$ECS_WORKER_SERVICE" "$ECS_SUBSTRATE_WORKER_SERVICE" "$ECS_CANON_WORKER_SERVICE" \
             --region "$AWS_REGION"
 
       - name: Verify prod image tags match deploy SHA
@@ -329,19 +371,25 @@ jobs:
             --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
           substrate_img=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SUBSTRATE_WORKER_SERVICE" \
             --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
+          canon_img=$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_CANON_WORKER_SERVICE" \
+            --region "$AWS_REGION" --query 'services[0].taskDefinition' --output text)
           api_tag=$(aws ecs describe-task-definition --task-definition "$api_img" --region "$AWS_REGION" \
             --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
           worker_tags=$(aws ecs describe-task-definition --task-definition "$worker_img" --region "$AWS_REGION" \
             --query 'taskDefinition.containerDefinitions[*].image' --output text | tr '\t' '\n' | awk -F: '{print $NF}')
           substrate_tags=$(aws ecs describe-task-definition --task-definition "$substrate_img" --region "$AWS_REGION" \
             --query 'taskDefinition.containerDefinitions[*].image' --output text | tr '\t' '\n' | awk -F: '{print $NF}')
+          canon_tag=$(aws ecs describe-task-definition --task-definition "$canon_img" --region "$AWS_REGION" \
+            --query 'taskDefinition.containerDefinitions[0].image' --output text | awk -F: '{print $NF}')
           echo "API image tag: $api_tag"
           echo "Worker image tags: $worker_tags"
           echo "Substrate worker image tags: $substrate_tags"
+          echo "Canon worker image tag: $canon_tag"
           echo "Expected: $IMAGE_TAG"
           test "$api_tag" = "$IMAGE_TAG"
           for tag in $worker_tags; do test "$tag" = "$IMAGE_TAG"; done
           for tag in $substrate_tags; do test "$tag" = "$IMAGE_TAG"; done
+          test "$canon_tag" = "$IMAGE_TAG"
 
       - name: Post-deploy gate (ECS image probe)
         env:
@@ -350,6 +398,7 @@ jobs:
           ECS_SERVICE: ${{ env.ECS_SERVICE }}
           ECS_WORKER_SERVICE: ${{ env.ECS_WORKER_SERVICE }}
           ECS_SUBSTRATE_WORKER_SERVICE: ${{ env.ECS_SUBSTRATE_WORKER_SERVICE }}
+          ECS_CANON_WORKER_SERVICE: ${{ env.ECS_CANON_WORKER_SERVICE }}
         run: |
           set -euo pipefail
           cd backend

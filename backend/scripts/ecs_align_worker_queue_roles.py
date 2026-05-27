@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write ingestion-only and substrate-only ECS worker task definition JSON files."""
+"""Write ingestion, substrate, and canon ECS worker task definition JSON files."""
 
 from __future__ import annotations
 
@@ -31,21 +31,27 @@ def main() -> int:
     parser.add_argument("input", type=Path, help="Source ECS task definition JSON (worker)")
     parser.add_argument("ingestion_out", type=Path, help="Ingestion worker task def output")
     parser.add_argument("substrate_out", type=Path, help="Substrate worker task def output")
+    parser.add_argument("canon_out", type=Path, help="Canon-only worker task def output")
     parser.add_argument("--ingestion-family", default="", help="Optional task family override")
     parser.add_argument("--substrate-family", default="vector-substrate-worker")
+    parser.add_argument("--canon-family", default="vector-canon-worker")
     args = parser.parse_args()
 
     roles = _load_roles_module()
     task_def = json.loads(args.input.read_text(encoding="utf-8"))
     ingestion = roles.apply_worker_role_to_task_definition_v1(task_def, role="ingestion")
     substrate = roles.apply_worker_role_to_task_definition_v1(task_def, role="substrate")
+    canon = roles.apply_canon_worker_task_definition_v1(task_def)
     if args.ingestion_family:
         ingestion["family"] = args.ingestion_family
     if args.substrate_family:
         substrate["family"] = args.substrate_family
+    if args.canon_family:
+        canon["family"] = args.canon_family
 
     args.ingestion_out.write_text(json.dumps(ingestion, indent=2) + "\n", encoding="utf-8")
     args.substrate_out.write_text(json.dumps(substrate, indent=2) + "\n", encoding="utf-8")
+    args.canon_out.write_text(json.dumps(canon, indent=2) + "\n", encoding="utf-8")
     return 0
 
 
