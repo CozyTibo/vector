@@ -4,16 +4,26 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "backend" / "src"))
-
-from vector.domains.cortex.ingestion.worker_queue_roles_v1 import (  # noqa: E402
-    apply_worker_role_to_task_definition_v1,
+_ROLES_MODULE_PATH = (
+    REPO_ROOT
+    / "backend/src/vector/domains/cortex/ingestion/worker_queue_roles_v1.py"
 )
+
+
+def _load_roles_module():
+    """Load queue role helpers without importing ``vector.domains.cortex.ingestion`` package."""
+    spec = importlib.util.spec_from_file_location("worker_queue_roles_v1", _ROLES_MODULE_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {_ROLES_MODULE_PATH}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def main() -> int:
@@ -25,9 +35,10 @@ def main() -> int:
     parser.add_argument("--substrate-family", default="vector-substrate-worker")
     args = parser.parse_args()
 
+    roles = _load_roles_module()
     task_def = json.loads(args.input.read_text(encoding="utf-8"))
-    ingestion = apply_worker_role_to_task_definition_v1(task_def, role="ingestion")
-    substrate = apply_worker_role_to_task_definition_v1(task_def, role="substrate")
+    ingestion = roles.apply_worker_role_to_task_definition_v1(task_def, role="ingestion")
+    substrate = roles.apply_worker_role_to_task_definition_v1(task_def, role="substrate")
     if args.ingestion_family:
         ingestion["family"] = args.ingestion_family
     if args.substrate_family:
