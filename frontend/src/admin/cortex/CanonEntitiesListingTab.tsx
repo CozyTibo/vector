@@ -1,9 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
-import type { CanonEntityItem, CanonEntityList, CanonEntityStats } from "../cortexAdminTypes";
+import type {
+  CanonEntityDetail,
+  CanonEntityItem,
+  CanonEntityList,
+  CanonEntityStats,
+} from "../cortexAdminTypes";
 import { titleConnector, type CortexConnectorId } from "../cortexAdminTypes";
 import { SectionSkeleton } from "./SectionSkeleton";
 
@@ -22,6 +27,116 @@ function formatWhen(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString();
 }
 
+function jsonBlock(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function entityRef(label: string, id: string | null): ReactNode {
+  if (!id) return null;
+  return (
+    <div>
+      <dt className="text-stone-500">{label}</dt>
+      <dd className="break-all font-mono text-stone-800">{id}</dd>
+    </div>
+  );
+}
+
+function CanonEntityExpandedPanel({
+  tenantId,
+  entity,
+}: {
+  tenantId: string;
+  entity: CanonEntityItem;
+}) {
+  const detailQ = useQuery({
+    queryKey: ["admin-cortex-canon-entity", tenantId, entity.id],
+    queryFn: () =>
+      adminJson<CanonEntityDetail>(
+        `/admin/tenants/${tenantId}/cortex/canon/entities/${entity.id}`,
+      ),
+    enabled: Boolean(tenantId && entity.id),
+  });
+
+  return (
+    <div className="border-t border-stone-200 bg-white px-3 py-3 text-xs">
+      <dl className="grid gap-1 sm:grid-cols-2">
+        <div>
+          <dt className="text-stone-500">Entity id</dt>
+          <dd className="break-all font-mono text-stone-800">{entity.id}</dd>
+        </div>
+        <div>
+          <dt className="text-stone-500">Connection</dt>
+          <dd className="break-all font-mono text-stone-800">{entity.connection_id}</dd>
+        </div>
+        <div>
+          <dt className="text-stone-500">Mapper version</dt>
+          <dd className="font-mono text-stone-800">{entity.mapper_version}</dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-stone-500">Entity key</dt>
+          <dd className="break-all font-mono text-stone-800">{entity.entity_key}</dd>
+        </div>
+        {entityRef("Author entity", entity.author_entity_id)}
+        {entityRef("Conversation entity", entity.conversation_entity_id)}
+        {entityRef("Parent message", entity.parent_message_entity_id)}
+        {entityRef("Repository entity", entity.repository_entity_id)}
+        {entityRef("Assignee entity", entity.assignee_entity_id)}
+        {entityRef("Parent document", entity.parent_document_entity_id)}
+        {entityRef("Work item", entity.work_item_entity_id)}
+      </dl>
+
+      {detailQ.isPending ? (
+        <p className="mt-3 text-stone-500">Loading attrs and sources…</p>
+      ) : detailQ.isError ? (
+        <p className="mt-3 text-red-700">{(detailQ.error as Error).message}</p>
+      ) : detailQ.data ? (
+        <>
+          <p className="mt-3 font-medium text-stone-700">Attrs</p>
+          <pre className="mt-1 max-h-48 overflow-auto rounded border border-stone-200 bg-stone-50 p-2 font-mono text-[11px] leading-relaxed text-stone-800">
+            {jsonBlock(detailQ.data.attrs_json)}
+          </pre>
+          <p className="mt-3 font-medium text-stone-700">Sources</p>
+          {detailQ.data.sources.length === 0 ? (
+            <p className="mt-1 text-stone-500">No source rows linked.</p>
+          ) : (
+            <ul className="mt-1 space-y-2">
+              {detailQ.data.sources.map((s) => (
+                <li key={s.raw_id} className="rounded border border-stone-200 bg-stone-50/80 p-2">
+                  <p className="text-stone-700">
+                    raw_id {s.raw_id} · {s.resource_type} · {s.external_id} ·{" "}
+                    {s.is_latest ? "latest" : "historical"}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] text-stone-500">
+                    {s.source_identity_key}
+                  </p>
+                  {s.payload_preview ? (
+                    <pre className="mt-1 max-h-32 overflow-auto font-mono text-[11px] text-stone-700">
+                      {jsonBlock(s.payload_preview)}
+                    </pre>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : null}
+
+      <p className="mt-3">
+        <Link
+          to={`/admin/tenants/${tenantId}/cortex/canon/entities/${entity.id}`}
+          className="text-indigo-700 hover:underline"
+        >
+          Open full entity page →
+        </Link>
+      </p>
+    </div>
+  );
+}
+
 export function CanonEntitiesListingTab() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,6 +146,11 @@ export function CanonEntitiesListingTab() {
   const [searchInput, setSearchInput] = useState(searchDraft);
   const page = Math.max(0, Number.parseInt(searchParams.get("canon_page") ?? "0", 10) || 0);
   const offset = page * PAGE_SIZE;
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    setExpandedIds(new Set());
+  }, [connector, entityType, searchDraft, page]);
 
   const patchParams = (patch: Record<string, string | null>) => {
     setSearchParams((prev) => {
@@ -87,13 +207,22 @@ export function CanonEntitiesListingTab() {
     patchParams({ canon_q: searchInput.trim() || null, canon_page: null });
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <div>
         <h2 className="text-base font-semibold text-stone-900">Canon entities by type</h2>
         <p className="text-sm text-stone-600">
           Browse materialized rows in <code className="text-xs">canon_entities</code> — filter by
-          connector and entity type. Open a row for provenance back to raw.
+          connector and entity type. Expand a row for attrs, sources, and provenance back to raw.
         </p>
       </div>
 
@@ -185,29 +314,43 @@ export function CanonEntitiesListingTab() {
             newest first
           </p>
           <ul className="mt-3 space-y-2">
-            {items.map((e) => (
-              <li
-                key={e.id}
-                className="rounded-lg border border-stone-200 bg-stone-50/60 px-3 py-2.5"
-              >
-                <Link
-                  to={`/admin/tenants/${tenantId}/cortex/canon/entities/${e.id}`}
-                  className="font-medium text-indigo-700 hover:underline"
+            {items.map((e) => {
+              const open = expandedIds.has(e.id);
+              return (
+                <li
+                  key={e.id}
+                  className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50/60"
                 >
-                  {e.display_label}
-                </Link>
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-stone-600">
-                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-medium text-indigo-900">
-                    {e.entity_type}
-                  </span>
-                  <span>{titleConnector(e.connector)}</span>
-                  <span>{formatWhen(e.materialized_at)}</span>
-                  <span className="font-mono text-stone-500 truncate max-w-md" title={e.entity_key}>
-                    {e.entity_key}
-                  </span>
-                </div>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    className="flex w-full flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5 text-left hover:bg-stone-100/80"
+                    onClick={() => toggleExpanded(e.id)}
+                    aria-expanded={open}
+                  >
+                    <span className="shrink-0 text-xs font-medium text-indigo-700">
+                      {open ? "▼" : "▶"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="font-medium text-stone-900">{e.display_label}</span>
+                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-stone-600">
+                        <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-medium text-indigo-900">
+                          {e.entity_type}
+                        </span>
+                        <span>{titleConnector(e.connector)}</span>
+                        <span>{formatWhen(e.materialized_at)}</span>
+                        <span
+                          className="max-w-md truncate font-mono text-stone-500"
+                          title={e.entity_key}
+                        >
+                          {e.entity_key}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
+                  {open ? <CanonEntityExpandedPanel tenantId={tenantId} entity={e} /> : null}
+                </li>
+              );
+            })}
           </ul>
           {total > PAGE_SIZE ? (
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -215,7 +358,10 @@ export function CanonEntitiesListingTab() {
                 type="button"
                 className="rounded border border-stone-300 bg-white px-3 py-1 text-xs font-medium disabled:opacity-40"
                 disabled={page <= 0}
-                onClick={() => patchParams({ canon_page: page <= 1 ? null : String(page - 1) })}
+                onClick={() => {
+                  setExpandedIds(new Set());
+                  patchParams({ canon_page: page <= 1 ? null : String(page - 1) });
+                }}
               >
                 Previous
               </button>
@@ -226,7 +372,10 @@ export function CanonEntitiesListingTab() {
                 type="button"
                 className="rounded border border-stone-300 bg-white px-3 py-1 text-xs font-medium disabled:opacity-40"
                 disabled={page + 1 >= pageCount}
-                onClick={() => patchParams({ canon_page: String(page + 1) })}
+                onClick={() => {
+                  setExpandedIds(new Set());
+                  patchParams({ canon_page: String(page + 1) });
+                }}
               >
                 Next
               </button>
