@@ -99,6 +99,24 @@ def _slack() -> dict[str, Any]:
             notes="users.list with cursor pagination; one raw row per member.",
         ),
         _row(
+            "slack.channel_member",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="conversations.members for ring-selected channels (capped per sync).",
+        ),
+        _row(
+            "slack.message_changed",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="History messages with subtype message_changed.",
+        ),
+        _row(
             "slack.conversation",
             coverage="partial",
             historical="partial",
@@ -178,6 +196,33 @@ def _slack() -> dict[str, Any]:
 
 def _github() -> dict[str, Any]:
     resources = [
+        _row(
+            "github.user",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="GET /orgs/{org}/members when installation account_type is Organization.",
+        ),
+        _row(
+            "github.team",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="GET /orgs/{org}/teams plus team membership rows.",
+        ),
+        _row(
+            "github.team_membership",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="Derived from /orgs/{org}/teams/{slug}/members.",
+        ),
         _row(
             "github.installation_repositories",
             coverage="partial",
@@ -390,6 +435,33 @@ def _github() -> dict[str, Any]:
 def _linear() -> dict[str, Any]:
     resources = [
         _row(
+            "linear.user",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="GraphQL users connection (people plane).",
+        ),
+        _row(
+            "linear.team",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="GraphQL teams with embedded members.",
+        ),
+        _row(
+            "linear.team_membership",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="One row per team member edge from teams query.",
+        ),
+        _row(
             "linear.issue",
             coverage="full",
             historical="partial",
@@ -510,6 +582,15 @@ def _linear() -> dict[str, Any]:
 
 def _notion() -> dict[str, Any]:
     resources = [
+        _row(
+            "notion.user",
+            coverage="partial",
+            historical="partial",
+            replay="partial",
+            canonicalization="none",
+            status="in_progress",
+            notes="GET /v1/users paginated (people plane before search/structure).",
+        ),
         _row(
             "notion.search_result",
             coverage="partial",

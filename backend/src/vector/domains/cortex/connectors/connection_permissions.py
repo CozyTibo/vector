@@ -30,6 +30,7 @@ SLACK_RECOMMENDED_INGEST_SCOPES: frozenset[str] = frozenset(
         "channels:history",
         "groups:history",
         "users:read",
+        "users:read.email",
     }
 )
 
@@ -38,7 +39,6 @@ SLACK_OPTIONAL_INGEST_SCOPES: frozenset[str] = frozenset(
         "channels:join",
         "im:history",
         "mpim:history",
-        "users:read.email",
         "usergroups:read",
     }
 )

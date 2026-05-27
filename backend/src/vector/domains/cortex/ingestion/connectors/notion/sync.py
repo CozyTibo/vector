@@ -83,6 +83,7 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
+from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -232,6 +233,69 @@ def run_notion_connector_sync(
         search_watermark_raw if isinstance(search_watermark_raw, str) and search_watermark_raw.strip() else None
     )
     latest_edited = search_watermark
+
+    users_state = _state_map(notion_existing, "users")
+    user_cursor_raw = users_state.get("next_cursor")
+    user_cursor = user_cursor_raw if isinstance(user_cursor_raw, str) and user_cursor_raw.strip() else None
+    user_rows = 0
+    user_pages = 0
+    users_complete = False
+    for _ in range(8):
+        params: dict[str, Any] = {"page_size": min(settings.cortex_notion_search_page_size, 100)}
+        if user_cursor:
+            params["start_cursor"] = user_cursor
+        try:
+            resp = httpx.get(
+                f"{notion_base}/users",
+                headers=_notion_headers(token),
+                params=params,
+                timeout=60.0,
+            )
+            if resp.is_error:
+                raise _NotionSyncApiError(f"notion users http {resp.status_code}")
+            users_payload = resp.json()
+        except (_NotionSyncApiError, httpx.HTTPError, ValueError):
+            break
+        if not isinstance(users_payload, dict):
+            break
+        user_pages += 1
+        results = users_payload.get("results")
+        if isinstance(results, list):
+            for u in results:
+                if not isinstance(u, dict):
+                    continue
+                uid = u.get("id")
+                if not isinstance(uid, str) or not uid:
+                    continue
+                if _append_notion_row(
+                    resource_type="notion.user",
+                    external_id=uid,
+                    api_endpoint=f"{notion_base}/users",
+                    query_params={"start_cursor": user_cursor},
+                    source_object_type="notion.user",
+                    payload_key="user",
+                    payload_value=u,
+                ):
+                    n_ins += 1
+                    user_rows += 1
+        has_more = bool(users_payload.get("has_more"))
+        next_c = users_payload.get("next_cursor")
+        user_cursor = next_c if isinstance(next_c, str) and next_c.strip() else None
+        if not has_more or not user_cursor:
+            users_complete = True
+            break
+        if time.monotonic() - start_t >= settings.cortex_notion_time_budget_seconds:
+            break
+    users_patch = ensure_stream_introduced_at(
+        {
+            "cursor_owner": "notion.user",
+            "next_cursor": user_cursor,
+            "pages_fetched_last_run": user_pages,
+            "rows_seen_last_run": user_rows,
+            "backfill_complete": bool(ctx.backfill_lane and users_complete),
+            "last_ok_at": utc_now().isoformat(),
+        },
+    )
 
     databases_discovered: set[str] = set()
     pages_discovered: set[str] = set()
@@ -712,6 +776,7 @@ def run_notion_connector_sync(
             "notion_blocks_written": block_rows,
             "streams": {
                 "notion": {
+                    "users": users_patch,
                     "search": {
                         "cursor_owner": "notion.search_result",
                         "next_cursor": search_cursor,

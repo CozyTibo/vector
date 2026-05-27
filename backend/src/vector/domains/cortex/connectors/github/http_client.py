@@ -600,6 +600,62 @@ def list_repo_issue_timeline_page(
     )
 
 
+def list_org_members_page(
+    settings: Settings,
+    installation_access_token: str,
+    org: str,
+    *,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    """GET /orgs/{org}/members — one page."""
+    org_s = org.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/orgs/{org_s}/members",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_org_teams_page(
+    settings: Settings,
+    installation_access_token: str,
+    org: str,
+    *,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    """GET /orgs/{org}/teams — one page."""
+    org_s = org.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/orgs/{org_s}/teams",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
+def list_team_members_page(
+    settings: Settings,
+    installation_access_token: str,
+    org: str,
+    team_slug: str,
+    *,
+    page: int,
+    per_page: int = 100,
+) -> list[dict[str, Any]]:
+    """GET /orgs/{org}/teams/{team_slug}/members — one page."""
+    org_s = org.strip().strip("/")
+    slug = team_slug.strip().strip("/")
+    return _github_rest_array(
+        settings,
+        installation_access_token,
+        path=f"/orgs/{org_s}/teams/{slug}/members",
+        params={"per_page": min(per_page, 100), "page": max(page, 1)},
+    )
+
+
 def list_installation_repositories_first_page(
     settings: Settings,
     installation_id: int,

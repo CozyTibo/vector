@@ -132,6 +132,37 @@ def conversations_join(
     return ch if isinstance(ch, dict) else {"id": channel}
 
 
+def iter_conversations_members_pages(
+    token: str,
+    *,
+    channel: str,
+    api_base: str | None = None,
+    limit: int = 200,
+    max_pages: int,
+) -> Iterator[list[str]]:
+    """Paginate ``conversations.members`` for one channel (user ids)."""
+    cursor: str | None = None
+    for _ in range(max_pages):
+        body: dict[str, Any] = {"channel": channel, "limit": min(limit, 1000)}
+        if cursor:
+            body["cursor"] = cursor
+        data = slack_web_api_post(token, "conversations.members", json_body=body, api_base=api_base)
+        if not data.get("ok"):
+            raise SlackWebApiError(str(data.get("error", "conversations.members_failed")))
+        raw = data.get("members")
+        members = [x for x in raw if isinstance(x, str) and x.strip()] if isinstance(raw, list) else []
+        yield members
+        meta = data.get("response_metadata")
+        next_c = None
+        if isinstance(meta, dict):
+            nc = meta.get("next_cursor")
+            if isinstance(nc, str) and nc.strip():
+                next_c = nc.strip()
+        if not next_c:
+            break
+        cursor = next_c
+
+
 def iter_conversations_list_pages(
     token: str,
     *,

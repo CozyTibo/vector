@@ -83,6 +83,7 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
+from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -221,6 +222,7 @@ def run_slack_connector_sync(
     from vector.domains.cortex.connectors.slack.ingestion_api import (
         iter_conversations_list_pages,
         iter_conversations_history_pages,
+        iter_conversations_members_pages,
         iter_conversations_replies_pages,
         iter_users_list_pages,
     )
@@ -263,6 +265,8 @@ def run_slack_connector_sync(
     channel_patch_map: dict[str, Any] = (
         dict(channels_existing) if isinstance(channels_existing, dict) else {}
     )
+    conversations_list_complete = False
+    channel_member_rows = 0
     try:
         for members in iter_users_list_pages(
             token,
@@ -310,6 +314,8 @@ def run_slack_connector_sync(
             max_pages=settings.cortex_slack_conversations_max_pages,
         ):
             channel_pages += 1
+            if len(chans) < 200:
+                conversations_list_complete = True
             all_channels.extend(chans)
             for c in chans:
                 cid = c.get("id")
@@ -390,6 +396,47 @@ def run_slack_connector_sync(
             ring_index=ring_index,
             count=settings.cortex_slack_history_channels_per_sync,
         )
+        for c in selected_channels[:6]:
+            cid = str(c["id"])
+            try:
+                for member_ids in iter_conversations_members_pages(
+                    token,
+                    channel=cid,
+                    api_base=slack_api_base,
+                    max_pages=2,
+                ):
+                    for uid in member_ids:
+                        mem_ext = f"{cid}:{uid}"[:512]
+                        if append_raw(
+                            session,
+                            ctx=ctx,
+                            tenant_id=tenant_id,
+                            connection_id=connection_id,
+                            connector=CONNECTION_PROVIDER_SLACK,
+                            run_id=run_id,
+                            source_trigger=source_trigger,
+                            resource_type="slack.channel_member",
+                            external_id=mem_ext,
+                            api_endpoint=f"{slack_api_base}/conversations.members",
+                            query_params={"channel": cid},
+                            payload_body={
+                                **core_envelope_fields(
+                                    connector=CONNECTION_PROVIDER_SLACK,
+                                    connection_id=connection_id,
+                                    source_object_type="slack.channel_member",
+                                    source_object_id=mem_ext,
+                                ),
+                                "channel_id": cid,
+                                "user_id": uid,
+                            },
+                            http_status=200,
+                            idempotency_key=idem_key(ctx, run_id, f"slack:member:{mem_ext}"),
+                        ):
+                            n_ins += 1
+                            channel_member_rows += 1
+            except SlackWebApiError:
+                continue
+
         for c in selected_channels:
             cid = str(c["id"])
             existing_channel = channel_patch_map.get(cid)
@@ -464,11 +511,15 @@ def run_slack_connector_sync(
                     ext = f"{cid}:{ts}"[:512]
                     if latest_message_ts is None or slack_ts_value(ts) > slack_ts_value(latest_message_ts):
                         latest_message_ts = ts
+                    subtype = msg.get("subtype")
+                    is_edit = subtype == "message_changed"
+                    res_type = "slack.message_changed" if is_edit else "slack.message"
+                    obj_type = res_type
                     body = {
                         **core_envelope_fields(
                             connector=CONNECTION_PROVIDER_SLACK,
                             connection_id=connection_id,
-                            source_object_type="slack.message",
+                            source_object_type=obj_type,
                             source_object_id=ext,
                         ),
                         "channel_id": cid,
@@ -485,7 +536,7 @@ def run_slack_connector_sync(
                         connector=CONNECTION_PROVIDER_SLACK,
                         run_id=run_id,
                         source_trigger=source_trigger,
-                        resource_type="slack.message",
+                        resource_type=res_type,
                         external_id=ext,
                         api_endpoint=f"{slack_api_base}/conversations.history",
                         query_params={"channel": cid, "mode": sync_mode},
@@ -846,14 +897,31 @@ def run_slack_connector_sync(
             "slack_files_seen": file_rows,
             "streams": {
                 "slack": {
-                    "users": {
-                        "cursor_owner": "slack.user",
-                        "pages_fetched": user_pages,
-                    },
-                    "conversations": {
-                        "cursor_owner": "slack.conversation",
-                        "pages_fetched": channel_pages,
-                    },
+                    "users": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "slack.user",
+                            "pages_fetched_last_run": user_pages,
+                            "rows_seen_last_run": user_members,
+                            "backfill_complete": bool(
+                                ctx.backfill_lane
+                                and user_pages < settings.cortex_slack_users_max_pages
+                            ),
+                        },
+                    ),
+                    "conversations": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "slack.conversation",
+                            "pages_fetched_last_run": channel_pages,
+                            "rows_seen_last_run": channel_rows,
+                            "backfill_complete": bool(ctx.backfill_lane and conversations_list_complete),
+                        },
+                    ),
+                    "channel_members": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "slack.channel_member",
+                            "rows_seen_last_run": channel_member_rows,
+                        },
+                    ),
                     "messages": {
                         "cursor_owner": "slack.message",
                         "rows_seen": message_rows,

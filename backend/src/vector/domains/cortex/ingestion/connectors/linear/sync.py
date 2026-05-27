@@ -83,6 +83,7 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
+from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -107,11 +108,48 @@ query LinearIngestIssues($first: Int!, $after: String) {
       updatedAt
       state { name }
       priority
+      assignee { id name email displayName }
+      creator { id name email displayName }
+      team { id name key }
+      subscriberIds
       project { id name }
       cycle { id name }
       labels { nodes { id name color } }
       attachments { nodes { id title url } }
       metadata
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}
+"""
+
+LINEAR_USERS_QUERY = """
+query LinearIngestUsers($first: Int!, $after: String) {
+  users(first: $first, after: $after) {
+    nodes {
+      id
+      name
+      email
+      displayName
+      active
+      admin
+      avatarUrl
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}
+"""
+
+LINEAR_TEAMS_QUERY = """
+query LinearIngestTeams($first: Int!, $after: String) {
+  teams(first: $first, after: $after) {
+    nodes {
+      id
+      name
+      key
+      description
+      private
+      members { nodes { id name email } }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -321,6 +359,172 @@ def linear_graphql_ping(
     return r.status_code, js
 
 
+def _sync_linear_people_plane(
+    session: Session,
+    settings: Settings,
+    *,
+    ctx: IngestionSyncContext,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    run_id: uuid.UUID,
+    source_trigger: str,
+    token: str,
+    linear_existing: dict[str, Any],
+    start_t: float,
+) -> tuple[int, dict[str, Any]]:
+    """People plane: users, teams (+ embedded members), team membership rows."""
+    n_ins = 0
+    people_patch: dict[str, Any] = {}
+    max_pages = settings.cortex_linear_projects_max_pages_per_sync
+
+    def _paginate_people(
+        *,
+        stream_key: str,
+        resource_type: str,
+        operation_name: str,
+        query: str,
+        root_field: str,
+        payload_key: str,
+    ) -> None:
+        nonlocal n_ins
+        state = linear_existing.get(stream_key) if isinstance(linear_existing, dict) else None
+        stream_state = state if isinstance(state, dict) else {}
+        cursor_raw = stream_state.get("next_cursor")
+        cursor = cursor_raw if isinstance(cursor_raw, str) and cursor_raw.strip() else None
+        rows = 0
+        pages = 0
+        complete = False
+        for _ in range(max_pages):
+            status, _payload, nodes, page_info = linear_graphql_connection_page(
+                settings,
+                token,
+                operation_name=operation_name,
+                query=query,
+                root_field=root_field,
+                first=settings.cortex_linear_stream_first,
+                after=cursor,
+            )
+            pages += 1
+            for idx, node in enumerate(nodes):
+                nid = node.get("id")
+                ext = str(nid if isinstance(nid, str) else f"{stream_key}:{idx}")[:512] or "unknown"
+                body = {
+                    **core_envelope_fields(
+                        connector=CONNECTION_PROVIDER_LINEAR,
+                        connection_id=connection_id,
+                        source_object_type=resource_type,
+                        source_object_id=ext,
+                    ),
+                    payload_key: node,
+                    "person": {
+                        "provider_user_id": nid,
+                        "display_name": node.get("displayName") or node.get("name"),
+                        "email": node.get("email"),
+                    },
+                }
+                if append_raw(
+                    session,
+                    ctx=ctx,
+                    tenant_id=tenant_id,
+                    connection_id=connection_id,
+                    connector=CONNECTION_PROVIDER_LINEAR,
+                    run_id=run_id,
+                    source_trigger=source_trigger,
+                    resource_type=resource_type,
+                    external_id=ext,
+                    api_endpoint=settings.linear_graphql_url()[:512],
+                    query_params={"operationName": operation_name, "after": cursor},
+                    payload_body=body,
+                    http_status=status if status >= 100 else 200,
+                    idempotency_key=idem_key(ctx, run_id, f"linear:{resource_type}:{ext}"),
+                ):
+                    n_ins += 1
+                    rows += 1
+                if stream_key == "teams" and resource_type == "linear.team":
+                    members_block = node.get("members")
+                    member_nodes = (
+                        members_block.get("nodes")
+                        if isinstance(members_block, dict) and isinstance(members_block.get("nodes"), list)
+                        else []
+                    )
+                    team_id = nid
+                    for midx, member in enumerate(member_nodes):
+                        if not isinstance(member, dict):
+                            continue
+                        mid = member.get("id")
+                        mem_ext = (
+                            f"{team_id}:{mid}"
+                            if isinstance(team_id, str) and isinstance(mid, str)
+                            else f"{team_id}:m:{midx}"
+                        )[:512]
+                        if append_raw(
+                            session,
+                            ctx=ctx,
+                            tenant_id=tenant_id,
+                            connection_id=connection_id,
+                            connector=CONNECTION_PROVIDER_LINEAR,
+                            run_id=run_id,
+                            source_trigger=source_trigger,
+                            resource_type="linear.team_membership",
+                            external_id=mem_ext,
+                            api_endpoint=settings.linear_graphql_url()[:512],
+                            query_params={"operationName": operation_name, "team_id": team_id},
+                            payload_body={
+                                **core_envelope_fields(
+                                    connector=CONNECTION_PROVIDER_LINEAR,
+                                    connection_id=connection_id,
+                                    source_object_type="linear.team_membership",
+                                    source_object_id=mem_ext,
+                                ),
+                                "team": {"id": team_id, "name": node.get("name")},
+                                "member": member,
+                            },
+                            http_status=status if status >= 100 else 200,
+                            idempotency_key=idem_key(
+                                ctx,
+                                run_id,
+                                f"linear:team_membership:{mem_ext}",
+                            ),
+                        ):
+                            n_ins += 1
+            next_cursor = page_info.get("endCursor") if isinstance(page_info, dict) else None
+            has_next = bool(page_info.get("hasNextPage")) if isinstance(page_info, dict) else False
+            cursor = next_cursor if isinstance(next_cursor, str) and next_cursor else None
+            if not has_next:
+                complete = True
+                break
+            if time.monotonic() - start_t >= settings.cortex_linear_time_budget_seconds:
+                break
+        people_patch[stream_key] = ensure_stream_introduced_at(
+            {
+                "cursor_owner": resource_type,
+                "next_cursor": cursor,
+                "pages_fetched_last_run": pages,
+                "rows_seen_last_run": rows,
+                "backfill_complete": bool(ctx.backfill_lane and complete),
+                "last_ok_at": utc_now().isoformat(),
+            },
+        )
+
+    _paginate_people(
+        stream_key="users",
+        resource_type="linear.user",
+        operation_name="LinearIngestUsers",
+        query=LINEAR_USERS_QUERY,
+        root_field="users",
+        payload_key="user",
+    )
+    _paginate_people(
+        stream_key="teams",
+        resource_type="linear.team",
+        operation_name="LinearIngestTeams",
+        query=LINEAR_TEAMS_QUERY,
+        root_field="teams",
+        payload_key="team",
+    )
+    return n_ins, people_patch
+
+
 def run_linear_connector_sync(
     session: Session,
     settings: Settings,
@@ -389,12 +593,27 @@ def run_linear_connector_sync(
         return ins
     token = link.detail.access_token
     n_ins = 0
+    start_t = time.monotonic()
     streams_existing = checkpoint_streams_for_mode(existing_ckpt, ctx.sync_mode)
     linear_existing = (
         streams_existing.get("linear")
         if isinstance(streams_existing, dict) and isinstance(streams_existing.get("linear"), dict)
         else {}
     )
+
+    people_n, people_patch = _sync_linear_people_plane(
+        session,
+        settings,
+        ctx=ctx,
+        tenant_id=tenant_id,
+        connection_id=connection_id,
+        run_id=run_id,
+        source_trigger=source_trigger,
+        token=token,
+        linear_existing=linear_existing,
+        start_t=start_t,
+    )
+    n_ins += people_n
 
     def _stream_state(name: str) -> dict[str, Any]:
         s = linear_existing.get(name) if isinstance(linear_existing, dict) else None
@@ -413,7 +632,6 @@ def run_linear_connector_sync(
     latest_issue_updated_at = issue_watermark
     issues_backfill_complete = False
     budget_exhausted = False
-    start_t = time.monotonic()
     last_issues_status = 0
     payload_issues: dict[str, Any] = {}
 
@@ -833,14 +1051,17 @@ def run_linear_connector_sync(
             "linear_activity_history_written": activity_rows,
             "streams": {
                 "linear": {
-                    "issues": {
+                    **people_patch,
+                    "issues": ensure_stream_introduced_at(
+                        {
                         "cursor_owner": "linear.issue",
                         "issues_fetched": issue_rows,
                         "next_cursor": issue_cursor,
                         "pages_fetched_last_run": issue_pages,
                         "issues_updated_at_watermark": latest_issue_updated_at,
                         "backfill_complete": bool(ctx.backfill_lane and issues_backfill_complete),
-                    },
+                        },
+                    ),
                     "comments": stream_patch.get("comments", {"cursor_owner": "linear.comment"}),
                     "projects": stream_patch.get("projects", {"cursor_owner": "linear.project"}),
                     "cycles": stream_patch.get("cycles", {"cursor_owner": "linear.cycle"}),

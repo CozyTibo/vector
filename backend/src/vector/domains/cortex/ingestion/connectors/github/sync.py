@@ -20,6 +20,9 @@ from vector.domains.cortex.connectors.github.http_client import (
     create_github_installation_access_token,
     list_deployment_statuses_page,
     list_installation_repositories_page,
+    list_org_members_page,
+    list_org_teams_page,
+    list_team_members_page,
     list_pull_issue_comments_page,
     list_pull_review_comments_page,
     list_pull_reviews_page,
@@ -83,6 +86,7 @@ from vector.settings import Settings
 
 _logger = logging.getLogger("app")
 
+from vector.domains.cortex.ingestion.stream_checkpoint import ensure_stream_introduced_at
 from vector.domains.cortex.ingestion.sync_shared import (
     append_raw,
     checkpoint_streams_for_mode,
@@ -145,6 +149,195 @@ def ensure_github_workflow_run_repository_metadata(
 
     wr["repository"] = merged
     return wr
+
+
+def _sync_github_people_plane(
+    session: Session,
+    settings: Settings,
+    *,
+    ctx: IngestionSyncContext,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+    run_id: uuid.UUID,
+    source_trigger: str,
+    token: str,
+    org_login: str,
+    github_existing: dict[str, Any],
+) -> tuple[int, dict[str, Any]]:
+    """Org members, teams, and team memberships (people plane)."""
+    n_ins = 0
+    people_patch: dict[str, Any] = {}
+    gh_base = settings.github_rest_api_base_url().rstrip("/")
+    max_pages = min(settings.cortex_github_installation_repos_max_pages, 10)
+
+    def _stream(name: str) -> dict[str, Any]:
+        s = github_existing.get(name) if isinstance(github_existing, dict) else None
+        return s if isinstance(s, dict) else {}
+
+    # Org members -> github.user
+    users_state = _stream("users")
+    user_page_start = max(1, int(users_state.get("last_page") or 0) + 1) if users_state.get("last_page") else 1
+    user_rows = 0
+    users_complete = False
+    last_user_page = user_page_start - 1
+    for page in range(user_page_start, user_page_start + max_pages):
+        last_user_page = page
+        try:
+            members = list_org_members_page(settings, token, org_login, page=page)
+        except GitHubApiError:
+            break
+        if not members:
+            users_complete = True
+            break
+        for m in members:
+            login = m.get("login")
+            if not isinstance(login, str) or not login:
+                continue
+            uid = str(m.get("id") or login)[:512]
+            if append_raw(
+                session,
+                ctx=ctx,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+                connector=CONNECTION_PROVIDER_GITHUB,
+                run_id=run_id,
+                source_trigger=source_trigger,
+                resource_type="github.user",
+                external_id=uid,
+                api_endpoint=f"{gh_base}/orgs/{org_login}/members",
+                query_params={"page": page},
+                payload_body={
+                    **core_envelope_fields(
+                        connector=CONNECTION_PROVIDER_GITHUB,
+                        connection_id=connection_id,
+                        source_object_type="github.user",
+                        source_object_id=uid,
+                    ),
+                    "person": {"provider_user_id": uid, "handle": login},
+                    "member": m,
+                },
+                http_status=200,
+                idempotency_key=idem_key(ctx, run_id, f"github:user:{login}"),
+            ):
+                n_ins += 1
+                user_rows += 1
+        if len(members) < 100:
+            users_complete = True
+            break
+    people_patch["users"] = ensure_stream_introduced_at(
+        {
+            "cursor_owner": "github.user",
+            "last_page": last_user_page if user_rows else users_state.get("last_page"),
+            "rows_seen_last_run": user_rows,
+            "backfill_complete": bool(ctx.backfill_lane and users_complete),
+            "last_ok_at": utc_now().isoformat(),
+        },
+    )
+
+    # Teams + memberships
+    teams_state = _stream("teams")
+    team_page_start = max(1, int(teams_state.get("last_page") or 0) + 1) if teams_state.get("last_page") else 1
+    team_rows = 0
+    membership_rows = 0
+    teams_complete = False
+    last_team_page = team_page_start - 1
+    for page in range(team_page_start, team_page_start + max_pages):
+        last_team_page = page
+        try:
+            teams = list_org_teams_page(settings, token, org_login, page=page)
+        except GitHubApiError:
+            break
+        if not teams:
+            teams_complete = True
+            break
+        for team in teams:
+            slug = team.get("slug")
+            tid = str(team.get("id") or slug or "")[:512]
+            if not tid:
+                continue
+            if append_raw(
+                session,
+                ctx=ctx,
+                tenant_id=tenant_id,
+                connection_id=connection_id,
+                connector=CONNECTION_PROVIDER_GITHUB,
+                run_id=run_id,
+                source_trigger=source_trigger,
+                resource_type="github.team",
+                external_id=tid,
+                api_endpoint=f"{gh_base}/orgs/{org_login}/teams",
+                query_params={"page": page},
+                payload_body={
+                    **core_envelope_fields(
+                        connector=CONNECTION_PROVIDER_GITHUB,
+                        connection_id=connection_id,
+                        source_object_type="github.team",
+                        source_object_id=tid,
+                    ),
+                    "team": team,
+                },
+                http_status=200,
+                idempotency_key=idem_key(ctx, run_id, f"github:team:{tid}"),
+            ):
+                n_ins += 1
+                team_rows += 1
+            if isinstance(slug, str) and slug.strip():
+                try:
+                    tmembers = list_team_members_page(
+                        settings,
+                        token,
+                        org_login,
+                        slug.strip(),
+                        page=1,
+                    )
+                except GitHubApiError:
+                    continue
+                for tm in tmembers:
+                    login = tm.get("login")
+                    mem_ext = f"{slug}:{login}"[:512] if isinstance(login, str) else f"{slug}:{tm.get('id')}"[:512]
+                    if append_raw(
+                        session,
+                        ctx=ctx,
+                        tenant_id=tenant_id,
+                        connection_id=connection_id,
+                        connector=CONNECTION_PROVIDER_GITHUB,
+                        run_id=run_id,
+                        source_trigger=source_trigger,
+                        resource_type="github.team_membership",
+                        external_id=mem_ext,
+                        api_endpoint=f"{gh_base}/orgs/{org_login}/teams/{slug}/members",
+                        query_params={"team": slug},
+                        payload_body={
+                            **core_envelope_fields(
+                                connector=CONNECTION_PROVIDER_GITHUB,
+                                connection_id=connection_id,
+                                source_object_type="github.team_membership",
+                                source_object_id=mem_ext,
+                            ),
+                            "team": {"id": tid, "slug": slug},
+                            "member": tm,
+                        },
+                        http_status=200,
+                        idempotency_key=idem_key(ctx, run_id, f"github:team_member:{mem_ext}"),
+                    ):
+                        n_ins += 1
+                        membership_rows += 1
+        if len(teams) < 100:
+            teams_complete = True
+            break
+    people_patch["teams"] = ensure_stream_introduced_at(
+        {
+            "cursor_owner": "github.team",
+            "last_page": last_team_page if team_rows else teams_state.get("last_page"),
+            "rows_seen_last_run": team_rows,
+            "membership_rows_seen_last_run": membership_rows,
+            "backfill_complete": bool(ctx.backfill_lane and teams_complete),
+            "last_ok_at": utc_now().isoformat(),
+        },
+    )
+    return n_ins, people_patch
+
+
 def run_github_connector_sync(
     session: Session,
     settings: Settings,
@@ -264,9 +457,32 @@ def run_github_connector_sync(
         return ins
 
     n_ins = 0
+    streams_existing = checkpoint_streams_for_mode(existing_ckpt, ctx.sync_mode)
+    github_existing_pre = (
+        streams_existing.get("github")
+        if isinstance(streams_existing, dict) and isinstance(streams_existing.get("github"), dict)
+        else {}
+    )
+    people_patch: dict[str, Any] = {}
+    if (link.detail.account_type or "").strip().lower() == "organization":
+        people_n, people_patch = _sync_github_people_plane(
+            session,
+            settings,
+            ctx=ctx,
+            tenant_id=tenant_id,
+            connection_id=connection_id,
+            run_id=run_id,
+            source_trigger=source_trigger,
+            token=token,
+            org_login=link.detail.account_login,
+            github_existing=github_existing_pre,
+        )
+        n_ins += people_n
+
     collected: list[tuple[str, str, dict[str, Any]]] = []
     total_hint: int | None = None
     pages_fetched = 0
+    install_complete = False
     per_page = 100
     max_pages = settings.cortex_github_installation_repos_max_pages
     page = 1
@@ -318,6 +534,7 @@ def run_github_connector_sync(
                     collected.append((rid_s, fn.strip(), repo))
             pages_fetched += 1
             if len(repos) < per_page:
+                install_complete = True
                 break
             page += 1
     except GitHubApiError as e:
@@ -360,10 +577,14 @@ def run_github_connector_sync(
                 "total_count_hint": total_hint,
                 "streams": {
                     "github": {
-                        "installation_repositories": {
-                            "cursor_owner": "github.installation_repositories",
-                            "last_page": pages_fetched,
-                        }
+                        **people_patch,
+                        "installation_repositories": ensure_stream_introduced_at(
+                            {
+                                "cursor_owner": "github.installation_repositories",
+                                "last_page": pages_fetched,
+                                "backfill_complete": bool(ctx.backfill_lane and install_complete),
+                            },
+                        ),
                     }
                 },
             },
@@ -387,6 +608,17 @@ def run_github_connector_sync(
         repo_ring_index = int(repo_ring_raw)
     except (TypeError, ValueError):
         repo_ring_index = 0
+
+    def _repo_deep_incomplete(fn: str) -> bool:
+        sub = repos_existing.get(fn) if isinstance(repos_existing, dict) else None
+        if not isinstance(sub, dict):
+            return True
+        pr = sub.get("pull_requests")
+        if isinstance(pr, dict) and pr.get("backfill_complete"):
+            return False
+        return True
+
+    collected.sort(key=lambda item: (not _repo_deep_incomplete(item[1]), item[1]))
 
     selected_repos, next_repo_ring_index = pick_github_repos_round_robin(
         collected,
@@ -1665,10 +1897,14 @@ def run_github_connector_sync(
             "total_count_hint": total_hint,
             "streams": {
                 "github": {
-                    "installation_repositories": {
-                        "cursor_owner": "github.installation_repositories",
-                        "last_page": pages_fetched,
-                    },
+                    **people_patch,
+                    "installation_repositories": ensure_stream_introduced_at(
+                        {
+                            "cursor_owner": "github.installation_repositories",
+                            "last_page": pages_fetched,
+                            "backfill_complete": bool(ctx.backfill_lane and install_complete),
+                        },
+                    ),
                     "pull_requests": {
                         "cursor_owner": "github.pull_request",
                         "repos_processed": len(selected_repos),
