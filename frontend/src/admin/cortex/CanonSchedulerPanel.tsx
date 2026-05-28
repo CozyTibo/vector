@@ -42,10 +42,15 @@ export function CanonSchedulerPanel() {
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-stone-900">Scheduler</h2>
       <p className="mt-1 text-sm text-stone-600">
-        Canon Beat every {sched.interval_seconds}s (default 300s) · mode{" "}
+        Orchestrator plans canon passes every {sched.orchestrator_interval_seconds ?? 120}s when raw backlog
+        exists (lane cadence {sched.interval_seconds}s) · mode{" "}
         <span className="font-medium text-stone-800">
           {sched.enabled ? "Active" : "Off (env)"}
         </span>
+        {sched.tenant_needs_work === false ? (
+          <span className="text-stone-500"> · idle (canon caught up)</span>
+        ) : null}
+        {sched.lane_stale ? <span className="font-medium text-rose-700"> · lane stale</span> : null}
         {readinessQ.data ? (
           <>
             {" "}

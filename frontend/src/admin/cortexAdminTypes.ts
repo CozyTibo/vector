@@ -1,5 +1,29 @@
 /** Cortex admin types — ingestion + canon surfaces. */
 
+export type CortexLaneSchedulerStatus = {
+  runtime_model?: "orchestrator";
+  enabled: boolean;
+  interval_seconds: number;
+  orchestrator_interval_seconds?: number;
+  tenant_needs_work?: boolean;
+  lane_stale?: boolean;
+  last_tick?: {
+    tick_id: string;
+    started_at: string;
+    completed_at: string | null;
+    outcome: string;
+  } | null;
+  last_orchestrator_run?: {
+    id: string;
+    started_at: string;
+    completed_at: string | null;
+    outcome: string;
+    passes_planned?: number;
+    passes_processed?: number;
+    error_summary?: string | null;
+  } | null;
+};
+
 export type CanonReadiness = {
   tenant_id: string;
   company_name: string;
@@ -27,7 +51,7 @@ export type CanonReadiness = {
   };
   dirty_queue_depth: number;
   latest_pass_run: Record<string, unknown> | null;
-  scheduler: { enabled: boolean; interval_seconds: number };
+  scheduler: CortexLaneSchedulerStatus;
 };
 
 export type CanonPassRunItem = {
@@ -136,7 +160,7 @@ export type IdentityReadiness = {
   unresolved_actor_count: number;
   dirty_queue_depth: number;
   latest_pass_run: IdentityLatestPassRun | null;
-  scheduler: { enabled: boolean; interval_seconds: number };
+  scheduler: CortexLaneSchedulerStatus;
 };
 
 export type IdentityPassRunItem = {

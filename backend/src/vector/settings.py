@@ -470,43 +470,6 @@ class Settings(BaseSettings):
             "defer post-ingestion substrate refresh countdown."
         ),
     )
-    cortex_convergence_sweeper_enabled: bool = Field(
-        default=True,
-        validation_alias="CORTEX_CONVERGENCE_SWEEPER_ENABLED",
-        description="Periodic sweep of dirty/stalled convergence leases.",
-    )
-    cortex_convergence_sweeper_interval_seconds: int = Field(
-        default=120,
-        ge=30,
-        le=3600,
-        validation_alias="CORTEX_CONVERGENCE_SWEEPER_INTERVAL_SECONDS",
-    )
-    cortex_convergence_sweeper_limit: int = Field(
-        default=50,
-        ge=1,
-        le=500,
-        validation_alias="CORTEX_CONVERGENCE_SWEEPER_LIMIT",
-    )
-    cortex_convergence_lease_ttl_seconds: int = Field(
-        default=900,
-        ge=60,
-        le=7200,
-        validation_alias="CORTEX_CONVERGENCE_LEASE_TTL_SECONDS",
-        description="Running lease heartbeat TTL; expired leases are recovered as dirty.",
-    )
-    cortex_convergence_time_budget_seconds: int = Field(
-        default=540,
-        ge=30,
-        le=3600,
-        validation_alias="CORTEX_CONVERGENCE_TIME_BUDGET_SECONDS",
-        description="Max wall time per convergence worker invocation before self-requeue.",
-    )
-    cortex_convergence_stalled_retry_seconds: int = Field(
-        default=300,
-        ge=30,
-        le=3600,
-        validation_alias="CORTEX_CONVERGENCE_STALLED_RETRY_SECONDS",
-    )
     cortex_substrate_pipeline_canonical_chain_gate_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_SUBSTRATE_PIPELINE_CANONICAL_CHAIN_GATE_ENABLED",
@@ -1120,14 +1083,6 @@ class Settings(BaseSettings):
         description=(
             "R1: cap canonical lane wall time per slice when execution lane is owed "
             "(cursor 03–08), so topology debt stays background."
-        ),
-    )
-    cortex_convergence_sweep_tcre_waiting_enabled: bool = Field(
-        default=True,
-        validation_alias="CORTEX_CONVERGENCE_SWEEP_TCRE_WAITING_ENABLED",
-        description=(
-            "R1: include WAITING/tcre_async tenants in convergence sweeper when "
-            "queued TCRE jobs are stale or terminal jobs need resume."
         ),
     )
     cortex_canonical_deferral_retry_storm_cooldown_seconds: int = Field(

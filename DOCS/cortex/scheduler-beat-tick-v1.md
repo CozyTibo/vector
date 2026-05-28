@@ -14,15 +14,17 @@ flowchart LR
   Poll --> Exec[execute canon/identity pass]
 ```
 
-- **One Beat process** per cluster (substrate ECS service / local `celery-beat` beside substrate worker).
-- **Ticks** are cheap Celery tasks on the `vector` queue; they only decide what to enqueue.
-- **Passes** run on dedicated queues so lanes do not starve each other.
+- **One Beat process** per cluster (`vector-substrate-worker-service` only; ingestion worker has no Beat).
+- **One orchestrator tick** (`vector.cortex.runtime.orchestrator_tick`, default 120s) replaces per-lane Beat entries.
+- **Passes** are rows in `cortex_passes`; poll claims and runs them on the `vector` queue.
 
-| Lane | Beat interval (default) | Tick task | Work task | Queue |
-|------|-------------------------|-----------|-----------|-------|
-| Ingestion | 120s | `vector.cortex.ingestion.scheduler_tick` | `vector.cortex.ingestion.run_sync` | `cortex_live` |
-| Pass plan | 300s | `vector.cortex.runtime.plan_passes` | upsert `cortex_passes` | `vector` |
-| Pass poll | 60s | `vector.cortex.runtime.poll_passes` | claim + execute pass | `vector` |
+| Lane | Plan cadence (default) | Execution | Queue |
+|------|------------------------|-------------|-------|
+| Ingestion | every orchestrator tick | `vector.cortex.ingestion.run_sync` | `cortex_live` / `cortex_replay` |
+| Canon | 300s when raw backlog | canon materialization pass | `vector` |
+| Identity | 300s when due | identity reconciliation pass | `vector` |
+
+Prod ECS (2 workers): `vector-worker-service` (ingestion queues only), `vector-substrate-worker-service` (Beat + `vector` queue). Legacy `vector-canon-worker-service` and `vector-identity-worker-service` are deleted on deploy.
 
 Config: `backend/src/app/celery_app.py`, `backend/src/vector/settings.py`, prod roles in `worker_queue_roles_v1.py`.
 
@@ -38,44 +40,12 @@ Incremental actors enqueue via `enqueue_identity_actor` on canon materialization
 
 ## Scheduler dedup (canon + identity)
 
-Before enqueueing a **scheduled** pass per tenant (both lanes):
+Planning runs inside `plan_cortex_passes_v1` on each orchestrator tick. Per-tenant skips use `should_skip_scheduled_*` (recent completed pass within lane interval). Canon only plans tenants with raw backlog (`_tenant_canon_has_backlog`).
 
-- Abandon `RUNNING` passes older than `max(600s, 2× beat interval)` (`canon/pass_run_ops`, `identity/pass_run_ops`).
-- Skip if a recent `RUNNING` pass exists (in-flight window).
-- Skip if a `scheduled` pass started within ~85% of the beat interval (duplicate Beat / slow worker guard).
+Admin **STALE** badges use `scheduler.lane_stale` from readiness APIs: stale only when the tenant needs work, there is no active `cortex_passes` row, no recent completed pass, and the global orchestrator has not ticked successfully within ~2.5× `CORTEX_ORCHESTRATOR_INTERVAL_SECONDS`.
 
-Post-ingestion passes use `source_trigger=ingestion_complete` and are not subject to the scheduled min-gap.
+## Observability
 
-## Beat tick audit (all lanes)
-
-| Lane | Table |
-|------|--------|
-| Ingestion | `ingestion_scheduler_ticks` |
-| Canon | `canon_scheduler_ticks` |
-| Identity | `identity_scheduler_ticks` |
-
-Admin readiness exposes `scheduler.last_tick` and `scheduler.lane_stale` for canon and identity.
-
-## Ingestion extras
-
-- Persists `IngestionSchedulerTick` rows for observability.
-- Honors Redis operator pause flag.
-- Per-connector min-gap between syncs.
-
-## Operational checks
-
-| Symptom | Likely cause |
-|---------|----------------|
-| Ingestion fresh, canon/identity STALE | Substrate beat OK; `cortex_canon` or `cortex_identity` worker down / not consuming |
-| All lanes STALE | Beat not running (substrate) or Redis broker issue |
-| Manual identity pass, one row at v6, rest v4 | Pre-fix: pass processed only pending incremental queue (~36 rows), never top-up’d `resolver_bump`. Re-run manual pass after deploy or use **Rebuild identities**. |
-| Identity pass stats `already_linked` high | Often includes `rematched` outcomes; check `rematched` stat after deploy. |
-| `RUNNING` forever on Runs tab | Stuck pass; readiness API and scheduler tick abandon stale rows |
-| Ingestion OK but canon/identity lag after sync | Post-ingestion should enqueue `ingestion_complete` passes; check `CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED` |
-| `scheduler.lane_stale=true` | No completed pass within ~2.5× beat interval; check lane worker and Beat tick tables |
-
-## Logs
-
-- Identity tick: `identity scheduler tick enqueued …` (`cortex_identity_scheduler.py`).
-- Pass completion: `IdentityPassRun.stats` JSON on admin **Runs** tab.
-- Prod: CloudWatch log groups for `vector-substrate-worker`, `vector-identity-worker`, `vector-canon-worker`.
+- Global: `GET /admin/cortex/operations` (`orchestrator_runs`, pass counts, lane pause flags).
+- Per-tenant readiness: `scheduler.last_orchestrator_run`, `scheduler.last_tick`, `scheduler.tenant_needs_work`.
+- CloudWatch: `vector-substrate-worker`, `vector-worker` (not canon/identity worker log groups).

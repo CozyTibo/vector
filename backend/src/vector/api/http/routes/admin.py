@@ -1837,6 +1837,9 @@ def build_admin_router() -> APIRouter:
             priority=100,
         )
         db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
         return AdminCanonTriggerPassResponse(tenant_id=tenant_id)
 
     @r.get(
@@ -1852,6 +1855,7 @@ def build_admin_router() -> APIRouter:
         from vector.domains.cortex.runtime.lane_scheduler_status import build_identity_lane_scheduler_status
 
         interval = max(60, int(settings.cortex_identity_scheduler_interval_seconds))
+        orch_interval = max(60, int(settings.cortex_orchestrator_interval_seconds))
         raw = build_identity_readiness(
             db,
             tenant_id,
@@ -1860,6 +1864,7 @@ def build_admin_router() -> APIRouter:
                 tenant_id=tenant_id,
                 enabled=settings.cortex_identity_scheduler_enabled,
                 interval_seconds=interval,
+                orchestrator_interval_seconds=orch_interval,
             ),
         )
         if int(raw.get("abandoned_stuck_running_passes") or 0) > 0:
@@ -1976,6 +1981,9 @@ def build_admin_router() -> APIRouter:
             payload_json=None,
         )
         db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
         return AdminIdentityTriggerPassResponse(tenant_id=tenant_id)
 
     @r.post(

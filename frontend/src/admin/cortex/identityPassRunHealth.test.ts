@@ -49,6 +49,24 @@ describe("isIdentityPassRunStale", () => {
     ).toBe(false);
   });
 
+  it("uses backend lane_stale when provided", () => {
+    expect(
+      isIdentityPassRunStale(
+        readiness({
+          latest_pass_run: null,
+          scheduler: { enabled: true, interval_seconds: 300, lane_stale: false },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isIdentityPassRunStale(
+        readiness({
+          scheduler: { enabled: true, interval_seconds: 300, lane_stale: true },
+        }),
+      ),
+    ).toBe(true);
+  });
+
   it("is true when the latest run started more than 10 minutes ago", () => {
     const started = new Date(Date.now() - PASS_RUN_STALE_MS - 1).toISOString();
     expect(

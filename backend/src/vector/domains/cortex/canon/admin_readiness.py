@@ -52,11 +52,13 @@ def build_canon_admin_readiness(
         dirty_queue_depth=_dirty_queue_depth(session, tenant_id),
     )
     interval = max(60, int(settings.cortex_canon_scheduler_interval_seconds))
+    orch_interval = max(60, int(settings.cortex_orchestrator_interval_seconds))
     payload["scheduler"] = build_canon_lane_scheduler_status(
         session,
         tenant_id=tenant_id,
         enabled=settings.cortex_canon_scheduler_enabled,
         interval_seconds=interval,
+        orchestrator_interval_seconds=orch_interval,
     )
     return payload
 

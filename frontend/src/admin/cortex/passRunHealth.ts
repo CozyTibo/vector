@@ -27,10 +27,16 @@ export function isPassRunStale(
 }
 
 export function isIdentityPassRunStale(readiness: IdentityReadiness | undefined): boolean {
+  if (typeof readiness?.scheduler?.lane_stale === "boolean") {
+    return readiness.scheduler.lane_stale;
+  }
   return isPassRunStale(readiness?.latest_pass_run ?? null, readiness?.scheduler?.enabled ?? false);
 }
 
 export function isCanonPassRunStale(readiness: CanonReadiness | undefined): boolean {
+  if (typeof readiness?.scheduler?.lane_stale === "boolean") {
+    return readiness.scheduler.lane_stale;
+  }
   const latest = readiness?.latest_pass_run;
   const typed =
     latest && typeof latest === "object" && typeof latest.started_at === "string"

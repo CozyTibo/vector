@@ -312,7 +312,7 @@ jobs:
               --network-configuration "$NETCFG" \
               --region "$AWS_REGION"
           fi
-          # Decommission legacy per-lane worker services (canon/identity fleets merged into cortex).
+          # Remove legacy per-lane worker services (canon/identity merged into cortex worker).
           for LEGACY_SVC in vector-canon-worker-service vector-identity-worker-service; do
             LEGACY_STATUS=$(aws ecs describe-services \
               --cluster "$ECS_CLUSTER" \
@@ -325,7 +325,18 @@ jobs:
                 --cluster "$ECS_CLUSTER" \
                 --service "$LEGACY_SVC" \
                 --desired-count 0 \
+                --region "$AWS_REGION" \
+                --no-cli-pager
+              aws ecs wait services-stable \
+                --cluster "$ECS_CLUSTER" \
+                --services "$LEGACY_SVC" \
                 --region "$AWS_REGION"
+              aws ecs delete-service \
+                --cluster "$ECS_CLUSTER" \
+                --service "$LEGACY_SVC" \
+                --force \
+                --region "$AWS_REGION" \
+                --no-cli-pager
             fi
           done
 

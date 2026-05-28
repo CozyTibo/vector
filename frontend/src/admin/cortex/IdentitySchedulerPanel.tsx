@@ -60,8 +60,13 @@ export function IdentitySchedulerPanel() {
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-stone-900">Scheduler</h2>
       <p className="mt-1 text-sm text-stone-600">
-        Identity Beat every {sched.interval_seconds}s · mode{" "}
+        Orchestrator plans identity passes every {sched.orchestrator_interval_seconds ?? 120}s (lane cadence{" "}
+        {sched.interval_seconds}s) · mode{" "}
         <span className="font-medium text-stone-800">{sched.enabled ? "Active" : "Off (env)"}</span>
+        {sched.tenant_needs_work === false ? (
+          <span className="text-stone-500"> · idle (no scheduled work)</span>
+        ) : null}
+        {sched.lane_stale ? <span className="font-medium text-rose-700"> · lane stale</span> : null}
       </p>
       <div className="mt-3 rounded border border-amber-100 bg-amber-50/80 p-3">
         <p className="text-xs text-amber-950">
