@@ -197,6 +197,32 @@ def _seed_identity_for_actor(
                 link_tier = "T2"
                 link_rule = "local_part_tenant_domain"
                 confidence = "high"
+    if matched_identity is None and signal.handles:
+        handle_matches: set[uuid.UUID] = set()
+        rows = list(
+            session.execute(
+                select(IdentityAccount, IdentityEntity)
+                .join(IdentityEntity, IdentityEntity.id == IdentityAccount.identity_entity_id)
+                .where(
+                    IdentityAccount.tenant_id == tenant_id,
+                    IdentityAccount.unlinked_at.is_(None),
+                    IdentityEntity.status == "active",
+                ),
+            ).all(),
+        )
+        for account, identity in rows:
+            evidence = account.evidence_json if isinstance(account.evidence_json, dict) else {}
+            prev = evidence.get("handles")
+            prev_handles = {str(v).strip().lower() for v in prev} if isinstance(prev, list) else set()
+            if prev_handles.intersection(signal.handles):
+                handle_matches.add(identity.id)
+        if len(handle_matches) == 1:
+            target_id = next(iter(handle_matches))
+            matched_identity = session.get(IdentityEntity, target_id)
+            if matched_identity is not None:
+                link_tier = "T3"
+                link_rule = "exact_normalized_handle"
+                confidence = "medium"
 
     if matched_identity is None:
         identity = IdentityEntity(

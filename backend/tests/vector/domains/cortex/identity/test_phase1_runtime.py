@@ -24,7 +24,12 @@ from vector.infrastructure.db.models.user import User
 pytestmark = pytest.mark.integration
 
 
-def _seed(db_session: Session, *, include_slack_same_email: bool = False) -> uuid.UUID:
+def _seed(
+    db_session: Session,
+    *,
+    include_slack_same_email: bool = False,
+    include_slack_same_handle_no_email: bool = False,
+) -> uuid.UUID:
     user = User(email=f"ident1-{uuid.uuid4().hex[:8]}@example.com", full_name="Identity1")
     tenant = Tenant(
         company_name="Identity1 Co",
@@ -45,7 +50,7 @@ def _seed(db_session: Session, *, include_slack_same_email: bool = False) -> uui
     )
     db_session.add(conn)
     slack_conn: TenantConnection | None = None
-    if include_slack_same_email:
+    if include_slack_same_email or include_slack_same_handle_no_email:
         slack_conn = TenantConnection(
             tenant_id=tenant.id,
             provider="slack",
@@ -109,6 +114,9 @@ def _seed(db_session: Session, *, include_slack_same_email: bool = False) -> uui
         idempotency_key="id1:linear:user:1",
     )
     if slack_conn is not None and slack_run is not None:
+        profile = {"real_name": "Tibo"}
+        if include_slack_same_email:
+            profile["email"] = "tibo@example.com"
         append_raw(
             db_session,
             ctx=ctx,
@@ -132,7 +140,7 @@ def _seed(db_session: Session, *, include_slack_same_email: bool = False) -> uui
                     "id": "U1",
                     "name": "tibo",
                     "is_bot": False,
-                    "profile": {"email": "tibo@example.com", "real_name": "Tibo"},
+                    "profile": profile,
                 },
             },
             http_status=200,
@@ -175,6 +183,35 @@ def test_phase1_identity_seed_from_canon_actors(db_session: Session) -> None:
 
 def test_phase2_exact_email_links_to_existing_identity(db_session: Session) -> None:
     tenant_id = _seed(db_session, include_slack_same_email=True)
+    execute_canon_pass_for_tenant(
+        db_session,
+        tenant_id=tenant_id,
+        source_trigger="test",
+        batch_limit=100,
+    )
+    db_session.commit()
+    out = execute_identity_pass_for_tenant(
+        db_session,
+        tenant_id=tenant_id,
+        source_trigger="test",
+        batch_limit=100,
+    )
+    db_session.commit()
+    assert out["status"] == "completed"
+    identities = int(
+        db_session.scalar(select(func.count()).select_from(IdentityEntity).where(IdentityEntity.tenant_id == tenant_id))
+        or 0
+    )
+    accounts = int(
+        db_session.scalar(select(func.count()).select_from(IdentityAccount).where(IdentityAccount.tenant_id == tenant_id))
+        or 0
+    )
+    assert accounts >= 2
+    assert identities == 1
+
+
+def test_phase3_handle_match_links_when_email_missing(db_session: Session) -> None:
+    tenant_id = _seed(db_session, include_slack_same_handle_no_email=True)
     execute_canon_pass_for_tenant(
         db_session,
         tenant_id=tenant_id,
