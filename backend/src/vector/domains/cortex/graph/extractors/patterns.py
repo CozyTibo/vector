@@ -28,3 +28,12 @@ GITHUB_SHORTHAND_RE = re.compile(r"\b([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#(\d+)\b
 GITHUB_HASH_NUM_RE = re.compile(r"(?<!\w)#(\d+)\b")
 
 MAX_TEXT_SCAN_CHARS = 8000
+
+NOTION_PAGE_URL_RE = re.compile(
+    r"https://(?:www\.)?notion\.so/(?:[^/\s]+-)?([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+    re.IGNORECASE,
+)
+
+SLACK_USER_MENTION_RE = re.compile(r"<@([A-Z0-9]+)>")
+
+GITHUB_AT_MENTION_RE = re.compile(r"@([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)")

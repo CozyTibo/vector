@@ -516,6 +516,11 @@ export type GraphUnresolvedList = {
   limit: number;
 };
 
+export type GraphEntityLinks = {
+  outbound: GraphRelationshipListItem[];
+  inbound: GraphRelationshipListItem[];
+};
+
 export function titleConnector(connector: string): string {
   if (connector === "github") return "GitHub";
   if (connector === "calls") return "Calls";

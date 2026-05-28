@@ -15,6 +15,7 @@ from vector.domains.cortex.graph.enqueue import GRAPH_SCOPED_ENTITY_TYPES
 from vector.domains.cortex.graph.extractor_version import effective_graph_extractor_version
 from vector.domains.cortex.graph.extractors import (
     extract_canon_ref_edges,
+    extract_cross_tool_edges,
     extract_provider_native_edges,
     extract_text_references,
 )
@@ -217,7 +218,15 @@ def _extract_edges_for_entity(
     drafts.extend(extract_provider_native_edges(session, tenant_id=tenant_id, entity=entity))
     text_out = extract_text_references(session, tenant_id=tenant_id, entity=entity)
     drafts.extend(text_out.edges)
-    return drafts, text_out.unresolved
+    unresolved = list(text_out.unresolved)
+    cross_edges, cross_unresolved = extract_cross_tool_edges(
+        session,
+        tenant_id=tenant_id,
+        entity=entity,
+    )
+    drafts.extend(cross_edges)
+    unresolved.extend(cross_unresolved)
+    return drafts, unresolved
 
 
 def _process_entity_extract(

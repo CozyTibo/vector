@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
+import { GraphEntityLinksPanel } from "./GraphEntityLinksPanel";
 import type { CanonEntityDetail } from "../cortexAdminTypes";
 
 export function CanonEntityDetailView() {
@@ -32,6 +33,12 @@ export function CanonEntityDetailView() {
       <pre className="max-h-48 overflow-auto rounded bg-stone-50 p-3 text-xs">
         {JSON.stringify(d.attrs_json, null, 2)}
       </pre>
+      <section className="rounded-lg border border-stone-200 bg-white p-4">
+        <h3 className="font-semibold">Execution links</h3>
+        <div className="mt-2">
+          <GraphEntityLinksPanel entityId={entityId} />
+        </div>
+      </section>
       <h3 className="font-semibold">Sources</h3>
       <ul className="space-y-2 text-sm">
         {d.sources.map((s) => (
