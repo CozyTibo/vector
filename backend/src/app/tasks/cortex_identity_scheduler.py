@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -10,7 +10,9 @@ from app.celery_app import celery_app
 from vector.domains.cortex.identity.pass_run_ops import RUN_RUNNING, abandon_stuck_running_identity_passes
 from vector.domains.cortex.identity.scheduler import iter_tenants_with_actor_entities
 from vector.domains.cortex.ingestion.sync_shared import utc_now
+from vector.domains.cortex.runtime.lane_scheduler_tick import complete_lane_scheduler_tick_v1
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
+from vector.infrastructure.db.models.identity_scheduler_tick import IdentitySchedulerTick
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
 
@@ -59,15 +61,38 @@ def _should_skip_scheduled_identity_pass(
 @celery_app.task(name=_TASK_TICK, queue="vector")
 def tick_cortex_identity_scheduler() -> dict[str, object]:
     settings = get_settings()
+    beat_interval = max(60, int(settings.cortex_identity_scheduler_interval_seconds))
+
+    with session_scope() as session:
+        tick = IdentitySchedulerTick(
+            started_at=datetime.now(tz=UTC),
+            outcome="running",
+            beat_interval_seconds=beat_interval,
+        )
+        session.add(tick)
+        session.flush()
+        tick_id = tick.id
+
     if not settings.cortex_identity_scheduler_enabled:
-        return {"status": "disabled", "enqueued": 0}
+        with session_scope() as session:
+            tick = session.get(IdentitySchedulerTick, tick_id)
+            if tick is not None:
+                complete_lane_scheduler_tick_v1(
+                    session,
+                    tick,
+                    outcome="skipped_disabled",
+                    enqueued_count=0,
+                    candidate_count=0,
+                    skip_reason="scheduler_disabled",
+                )
+        return {"status": "disabled", "enqueued": 0, "tick_id": str(tick_id)}
 
     from app.tasks.cortex_identity_sync import run_cortex_identity_pass_task
 
-    interval = max(60, int(settings.cortex_identity_scheduler_interval_seconds))
     enqueued = 0
     skipped = 0
     tenant_ids: list[str] = []
+    enqueued_ids: list[str] = []
     with session_scope() as session:
         for tid in iter_tenants_with_actor_entities(session):
             tenant_ids.append(str(tid))
@@ -77,12 +102,26 @@ def tick_cortex_identity_scheduler() -> dict[str, object]:
             if _should_skip_scheduled_identity_pass(
                 session,
                 tenant_id=tid_uuid,
-                interval_seconds=interval,
+                interval_seconds=beat_interval,
             ):
                 skipped += 1
                 continue
         run_cortex_identity_pass_task.delay(tid, source_trigger="scheduled")
         enqueued += 1
+        enqueued_ids.append(tid)
+    outcome = "enqueued" if enqueued else "noop"
+    with session_scope() as session:
+        tick = session.get(IdentitySchedulerTick, tick_id)
+        if tick is not None:
+            complete_lane_scheduler_tick_v1(
+                session,
+                tick,
+                outcome=outcome,
+                enqueued_count=enqueued,
+                candidate_count=len(tenant_ids),
+                skipped_count=skipped,
+                enqueued_tenant_ids=enqueued_ids,
+            )
     _LOGGER.info(
         "identity scheduler tick enqueued %s passes (%s skipped, %s tenants)",
         enqueued,
@@ -94,6 +133,6 @@ def tick_cortex_identity_scheduler() -> dict[str, object]:
         "enqueued": enqueued,
         "skipped": skipped,
         "tenant_count": len(tenant_ids),
-        "interval_seconds": interval,
+        "interval_seconds": beat_interval,
+        "tick_id": str(tick_id),
     }
-

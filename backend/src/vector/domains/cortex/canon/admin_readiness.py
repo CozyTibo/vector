@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canon.inventory import build_tenant_canon_readiness
+from vector.domains.cortex.runtime.lane_scheduler_status import build_canon_lane_scheduler_status
 from vector.settings import Settings
 
 
@@ -50,10 +51,13 @@ def build_canon_admin_readiness(
         registry_disposition=_registry_disposition(),
         dirty_queue_depth=_dirty_queue_depth(session, tenant_id),
     )
-    payload["scheduler"] = {
-        "enabled": settings.cortex_canon_scheduler_enabled,
-        "interval_seconds": settings.cortex_canon_scheduler_interval_seconds,
-    }
+    interval = max(60, int(settings.cortex_canon_scheduler_interval_seconds))
+    payload["scheduler"] = build_canon_lane_scheduler_status(
+        session,
+        tenant_id=tenant_id,
+        enabled=settings.cortex_canon_scheduler_enabled,
+        interval_seconds=interval,
+    )
     return payload
 
 

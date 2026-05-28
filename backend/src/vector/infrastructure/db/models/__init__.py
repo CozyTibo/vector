@@ -6,6 +6,7 @@ from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.canon_entity_source import CanonEntitySource
 from vector.infrastructure.db.models.canon_materialization_cursor import CanonMaterializationCursor
 from vector.infrastructure.db.models.canon_pass_run import CanonPassRun
+from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
 from vector.infrastructure.db.models.cortex_admin_continuity_snapshot import CortexAdminContinuitySnapshot
 from vector.infrastructure.db.models.cortex_admin_graph_component_snapshot import (
     CortexAdminGraphComponentSnapshot,
@@ -21,6 +22,7 @@ from vector.infrastructure.db.models.identity_account import IdentityAccount
 from vector.infrastructure.db.models.identity_dirty_queue import IdentityDirtyQueue
 from vector.infrastructure.db.models.identity_entity import IdentityEntity
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
+from vector.infrastructure.db.models.identity_scheduler_tick import IdentitySchedulerTick
 from vector.infrastructure.db.models.identity_suggestion import IdentitySuggestion
 from vector.infrastructure.db.models.identity import UserIdentity
 from vector.infrastructure.db.models.linear_connection_detail import LinearConnectionDetail
@@ -49,6 +51,7 @@ __all__ = [
     "CanonEntitySource",
     "CanonMaterializationCursor",
     "CanonPassRun",
+    "CanonSchedulerTick",
     "CallsConnectionDetail",
     "ConnectorSyncState",
     "CortexAdminContinuitySnapshot",
@@ -61,6 +64,7 @@ __all__ = [
     "IdentityDirtyQueue",
     "IdentityEntity",
     "IdentityPassRun",
+    "IdentitySchedulerTick",
     "IdentitySuggestion",
     "LinearConnectionDetail",
     "NotionConnectionDetail",

@@ -1776,13 +1776,18 @@ def build_admin_router() -> APIRouter:
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminIdentityReadinessResponse:
         _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.runtime.lane_scheduler_status import build_identity_lane_scheduler_status
+
+        interval = max(60, int(settings.cortex_identity_scheduler_interval_seconds))
         raw = build_identity_readiness(
             db,
             tenant_id,
-            scheduler={
-                "enabled": settings.cortex_identity_scheduler_enabled,
-                "interval_seconds": settings.cortex_identity_scheduler_interval_seconds,
-            },
+            scheduler=build_identity_lane_scheduler_status(
+                db,
+                tenant_id=tenant_id,
+                enabled=settings.cortex_identity_scheduler_enabled,
+                interval_seconds=interval,
+            ),
         )
         if int(raw.get("abandoned_stuck_running_passes") or 0) > 0:
             db.commit()
