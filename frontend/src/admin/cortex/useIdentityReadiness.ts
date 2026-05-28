@@ -11,6 +11,7 @@ export function useIdentityReadiness() {
     queryFn: () => adminJson<IdentityReadiness>(`/admin/tenants/${tenantId}/cortex/identities/readiness`),
     enabled: Boolean(tenantId),
     staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 

@@ -148,6 +148,7 @@ export type IdentityListItem = {
   resolved_at: string;
   account_count: number;
   connectors: string[];
+  avatar_url?: string | null;
 };
 
 export type IdentityList = {

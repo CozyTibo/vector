@@ -13,8 +13,68 @@ from vector.infrastructure.db.models.identity_account import IdentityAccount
 from vector.infrastructure.db.models.identity_dirty_queue import IdentityDirtyQueue
 from vector.infrastructure.db.models.identity_entity import IdentityEntity
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
+from vector.domains.cortex.identity.materialize import _latest_actor_payload
+from vector.domains.cortex.identity.signals import extract_actor_signal
 
 MANUAL_IDENTITY_PASS_CONFIRMATION = "RUN IDENTITY RECONCILIATION PASS"
+AVATAR_CONNECTOR_PRIORITY: tuple[str, ...] = ("slack", "github", "notion", "linear")
+
+
+def _avatar_url_from_evidence(evidence: dict[str, Any]) -> str | None:
+    raw = evidence.get("avatar_url")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def _avatar_url_for_account(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    account: IdentityAccount,
+) -> str | None:
+    evidence = account.evidence_json if isinstance(account.evidence_json, dict) else {}
+    cached = _avatar_url_from_evidence(evidence)
+    if cached:
+        return cached
+    row = _latest_actor_payload(session, tenant_id=tenant_id, canon_entity_id=account.canon_entity_id)
+    if row is None:
+        return None
+    entity, source, raw = row
+    payload = dict(raw.payload_body) if isinstance(raw.payload_body, dict) else {}
+    signal = extract_actor_signal(
+        canon_entity_id=entity.id,
+        connector=entity.connector,
+        connection_id=entity.connection_id,
+        entity_key=entity.entity_key,
+        external_id=source.external_id,
+        source_revision_key=source.source_revision_key,
+        payload_body=payload,
+    )
+    return signal.avatar_url
+
+
+def pick_identity_avatar_url(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    accounts: list[IdentityAccount],
+) -> str | None:
+    """Prefer Slack portrait, then GitHub, Notion, Linear."""
+    by_connector: dict[str, IdentityAccount] = {}
+    for account in accounts:
+        if account.connector not in by_connector:
+            by_connector[account.connector] = account
+    for connector in AVATAR_CONNECTOR_PRIORITY:
+        account = by_connector.get(connector)
+        if account is None:
+            continue
+        url = _avatar_url_for_account(session, tenant_id=tenant_id, account=account)
+        if url:
+            return url
+    return None
+
+
 MANUAL_IDENTITY_REBUILD_CONFIRMATION = "REBUILD IDENTITIES FROM CANON ACTORS"
 
 
@@ -170,6 +230,7 @@ def list_identities(
             ).all(),
         )
         connectors = sorted({a.connector for a in linked_accounts})
+        avatar_url = pick_identity_avatar_url(session, tenant_id=tenant_id, accounts=linked_accounts)
         items.append(
             {
                 "id": str(r.id),
@@ -180,6 +241,7 @@ def list_identities(
                 "resolved_at": r.resolved_at.isoformat(),
                 "account_count": len(linked_accounts),
                 "connectors": connectors,
+                "avatar_url": avatar_url,
             },
         )
     return items, total

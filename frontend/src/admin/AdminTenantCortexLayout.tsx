@@ -1,5 +1,9 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 
+import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
+import { isIdentityPassRunStale } from "./cortex/identityPassRunHealth";
+import { useIdentityReadiness } from "./cortex/useIdentityReadiness";
+
 function tabCls(isActive: boolean): string {
   return [
     "rounded-md px-3 py-1.5 text-sm font-medium no-underline",
@@ -11,6 +15,8 @@ function tabCls(isActive: boolean): string {
 
 export default function AdminTenantCortexLayout() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
+  const readinessQ = useIdentityReadiness();
+  const passRunStale = isIdentityPassRunStale(readinessQ.data);
 
   return (
     <div className="space-y-5">
@@ -39,7 +45,10 @@ export default function AdminTenantCortexLayout() {
           to={`/admin/tenants/${tenantId}/cortex/identities`}
           className={({ isActive }) => tabCls(isActive)}
         >
-          Identities
+          <span className="inline-flex items-center">
+            Identities
+            {passRunStale ? <IdentityPassStaleBadge /> : null}
+          </span>
         </NavLink>
       </nav>
 

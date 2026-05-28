@@ -707,6 +707,8 @@ def _seed_identity_for_actor(
         "kind": kind,
         "kind_reason": kind_reason,
     }
+    if signal.avatar_url:
+        evidence["avatar_url"] = signal.avatar_url
     if existing_account is not None:
         existing_account.identity_entity_id = identity.id
         existing_account.connector = canon_entity.connector

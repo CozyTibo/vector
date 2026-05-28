@@ -4,7 +4,10 @@ import { Link, useSearchParams, useParams } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
 import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
+import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
+import { IdentityRowAvatar } from "./cortex/IdentityRowAvatar";
 import { IdentitySchedulerPanel } from "./cortex/IdentitySchedulerPanel";
+import { isIdentityPassRunStale } from "./cortex/identityPassRunHealth";
 import { useIdentityReadiness } from "./cortex/useIdentityReadiness";
 import type {
   IdentityDetail,
@@ -92,6 +95,9 @@ function IdentityListTab({ kind }: { kind: "human" | "inactive_human" | "bot" | 
                   <span className="shrink-0 pt-1 text-xs font-medium text-indigo-700">
                     {open ? "▼" : "▶"}
                   </span>
+                  {kind === "human" && item.avatar_url ? (
+                    <IdentityRowAvatar url={item.avatar_url} displayName={item.display_name} />
+                  ) : null}
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-stone-900">{item.display_name}</span>
@@ -324,6 +330,7 @@ export default function AdminCortexIdentitiesPage() {
               ? "unresolved"
               : "humans";
   const readinessQ = useIdentityReadiness();
+  const passRunStale = isIdentityPassRunStale(readinessQ.data);
 
   const setTab = (next: "humans" | "inactive" | "bots" | "unknown" | "unresolved" | "runs") => {
     setSearchParams((prev) => {
@@ -381,6 +388,7 @@ export default function AdminCortexIdentitiesPage() {
             onClick={() => setTab(key)}
           >
             {label}
+            {key === "runs" && passRunStale ? <IdentityPassStaleBadge /> : null}
           </button>
         ))}
       </nav>
