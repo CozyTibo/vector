@@ -56,8 +56,8 @@ class GraphRelationship(Base):
     evidence_ref: Mapped[str] = mapped_column(String(256), nullable=False)
     evidence_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     source_raw_id: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
-    source_canon_source_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
+    source_canon_source_id: Mapped[int | None] = mapped_column(
+        BigInteger(),
         ForeignKey("canon_entity_sources.id", ondelete="SET NULL"),
         nullable=True,
     )

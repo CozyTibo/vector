@@ -206,9 +206,7 @@ def get_relationship_detail(
         "to_identity": _identity_summary(session, row.to_identity_id),
         "evidence_snapshot": row.evidence_snapshot or {},
         "source_raw_id": row.source_raw_id,
-        "source_canon_source_id": (
-            str(row.source_canon_source_id) if row.source_canon_source_id else None
-        ),
+        "source_canon_source_id": row.source_canon_source_id,
     }
 
 

@@ -19,7 +19,7 @@ class EdgeDraft:
     confidence: str = "certain"
     evidence_snapshot: dict[str, Any] | None = None
     source_raw_id: int | None = None
-    source_canon_source_id: uuid.UUID | None = None
+    source_canon_source_id: int | None = None
     observed_at: datetime | None = None
 
 

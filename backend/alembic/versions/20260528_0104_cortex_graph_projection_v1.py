@@ -35,7 +35,7 @@ def upgrade() -> None:
         sa.Column("evidence_ref", sa.String(length=256), nullable=False),
         sa.Column("evidence_snapshot", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("source_raw_id", sa.BigInteger(), nullable=True),
-        sa.Column("source_canon_source_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("source_canon_source_id", sa.BigInteger(), nullable=True),
         sa.Column("observed_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column("superseded_by_id", postgresql.UUID(as_uuid=True), nullable=True),

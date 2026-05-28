@@ -5032,7 +5032,7 @@ class AdminGraphRelationshipDetailResponse(BaseModel):
     to_identity: dict[str, Any] | None = None
     evidence_snapshot: dict[str, Any] = Field(default_factory=dict)
     source_raw_id: int | None = None
-    source_canon_source_id: str | None = None
+    source_canon_source_id: int | None = None
 
 
 class AdminGraphEntityLinksResponse(BaseModel):
