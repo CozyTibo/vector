@@ -6,6 +6,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AdminLayout from "./admin/AdminLayout.tsx";
 import AdminCortexCanonEntityPage from "./admin/AdminCortexCanonEntityPage.tsx";
 import AdminCortexCanonPage from "./admin/AdminCortexCanonPage.tsx";
+import AdminCortexIdentitiesPage from "./admin/AdminCortexIdentitiesPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
@@ -82,6 +83,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
                 <Route path="canon" element={<AdminCortexCanonPage />} />
                 <Route path="canon/entities/:entityId" element={<AdminCortexCanonEntityPage />} />
+                <Route path="identities" element={<AdminCortexIdentitiesPage />} />
                 <Route path="overview" element={<Navigate to="ingestion" replace />} />
                 <Route path="runtime" element={<Navigate to="ingestion" replace />} />
                 <Route path="queues" element={<Navigate to="ingestion" replace />} />
@@ -92,8 +94,8 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="inspect" element={<Navigate to="ingestion" replace />} />
                 <Route path="inspect/*" element={<Navigate to="../ingestion" replace />} />
                 <Route path="settings" element={<Navigate to="ingestion" replace />} />
-                <Route path="identity" element={<Navigate to="ingestion" replace />} />
-                <Route path="identity/*" element={<Navigate to="../ingestion" replace />} />
+                <Route path="identity" element={<Navigate to="identities" replace />} />
+                <Route path="identity/*" element={<Navigate to="../identities" replace />} />
                 <Route path="graph" element={<Navigate to="ingestion" replace />} />
                 <Route path="reconstruction" element={<Navigate to="ingestion" replace />} />
                 <Route path="reconstruction/*" element={<Navigate to="../ingestion" replace />} />

@@ -35,6 +35,12 @@ export default function AdminTenantCortexLayout() {
         >
           Canonical
         </NavLink>
+        <NavLink
+          to={`/admin/tenants/${tenantId}/cortex/identities`}
+          className={({ isActive }) => tabCls(isActive)}
+        >
+          Identities
+        </NavLink>
       </nav>
 
       <Outlet />

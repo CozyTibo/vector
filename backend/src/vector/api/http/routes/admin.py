@@ -56,6 +56,16 @@ from vector.contracts.admin import (
     AdminCanonEntityDetailResponse,
     AdminCanonEntityListResponse,
     AdminCanonEntityStatsResponse,
+    AdminIdentityDetailResponse,
+    AdminIdentityListResponse,
+    AdminIdentityPassRunItem,
+    AdminIdentityReadinessResponse,
+    AdminIdentityRecentPassRunsResponse,
+    AdminIdentityRebuildRequest,
+    AdminIdentityRebuildResponse,
+    AdminIdentityTriggerPassRequest,
+    AdminIdentityTriggerPassResponse,
+    AdminIdentityUnresolvedActorsResponse,
     AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
     AdminCanonTriggerPassRequest,
@@ -125,6 +135,15 @@ from vector.domains.cortex.canon.admin_readiness import (
     list_recent_canon_pass_runs,
 )
 from vector.domains.cortex.canon.resource_type_registry import registry_rows
+from vector.domains.cortex.identity.admin import (
+    MANUAL_IDENTITY_PASS_CONFIRMATION,
+    MANUAL_IDENTITY_REBUILD_CONFIRMATION,
+    build_identity_readiness,
+    get_identity_detail,
+    list_identities,
+    list_recent_identity_pass_runs,
+    list_unresolved_actor_entities,
+)
 from vector.domains.cortex.ingestion.admin_overview import build_cortex_ingestion_admin_overview
 from vector.domains.cortex.ingestion.admin_recent_raw import (
     aggregate_raw_ingestion_stats,
@@ -1746,6 +1765,154 @@ def build_admin_router() -> APIRouter:
 
         run_cortex_canon_pass_task.delay(str(tenant_id), source_trigger="manual_admin")
         return AdminCanonTriggerPassResponse(tenant_id=tenant_id)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identities/readiness",
+        response_model=AdminIdentityReadinessResponse,
+    )
+    def admin_cortex_identity_readiness(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminIdentityReadinessResponse:
+        _assert_tenant(db, tenant_id)
+        raw = build_identity_readiness(
+            db,
+            tenant_id,
+            scheduler={
+                "enabled": settings.cortex_identity_scheduler_enabled,
+                "interval_seconds": settings.cortex_identity_scheduler_interval_seconds,
+            },
+        )
+        return AdminIdentityReadinessResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identities/runs",
+        response_model=AdminIdentityRecentPassRunsResponse,
+    )
+    def admin_cortex_identity_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+    ) -> AdminIdentityRecentPassRunsResponse:
+        _assert_tenant(db, tenant_id)
+        rows, total = list_recent_identity_pass_runs(db, tenant_id, limit=limit, offset=offset)
+        return AdminIdentityRecentPassRunsResponse(
+            items=[AdminIdentityPassRunItem.model_validate(x) for x in rows],
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identities",
+        response_model=AdminIdentityListResponse,
+    )
+    def admin_cortex_identities(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        kind: Annotated[str | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+        search: Annotated[str | None, Query()] = None,
+    ) -> AdminIdentityListResponse:
+        _assert_tenant(db, tenant_id)
+        items, total = list_identities(
+            db,
+            tenant_id,
+            kind=kind,
+            limit=limit,
+            offset=offset,
+            search=search,
+        )
+        return AdminIdentityListResponse(items=items, total_count=total, offset=offset, limit=limit)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identities/{identity_id}",
+        response_model=AdminIdentityDetailResponse,
+    )
+    def admin_cortex_identity_detail(
+        tenant_id: uuid.UUID,
+        identity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminIdentityDetailResponse:
+        _assert_tenant(db, tenant_id)
+        raw = get_identity_detail(db, tenant_id, identity_id)
+        if raw is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Identity not found.")
+        return AdminIdentityDetailResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identities/unresolved-actors",
+        response_model=AdminIdentityUnresolvedActorsResponse,
+    )
+    def admin_cortex_identity_unresolved_actors(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+    ) -> AdminIdentityUnresolvedActorsResponse:
+        _assert_tenant(db, tenant_id)
+        items, total = list_unresolved_actor_entities(
+            db,
+            tenant_id,
+            limit=limit,
+            offset=offset,
+        )
+        return AdminIdentityUnresolvedActorsResponse(items=items, total_count=total, offset=offset, limit=limit)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identities/actions/trigger-pass",
+        response_model=AdminIdentityTriggerPassResponse,
+    )
+    def admin_cortex_identity_trigger_pass(
+        tenant_id: uuid.UUID,
+        body: AdminIdentityTriggerPassRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminIdentityTriggerPassResponse:
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != MANUAL_IDENTITY_PASS_CONFIRMATION:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation must be exactly: {MANUAL_IDENTITY_PASS_CONFIRMATION}",
+            )
+        from app.tasks.cortex_identity_sync import run_cortex_identity_pass_task
+
+        run_cortex_identity_pass_task.delay(str(tenant_id), source_trigger="manual_admin")
+        return AdminIdentityTriggerPassResponse(tenant_id=tenant_id)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/identities/actions/rebuild",
+        response_model=AdminIdentityRebuildResponse,
+    )
+    def admin_cortex_identity_rebuild(
+        tenant_id: uuid.UUID,
+        body: AdminIdentityRebuildRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminIdentityRebuildResponse:
+        _assert_tenant(db, tenant_id)
+        if body.confirmation != MANUAL_IDENTITY_REBUILD_CONFIRMATION:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation must be exactly: {MANUAL_IDENTITY_REBUILD_CONFIRMATION}",
+            )
+        from vector.domains.cortex.identity.materialize import rebuild_identities_for_tenant
+
+        out = rebuild_identities_for_tenant(
+            db,
+            tenant_id=tenant_id,
+            resolver_version=settings.cortex_identity_resolver_version,
+            source_trigger="manual_rebuild_admin",
+            batch_limit=settings.cortex_identity_batch_actor_limit,
+        )
+        db.commit()
+        return AdminIdentityRebuildResponse(
+            tenant_id=tenant_id,
+            enqueued_actor_count=int(out.get("enqueued", 0)),
+            stats={k: int(v) for k, v in (out.get("stats") or {}).items()},
+        )
 
     @r.get(
         "/tenants/{tenant_id}/cortex/ingestion/connectors/{connector}/raw-records",

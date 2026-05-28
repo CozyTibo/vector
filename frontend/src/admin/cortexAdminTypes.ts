@@ -117,6 +117,80 @@ export type CanonEntityDetail = CanonEntityItem & {
   }>;
 };
 
+export type IdentityReadiness = {
+  tenant_id: string;
+  actor_count: number;
+  identity_count: number;
+  linked_account_count: number;
+  unresolved_actor_count: number;
+  dirty_queue_depth: number;
+  latest_pass_run: Record<string, unknown> | null;
+  scheduler: { enabled: boolean; interval_seconds: number };
+};
+
+export type IdentityPassRunItem = {
+  id: string;
+  status: string;
+  source_trigger: string;
+  started_at: string;
+  finished_at: string | null;
+  error_summary: string | null;
+  stats: Record<string, unknown> | null;
+};
+
+export type IdentityListItem = {
+  id: string;
+  kind: string;
+  display_name: string;
+  primary_email: string | null;
+  resolver_version: number;
+  resolved_at: string;
+  account_count: number;
+  connectors: string[];
+};
+
+export type IdentityList = {
+  items: IdentityListItem[];
+  total_count: number;
+  offset: number;
+  limit: number;
+};
+
+export type IdentityDetail = {
+  id: string;
+  kind: string;
+  display_name: string;
+  primary_email: string | null;
+  resolver_version: number;
+  resolved_at: string;
+  accounts: Array<{
+    identity_account_id: string;
+    canon_entity_id: string;
+    connector: string;
+    connection_id: string;
+    display_label: string;
+    entity_key: string;
+    link_tier: string;
+    link_rule: string;
+    confidence: string;
+    evidence_json: Record<string, unknown>;
+    linked_at: string;
+  }>;
+};
+
+export type IdentityUnresolvedActors = {
+  items: Array<{
+    canon_entity_id: string;
+    connector: string;
+    display_label: string;
+    entity_key: string;
+    materialized_at: string;
+  }>;
+  total_count: number;
+  offset: number;
+  limit: number;
+};
+
 export type CortexConnectorId = "calls" | "github" | "linear" | "notion" | "slack";
 
 export type CortexIngestionRunSummary = {

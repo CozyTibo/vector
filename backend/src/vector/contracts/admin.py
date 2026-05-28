@@ -4721,6 +4721,98 @@ class AdminCortexIdentityContinuityEntityCandidatesResponse(BaseModel):
     promotion_lineage: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AdminIdentityReadinessResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: str
+    actor_count: int
+    identity_count: int
+    linked_account_count: int
+    unresolved_actor_count: int
+    dirty_queue_depth: int
+    latest_pass_run: dict[str, Any] | None = None
+    scheduler: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminIdentityPassRunItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    status: str
+    source_trigger: str
+    started_at: str
+    finished_at: str | None = None
+    error_summary: str | None = None
+    stats: dict[str, Any] | None = None
+
+
+class AdminIdentityRecentPassRunsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[AdminIdentityPassRunItem]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminIdentityTriggerPassRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str = Field(..., description="Must exactly match the server phrase.")
+
+
+class AdminIdentityTriggerPassResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    enqueued: bool = True
+    queue: Literal["cortex_identity"] = "cortex_identity"
+    tenant_id: uuid.UUID
+
+
+class AdminIdentityRebuildRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str = Field(..., description="Must exactly match the server phrase.")
+
+
+class AdminIdentityRebuildResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    enqueued_actor_count: int
+    stats: dict[str, int]
+
+
+class AdminIdentityListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminIdentityDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    kind: str
+    display_name: str
+    primary_email: str | None = None
+    resolver_version: int
+    resolved_at: str
+    accounts: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdminIdentityUnresolvedActorsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
 class AdminCanonReadinessResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
