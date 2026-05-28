@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 import unicodedata
 from typing import Any
@@ -33,6 +34,8 @@ RUN_FAILED = "FAILED"
 BOT_MARKERS = ("[bot]", "-bot", "dependabot", "githubactions", "github-actions", "slackbot")
 # Handles/local-parts shorter than this are too ambiguous for cross-actor auto-link (e.g. shared first names).
 MIN_CROSS_ACTOR_HANDLE_LEN = 10
+# Display-name tokens below this length are ignored for T4 (e.g. bare "julien", "camille").
+MIN_CROSS_ACTOR_NAME_TOKEN_LEN = MIN_CROSS_ACTOR_HANDLE_LEN
 # Email local-part must be at least this long to derive surname suffixes (e.g. cecile + veneziani).
 MIN_EMAIL_LOCAL_FOR_SUFFIX = 5
 MIN_SURNAME_SUFFIX_LEN = 8
@@ -198,6 +201,21 @@ def _name_token(raw: str) -> str | None:
     ascii_only = "".join(ch for ch in folded if ord(ch) < 128)
     token = "".join(ch for ch in ascii_only.lower() if ch.isalnum())
     return token or None
+
+
+def _significant_display_name_tokens(raw: str) -> set[str]:
+    """Tokens safe for cross-actor display-name matching (excludes bare first names)."""
+    tokens: set[str] = set()
+    full = _name_token(raw)
+    if full and len(full) >= MIN_CROSS_ACTOR_NAME_TOKEN_LEN:
+        tokens.add(full)
+    folded = unicodedata.normalize("NFKD", raw)
+    ascii_only = "".join(ch for ch in folded if ord(ch) < 128)
+    for part in re.split(r"[\s._-]+", ascii_only.lower()):
+        word = "".join(ch for ch in part if ch.isalnum())
+        if word and len(word) >= MIN_CROSS_ACTOR_NAME_TOKEN_LEN:
+            tokens.add(word)
+    return tokens
 
 
 def classify_identity_kind(
@@ -628,8 +646,9 @@ def _seed_identity_for_actor(
                 confidence = "medium"
     if matched_identity is None and signal.display_names:
         name_matches: set[uuid.UUID] = set()
-        incoming_name_tokens = {_name_token(n) for n in signal.display_names}
-        incoming_name_tokens.discard(None)
+        incoming_name_tokens: set[str] = set()
+        for name in signal.display_names:
+            incoming_name_tokens.update(_significant_display_name_tokens(name))
         if incoming_name_tokens:
             rows = list(
                 session.execute(
@@ -648,8 +667,9 @@ def _seed_identity_for_actor(
                 prior_names = {str(v) for v in prev_names} if isinstance(prev_names, list) else set()
                 if isinstance(identity.display_name, str) and identity.display_name.strip():
                     prior_names.add(identity.display_name)
-                prior_tokens = {_name_token(name) for name in prior_names}
-                prior_tokens.discard(None)
+                prior_tokens: set[str] = set()
+                for name in prior_names:
+                    prior_tokens.update(_significant_display_name_tokens(name))
                 if prior_tokens.intersection(incoming_name_tokens):
                     name_matches.add(identity.id)
             if len(name_matches) == 1:

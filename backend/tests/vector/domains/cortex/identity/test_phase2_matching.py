@@ -9,6 +9,7 @@ from vector.domains.cortex.identity.materialize import (
     _local_part_token,
     _matches_initial_plus_surname_suffix,
     _name_token,
+    _significant_display_name_tokens,
     _significant_handle_overlap,
     _significant_handles_edit_distance_one,
     _surname_suffixes_from_email_local,
@@ -91,4 +92,18 @@ def test_cross_actor_match_handles_use_provider_login_only() -> None:
 
 def test_name_token_normalizes_accents_and_separators() -> None:
     assert _name_token("Cyril Clément") == "cyrilclement"
+
+
+def test_significant_display_name_tokens_reject_bare_first_names() -> None:
+    assert _significant_display_name_tokens("julien") == set()
+    assert _significant_display_name_tokens("camille") == set()
+    assert "julienpeyruchat" in _significant_display_name_tokens("Julien Peyruchat")
+    assert "camilleortholand" in _significant_display_name_tokens("Camille Ortholand")
+    assert "chambefort" in _significant_display_name_tokens("camille chambefort")
+
+
+def test_bare_first_name_tokens_do_not_cross_match() -> None:
+    left = _significant_display_name_tokens("julien")
+    right = _significant_display_name_tokens("Julien Peyruchat")
+    assert not left.intersection(right)
 
