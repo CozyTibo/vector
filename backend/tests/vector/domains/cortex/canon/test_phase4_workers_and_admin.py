@@ -96,6 +96,7 @@ def _seed(db_session: Session) -> uuid.UUID:
 def test_plan_passes_skips_canon_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CORTEX_CANON_SCHEDULER_ENABLED", "false")
     monkeypatch.setenv("CORTEX_IDENTITY_SCHEDULER_ENABLED", "false")
+    monkeypatch.setenv("CORTEX_GRAPH_SCHEDULER_ENABLED", "false")
     from vector.settings import get_settings
 
     get_settings.cache_clear()
@@ -108,6 +109,7 @@ def test_plan_passes_skips_canon_when_disabled(monkeypatch: pytest.MonkeyPatch) 
     out = plan_cortex_passes_v1(_Sess(), get_settings())  # type: ignore[arg-type]
     assert out["canon_planned"] == 0
     assert out["identity_planned"] == 0
+    assert out["graph_planned"] == 0
 
 
 def test_list_entities_after_pass(db_session: Session) -> None:
