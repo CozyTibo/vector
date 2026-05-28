@@ -41,6 +41,8 @@ MIN_CROSS_ACTOR_NAME_WORD_LEN = MIN_CROSS_ACTOR_FULL_NAME_LEN
 # Email local-part must be at least this long to derive surname suffixes (e.g. cecile + veneziani).
 MIN_EMAIL_LOCAL_FOR_SUFFIX = 5
 MIN_SURNAME_SUFFIX_LEN = 8
+# GitHub-style logins like ``cveneziani`` (9) are below general handle length but safe with surname suffix.
+MIN_INITIAL_SUFFIX_LOGIN_LEN = 9
 # Auto-links that may be invalidated when resolver rules tighten.
 REVOCABLE_WEAK_LINK_RULES = frozenset(
     {
@@ -156,12 +158,25 @@ def _surname_suffixes_from_email_local(local_tok: str, handles: set[str]) -> set
 
 
 def _matches_initial_plus_surname_suffix(handle: str, local_tok: str, suffixes: set[str]) -> bool:
-    if len(handle) < MIN_CROSS_ACTOR_HANDLE_LEN or not suffixes:
+    if len(handle) < MIN_INITIAL_SUFFIX_LOGIN_LEN or not suffixes:
         return False
     if len(local_tok) < MIN_EMAIL_LOCAL_FOR_SUFFIX:
         return False
     initial = local_tok[0]
     return any(handle == initial + suffix for suffix in suffixes)
+
+
+def _initial_suffix_login_handles(signal: ActorSignal) -> set[str]:
+    """Provider logins like ``cveneziani`` (9) used only for initial+surname suffix matching."""
+    tokens: set[str] = set()
+    if signal.primary_handle:
+        key = normalize_handle(signal.primary_handle)
+        if key and len(key) >= MIN_INITIAL_SUFFIX_LOGIN_LEN:
+            tokens.add(key)
+    for handle in signal.handles:
+        if handle and len(handle) >= MIN_INITIAL_SUFFIX_LOGIN_LEN:
+            tokens.add(handle)
+    return tokens
 
 
 def _handles_for_identity_entity(
@@ -536,7 +551,7 @@ def _seed_identity_for_actor(
                 link_rule = "local_part_tenant_domain"
                 confidence = "high"
     weak_merge_ok = _weak_cross_actor_merge_allowed(signal, tenant_domain)
-    if matched_identity is None and weak_merge_ok and signal.handles and tenant_domain:
+    if matched_identity is None and signal.handles and tenant_domain:
         handle_to_email_matches: set[uuid.UUID] = set()
         existing = list(
             session.scalars(
@@ -604,7 +619,7 @@ def _seed_identity_for_actor(
             prev_handles = _cross_actor_match_handles(prev_signal)
             if _significant_handle_overlap(prev_handles, incoming_handles):
                 handle_matches[identity.id] = "exact_normalized_handle"
-            elif weak_merge_ok and _significant_handles_edit_distance_one(prev_handles, incoming_handles):
+            elif _significant_handles_edit_distance_one(prev_handles, incoming_handles):
                 handle_matches[identity.id] = "handle_edit_distance_one"
         if len(handle_matches) == 1:
             target_id = next(iter(handle_matches))
@@ -613,7 +628,8 @@ def _seed_identity_for_actor(
                 link_tier = "T3"
                 link_rule = handle_matches[target_id]
                 confidence = "medium"
-    if matched_identity is None and weak_merge_ok and incoming_handles and tenant_domain:
+    suffix_login_handles = _initial_suffix_login_handles(signal)
+    if matched_identity is None and suffix_login_handles and tenant_domain:
         initial_suffix_matches: set[uuid.UUID] = set()
         anchored_identities = list(
             session.scalars(
@@ -646,7 +662,7 @@ def _seed_identity_for_actor(
             suffixes = _surname_suffixes_from_email_local(local_tok, identity_handles)
             if not suffixes:
                 continue
-            for handle in incoming_handles:
+            for handle in suffix_login_handles:
                 if _matches_initial_plus_surname_suffix(handle, local_tok, suffixes):
                     initial_suffix_matches.add(identity.id)
                     break

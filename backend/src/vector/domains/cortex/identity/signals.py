@@ -151,7 +151,13 @@ def _extract_linear(signal: ActorSignal, body: dict[str, Any]) -> None:
     signal.add_handle(user.get("name"))
     signal.add_name(user.get("name"))
     signal.add_name(user.get("displayName"))
-    signal.add_email(user.get("email"))
+    email = user.get("email")
+    signal.add_email(email)
+    if isinstance(email, str) and "@" in email:
+        local = normalize_handle(email.split("@", 1)[0])
+        if local:
+            signal.primary_handle = local
+        signal.add_handle(email.split("@", 1)[0])
     avatar = user.get("avatarUrl")
     if isinstance(avatar, str) and avatar.strip():
         signal.avatar_url = avatar.strip()

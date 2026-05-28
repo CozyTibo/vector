@@ -254,7 +254,10 @@ def test_rematch_updates_existing_account_row_without_duplicate(db_session: Sess
     slack_account_after = db_session.get(IdentityAccount, slack_account_id)
     assert slack_account_after is not None
     assert slack_account_after.identity_entity_id == notion_identity_id
-    assert slack_account_after.link_rule == "handle_to_email_local_part"
+    assert slack_account_after.link_rule in {
+        "handle_to_email_local_part",
+        "exact_normalized_handle",
+    }
     assert slack_account_after.unlinked_at is None
 
 

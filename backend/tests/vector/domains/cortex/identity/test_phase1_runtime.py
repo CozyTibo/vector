@@ -211,7 +211,7 @@ def test_phase2_exact_email_links_to_existing_identity(db_session: Session) -> N
 
 
 def test_phase3_handle_match_links_when_email_missing(db_session: Session) -> None:
-    """Slack handle must match full email local-part (>=10 chars), not short first names."""
+    """Slack handle must match full email local-part (>=12 chars), not short first names."""
     user = User(email=f"ident-h3-{uuid.uuid4().hex[:8]}@example.com", full_name="Identity H3")
     tenant = Tenant(
         company_name="Identity H3 Co",
