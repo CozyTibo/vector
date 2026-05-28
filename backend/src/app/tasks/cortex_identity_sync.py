@@ -4,6 +4,7 @@ import uuid
 
 from app.celery_app import celery_app
 from vector.domains.cortex.identity.materialize import execute_identity_pass_for_tenant
+from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
 
@@ -20,7 +21,7 @@ def run_cortex_identity_pass_task(
     batch = settings.cortex_identity_batch_actor_limit
     max_attempts = settings.cortex_identity_max_attempts
     periodic_rescan_limit = settings.cortex_identity_periodic_rescan_limit
-    resolver_version = settings.cortex_identity_resolver_version
+    resolver_version = effective_identity_resolver_version(settings.cortex_identity_resolver_version)
     with session_scope() as session:
         out = execute_identity_pass_for_tenant(
             session,

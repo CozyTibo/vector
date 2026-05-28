@@ -1899,11 +1899,12 @@ def build_admin_router() -> APIRouter:
                 detail=f"confirmation must be exactly: {MANUAL_IDENTITY_REBUILD_CONFIRMATION}",
             )
         from vector.domains.cortex.identity.materialize import rebuild_identities_for_tenant
+        from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
 
         out = rebuild_identities_for_tenant(
             db,
             tenant_id=tenant_id,
-            resolver_version=settings.cortex_identity_resolver_version,
+            resolver_version=effective_identity_resolver_version(settings.cortex_identity_resolver_version),
             source_trigger="manual_rebuild_admin",
             batch_limit=settings.cortex_identity_batch_actor_limit,
         )

@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.identity.resolver_version import get_identity_resolver_version
+from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
 from vector.domains.cortex.identity.signals import extract_actor_signal, normalize_email
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.canon_entity import CanonEntity
@@ -194,10 +194,13 @@ def _seed_identity_for_actor(
     )
     tenant = session.get(Tenant, tenant_id)
     tenant_domain = tenant.email_domain if tenant is not None else None
-    resolved_version = get_identity_resolver_version(resolver_version)
+    resolved_version = effective_identity_resolver_version(resolver_version)
     if existing_row is not None:
         existing_account, existing_identity = existing_row
-        if existing_identity.resolver_version >= resolved_version:
+        if (
+            existing_identity.resolver_version >= resolved_version
+            and existing_account.link_rule != "seed_actor"
+        ):
             return {"outcome": "already_linked", "identity_entity_id": str(existing_account.identity_entity_id)}
         existing_account.unlinked_at = utc_now()
     emails_sorted = sorted(signal.emails)
@@ -438,7 +441,7 @@ def enqueue_periodic_identity_candidates(
     if queued >= limit:
         return queued
 
-    resolved_version = get_identity_resolver_version(resolver_version)
+    resolved_version = effective_identity_resolver_version(resolver_version)
     stale_actor_ids = list(
         session.scalars(
             select(IdentityAccount.canon_entity_id)
@@ -459,6 +462,31 @@ def enqueue_periodic_identity_candidates(
             tenant_id=tenant_id,
             canon_entity_id=eid,
             reason="resolver_bump",
+        )
+        queued += 1
+    if queued >= limit:
+        return queued
+
+    seed_actor_ids = list(
+        session.scalars(
+            select(IdentityAccount.canon_entity_id)
+            .join(IdentityEntity, IdentityEntity.id == IdentityAccount.identity_entity_id)
+            .where(
+                IdentityAccount.tenant_id == tenant_id,
+                IdentityAccount.unlinked_at.is_(None),
+                IdentityAccount.link_rule == "seed_actor",
+                IdentityEntity.status == "active",
+            )
+            .order_by(IdentityEntity.resolved_at.asc())
+            .limit(limit - queued),
+        ).all(),
+    )
+    for eid in seed_actor_ids:
+        enqueue_identity_actor(
+            session,
+            tenant_id=tenant_id,
+            canon_entity_id=eid,
+            reason="seed_rematch",
         )
         queued += 1
     return queued
@@ -595,6 +623,15 @@ def rebuild_identities_for_tenant(
         for key in total_stats:
             total_stats[key] += int(stats.get(key, 0))
         if int(stats.get("processed", 0)) <= 0:
-            break
+            if (
+                enqueue_periodic_identity_candidates(
+                    session,
+                    tenant_id=tenant_id,
+                    limit=5000,
+                    resolver_version=resolver_version,
+                )
+                <= 0
+            ):
+                break
     return {"enqueued": enqueued, "stats": total_stats}
 

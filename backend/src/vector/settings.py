@@ -359,7 +359,7 @@ class Settings(BaseSettings):
         description="Max actors auto-enqueued per pass for periodic unresolved/resolver-bump rescan.",
     )
     cortex_identity_resolver_version: int = Field(
-        default=1,
+        default=2,
         ge=1,
         le=1000,
         validation_alias="CORTEX_IDENTITY_RESOLVER_VERSION",

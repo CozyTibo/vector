@@ -19,3 +19,8 @@ def get_identity_resolver_version(override: int | None = None) -> int:
         return IDENTITY_RESOLVER_VERSION
     return max(1, v)
 
+
+def effective_identity_resolver_version(override: int | None = None) -> int:
+    """Code baseline wins over stale settings/env pinned below current resolver logic."""
+    return max(IDENTITY_RESOLVER_VERSION, get_identity_resolver_version(override))
+
