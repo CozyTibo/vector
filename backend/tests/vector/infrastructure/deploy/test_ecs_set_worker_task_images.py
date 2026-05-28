@@ -6,8 +6,20 @@ from pathlib import Path
 import pytest
 
 _THIS = Path(__file__).resolve()
-_BACKEND_ROOT = next((p for p in _THIS.parents if p.name == "backend"), _THIS.parents[0])
-_SCRIPT = _BACKEND_ROOT / "scripts/ecs_set_worker_task_images.py"
+
+
+def _resolve_script_path() -> Path:
+    for p in (_THIS, *_THIS.parents):
+        direct = p / "scripts/ecs_set_worker_task_images.py"
+        if direct.exists():
+            return direct
+        backend_nested = p / "backend/scripts/ecs_set_worker_task_images.py"
+        if backend_nested.exists():
+            return backend_nested
+    raise FileNotFoundError("Could not locate ecs_set_worker_task_images.py from test path")
+
+
+_SCRIPT = _resolve_script_path()
 
 
 def _load_apply():
