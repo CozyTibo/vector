@@ -6,7 +6,9 @@ import { IngestionRawDataTab } from "./cortex/IngestionRawDataTab";
 import { IngestionRunsTab } from "./cortex/IngestionRunsTab";
 import { IngestionSchedulerPanel } from "./cortex/IngestionSchedulerPanel";
 import { SectionSkeleton } from "./cortex/SectionSkeleton";
+import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
 import { useCortexIngestionOverview } from "./cortex/useCortexIngestionOverview";
+import { useCortexPassRunHealth } from "./cortex/useCortexPassRunHealth";
 
 export default function AdminCortexIngestionPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -20,6 +22,7 @@ export default function AdminCortexIngestionPage() {
           ? "raw"
           : "connectors";
   const overviewQ = useCortexIngestionOverview();
+  const { ingestionStale: passRunStale } = useCortexPassRunHealth();
 
   const setTab = (next: "connectors" | "runs" | "beats" | "raw") => {
     setSearchParams((prev) => {
@@ -66,6 +69,7 @@ export default function AdminCortexIngestionPage() {
             onClick={() => setTab(key)}
           >
             {label}
+            {key === "runs" && passRunStale ? <IdentityPassStaleBadge /> : null}
           </button>
         ))}
       </nav>

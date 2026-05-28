@@ -8,6 +8,7 @@ const overviewQueryOpts = {
   staleTime: 30_000,
   gcTime: 5 * 60_000,
   retry: 0,
+  refetchInterval: 60_000,
 } as const;
 
 export function cortexIngestionOverviewKey(tenantId: string) {

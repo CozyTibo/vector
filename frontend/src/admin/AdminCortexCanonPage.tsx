@@ -5,7 +5,9 @@ import { CanonEntitiesListingTab } from "./cortex/CanonEntitiesListingTab";
 import { CanonRunsTab } from "./cortex/CanonRunsTab";
 import { CanonSchedulerPanel } from "./cortex/CanonSchedulerPanel";
 import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
+import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
 import { useCanonReadiness } from "./cortex/useCanonReadiness";
+import { useCortexPassRunHealth } from "./cortex/useCortexPassRunHealth";
 
 export default function AdminCortexCanonPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -13,6 +15,7 @@ export default function AdminCortexCanonPage() {
   const tab =
     tabParam === "entities" ? "entities" : tabParam === "runs" ? "runs" : "connectors";
   const readinessQ = useCanonReadiness();
+  const { canonStale: passRunStale } = useCortexPassRunHealth();
 
   const setTab = (next: "connectors" | "runs" | "entities") => {
     setSearchParams((prev) => {
@@ -69,6 +72,7 @@ export default function AdminCortexCanonPage() {
             onClick={() => setTab(key)}
           >
             {label}
+            {key === "runs" && passRunStale ? <IdentityPassStaleBadge /> : null}
           </button>
         ))}
       </nav>

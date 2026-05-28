@@ -6,7 +6,10 @@ from datetime import timedelta
 import pytest
 from sqlalchemy.orm import Session
 
-from app.tasks.cortex_identity_scheduler import _should_skip_scheduled_identity_pass
+from app.tasks.cortex_identity_scheduler import (
+    _fail_stuck_running_identity_passes,
+    _should_skip_scheduled_identity_pass,
+)
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
 from vector.infrastructure.db.models.tenant import Tenant
@@ -63,6 +66,42 @@ def test_no_skip_when_last_scheduled_pass_is_stale(db_session: Session) -> None:
         ),
     )
     db_session.commit()
+    assert not _should_skip_scheduled_identity_pass(
+        db_session,
+        tenant_id=tenant.id,
+        interval_seconds=300,
+    )
+
+
+def test_stuck_running_pass_is_abandoned_and_scheduler_unblocks(db_session: Session) -> None:
+    tenant = Tenant(
+        company_name="Stuck Co",
+        primary_email="stuck@example.com",
+        email_domain="example.com",
+        slug=f"stuck-{uuid.uuid4().hex[:8]}",
+        status="active",
+        workspace_access_enabled=True,
+    )
+    db_session.add(tenant)
+    db_session.flush()
+    stuck_run = IdentityPassRun(
+        tenant_id=tenant.id,
+        source_trigger="scheduled",
+        status="RUNNING",
+        started_at=utc_now() - timedelta(hours=2),
+    )
+    db_session.add(stuck_run)
+    db_session.commit()
+    abandoned = _fail_stuck_running_identity_passes(
+        db_session,
+        tenant_id=tenant.id,
+        interval_seconds=300,
+    )
+    db_session.commit()
+    assert abandoned == 1
+    db_session.refresh(stuck_run)
+    assert stuck_run.status == "FAILED"
+    assert stuck_run.error_summary == "stale_running_pass_abandoned"
     assert not _should_skip_scheduled_identity_pass(
         db_session,
         tenant_id=tenant.id,

@@ -11,5 +11,6 @@ export function useCanonReadiness() {
     queryFn: () => adminJson<CanonReadiness>(`/admin/tenants/${tenantId}/cortex/canon`),
     enabled: Boolean(tenantId),
     staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }

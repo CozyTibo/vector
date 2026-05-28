@@ -7,8 +7,8 @@ import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
 import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
 import { IdentityRowAvatar } from "./cortex/IdentityRowAvatar";
 import { IdentitySchedulerPanel } from "./cortex/IdentitySchedulerPanel";
-import { isIdentityPassRunStale } from "./cortex/identityPassRunHealth";
 import { useIdentityReadiness } from "./cortex/useIdentityReadiness";
+import { useCortexPassRunHealth } from "./cortex/useCortexPassRunHealth";
 import type {
   IdentityDetail,
   IdentityList,
@@ -330,7 +330,7 @@ export default function AdminCortexIdentitiesPage() {
               ? "unresolved"
               : "humans";
   const readinessQ = useIdentityReadiness();
-  const passRunStale = isIdentityPassRunStale(readinessQ.data);
+  const { identityStale: passRunStale } = useCortexPassRunHealth();
 
   const setTab = (next: "humans" | "inactive" | "bots" | "unknown" | "unresolved" | "runs") => {
     setSearchParams((prev) => {

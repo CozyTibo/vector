@@ -1,8 +1,7 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 
 import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
-import { isIdentityPassRunStale } from "./cortex/identityPassRunHealth";
-import { useIdentityReadiness } from "./cortex/useIdentityReadiness";
+import { useCortexPassRunHealth } from "./cortex/useCortexPassRunHealth";
 
 function tabCls(isActive: boolean): string {
   return [
@@ -13,10 +12,28 @@ function tabCls(isActive: boolean): string {
   ].join(" ");
 }
 
+function CortexNavTab({
+  to,
+  label,
+  stale,
+}: {
+  to: string;
+  label: string;
+  stale: boolean;
+}) {
+  return (
+    <NavLink to={to} className={({ isActive }) => tabCls(isActive)}>
+      <span className="inline-flex items-center">
+        {label}
+        {stale ? <IdentityPassStaleBadge /> : null}
+      </span>
+    </NavLink>
+  );
+}
+
 export default function AdminTenantCortexLayout() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
-  const readinessQ = useIdentityReadiness();
-  const passRunStale = isIdentityPassRunStale(readinessQ.data);
+  const { ingestionStale, canonStale, identityStale } = useCortexPassRunHealth();
 
   return (
     <div className="space-y-5">
@@ -29,27 +46,21 @@ export default function AdminTenantCortexLayout() {
       </header>
 
       <nav className="flex flex-wrap gap-2 border-b border-stone-200 pb-3">
-        <NavLink
+        <CortexNavTab
           to={`/admin/tenants/${tenantId}/cortex/ingestion`}
-          className={({ isActive }) => tabCls(isActive)}
-        >
-          Ingestion
-        </NavLink>
-        <NavLink
+          label="Ingestion"
+          stale={ingestionStale}
+        />
+        <CortexNavTab
           to={`/admin/tenants/${tenantId}/cortex/canon`}
-          className={({ isActive }) => tabCls(isActive)}
-        >
-          Canonical
-        </NavLink>
-        <NavLink
+          label="Canonical"
+          stale={canonStale}
+        />
+        <CortexNavTab
           to={`/admin/tenants/${tenantId}/cortex/identities`}
-          className={({ isActive }) => tabCls(isActive)}
-        >
-          <span className="inline-flex items-center">
-            Identities
-            {passRunStale ? <IdentityPassStaleBadge /> : null}
-          </span>
-        </NavLink>
+          label="Identities"
+          stale={identityStale}
+        />
       </nav>
 
       <Outlet />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { IdentityReadiness } from "../cortexAdminTypes";
-import { IDENTITY_PASS_STALE_MS, isIdentityPassRunStale } from "./identityPassRunHealth";
+import { isIdentityPassRunStale, PASS_RUN_STALE_MS } from "./passRunHealth";
 
 function readiness(overrides: Partial<IdentityReadiness> = {}): IdentityReadiness {
   return {
@@ -31,7 +31,7 @@ describe("isIdentityPassRunStale", () => {
   });
 
   it("is false when the latest run started within 10 minutes", () => {
-    const started = new Date(Date.now() - IDENTITY_PASS_STALE_MS + 60_000).toISOString();
+    const started = new Date(Date.now() - PASS_RUN_STALE_MS + 60_000).toISOString();
     expect(
       isIdentityPassRunStale(
         readiness({
@@ -50,7 +50,7 @@ describe("isIdentityPassRunStale", () => {
   });
 
   it("is true when the latest run started more than 10 minutes ago", () => {
-    const started = new Date(Date.now() - IDENTITY_PASS_STALE_MS - 1).toISOString();
+    const started = new Date(Date.now() - PASS_RUN_STALE_MS - 1).toISOString();
     expect(
       isIdentityPassRunStale(
         readiness({
