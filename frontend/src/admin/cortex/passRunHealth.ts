@@ -26,23 +26,25 @@ export function isPassRunStale(
   return Date.now() - startedMs > staleMs;
 }
 
+/** Tab STALE badge: no pass started in 10m, or backend lane/orchestrator unhealthy. */
 export function isIdentityPassRunStale(readiness: IdentityReadiness | undefined): boolean {
-  if (typeof readiness?.scheduler?.lane_stale === "boolean") {
-    return readiness.scheduler.lane_stale;
-  }
-  return isPassRunStale(readiness?.latest_pass_run ?? null, readiness?.scheduler?.enabled ?? false);
+  const passRunStale = isPassRunStale(
+    readiness?.latest_pass_run ?? null,
+    readiness?.scheduler?.enabled ?? false,
+  );
+  const laneStale = readiness?.scheduler?.lane_stale === true;
+  return passRunStale || laneStale;
 }
 
 export function isCanonPassRunStale(readiness: CanonReadiness | undefined): boolean {
-  if (typeof readiness?.scheduler?.lane_stale === "boolean") {
-    return readiness.scheduler.lane_stale;
-  }
   const latest = readiness?.latest_pass_run;
   const typed =
     latest && typeof latest === "object" && typeof latest.started_at === "string"
       ? { started_at: latest.started_at }
       : null;
-  return isPassRunStale(typed, readiness?.scheduler?.enabled ?? false);
+  const passRunStale = isPassRunStale(typed, readiness?.scheduler?.enabled ?? false);
+  const laneStale = readiness?.scheduler?.lane_stale === true;
+  return passRunStale || laneStale;
 }
 
 export function isIngestionSchedulerActive(overview: CortexIngestionOverview | undefined): boolean {

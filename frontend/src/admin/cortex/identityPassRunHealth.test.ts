@@ -49,11 +49,20 @@ describe("isIdentityPassRunStale", () => {
     ).toBe(false);
   });
 
-  it("uses backend lane_stale when provided", () => {
+  it("combines 10m pass-run staleness with backend lane_stale", () => {
+    const recent = new Date(Date.now() - PASS_RUN_STALE_MS + 60_000).toISOString();
     expect(
       isIdentityPassRunStale(
         readiness({
-          latest_pass_run: null,
+          latest_pass_run: {
+            id: "1",
+            status: "COMPLETED",
+            source_trigger: "scheduled",
+            started_at: recent,
+            finished_at: recent,
+            error_summary: null,
+            stats: {},
+          },
           scheduler: { enabled: true, interval_seconds: 300, lane_stale: false },
         }),
       ),
@@ -61,6 +70,23 @@ describe("isIdentityPassRunStale", () => {
     expect(
       isIdentityPassRunStale(
         readiness({
+          latest_pass_run: null,
+          scheduler: { enabled: true, interval_seconds: 300, lane_stale: false },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isIdentityPassRunStale(
+        readiness({
+          latest_pass_run: {
+            id: "1",
+            status: "COMPLETED",
+            source_trigger: "scheduled",
+            started_at: recent,
+            finished_at: recent,
+            error_summary: null,
+            stats: {},
+          },
           scheduler: { enabled: true, interval_seconds: 300, lane_stale: true },
         }),
       ),
