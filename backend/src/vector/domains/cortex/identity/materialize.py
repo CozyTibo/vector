@@ -195,6 +195,8 @@ def _seed_identity_for_actor(
     tenant = session.get(Tenant, tenant_id)
     tenant_domain = tenant.email_domain if tenant is not None else None
     resolved_version = effective_identity_resolver_version(resolver_version)
+    existing_account: IdentityAccount | None = None
+    existing_identity: IdentityEntity | None = None
     if existing_row is not None:
         existing_account, existing_identity = existing_row
         if (
@@ -202,7 +204,6 @@ def _seed_identity_for_actor(
             and existing_account.link_rule != "seed_actor"
         ):
             return {"outcome": "already_linked", "identity_entity_id": str(existing_account.identity_entity_id)}
-        existing_account.unlinked_at = utc_now()
     emails_sorted = sorted(signal.emails)
     chosen_email = emails_sorted[0] if emails_sorted else None
     kind, kind_reason = classify_identity_kind(
@@ -351,17 +352,27 @@ def _seed_identity_for_actor(
                     confidence = "medium"
 
     if matched_identity is None:
-        identity = IdentityEntity(
-            tenant_id=tenant_id,
-            kind=kind,
-            display_name=canon_entity.display_label[:512],
-            primary_email=chosen_email,
-            resolver_version=resolved_version,
-            status="active",
-            resolved_at=utc_now(),
-        )
-        session.add(identity)
-        session.flush()
+        if existing_identity is not None:
+            identity = existing_identity
+            identity.kind = kind
+            identity.display_name = canon_entity.display_label[:512]
+            if chosen_email is not None:
+                identity.primary_email = chosen_email
+            if identity.resolver_version < resolved_version:
+                identity.resolver_version = resolved_version
+            identity.resolved_at = utc_now()
+        else:
+            identity = IdentityEntity(
+                tenant_id=tenant_id,
+                kind=kind,
+                display_name=canon_entity.display_label[:512],
+                primary_email=chosen_email,
+                resolver_version=resolved_version,
+                status="active",
+                resolved_at=utc_now(),
+            )
+            session.add(identity)
+            session.flush()
     else:
         identity = matched_identity
         if identity.kind == "unknown" and kind in {"human", "bot"}:
@@ -386,6 +397,18 @@ def _seed_identity_for_actor(
         "kind": kind,
         "kind_reason": kind_reason,
     }
+    if existing_account is not None:
+        existing_account.identity_entity_id = identity.id
+        existing_account.connector = canon_entity.connector
+        existing_account.connection_id = canon_entity.connection_id
+        existing_account.link_tier = link_tier
+        existing_account.link_rule = link_rule
+        existing_account.confidence = confidence
+        existing_account.evidence_json = evidence
+        existing_account.linked_at = utc_now()
+        existing_account.unlinked_at = None
+        return {"outcome": "rematched", "identity_entity_id": str(identity.id)}
+
     account = IdentityAccount(
         tenant_id=tenant_id,
         identity_entity_id=identity.id,
@@ -537,6 +560,7 @@ def execute_identity_pass_for_tenant(
                 limit=max(1, min(periodic_rescan_limit, 5000)),
                 resolver_version=resolver_version,
             ) > 0:
+                session.flush()
                 items = list(
                     session.scalars(
                         select(IdentityDirtyQueue)

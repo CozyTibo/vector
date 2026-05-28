@@ -415,14 +415,6 @@ def test_phase5_resolver_bump_relinks_existing_accounts(db_session: Session) -> 
         )
         or 0
     )
-    unlinked_accounts = int(
-        db_session.scalar(
-            select(func.count())
-            .select_from(IdentityAccount)
-            .where(IdentityAccount.tenant_id == tenant_id, IdentityAccount.unlinked_at.is_not(None)),
-        )
-        or 0
-    )
     max_version = int(
         db_session.scalar(
             select(func.max(IdentityEntity.resolver_version)).where(IdentityEntity.tenant_id == tenant_id),
@@ -430,6 +422,5 @@ def test_phase5_resolver_bump_relinks_existing_accounts(db_session: Session) -> 
         or 0
     )
     assert active_accounts >= 2
-    assert unlinked_accounts >= 2
     assert max_version == 2
 
