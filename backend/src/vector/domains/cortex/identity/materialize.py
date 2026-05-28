@@ -24,6 +24,7 @@ from vector.infrastructure.db.models.tenant import Tenant
 RUN_RUNNING = "RUNNING"
 RUN_COMPLETED = "COMPLETED"
 RUN_FAILED = "FAILED"
+BOT_MARKERS = ("[bot]", "-bot", "dependabot", "githubactions", "github-actions", "slackbot")
 
 
 def same_local_part_with_tenant_domain(
@@ -42,6 +43,27 @@ def same_local_part_with_tenant_domain(
     if not l.endswith(f"@{domain}") or not r.endswith(f"@{domain}"):
         return False
     return l.split("@", 1)[0] == r.split("@", 1)[0]
+
+
+def classify_identity_kind(
+    *,
+    handles: set[str],
+    display_names: set[str],
+    emails: set[str],
+    signal_is_bot: bool | None,
+) -> tuple[str, str]:
+    if signal_is_bot is True:
+        return ("bot", "provider_bot_flag")
+    merged = " ".join(sorted(handles.union(display_names)))
+    if any(m in merged for m in BOT_MARKERS):
+        return ("bot", "name_or_handle_bot_marker")
+    for email in emails:
+        if email.endswith("@users.noreply.github.com"):
+            if any("bot" in h for h in handles):
+                return ("bot", "github_noreply_bot_pattern")
+    if emails or display_names:
+        return ("human", "has_human_profile_signals")
+    return ("unknown", "insufficient_signals")
 
 
 def enqueue_identity_actor(
@@ -148,6 +170,12 @@ def _seed_identity_for_actor(
     tenant_domain = tenant.email_domain if tenant is not None else None
     emails_sorted = sorted(signal.emails)
     chosen_email = emails_sorted[0] if emails_sorted else None
+    kind, kind_reason = classify_identity_kind(
+        handles=signal.handles,
+        display_names=signal.display_names,
+        emails=signal.emails,
+        signal_is_bot=signal.is_bot,
+    )
     link_tier = "seed"
     link_rule = "seed_actor"
     confidence = "low"
@@ -227,7 +255,7 @@ def _seed_identity_for_actor(
     if matched_identity is None:
         identity = IdentityEntity(
             tenant_id=tenant_id,
-            kind="unknown",
+            kind=kind,
             display_name=canon_entity.display_label[:512],
             primary_email=chosen_email,
             resolver_version=IDENTITY_RESOLVER_VERSION,
@@ -238,6 +266,8 @@ def _seed_identity_for_actor(
         session.flush()
     else:
         identity = matched_identity
+        if identity.kind == "unknown" and kind in {"human", "bot"}:
+            identity.kind = kind
         if identity.primary_email is None and chosen_email is not None:
             identity.primary_email = chosen_email
     evidence = {
@@ -252,6 +282,8 @@ def _seed_identity_for_actor(
         "tenant_email_domain": tenant_domain,
         "match_tier": link_tier,
         "match_rule": link_rule,
+        "kind": kind,
+        "kind_reason": kind_reason,
     }
     account = IdentityAccount(
         tenant_id=tenant_id,
