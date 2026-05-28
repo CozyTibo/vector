@@ -40,6 +40,11 @@ function evidenceSignals(evidence: Record<string, unknown>): string[] {
   return parts;
 }
 
+function kindLabel(kind: string): string {
+  if (kind === "inactive_human") return "inactive";
+  return kind;
+}
+
 function IdentityListTab({ kind }: { kind: "human" | "inactive_human" | "bot" | "unknown" }) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -80,31 +85,47 @@ function IdentityListTab({ kind }: { kind: "human" | "inactive_human" | "bot" | 
               >
                 <button
                   type="button"
-                  className="flex w-full flex-wrap items-start gap-x-3 gap-y-1 px-3 py-2.5 text-left hover:bg-stone-100/80"
+                  className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-stone-100/80"
                   onClick={() => toggleExpanded(item.id)}
                   aria-expanded={open}
                 >
-                  <span className="shrink-0 pt-0.5 text-xs font-medium text-indigo-700">
+                  <span className="shrink-0 pt-1 text-xs font-medium text-indigo-700">
                     {open ? "▼" : "▶"}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="font-medium text-stone-900">{item.display_name}</span>
-                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-stone-600">
-                      <span className="rounded bg-stone-200/80 px-1.5 py-0.5 font-medium text-stone-800">
-                        {item.kind}
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-stone-900">{item.display_name}</span>
+                      <span className="rounded bg-stone-200/80 px-1.5 py-0.5 text-[11px] font-medium text-stone-800">
+                        {kindLabel(item.kind)}
                       </span>
-                      <span>{item.primary_email ?? "no primary email"}</span>
-                      <span>
-                        {item.account_count} account{item.account_count === 1 ? "" : "s"}
+                      <span
+                        className="rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-900"
+                        title="Identity resolver version"
+                      >
+                        v{item.resolver_version}
                       </span>
-                      <span>{item.connectors.join(", ") || "—"}</span>
-                      <span>resolver v{item.resolver_version}</span>
-                      <span>{formatWhen(item.resolved_at)}</span>
                     </span>
-                    <span className="mt-0.5 block font-mono text-[11px] text-stone-400">{item.id}</span>
+                    <span className="mt-1 block text-xs text-stone-600">
+                      {item.primary_email ?? "no primary email"}
+                      <span className="text-stone-400"> · </span>
+                      {item.account_count} account{item.account_count === 1 ? "" : "s"}
+                      <span className="text-stone-400"> · </span>
+                      {item.connectors.join(", ") || "no connectors"}
+                      <span className="text-stone-400"> · </span>
+                      resolved {formatWhen(item.resolved_at)}
+                    </span>
+                    <span className="mt-0.5 block truncate font-mono text-[11px] text-stone-400" title={item.id}>
+                      {item.id}
+                    </span>
                   </span>
                 </button>
-                {open ? <IdentityExpandedPanel tenantId={tenantId} identityId={item.id} /> : null}
+                {open ? (
+                  <IdentityExpandedPanel
+                    tenantId={tenantId}
+                    identityId={item.id}
+                    resolverVersion={item.resolver_version}
+                  />
+                ) : null}
               </li>
             );
           })}
@@ -114,7 +135,15 @@ function IdentityListTab({ kind }: { kind: "human" | "inactive_human" | "bot" | 
   );
 }
 
-function IdentityExpandedPanel({ tenantId, identityId }: { tenantId: string; identityId: string }) {
+function IdentityExpandedPanel({
+  tenantId,
+  identityId,
+  resolverVersion,
+}: {
+  tenantId: string;
+  identityId: string;
+  resolverVersion: number;
+}) {
   const q = useQuery({
     queryKey: ["admin-cortex-identity-detail", tenantId, identityId],
     queryFn: () => adminJson<IdentityDetail>(`/admin/tenants/${tenantId}/cortex/identities/${identityId}`),
@@ -128,90 +157,81 @@ function IdentityExpandedPanel({ tenantId, identityId }: { tenantId: string; ide
   const detail = q.data;
   return (
     <div className="border-t border-stone-200 bg-white px-3 py-3">
-      <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
-        <span>
-          <span className="font-medium text-stone-700">Kind:</span> {detail.kind}
-        </span>
-        <span>
-          <span className="font-medium text-stone-700">Primary email:</span> {detail.primary_email ?? "—"}
-        </span>
-        <span>
-          <span className="font-medium text-stone-700">Resolver:</span> v{detail.resolver_version}
-        </span>
-        <span>
-          <span className="font-medium text-stone-700">Resolved:</span> {formatWhen(detail.resolved_at)}
-        </span>
-      </div>
+      <p className="mb-3 text-xs text-stone-600">
+        <span className="font-medium text-stone-700">{detail.accounts.length}</span> linked account
+        {detail.accounts.length === 1 ? "" : "s"} · resolver{" "}
+        <span className="font-semibold text-indigo-900">v{resolverVersion}</span>
+        {detail.resolver_version !== resolverVersion ? (
+          <span className="text-amber-700"> (detail reports v{detail.resolver_version})</span>
+        ) : null}
+      </p>
 
       {detail.accounts.length === 0 ? (
         <p className="text-sm text-stone-500">No linked accounts.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-xs">
-            <thead>
-              <tr className="border-b border-stone-200 text-left text-stone-500">
-                <th className="py-1.5 pr-3 font-medium">Connector</th>
-                <th className="py-1.5 pr-3 font-medium">Canon label</th>
-                <th className="py-1.5 pr-3 font-medium">Entity key</th>
-                <th className="py-1.5 pr-3 font-medium">Match</th>
-                <th className="py-1.5 pr-3 font-medium">Confidence</th>
-                <th className="py-1.5 pr-3 font-medium">Signals</th>
-                <th className="py-1.5 font-medium">Canon</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.accounts.map((account) => {
-                const signals = evidenceSignals(account.evidence_json);
-                return (
-                  <tr key={account.identity_account_id} className="border-b border-stone-100 align-top">
-                    <td className="py-2 pr-3 font-medium text-stone-800">{account.connector}</td>
-                    <td className="py-2 pr-3 text-stone-800">{account.display_label}</td>
-                    <td className="max-w-[14rem] py-2 pr-3 font-mono text-[11px] text-stone-600" title={account.entity_key}>
-                      {account.entity_key}
-                    </td>
-                    <td className="py-2 pr-3 text-stone-700">
-                      <span className="rounded bg-indigo-50 px-1 py-0.5 font-medium text-indigo-900">
-                        {account.link_tier}
-                      </span>
-                      <span className="mt-0.5 block text-stone-600">{formatLinkRule(account.link_rule)}</span>
-                    </td>
-                    <td className="py-2 pr-3 text-stone-700">{account.confidence}</td>
-                    <td className="max-w-xs py-2 pr-3 text-stone-600">
-                      {signals.length > 0 ? (
-                        <ul className="list-inside list-disc space-y-0.5">
-                          {signals.map((line) => (
-                            <li key={line} className="break-words">
-                              {line}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        "—"
-                      )}
-                      {Object.keys(account.evidence_json).length > 0 ? (
-                        <details className="mt-1">
-                          <summary className="cursor-pointer text-indigo-700 hover:underline">Evidence JSON</summary>
-                          <pre className="mt-1 max-h-40 overflow-auto rounded bg-stone-100 p-2 font-mono text-[10px] text-stone-700">
-                            {JSON.stringify(account.evidence_json, null, 2)}
-                          </pre>
-                        </details>
-                      ) : null}
-                    </td>
-                    <td className="py-2">
-                      <Link
-                        className="text-indigo-700 hover:underline"
-                        to={`/admin/tenants/${tenantId}/cortex/canon/entities/${account.canon_entity_id}`}
-                      >
-                        View canon
-                      </Link>
-                      <div className="mt-1 font-mono text-[10px] text-stone-400">{account.canon_entity_id}</div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ul className="space-y-3">
+          {detail.accounts.map((account) => {
+            const signals = evidenceSignals(account.evidence_json);
+            return (
+              <li
+                key={account.identity_account_id}
+                className="rounded-lg border border-stone-200 bg-stone-50/80 p-3 text-xs"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-stone-900">{account.connector}</span>
+                  <span className="text-stone-700">{account.display_label}</span>
+                  <span className="ml-auto flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-medium text-indigo-900">
+                      {account.link_tier}
+                    </span>
+                    <span className="text-stone-600">{formatLinkRule(account.link_rule)}</span>
+                    <span className="rounded bg-stone-200/80 px-1.5 py-0.5 text-stone-700">{account.confidence}</span>
+                  </span>
+                </div>
+
+                <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  <div>
+                    <dt className="font-medium text-stone-500">Entity key</dt>
+                    <dd className="break-all font-mono text-[11px] text-stone-700">{account.entity_key}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-stone-500">Linked at</dt>
+                    <dd className="text-stone-700">{formatWhen(account.linked_at)}</dd>
+                  </div>
+                  {signals.length > 0 ? (
+                    <div className="sm:col-span-2">
+                      <dt className="font-medium text-stone-500">Signals</dt>
+                      <dd className="mt-0.5 space-y-0.5 text-stone-700">
+                        {signals.map((line) => (
+                          <div key={line} className="break-words">
+                            {line}
+                          </div>
+                        ))}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <Link
+                    className="font-medium text-indigo-700 hover:underline"
+                    to={`/admin/tenants/${tenantId}/cortex/canon/entities/${account.canon_entity_id}`}
+                  >
+                    View canon entity
+                  </Link>
+                  {Object.keys(account.evidence_json).length > 0 ? (
+                    <details>
+                      <summary className="cursor-pointer text-indigo-700 hover:underline">Evidence JSON</summary>
+                      <pre className="mt-1 max-h-48 overflow-auto rounded border border-stone-200 bg-white p-2 font-mono text-[10px] text-stone-700">
+                        {JSON.stringify(account.evidence_json, null, 2)}
+                      </pre>
+                    </details>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
