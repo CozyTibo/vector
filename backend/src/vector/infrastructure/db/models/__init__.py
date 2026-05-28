@@ -13,6 +13,7 @@ from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
 from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
 from vector.infrastructure.db.models.graph_relationship import GraphRelationship
 from vector.infrastructure.db.models.graph_scheduler_tick import GraphSchedulerTick
+from vector.infrastructure.db.models.graph_unresolved_reference import GraphUnresolvedReference
 from vector.infrastructure.db.models.cortex_admin_graph_component_snapshot import (
     CortexAdminGraphComponentSnapshot,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "GraphPassRun",
     "GraphRelationship",
     "GraphSchedulerTick",
+    "GraphUnresolvedReference",
     "CortexAdminGraphComponentSnapshot",
     "CortexPhase09ReadinessSignoff",
     "GithubConnectionDetail",

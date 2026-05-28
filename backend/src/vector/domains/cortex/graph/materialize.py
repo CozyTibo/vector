@@ -10,12 +10,13 @@ from typing import Any
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.graph.edges import EdgeDraft
+from vector.domains.cortex.graph.edges import EdgeDraft, UnresolvedRefDraft
 from vector.domains.cortex.graph.enqueue import GRAPH_SCOPED_ENTITY_TYPES
 from vector.domains.cortex.graph.extractor_version import effective_graph_extractor_version
 from vector.domains.cortex.graph.extractors import (
     extract_canon_ref_edges,
     extract_provider_native_edges,
+    extract_text_references,
 )
 from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
 from vector.domains.cortex.ingestion.sync_shared import utc_now
@@ -28,6 +29,10 @@ from vector.infrastructure.db.models.graph_relationship import (
     STATUS_ACTIVE,
     STATUS_SUPERSEDED,
     GraphRelationship,
+)
+from vector.infrastructure.db.models.graph_unresolved_reference import (
+    STATUS_UNRESOLVED,
+    GraphUnresolvedReference,
 )
 from vector.infrastructure.db.models.identity_account import IdentityAccount
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
@@ -167,15 +172,52 @@ def upsert_edge_draft(
     return "upserted"
 
 
+def _record_unresolved(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    source_entity_id: uuid.UUID,
+    source_raw_id: int | None,
+    draft: UnresolvedRefDraft,
+) -> None:
+    existing = session.scalar(
+        select(GraphUnresolvedReference.id)
+        .where(
+            GraphUnresolvedReference.tenant_id == tenant_id,
+            GraphUnresolvedReference.source_entity_id == source_entity_id,
+            GraphUnresolvedReference.reference_text == draft.reference_text[:512],
+            GraphUnresolvedReference.status == STATUS_UNRESOLVED,
+        )
+        .limit(1),
+    )
+    if existing is not None:
+        return
+    session.add(
+        GraphUnresolvedReference(
+            tenant_id=tenant_id,
+            source_entity_id=source_entity_id,
+            source_raw_id=source_raw_id,
+            reference_kind=draft.reference_kind,
+            reference_text=draft.reference_text[:512],
+            extractor_rule=draft.extractor_rule,
+            evidence_snapshot=draft.evidence_snapshot,
+            status=STATUS_UNRESOLVED,
+            created_at=utc_now(),
+        ),
+    )
+
+
 def _extract_edges_for_entity(
     session: Session,
     *,
     tenant_id: uuid.UUID,
     entity: CanonEntity,
-) -> list[EdgeDraft]:
+) -> tuple[list[EdgeDraft], list[UnresolvedRefDraft]]:
     drafts = extract_canon_ref_edges(session, tenant_id=tenant_id, entity=entity)
     drafts.extend(extract_provider_native_edges(session, tenant_id=tenant_id, entity=entity))
-    return drafts
+    text_out = extract_text_references(session, tenant_id=tenant_id, entity=entity)
+    drafts.extend(text_out.edges)
+    return drafts, text_out.unresolved
 
 
 def _process_entity_extract(
@@ -188,7 +230,12 @@ def _process_entity_extract(
     stats: dict[str, int],
 ) -> None:
     now = utc_now()
-    for draft in _extract_edges_for_entity(session, tenant_id=tenant_id, entity=entity):
+    edge_drafts, unresolved_drafts = _extract_edges_for_entity(
+        session,
+        tenant_id=tenant_id,
+        entity=entity,
+    )
+    for draft in edge_drafts:
         outcome = upsert_edge_draft(
             session,
             tenant_id=tenant_id,
@@ -200,6 +247,20 @@ def _process_entity_extract(
             stats["edges_upserted"] += 1
         elif outcome == "unchanged":
             stats["edges_unchanged"] += 1
+    pair = None
+    from vector.domains.cortex.graph.extractors.phase0_provider_native import _latest_raw
+
+    pair = _latest_raw(session, tenant_id=tenant_id, entity_id=entity.id)
+    raw_id = int(pair[1].id) if pair is not None else None
+    for udraft in unresolved_drafts:
+        _record_unresolved(
+            session,
+            tenant_id=tenant_id,
+            source_entity_id=entity.id,
+            source_raw_id=raw_id,
+            draft=udraft,
+        )
+        stats["unresolved_refs"] += 1
     resolver_version = effective_identity_resolver_version(identity_resolver_version)
     active_edges = session.scalars(
         select(GraphRelationship).where(
@@ -311,6 +372,7 @@ def execute_graph_projection_pass_for_tenant(
         "edges_upserted": 0,
         "edges_unchanged": 0,
         "edges_enriched": 0,
+        "unresolved_refs": 0,
         "errors": 0,
     }
     max_iterations = 100 if drain else 1

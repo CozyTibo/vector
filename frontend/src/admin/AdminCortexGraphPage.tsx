@@ -5,7 +5,12 @@ import { adminJson } from "../lib/adminFetch";
 import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
 import { GraphSchedulerPanel } from "./cortex/GraphSchedulerPanel";
 import { useGraphReadiness } from "./cortex/useGraphReadiness";
-import type { GraphPassRuns, GraphRelationshipList, GraphStats } from "./cortexAdminTypes";
+import type {
+  GraphPassRuns,
+  GraphRelationshipList,
+  GraphStats,
+  GraphUnresolvedList,
+} from "./cortexAdminTypes";
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -93,6 +98,43 @@ function OverviewTab() {
   );
 }
 
+function UnresolvedTab() {
+  const { tenantId = "" } = useParams<{ tenantId: string }>();
+  const q = useQuery({
+    queryKey: ["admin-cortex-graph-unresolved", tenantId],
+    queryFn: () =>
+      adminJson<GraphUnresolvedList>(
+        `/admin/tenants/${tenantId}/cortex/graph/unresolved?limit=50`,
+      ),
+    enabled: Boolean(tenantId),
+  });
+  if (q.isPending) return <p className="text-sm text-stone-500">Loading unresolved…</p>;
+  const items = q.data?.items ?? [];
+  if (items.length === 0) {
+    return <p className="text-sm text-stone-500">No unresolved reference tokens.</p>;
+  }
+  return (
+    <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white text-sm">
+      {items.map((row) => (
+        <li key={row.id} className="space-y-1 p-4">
+          <p className="font-mono text-stone-800">{row.reference_text}</p>
+          <p className="text-stone-600">
+            {row.reference_kind} · {row.extractor_rule}
+          </p>
+          {row.source_entity ? (
+            <Link
+              className="text-indigo-700 hover:underline"
+              to={`/admin/tenants/${tenantId}/cortex/canon/entities/${row.source_entity.entity_id}`}
+            >
+              {row.source_entity.display_label}
+            </Link>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function RunsTab() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const q = useQuery({
@@ -122,10 +164,18 @@ function RunsTab() {
 
 export default function AdminCortexGraphPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === "overview" ? "overview" : searchParams.get("tab") === "runs" ? "runs" : "links";
+  const tabParam = searchParams.get("tab");
+  const tab =
+    tabParam === "overview"
+      ? "overview"
+      : tabParam === "runs"
+        ? "runs"
+        : tabParam === "unresolved"
+          ? "unresolved"
+          : "links";
   const readinessQ = useGraphReadiness();
 
-  const setTab = (next: "links" | "overview" | "runs") => {
+  const setTab = (next: "links" | "overview" | "runs" | "unresolved") => {
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
       if (next === "links") p.delete("tab");
@@ -153,6 +203,7 @@ export default function AdminCortexGraphPage() {
             ["links", "Links"],
             ["overview", "Overview"],
             ["runs", "Pass runs"],
+            ["unresolved", "Unresolved"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -173,6 +224,7 @@ export default function AdminCortexGraphPage() {
       {tab === "links" ? <LinksTab /> : null}
       {tab === "overview" ? <OverviewTab /> : null}
       {tab === "runs" ? <RunsTab /> : null}
+      {tab === "unresolved" ? <UnresolvedTab /> : null}
     </div>
   );
 }

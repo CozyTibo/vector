@@ -76,6 +76,7 @@ from vector.contracts.admin import (
     AdminGraphStatsResponse,
     AdminGraphTriggerPassRequest,
     AdminGraphTriggerPassResponse,
+    AdminGraphUnresolvedListResponse,
     AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
     AdminCortexPassActionResponse,
@@ -2143,6 +2144,27 @@ def build_admin_router() -> APIRouter:
 
         items, total = list_recent_graph_pass_runs(db, tenant_id, limit=limit, offset=offset)
         return AdminGraphRecentPassRunsResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/graph/unresolved",
+        response_model=AdminGraphUnresolvedListResponse,
+    )
+    def admin_cortex_graph_unresolved(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+    ) -> AdminGraphUnresolvedListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import list_unresolved_references
+
+        items, total = list_unresolved_references(db, tenant_id, limit=limit, offset=offset)
+        return AdminGraphUnresolvedListResponse(
             items=items,
             total_count=total,
             offset=offset,

@@ -5089,3 +5089,12 @@ class AdminGraphRebuildResponse(BaseModel):
     stats: dict[str, Any] = Field(default_factory=dict)
 
 
+class AdminGraphUnresolvedListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+

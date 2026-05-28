@@ -18,6 +18,7 @@ from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
 from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
 from vector.infrastructure.db.models.graph_relationship import STATUS_ACTIVE, GraphRelationship
+from vector.infrastructure.db.models.graph_unresolved_reference import GraphUnresolvedReference
 from vector.infrastructure.db.models.identity_entity import IdentityEntity
 
 MANUAL_GRAPH_PASS_CONFIRMATION = "RUN GRAPH PROJECTION PASS"
@@ -320,6 +321,42 @@ def list_recent_graph_pass_runs(
         }
         for r in rows
     ]
+    return items, total
+
+
+def list_unresolved_references(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
+    base = select(GraphUnresolvedReference).where(
+        GraphUnresolvedReference.tenant_id == tenant_id,
+        GraphUnresolvedReference.status == "unresolved",
+    )
+    total = int(session.scalar(select(func.count()).select_from(base.subquery())) or 0)
+    rows = list(
+        session.scalars(
+            base.order_by(GraphUnresolvedReference.created_at.desc())
+            .offset(offset)
+            .limit(limit),
+        ).all(),
+    )
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        source = session.get(CanonEntity, row.source_entity_id)
+        items.append(
+            {
+                "id": str(row.id),
+                "reference_kind": row.reference_kind,
+                "reference_text": row.reference_text,
+                "extractor_rule": row.extractor_rule,
+                "created_at": row.created_at.isoformat(),
+                "source_entity": _entity_summary(source) if source else None,
+                "evidence_snapshot": row.evidence_snapshot or {},
+            },
+        )
     return items, total
 
 

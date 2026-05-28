@@ -499,6 +499,23 @@ export type GraphPassRuns = {
   limit: number;
 };
 
+export type GraphUnresolvedItem = {
+  id: string;
+  reference_kind: string;
+  reference_text: string;
+  extractor_rule: string;
+  created_at: string;
+  source_entity: { entity_id: string; display_label: string } | null;
+  evidence_snapshot: Record<string, unknown>;
+};
+
+export type GraphUnresolvedList = {
+  items: GraphUnresolvedItem[];
+  total_count: number;
+  offset: number;
+  limit: number;
+};
+
 export function titleConnector(connector: string): string {
   if (connector === "github") return "GitHub";
   if (connector === "calls") return "Calls";
