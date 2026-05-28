@@ -89,16 +89,77 @@ def _worker_container_from_task_def(task_def: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(msg)
 
 
+def _single_worker_container_task_definition_v1(
+    task_def: dict[str, Any],
+    *,
+    command: list[str],
+) -> dict[str, Any]:
+    """Drop celery-beat sidecars — only one Beat container may run per cluster."""
+    out = dict(task_def)
+    container = _worker_container_from_task_def(task_def)
+    container["command"] = command
+    out["containerDefinitions"] = [container]
+    return out
+
+
 def apply_canon_worker_task_definition_v1(
     task_def: dict[str, Any],
     *,
     concurrency: int = 2,
 ) -> dict[str, Any]:
     """Single-container task def for canon-only worker (no Beat sidecar)."""
+    return _single_worker_container_task_definition_v1(
+        task_def,
+        command=canon_worker_command_v1(concurrency=concurrency),
+    )
+
+
+def apply_ingestion_worker_task_definition_v1(
+    task_def: dict[str, Any],
+    *,
+    concurrency: int = 2,
+) -> dict[str, Any]:
+    """Ingestion lane worker only (Beat runs on the substrate/vector-queue service)."""
+    return _single_worker_container_task_definition_v1(
+        task_def,
+        command=ingestion_worker_command_v1(concurrency=concurrency),
+    )
+
+
+def apply_identity_worker_task_definition_v1(
+    task_def: dict[str, Any],
+    *,
+    concurrency: int = 2,
+) -> dict[str, Any]:
+    """Identity lane worker only (Beat runs on the substrate/vector-queue service)."""
+    return _single_worker_container_task_definition_v1(
+        task_def,
+        command=identity_worker_command_v1(concurrency=concurrency),
+    )
+
+
+def apply_substrate_worker_task_definition_v1(
+    task_def: dict[str, Any],
+    *,
+    concurrency: int = 2,
+) -> dict[str, Any]:
+    """Substrate/vector-queue worker; retains celery-beat sidecar when present."""
     out = dict(task_def)
-    container = _worker_container_from_task_def(task_def)
-    container["command"] = canon_worker_command_v1(concurrency=concurrency)
-    out["containerDefinitions"] = [container]
+    containers = [dict(c) for c in out.get("containerDefinitions") or []]
+    if not containers:
+        msg = "task definition has no containerDefinitions"
+        raise ValueError(msg)
+    worker = _worker_container_from_task_def(task_def)
+    worker["command"] = substrate_worker_command_v1(concurrency=concurrency)
+    replaced = False
+    for i, raw in enumerate(containers):
+        if raw.get("name") == "worker" or (not replaced and raw.get("name") != "celery-beat"):
+            containers[i] = worker
+            replaced = True
+            break
+    if not replaced:
+        containers[0] = worker
+    out["containerDefinitions"] = containers
     return out
 
 
@@ -109,22 +170,13 @@ def apply_worker_role_to_task_definition_v1(
     concurrency: int = 2,
 ) -> dict[str, Any]:
     """Return a copy of an ECS task definition with Celery ``command`` for a worker role."""
-    out = dict(task_def)
-    containers = list(out.get("containerDefinitions") or [])
-    if not containers:
-        return out
-    container = dict(containers[0])
     if role == "ingestion":
-        container["command"] = ingestion_worker_command_v1(concurrency=concurrency)
-    elif role == "substrate":
-        container["command"] = substrate_worker_command_v1(concurrency=concurrency)
-    elif role == "canon":
+        return apply_ingestion_worker_task_definition_v1(task_def, concurrency=concurrency)
+    if role == "substrate":
+        return apply_substrate_worker_task_definition_v1(task_def, concurrency=concurrency)
+    if role == "canon":
         return apply_canon_worker_task_definition_v1(task_def, concurrency=concurrency)
-    elif role == "identity":
-        container["command"] = identity_worker_command_v1(concurrency=concurrency)
-    else:
-        msg = f"unsupported_worker_role:{role}"
-        raise ValueError(msg)
-    containers[0] = container
-    out["containerDefinitions"] = containers
-    return out
+    if role == "identity":
+        return apply_identity_worker_task_definition_v1(task_def, concurrency=concurrency)
+    msg = f"unsupported_worker_role:{role}"
+    raise ValueError(msg)
