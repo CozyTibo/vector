@@ -21,7 +21,7 @@
         "2",
         "--prefetch-multiplier=1",
         "-Q",
-        "vector"
+        "vector,cortex_canon,cortex_identity"
       ],
       "environment": [
         {

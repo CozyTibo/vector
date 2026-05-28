@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write ingestion, substrate, canon, and identity ECS worker task defs."""
+"""Write ingestion and merged cortex ECS worker task defs (two-service model)."""
 
 from __future__ import annotations
 
@@ -27,37 +27,25 @@ def _load_roles_module():
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Split ECS worker Celery queue bindings")
+    parser = argparse.ArgumentParser(description="Split ECS worker Celery queue bindings (2 services)")
     parser.add_argument("input", type=Path, help="Source ECS task definition JSON (worker)")
     parser.add_argument("ingestion_out", type=Path, help="Ingestion worker task def output")
-    parser.add_argument("substrate_out", type=Path, help="Substrate worker task def output")
-    parser.add_argument("canon_out", type=Path, help="Canon-only worker task def output")
-    parser.add_argument("identity_out", type=Path, help="Identity-only worker task def output")
+    parser.add_argument("cortex_out", type=Path, help="Cortex worker task def output (Beat + passes)")
     parser.add_argument("--ingestion-family", default="", help="Optional task family override")
-    parser.add_argument("--substrate-family", default="vector-substrate-worker")
-    parser.add_argument("--canon-family", default="vector-canon-worker")
-    parser.add_argument("--identity-family", default="vector-identity-worker")
+    parser.add_argument("--cortex-family", default="vector-substrate-worker")
     args = parser.parse_args()
 
     roles = _load_roles_module()
     task_def = json.loads(args.input.read_text(encoding="utf-8"))
     ingestion = roles.apply_worker_role_to_task_definition_v1(task_def, role="ingestion")
-    substrate = roles.apply_worker_role_to_task_definition_v1(task_def, role="substrate")
-    canon = roles.apply_canon_worker_task_definition_v1(task_def)
-    identity = roles.apply_worker_role_to_task_definition_v1(task_def, role="identity")
+    cortex = roles.apply_worker_role_to_task_definition_v1(task_def, role="cortex")
     if args.ingestion_family:
         ingestion["family"] = args.ingestion_family
-    if args.substrate_family:
-        substrate["family"] = args.substrate_family
-    if args.canon_family:
-        canon["family"] = args.canon_family
-    if args.identity_family:
-        identity["family"] = args.identity_family
+    if args.cortex_family:
+        cortex["family"] = args.cortex_family
 
     args.ingestion_out.write_text(json.dumps(ingestion, indent=2) + "\n", encoding="utf-8")
-    args.substrate_out.write_text(json.dumps(substrate, indent=2) + "\n", encoding="utf-8")
-    args.canon_out.write_text(json.dumps(canon, indent=2) + "\n", encoding="utf-8")
-    args.identity_out.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+    args.cortex_out.write_text(json.dumps(cortex, indent=2) + "\n", encoding="utf-8")
     return 0
 
 

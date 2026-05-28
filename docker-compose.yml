@@ -136,7 +136,7 @@ services:
     depends_on:
       - backend
 
-  celery-worker:
+  celery-worker-ingestion:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -145,8 +145,6 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://vector:vector@postgres:5432/vector}
       REDIS_URL: redis://redis:6379/0
-      # Same as `backend`: `.env` often has 127.0.0.1 for host dev; inside Docker the mock is a
-      # sibling service — without this, ingestion tasks cannot reach the mock GitHub/Linear APIs.
       VECTOR_MOCK_CONNECTOR_BASE_URL: http://mock-connectors:9183
     depends_on:
       postgres:
@@ -164,7 +162,35 @@ services:
       - ./secrets:/run/secrets:ro
     command: >
       celery -A app.worker worker --loglevel=info
-      -Q vector,cortex_live,cortex_replay,cortex_canon,cortex_identity
+      --concurrency 2 --prefetch-multiplier=1
+      -Q cortex_live,cortex_replay
+
+  celery-worker-cortex:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://vector:vector@postgres:5432/vector}
+      REDIS_URL: redis://redis:6379/0
+      VECTOR_MOCK_CONNECTOR_BASE_URL: http://mock-connectors:9183
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./backend/src:/app/src
+      - ./backend/alembic:/app/alembic
+      - ./backend/pyproject.toml:/app/pyproject.toml
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./secrets:/run/secrets:ro
+    command: >
+      celery -A app.worker worker --loglevel=info
+      --concurrency 3 --prefetch-multiplier=1
+      -Q vector,cortex_canon,cortex_identity
 
   celery-beat:
     build:
