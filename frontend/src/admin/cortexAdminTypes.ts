@@ -117,6 +117,16 @@ export type CanonEntityDetail = CanonEntityItem & {
   }>;
 };
 
+export type IdentityLatestPassRun = {
+  id: string;
+  status: string;
+  source_trigger: string;
+  started_at: string;
+  finished_at: string | null;
+  error_summary: string | null;
+  stats: Record<string, unknown> | null;
+};
+
 export type IdentityReadiness = {
   tenant_id: string;
   actor_count: number;
@@ -125,7 +135,7 @@ export type IdentityReadiness = {
   linked_account_count: number;
   unresolved_actor_count: number;
   dirty_queue_depth: number;
-  latest_pass_run: Record<string, unknown> | null;
+  latest_pass_run: IdentityLatestPassRun | null;
   scheduler: { enabled: boolean; interval_seconds: number };
 };
 
