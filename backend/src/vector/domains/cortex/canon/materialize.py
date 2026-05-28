@@ -156,6 +156,19 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
         entity.connector = draft.connector
 
     _apply_refs(session, tenant_id=row.tenant_id, draft=draft, entity=entity)
+    if draft.entity_type == "actor":
+        try:
+            from vector.domains.cortex.identity.materialize import enqueue_identity_actor
+
+            enqueue_identity_actor(
+                session,
+                tenant_id=row.tenant_id,
+                canon_entity_id=entity.id,
+                reason="actor_materialized",
+            )
+        except Exception:
+            # Identity queueing is best-effort and must not break canon materialization.
+            _logger.exception("identity enqueue failed during canon materialization")
 
     observed = datetime.fromisoformat(result.source.observed_at_iso.replace("Z", "+00:00"))
     session.execute(

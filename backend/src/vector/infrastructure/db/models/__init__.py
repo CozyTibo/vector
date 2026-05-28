@@ -17,6 +17,11 @@ from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncSt
 from vector.infrastructure.db.models.github_connection_detail import GithubConnectionDetail
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.ingestion_scheduler_tick import IngestionSchedulerTick
+from vector.infrastructure.db.models.identity_account import IdentityAccount
+from vector.infrastructure.db.models.identity_dirty_queue import IdentityDirtyQueue
+from vector.infrastructure.db.models.identity_entity import IdentityEntity
+from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
+from vector.infrastructure.db.models.identity_suggestion import IdentitySuggestion
 from vector.infrastructure.db.models.identity import UserIdentity
 from vector.infrastructure.db.models.linear_connection_detail import LinearConnectionDetail
 from vector.infrastructure.db.models.membership import TenantMembership
@@ -52,6 +57,11 @@ __all__ = [
     "GithubConnectionDetail",
     "IngestionRun",
     "IngestionSchedulerTick",
+    "IdentityAccount",
+    "IdentityDirtyQueue",
+    "IdentityEntity",
+    "IdentityPassRun",
+    "IdentitySuggestion",
     "LinearConnectionDetail",
     "NotionConnectionDetail",
     "OnboardingMessage",

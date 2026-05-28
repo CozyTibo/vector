@@ -1,4 +1,4 @@
-"""ECS Celery worker queue roles — ingestion, canon, and default (Beat + misc)."""
+"""ECS Celery worker queue roles — ingestion, canon, identity, and default."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ CELERY_INGESTION_QUEUES_V1: Final[tuple[str, ...]] = (
 )
 # Canon lane: materialization passes only (dedicated ECS service in prod).
 CELERY_CANON_QUEUES_V1: Final[tuple[str, ...]] = ("cortex_canon",)
+# Identity lane: deterministic identity reconciliation passes only.
+CELERY_IDENTITY_QUEUES_V1: Final[tuple[str, ...]] = ("cortex_identity",)
 # Default lane: Beat scheduler tick, email, onboarding, verify (must not starve behind sync).
 CELERY_DEFAULT_WORKER_QUEUES_V1: Final[tuple[str, ...]] = ("vector",)
 
@@ -55,6 +57,14 @@ def ingestion_worker_command_v1(*, concurrency: int = 2) -> list[str]:
 def canon_worker_command_v1(*, concurrency: int = 2) -> list[str]:
     return celery_worker_command_for_queues_v1(
         queues=CELERY_CANON_QUEUES_V1,
+        concurrency=concurrency,
+        prefetch_multiplier=1,
+    )
+
+
+def identity_worker_command_v1(*, concurrency: int = 2) -> list[str]:
+    return celery_worker_command_for_queues_v1(
+        queues=CELERY_IDENTITY_QUEUES_V1,
         concurrency=concurrency,
         prefetch_multiplier=1,
     )
@@ -110,6 +120,8 @@ def apply_worker_role_to_task_definition_v1(
         container["command"] = substrate_worker_command_v1(concurrency=concurrency)
     elif role == "canon":
         return apply_canon_worker_task_definition_v1(task_def, concurrency=concurrency)
+    elif role == "identity":
+        container["command"] = identity_worker_command_v1(concurrency=concurrency)
     else:
         msg = f"unsupported_worker_role:{role}"
         raise ValueError(msg)

@@ -326,6 +326,24 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_CANON_BATCH_RAW_LIMIT",
         description="Max raw rows processed per canon pass batch.",
     )
+    cortex_identity_scheduler_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_IDENTITY_SCHEDULER_ENABLED",
+        description="Cortex identity v1 Beat: enqueue tenant identity reconciliation passes on schedule.",
+    )
+    cortex_identity_scheduler_interval_seconds: int = Field(
+        default=300,
+        ge=60,
+        validation_alias="CORTEX_IDENTITY_SCHEDULER_INTERVAL_SECONDS",
+        description="Identity reconciliation Beat cadence (seconds). Default 300.",
+    )
+    cortex_identity_batch_actor_limit: int = Field(
+        default=500,
+        ge=1,
+        le=5000,
+        validation_alias="CORTEX_IDENTITY_BATCH_ACTOR_LIMIT",
+        description="Max actor rows processed per identity pass batch.",
+    )
     cortex_ingestion_verify_after_sync: bool = Field(
         default=True,
         validation_alias="CORTEX_INGESTION_VERIFY_AFTER_SYNC",
