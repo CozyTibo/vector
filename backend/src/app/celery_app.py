@@ -13,7 +13,6 @@ from vector.infrastructure.redis_url import normalize_rediss_url
 
 
 def _redis_url_for_celery(url: str) -> str:
-    """Normalize Redis URL for Celery."""
     return normalize_rediss_url(url)
 
 
@@ -69,31 +68,20 @@ celery_app.conf.imports = (
 celery_app.conf.task_routes = {
     "vector.cortex.ingestion.run_sync": {"queue": "cortex_live"},
     "vector.cortex.ingestion.run_sync_replay": {"queue": "cortex_replay"},
+    "vector.cortex.runtime.orchestrator_tick": {"queue": "vector"},
     "vector.cortex.runtime.plan_passes": {"queue": "vector"},
     "vector.cortex.runtime.poll_passes": {"queue": "vector"},
 }
 
-_tick_seconds = max(60, int(os.environ.get("CORTEX_INGESTION_SCHEDULER_INTERVAL_SECONDS", "120")))
-_plan_seconds = max(
+_orchestrator_seconds = max(
     60,
-    int(os.environ.get("CORTEX_CANON_SCHEDULER_INTERVAL_SECONDS", "300")),
+    int(os.environ.get("CORTEX_ORCHESTRATOR_INTERVAL_SECONDS", "120")),
 )
-_poll_seconds = max(30, int(os.environ.get("CORTEX_RUNTIME_POLL_INTERVAL_SECONDS", "60")))
 
 celery_app.conf.beat_schedule = {
-    "cortex-ingestion-beat-tick": {
-        "task": "vector.cortex.ingestion.scheduler_tick",
-        "schedule": timedelta(seconds=_tick_seconds),
-        "options": {"queue": "vector"},
-    },
-    "cortex-runtime-plan-passes": {
-        "task": "vector.cortex.runtime.plan_passes",
-        "schedule": timedelta(seconds=_plan_seconds),
-        "options": {"queue": "vector"},
-    },
-    "cortex-runtime-poll-passes": {
-        "task": "vector.cortex.runtime.poll_passes",
-        "schedule": timedelta(seconds=_poll_seconds),
+    "cortex-orchestrator-tick": {
+        "task": "vector.cortex.runtime.orchestrator_tick",
+        "schedule": timedelta(seconds=_orchestrator_seconds),
         "options": {"queue": "vector"},
     },
 }

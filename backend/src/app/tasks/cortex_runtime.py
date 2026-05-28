@@ -16,8 +16,10 @@ from vector.domains.cortex.runtime.execute import (
 from vector.domains.cortex.runtime.lane_scheduler_tick import complete_lane_scheduler_tick_v1
 from vector.domains.cortex.runtime.plan import plan_cortex_passes_v1
 from vector.domains.cortex.runtime.queue import recover_expired_leases_v1
+from vector.infrastructure.cortex_lane_pause import read_lane_paused_flag
 from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
 from vector.infrastructure.db.models.identity_scheduler_tick import IdentitySchedulerTick
+from vector.infrastructure.db.models.orchestrator_run import OrchestratorRun
 from vector.infrastructure.db.session import session_scope
 from vector.settings import get_settings
 
@@ -25,6 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _TASK_PLAN = "vector.cortex.runtime.plan_passes"
 _TASK_POLL = "vector.cortex.runtime.poll_passes"
+_TASK_ORCHESTRATOR = "vector.cortex.runtime.orchestrator_tick"
 
 
 def _worker_id() -> str:
@@ -134,3 +137,71 @@ def poll_cortex_passes_task() -> dict[str, object]:
                     break
 
     return {"processed": processed, "failed": failed, "worker_id": worker}
+
+
+@celery_app.task(name=_TASK_ORCHESTRATOR, queue="vector")
+def orchestrator_tick_task() -> dict[str, object]:
+    """Unified Beat: ingestion tick, pass planning, and pass polling."""
+    settings = get_settings()
+    interval = max(60, int(settings.cortex_orchestrator_interval_seconds))
+
+    with session_scope() as session:
+        run = OrchestratorRun(
+            started_at=datetime.now(tz=UTC),
+            outcome="running",
+            beat_interval_seconds=interval,
+        )
+        session.add(run)
+        session.flush()
+        run_id = run.id
+
+    detail: dict[str, object] = {}
+    ingestion_enqueued = 0
+    passes_planned = 0
+    passes_processed = 0
+    error_summary: str | None = None
+    outcome = "ok"
+
+    try:
+        if settings.cortex_ingestion_scheduler_enabled and not read_lane_paused_flag(
+            settings,
+            "ingestion",
+        ):
+            from app.tasks.cortex_ingestion_scheduler import tick_cortex_ingestion_scheduler
+
+            ingestion_out = tick_cortex_ingestion_scheduler()
+            detail["ingestion"] = ingestion_out
+            ingestion_enqueued = int(ingestion_out.get("enqueued") or 0)
+        else:
+            detail["ingestion"] = {"skipped": True}
+
+        plan_out = plan_cortex_passes_task()
+        poll_out = poll_cortex_passes_task()
+        detail["plan"] = plan_out
+        detail["poll"] = poll_out
+        passes_planned = int(plan_out.get("canon_planned") or 0) + int(
+            plan_out.get("identity_planned") or 0,
+        )
+        passes_processed = int(poll_out.get("processed") or 0)
+    except Exception as exc:
+        outcome = "error"
+        error_summary = str(exc)[:500]
+        _LOGGER.exception("orchestrator tick failed")
+    finally:
+        with session_scope() as session:
+            row = session.get(OrchestratorRun, run_id)
+            if row is not None:
+                row.completed_at = datetime.now(tz=UTC)
+                row.outcome = outcome
+                row.ingestion_enqueued = ingestion_enqueued
+                row.passes_planned = passes_planned
+                row.passes_processed = passes_processed
+                row.detail_json = detail
+                row.error_summary = error_summary
+
+    return {
+        "orchestrator_run_id": str(run_id),
+        "outcome": outcome,
+        "ingestion_enqueued": ingestion_enqueued,
+        "detail": detail,
+    }

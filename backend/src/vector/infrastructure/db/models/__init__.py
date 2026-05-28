@@ -30,6 +30,7 @@ from vector.infrastructure.db.models.linear_connection_detail import LinearConne
 from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.notion_connection_detail import NotionConnectionDetail
 from vector.infrastructure.db.models.onboarding_message import OnboardingMessage
+from vector.infrastructure.db.models.orchestrator_run import OrchestratorRun
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
 from vector.infrastructure.db.models.password_reset_token import PasswordResetToken
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
@@ -71,6 +72,7 @@ __all__ = [
     "LinearConnectionDetail",
     "NotionConnectionDetail",
     "OnboardingMessage",
+    "OrchestratorRun",
     "OnboardingState",
     "PasswordResetToken",
     "RawIngestionRecord",

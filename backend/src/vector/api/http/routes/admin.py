@@ -71,6 +71,8 @@ from vector.contracts.admin import (
     AdminCortexPassActionResponse,
     AdminCortexPassItem,
     AdminCortexPassListResponse,
+    AdminCortexOperationsResponse,
+    AdminCortexLanePauseRequest,
     AdminCanonTriggerPassRequest,
     AdminCanonTriggerPassResponse,
     CortexIngestionConnectorId,
@@ -2561,6 +2563,47 @@ def build_admin_router() -> APIRouter:
             phase=PHASE_STEP6,
             outcome="paused" if body.paused else "resumed",
         )
+        return AdminCortexSchedulerPauseResponse(paused_via_redis=body.paused)
+
+    @r.get(
+        "/cortex/operations",
+        response_model=AdminCortexOperationsResponse,
+    )
+    def admin_cortex_operations(
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexOperationsResponse:
+        from vector.domains.cortex.runtime.operations import build_cortex_operations_overview_v1
+
+        raw = build_cortex_operations_overview_v1(db, settings)
+        return AdminCortexOperationsResponse.model_validate(raw)
+
+    @r.post(
+        "/cortex/lanes/pause",
+        response_model=AdminCortexSchedulerPauseResponse,
+    )
+    def admin_cortex_lane_pause(
+        body: AdminCortexLanePauseRequest,
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminCortexSchedulerPauseResponse:
+        from vector.infrastructure.cortex_lane_pause import write_lane_paused_flag
+        from vector.infrastructure.cortex_scheduler_pause import scheduler_pause_redis_available
+
+        if not scheduler_pause_redis_available(settings):
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Lane pause requires REDIS_URL.",
+            )
+        try:
+            write_lane_paused_flag(settings, lane=body.lane, paused=body.paused)
+        except ValueError as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+        except RuntimeError as e:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
+        if body.lane == "ingestion":
+            from vector.infrastructure.cortex_scheduler_pause import write_scheduler_paused_flag
+
+            write_scheduler_paused_flag(settings, paused=body.paused)
         return AdminCortexSchedulerPauseResponse(paused_via_redis=body.paused)
 
     return r

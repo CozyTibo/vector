@@ -387,6 +387,20 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_RUNTIME_RETRY_DELAY_SECONDS",
         description="Backoff before retrying a failed pass row.",
     )
+    cortex_runtime_poll_interval_seconds: int = Field(
+        default=60,
+        ge=30,
+        le=600,
+        validation_alias="CORTEX_RUNTIME_POLL_INTERVAL_SECONDS",
+        description="Cadence for poll_passes within the unified orchestrator tick.",
+    )
+    cortex_orchestrator_interval_seconds: int = Field(
+        default=120,
+        ge=60,
+        le=3600,
+        validation_alias="CORTEX_ORCHESTRATOR_INTERVAL_SECONDS",
+        description="Unified Beat cadence for ingestion + pass plan + pass poll.",
+    )
     cortex_ingestion_verify_after_sync: bool = Field(
         default=True,
         validation_alias="CORTEX_INGESTION_VERIFY_AFTER_SYNC",

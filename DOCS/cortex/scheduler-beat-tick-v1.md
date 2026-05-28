@@ -6,12 +6,12 @@ Single mental model for ingestion, canon, and identity background work.
 
 ```mermaid
 flowchart LR
-  Beat[Celery Beat<br/>substrate worker only] -->|vector queue| IT[Ingestion tick]
-  Beat --> CT[Canon tick]
-  Beat --> IDT[Identity tick]
-  IT -->|cortex_live| Ing[Ingestion workers]
-  Plan -->|cortex_passes| Poll[poll_passes on vector queue]
-  Poll --> Exec[execute claimed pass]
+  Beat[Celery Beat on cortex worker] --> Orch[orchestrator_tick]
+  Orch --> IT[ingestion scheduler_tick]
+  Orch --> Plan[plan_passes → cortex_passes]
+  Orch --> Poll[poll_passes]
+  IT -->|cortex_live| Ing[Ingestion worker]
+  Poll --> Exec[execute canon/identity pass]
 ```
 
 - **One Beat process** per cluster (substrate ECS service / local `celery-beat` beside substrate worker).

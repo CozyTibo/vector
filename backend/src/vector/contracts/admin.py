@@ -4886,6 +4886,25 @@ class AdminCortexPassActionResponse(BaseModel):
     status: str
 
 
+class AdminCortexOperationsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    lane_pause: dict[str, bool] = Field(default_factory=dict)
+    pass_counts_by_status: dict[str, int] = Field(default_factory=dict)
+    last_orchestrator_run: dict[str, Any] | None = None
+    last_ingestion_tick: dict[str, Any] | None = None
+    last_canon_tick: dict[str, Any] | None = None
+    last_identity_tick: dict[str, Any] | None = None
+    scheduler_intervals_seconds: dict[str, int] = Field(default_factory=dict)
+
+
+class AdminCortexLanePauseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lane: str = Field(..., description="ingestion, canon, identity, or orchestrator")
+    paused: bool
+
+
 class AdminCanonTriggerPassRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -17,6 +17,7 @@ from vector.infrastructure.db.models.canon_dirty_queue import CanonDirtyQueue
 from vector.infrastructure.db.models.canon_materialization_cursor import CanonMaterializationCursor
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.domains.cortex.identity.scheduler_dedup import should_skip_scheduled_identity_pass
+from vector.infrastructure.cortex_lane_pause import read_lane_paused_flag
 from vector.settings import Settings
 
 
@@ -52,6 +53,14 @@ def _tenant_canon_has_backlog(session: Session, tenant_id: uuid.UUID) -> bool:
 
 def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any]:
     """Enqueue pending pass rows for tenants that need work (no Celery fan-out)."""
+    if read_lane_paused_flag(settings, "orchestrator"):
+        return {
+            "canon_planned": 0,
+            "canon_skipped": 0,
+            "identity_planned": 0,
+            "identity_skipped": 0,
+            "skipped_reason": "orchestrator_paused",
+        }
     canon_planned = 0
     canon_skipped = 0
     identity_planned = 0
@@ -59,7 +68,7 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
     canon_interval = max(60, int(settings.cortex_canon_scheduler_interval_seconds))
     identity_interval = max(60, int(settings.cortex_identity_scheduler_interval_seconds))
 
-    if settings.cortex_canon_scheduler_enabled:
+    if settings.cortex_canon_scheduler_enabled and not read_lane_paused_flag(settings, "canon"):
         for tid in iter_tenants_with_live_raw(session, settings):
             if not _tenant_canon_has_backlog(session, tid):
                 continue
@@ -78,7 +87,7 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
             )
             canon_planned += 1
 
-    if settings.cortex_identity_scheduler_enabled:
+    if settings.cortex_identity_scheduler_enabled and not read_lane_paused_flag(settings, "identity"):
         for tid in iter_tenants_with_actor_entities(session):
             if should_skip_scheduled_identity_pass(
                 session,
