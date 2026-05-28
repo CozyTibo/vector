@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-IDENTITY_RESOLVER_VERSION = 3
+IDENTITY_RESOLVER_VERSION = 4
 
 
 def get_identity_resolver_version(override: int | None = None) -> int:

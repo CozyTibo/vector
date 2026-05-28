@@ -211,7 +211,115 @@ def test_phase2_exact_email_links_to_existing_identity(db_session: Session) -> N
 
 
 def test_phase3_handle_match_links_when_email_missing(db_session: Session) -> None:
-    tenant_id = _seed(db_session, include_slack_same_handle_no_email=True)
+    """Slack handle must match full email local-part (>=10 chars), not short first names."""
+    user = User(email=f"ident-h3-{uuid.uuid4().hex[:8]}@example.com", full_name="Identity H3")
+    tenant = Tenant(
+        company_name="Identity H3 Co",
+        primary_email=user.email,
+        email_domain="example.com",
+        slug=f"ident-h3-{uuid.uuid4().hex[:8]}",
+        status="active",
+        workspace_access_enabled=True,
+    )
+    db_session.add_all([user, tenant])
+    db_session.flush()
+    db_session.add(TenantMembership(tenant_id=tenant.id, user_id=user.id, role="owner"))
+    linear_conn = TenantConnection(
+        tenant_id=tenant.id,
+        provider="linear",
+        status="active",
+        connected_by_user_id=user.id,
+    )
+    slack_conn = TenantConnection(
+        tenant_id=tenant.id,
+        provider="slack",
+        status="active",
+        connected_by_user_id=user.id,
+    )
+    db_session.add_all([linear_conn, slack_conn])
+    db_session.flush()
+    linear_run = IngestionRun(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        connection_id=linear_conn.id,
+        connector="linear",
+        status="COMPLETED",
+        source_trigger="test",
+        sync_mode="incremental",
+        replay_mode=False,
+        replay_version=1,
+        started_at=datetime.now(UTC),
+    )
+    slack_run = IngestionRun(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        connection_id=slack_conn.id,
+        connector="slack",
+        status="COMPLETED",
+        source_trigger="test",
+        sync_mode="incremental",
+        replay_mode=False,
+        replay_version=1,
+        started_at=datetime.now(UTC),
+    )
+    db_session.add_all([linear_run, slack_run])
+    db_session.flush()
+    ctx = IngestionSyncContext.live_incremental()
+    append_raw(
+        db_session,
+        ctx=ctx,
+        tenant_id=tenant.id,
+        connection_id=linear_conn.id,
+        connector="linear",
+        run_id=linear_run.id,
+        source_trigger="test",
+        resource_type="linear.user",
+        external_id="linear-tibo",
+        api_endpoint="https://api.linear.app/graphql",
+        query_params={},
+        payload_body={
+            **core_envelope_fields(
+                connector="linear",
+                connection_id=linear_conn.id,
+                source_object_type="linear.user",
+                source_object_id="linear-tibo",
+            ),
+            "user": {"id": "linear-tibo", "name": "Tibo", "email": "thibaulthagler@example.com"},
+        },
+        http_status=200,
+        idempotency_key="id3:linear:user:1",
+    )
+    append_raw(
+        db_session,
+        ctx=ctx,
+        tenant_id=tenant.id,
+        connection_id=slack_conn.id,
+        connector="slack",
+        run_id=slack_run.id,
+        source_trigger="test",
+        resource_type="slack.user",
+        external_id="U-TIBO",
+        api_endpoint="https://slack.test/users.list",
+        query_params={},
+        payload_body={
+            **core_envelope_fields(
+                connector="slack",
+                connection_id=slack_conn.id,
+                source_object_type="slack.user",
+                source_object_id="U-TIBO",
+            ),
+            "member": {
+                "id": "U-TIBO",
+                "name": "thibaulthagler",
+                "is_bot": False,
+                "profile": {"real_name": "Tibo"},
+            },
+        },
+        http_status=200,
+        idempotency_key="id3:slack:user:1",
+    )
+    db_session.commit()
+    tenant_id = tenant.id
     execute_canon_pass_for_tenant(
         db_session,
         tenant_id=tenant_id,

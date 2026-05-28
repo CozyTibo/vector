@@ -26,6 +26,16 @@ RUN_RUNNING = "RUNNING"
 RUN_COMPLETED = "COMPLETED"
 RUN_FAILED = "FAILED"
 BOT_MARKERS = ("[bot]", "-bot", "dependabot", "githubactions", "github-actions", "slackbot")
+# Handles/local-parts shorter than this are too ambiguous for cross-actor auto-link (e.g. shared first names).
+MIN_CROSS_ACTOR_HANDLE_LEN = 10
+# Auto-links that may be invalidated when resolver rules tighten.
+REVOCABLE_WEAK_LINK_RULES = frozenset(
+    {
+        "handle_to_email_local_part",
+        "exact_normalized_handle",
+        "exact_normalized_display_name",
+    },
+)
 
 
 def same_local_part_with_tenant_domain(
@@ -53,6 +63,21 @@ def _local_part_token(email: str) -> str | None:
     local = norm.split("@", 1)[0]
     token = "".join(ch for ch in local if ch.isalnum())
     return token or None
+
+
+def _significant_handle_tokens(handles: set[str]) -> set[str]:
+    return {h for h in handles if h and len(h) >= MIN_CROSS_ACTOR_HANDLE_LEN}
+
+
+def _handle_matches_email_local_part(handle_tokens: set[str], local_tok: str) -> bool:
+    """True only when a normalized handle equals the full email local-part token (not a short prefix)."""
+    if not local_tok or len(local_tok) < MIN_CROSS_ACTOR_HANDLE_LEN:
+        return False
+    return local_tok in handle_tokens
+
+
+def _significant_handle_overlap(left: set[str], right: set[str]) -> bool:
+    return bool(_significant_handle_tokens(left).intersection(_significant_handle_tokens(right)))
 
 
 def _name_token(raw: str) -> str | None:
@@ -342,7 +367,7 @@ def _seed_identity_for_actor(
             if not identity.primary_email.endswith(f"@{tenant_domain}"):
                 continue
             local_tok = _local_part_token(identity.primary_email)
-            if local_tok and local_tok in handle_tokens:
+            if local_tok and _handle_matches_email_local_part(handle_tokens, local_tok):
                 handle_to_email_matches.add(identity.id)
         if len(handle_to_email_matches) == 1:
             target_id = next(iter(handle_to_email_matches))
@@ -368,7 +393,7 @@ def _seed_identity_for_actor(
             evidence = account.evidence_json if isinstance(account.evidence_json, dict) else {}
             prev = evidence.get("handles")
             prev_handles = {str(v).strip().lower() for v in prev} if isinstance(prev, list) else set()
-            if prev_handles.intersection(signal.handles):
+            if _significant_handle_overlap(prev_handles, signal.handles):
                 handle_matches.add(identity.id)
         if len(handle_matches) == 1:
             target_id = next(iter(handle_matches))
@@ -412,15 +437,11 @@ def _seed_identity_for_actor(
                     confidence = "medium"
 
     if matched_identity is None:
-        if existing_identity is not None:
-            identity = existing_identity
-            identity.display_name = canon_entity.display_label[:512]
-            if chosen_email is not None:
-                identity.primary_email = chosen_email
-            if identity.resolver_version < resolved_version:
-                identity.resolver_version = resolved_version
-            identity.resolved_at = utc_now()
-        else:
+        should_split = (
+            existing_account is not None
+            and existing_account.link_rule in REVOCABLE_WEAK_LINK_RULES
+        )
+        if should_split or existing_identity is None:
             identity = IdentityEntity(
                 tenant_id=tenant_id,
                 kind=kind,
@@ -432,6 +453,18 @@ def _seed_identity_for_actor(
             )
             session.add(identity)
             session.flush()
+            if should_split:
+                link_tier = "seed"
+                link_rule = "resolver_split"
+                confidence = "low"
+        else:
+            identity = existing_identity
+            identity.display_name = canon_entity.display_label[:512]
+            if chosen_email is not None:
+                identity.primary_email = chosen_email
+            if identity.resolver_version < resolved_version:
+                identity.resolver_version = resolved_version
+            identity.resolved_at = utc_now()
     else:
         identity = matched_identity
         if identity.primary_email is None and chosen_email is not None:
