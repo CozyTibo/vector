@@ -68,6 +68,9 @@ from vector.contracts.admin import (
     AdminIdentityUnresolvedActorsResponse,
     AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
+    AdminCortexPassActionResponse,
+    AdminCortexPassItem,
+    AdminCortexPassListResponse,
     AdminCanonTriggerPassRequest,
     AdminCanonTriggerPassResponse,
     CortexIngestionConnectorId,
@@ -1653,6 +1656,66 @@ def build_admin_router() -> APIRouter:
         )
 
     @r.get(
+        "/tenants/{tenant_id}/cortex/passes",
+        response_model=AdminCortexPassListResponse,
+    )
+    def admin_tenant_cortex_passes(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        status: Annotated[str | None, Query()] = None,
+        pass_type: Annotated[str | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+    ) -> AdminCortexPassListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.runtime.queue import list_passes_v1
+
+        rows, total = list_passes_v1(
+            db,
+            tenant_id=tenant_id,
+            status=status,
+            pass_type=pass_type,
+            limit=limit,
+            offset=offset,
+        )
+        return AdminCortexPassListResponse(
+            items=[AdminCortexPassItem.model_validate(x) for x in rows],
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.post(
+        "/cortex/passes/{pass_id}/requeue",
+        response_model=AdminCortexPassActionResponse,
+    )
+    def admin_cortex_pass_requeue(
+        pass_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexPassActionResponse:
+        from vector.domains.cortex.runtime.queue import requeue_pass_v1
+
+        if not requeue_pass_v1(db, pass_id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Pass not found.")
+        db.commit()
+        return AdminCortexPassActionResponse(pass_id=str(pass_id), status="pending")
+
+    @r.post(
+        "/cortex/passes/{pass_id}/abandon",
+        response_model=AdminCortexPassActionResponse,
+    )
+    def admin_cortex_pass_abandon(
+        pass_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexPassActionResponse:
+        from vector.domains.cortex.runtime.queue import abandon_pass_v1
+
+        if not abandon_pass_v1(db, pass_id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Pass not found.")
+        db.commit()
+        return AdminCortexPassActionResponse(pass_id=str(pass_id), status="cancelled")
+
+    @r.get(
         "/tenants/{tenant_id}/cortex/canon/coverage",
         response_model=AdminCanonCoverageResponse,
     )
@@ -1761,9 +1824,17 @@ def build_admin_router() -> APIRouter:
                 status.HTTP_400_BAD_REQUEST,
                 detail=f"confirmation must be exactly: {MANUAL_CANON_PASS_CONFIRMATION}",
             )
-        from app.tasks.cortex_canon_sync import run_cortex_canon_pass_task
+        from vector.domains.cortex.runtime.pass_types import CANON_PASS
+        from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
 
-        run_cortex_canon_pass_task.delay(str(tenant_id), source_trigger="manual_admin")
+        upsert_pending_pass_v1(
+            db,
+            tenant_id=tenant_id,
+            pass_type=CANON_PASS,
+            source_trigger="manual_admin",
+            priority=100,
+        )
+        db.commit()
         return AdminCanonTriggerPassResponse(tenant_id=tenant_id)
 
     @r.get(
@@ -1885,16 +1956,24 @@ def build_admin_router() -> APIRouter:
                 status.HTTP_400_BAD_REQUEST,
                 detail=f"confirmation must be exactly: {MANUAL_IDENTITY_PASS_CONFIRMATION}",
             )
-        from app.tasks.cortex_identity_sync import run_cortex_identity_pass_task
         from vector.domains.cortex.identity.pass_run_ops import abandon_stuck_running_identity_passes
+        from vector.domains.cortex.runtime.pass_types import IDENTITY_PASS
+        from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
 
         abandon_stuck_running_identity_passes(
             db,
             tenant_id=tenant_id,
             interval_seconds=settings.cortex_identity_scheduler_interval_seconds,
         )
+        upsert_pending_pass_v1(
+            db,
+            tenant_id=tenant_id,
+            pass_type=IDENTITY_PASS,
+            source_trigger="manual_admin",
+            priority=100,
+            payload_json=None,
+        )
         db.commit()
-        run_cortex_identity_pass_task.delay(str(tenant_id), source_trigger="manual_admin")
         return AdminIdentityTriggerPassResponse(tenant_id=tenant_id)
 
     @r.post(

@@ -93,15 +93,21 @@ def _seed(db_session: Session) -> uuid.UUID:
     return tenant.id
 
 
-def test_canon_scheduler_tick_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plan_passes_skips_canon_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CORTEX_CANON_SCHEDULER_ENABLED", "false")
+    monkeypatch.setenv("CORTEX_IDENTITY_SCHEDULER_ENABLED", "false")
     from vector.settings import get_settings
 
     get_settings.cache_clear()
-    from app.tasks.cortex_canon_scheduler import tick_cortex_canon_scheduler
+    from vector.domains.cortex.runtime.plan import plan_cortex_passes_v1
 
-    out = tick_cortex_canon_scheduler()
-    assert out["status"] == "disabled"
+    class _Sess:
+        def __init__(self) -> None:
+            pass
+
+    out = plan_cortex_passes_v1(_Sess(), get_settings())  # type: ignore[arg-type]
+    assert out["canon_planned"] == 0
+    assert out["identity_planned"] == 0
 
 
 def test_list_entities_after_pass(db_session: Session) -> None:

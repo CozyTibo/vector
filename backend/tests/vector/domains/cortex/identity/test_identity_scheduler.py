@@ -6,7 +6,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy.orm import Session
 
-from app.tasks.cortex_identity_scheduler import _should_skip_scheduled_identity_pass
+from vector.domains.cortex.identity.scheduler_dedup import should_skip_scheduled_identity_pass
 from vector.domains.cortex.identity.pass_run_ops import abandon_stuck_running_identity_passes
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
@@ -36,7 +36,7 @@ def test_skip_when_scheduled_pass_ran_recently(db_session: Session) -> None:
         ),
     )
     db_session.commit()
-    assert _should_skip_scheduled_identity_pass(
+    assert should_skip_scheduled_identity_pass(
         db_session,
         tenant_id=tenant.id,
         interval_seconds=300,
@@ -64,7 +64,7 @@ def test_no_skip_when_last_scheduled_pass_is_stale(db_session: Session) -> None:
         ),
     )
     db_session.commit()
-    assert not _should_skip_scheduled_identity_pass(
+    assert not should_skip_scheduled_identity_pass(
         db_session,
         tenant_id=tenant.id,
         interval_seconds=300,
@@ -100,7 +100,7 @@ def test_stuck_running_pass_is_abandoned_and_scheduler_unblocks(db_session: Sess
     db_session.refresh(stuck_run)
     assert stuck_run.status == "FAILED"
     assert stuck_run.error_summary == "stale_running_pass_abandoned"
-    assert not _should_skip_scheduled_identity_pass(
+    assert not should_skip_scheduled_identity_pass(
         db_session,
         tenant_id=tenant.id,
         interval_seconds=300,

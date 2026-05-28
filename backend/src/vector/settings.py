@@ -366,6 +366,27 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_IDENTITY_RESOLVER_VERSION",
         description="Resolver version override to force deterministic rematching/rescoring passes.",
     )
+    cortex_runtime_lease_ttl_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=7200,
+        validation_alias="CORTEX_RUNTIME_LEASE_TTL_SECONDS",
+        description="Pass execution lease TTL while RUNNING (seconds).",
+    )
+    cortex_runtime_poll_batch_limit: int = Field(
+        default=8,
+        ge=1,
+        le=64,
+        validation_alias="CORTEX_RUNTIME_POLL_BATCH_LIMIT",
+        description="Max passes claimed per poll_passes Beat tick.",
+    )
+    cortex_runtime_retry_delay_seconds: int = Field(
+        default=120,
+        ge=30,
+        le=3600,
+        validation_alias="CORTEX_RUNTIME_RETRY_DELAY_SECONDS",
+        description="Backoff before retrying a failed pass row.",
+    )
     cortex_ingestion_verify_after_sync: bool = Field(
         default=True,
         validation_alias="CORTEX_INGESTION_VERIFY_AFTER_SYNC",

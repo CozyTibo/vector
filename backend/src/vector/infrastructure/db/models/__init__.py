@@ -8,6 +8,7 @@ from vector.infrastructure.db.models.canon_materialization_cursor import CanonMa
 from vector.infrastructure.db.models.canon_pass_run import CanonPassRun
 from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
 from vector.infrastructure.db.models.cortex_admin_continuity_snapshot import CortexAdminContinuitySnapshot
+from vector.infrastructure.db.models.cortex_pass import CortexPass
 from vector.infrastructure.db.models.cortex_admin_graph_component_snapshot import (
     CortexAdminGraphComponentSnapshot,
 )
@@ -55,6 +56,7 @@ __all__ = [
     "CallsConnectionDetail",
     "ConnectorSyncState",
     "CortexAdminContinuitySnapshot",
+    "CortexPass",
     "CortexAdminGraphComponentSnapshot",
     "CortexPhase09ReadinessSignoff",
     "GithubConnectionDetail",

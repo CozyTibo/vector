@@ -4849,6 +4849,43 @@ class AdminCanonRecentPassRunsResponse(BaseModel):
     limit: int
 
 
+class AdminCortexPassItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    tenant_id: str
+    pass_type: str
+    status: str
+    priority: int
+    scheduled_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    locked_by: str | None = None
+    locked_until: str | None = None
+    attempt_count: int
+    max_attempts: int
+    source_trigger: str
+    payload_json: dict[str, Any] | None = None
+    error_summary: str | None = None
+    stats_json: dict[str, Any] | None = None
+
+
+class AdminCortexPassListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[AdminCortexPassItem]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminCortexPassActionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    pass_id: str
+    status: str
+
+
 class AdminCanonTriggerPassRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
