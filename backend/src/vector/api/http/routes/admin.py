@@ -1784,6 +1784,8 @@ def build_admin_router() -> APIRouter:
                 "interval_seconds": settings.cortex_identity_scheduler_interval_seconds,
             },
         )
+        if int(raw.get("abandoned_stuck_running_passes") or 0) > 0:
+            db.commit()
         return AdminIdentityReadinessResponse.model_validate(raw)
 
     @r.get(
@@ -1870,6 +1872,7 @@ def build_admin_router() -> APIRouter:
         tenant_id: uuid.UUID,
         body: AdminIdentityTriggerPassRequest,
         db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminIdentityTriggerPassResponse:
         _assert_tenant(db, tenant_id)
         if body.confirmation != MANUAL_IDENTITY_PASS_CONFIRMATION:
@@ -1878,7 +1881,14 @@ def build_admin_router() -> APIRouter:
                 detail=f"confirmation must be exactly: {MANUAL_IDENTITY_PASS_CONFIRMATION}",
             )
         from app.tasks.cortex_identity_sync import run_cortex_identity_pass_task
+        from vector.domains.cortex.identity.pass_run_ops import abandon_stuck_running_identity_passes
 
+        abandon_stuck_running_identity_passes(
+            db,
+            tenant_id=tenant_id,
+            interval_seconds=settings.cortex_identity_scheduler_interval_seconds,
+        )
+        db.commit()
         run_cortex_identity_pass_task.delay(str(tenant_id), source_trigger="manual_admin")
         return AdminIdentityTriggerPassResponse(tenant_id=tenant_id)
 

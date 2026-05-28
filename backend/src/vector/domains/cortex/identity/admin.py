@@ -14,6 +14,7 @@ from vector.infrastructure.db.models.identity_dirty_queue import IdentityDirtyQu
 from vector.infrastructure.db.models.identity_entity import IdentityEntity
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
 from vector.domains.cortex.identity.materialize import _latest_actor_payload
+from vector.domains.cortex.identity.pass_run_ops import abandon_stuck_running_identity_passes
 from vector.domains.cortex.identity.signals import extract_actor_signal
 
 MANUAL_IDENTITY_PASS_CONFIRMATION = "RUN IDENTITY RECONCILIATION PASS"
@@ -78,7 +79,21 @@ def pick_identity_avatar_url(
 MANUAL_IDENTITY_REBUILD_CONFIRMATION = "REBUILD IDENTITIES FROM CANON ACTORS"
 
 
-def build_identity_readiness(session: Session, tenant_id: uuid.UUID, *, scheduler: dict[str, Any]) -> dict[str, Any]:
+def build_identity_readiness(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    scheduler: dict[str, Any],
+    reconcile_stuck_passes: bool = True,
+) -> dict[str, Any]:
+    abandoned_stuck = 0
+    if reconcile_stuck_passes and scheduler.get("enabled"):
+        interval = int(scheduler.get("interval_seconds") or 300)
+        abandoned_stuck = abandon_stuck_running_identity_passes(
+            session,
+            tenant_id=tenant_id,
+            interval_seconds=interval,
+        )
     actor_count = int(
         session.scalar(
             select(func.count())
@@ -154,6 +169,7 @@ def build_identity_readiness(session: Session, tenant_id: uuid.UUID, *, schedule
         "dirty_queue_depth": dirty_queue_depth,
         "latest_pass_run": latest_payload,
         "scheduler": scheduler,
+        "abandoned_stuck_running_passes": abandoned_stuck,
     }
 
 

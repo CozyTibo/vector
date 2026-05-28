@@ -6,10 +6,8 @@ from datetime import timedelta
 import pytest
 from sqlalchemy.orm import Session
 
-from app.tasks.cortex_identity_scheduler import (
-    _fail_stuck_running_identity_passes,
-    _should_skip_scheduled_identity_pass,
-)
+from app.tasks.cortex_identity_scheduler import _should_skip_scheduled_identity_pass
+from vector.domains.cortex.identity.pass_run_ops import abandon_stuck_running_identity_passes
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
 from vector.infrastructure.db.models.tenant import Tenant
@@ -92,7 +90,7 @@ def test_stuck_running_pass_is_abandoned_and_scheduler_unblocks(db_session: Sess
     )
     db_session.add(stuck_run)
     db_session.commit()
-    abandoned = _fail_stuck_running_identity_passes(
+    abandoned = abandon_stuck_running_identity_passes(
         db_session,
         tenant_id=tenant.id,
         interval_seconds=300,

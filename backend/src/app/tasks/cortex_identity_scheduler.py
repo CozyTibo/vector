@@ -7,6 +7,7 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from app.celery_app import celery_app
+from vector.domains.cortex.identity.pass_run_ops import RUN_RUNNING, abandon_stuck_running_identity_passes
 from vector.domains.cortex.identity.scheduler import iter_tenants_with_actor_entities
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
@@ -16,43 +17,6 @@ from vector.settings import get_settings
 _LOGGER = logging.getLogger(__name__)
 
 _TASK_TICK = "vector.cortex.identity.scheduler_tick"
-_RUN_RUNNING = "RUNNING"
-_RUN_FAILED = "FAILED"
-_STUCK_RUNNING_MIN_SECONDS = 600
-
-
-def _fail_stuck_running_identity_passes(
-    session,
-    *,
-    tenant_id: uuid.UUID,
-    interval_seconds: int,
-) -> int:
-    """Worker crash mid-pass leaves RUNNING forever and blocks the scheduler."""
-    grace_seconds = max(_STUCK_RUNNING_MIN_SECONDS, int(interval_seconds) * 2)
-    cutoff = utc_now() - timedelta(seconds=grace_seconds)
-    stuck = list(
-        session.scalars(
-            select(IdentityPassRun).where(
-                IdentityPassRun.tenant_id == tenant_id,
-                IdentityPassRun.status == _RUN_RUNNING,
-                IdentityPassRun.started_at < cutoff,
-            ),
-        ).all(),
-    )
-    if not stuck:
-        return 0
-    now = utc_now()
-    for row in stuck:
-        row.status = _RUN_FAILED
-        row.finished_at = now
-        row.error_summary = "stale_running_pass_abandoned"
-    session.flush()
-    _LOGGER.warning(
-        "identity scheduler abandoned %s stale RUNNING pass(es) for tenant %s",
-        len(stuck),
-        tenant_id,
-    )
-    return len(stuck)
 
 
 def _should_skip_scheduled_identity_pass(
@@ -62,7 +26,7 @@ def _should_skip_scheduled_identity_pass(
     interval_seconds: int,
 ) -> bool:
     """Avoid duplicate scheduled passes (multiple Beat containers or slow workers)."""
-    _fail_stuck_running_identity_passes(
+    abandon_stuck_running_identity_passes(
         session,
         tenant_id=tenant_id,
         interval_seconds=interval_seconds,
@@ -72,7 +36,7 @@ def _should_skip_scheduled_identity_pass(
         select(IdentityPassRun.id)
         .where(
             IdentityPassRun.tenant_id == tenant_id,
-            IdentityPassRun.status == _RUN_RUNNING,
+            IdentityPassRun.status == RUN_RUNNING,
             IdentityPassRun.started_at >= utc_now() - timedelta(seconds=in_flight_window),
         )
         .limit(1),
