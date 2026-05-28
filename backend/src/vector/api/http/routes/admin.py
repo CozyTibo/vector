@@ -2037,11 +2037,27 @@ def build_admin_router() -> APIRouter:
     def admin_cortex_graph_readiness(
         tenant_id: uuid.UUID,
         db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminGraphReadinessResponse:
         _assert_tenant(db, tenant_id)
         from vector.domains.cortex.graph.admin import build_graph_readiness
+        from vector.domains.cortex.runtime.lane_scheduler_status import build_graph_lane_scheduler_status
 
-        return AdminGraphReadinessResponse.model_validate(build_graph_readiness(db, tenant_id))
+        graph_interval = max(60, int(settings.cortex_graph_scheduler_interval_seconds))
+        orch_interval = max(60, int(settings.cortex_orchestrator_interval_seconds))
+        return AdminGraphReadinessResponse.model_validate(
+            build_graph_readiness(
+                db,
+                tenant_id,
+                scheduler=build_graph_lane_scheduler_status(
+                    db,
+                    tenant_id=tenant_id,
+                    enabled=settings.cortex_graph_scheduler_enabled,
+                    interval_seconds=graph_interval,
+                    orchestrator_interval_seconds=orch_interval,
+                ),
+            ),
+        )
 
     @r.get(
         "/tenants/{tenant_id}/cortex/graph/stats",

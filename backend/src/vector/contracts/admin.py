@@ -4992,7 +4992,14 @@ class AdminGraphReadinessResponse(BaseModel):
     extractor_version: int
     extractor_version_code: int
     dirty_queue_pending: int
+    dirty_queue_extract_pending: int = 0
+    dirty_queue_enrich_pending: int = 0
+    dirty_queue_by_reason: dict[str, int] = Field(default_factory=dict)
     active_relationship_count: int
+    unresolved_reference_count: int = 0
+    scoped_entity_count: int = 0
+    canon_backlog: bool = False
+    graph_caught_up: bool = False
     latest_pass_run: dict[str, Any] | None = None
     scheduler: dict[str, Any] = Field(default_factory=dict)
 

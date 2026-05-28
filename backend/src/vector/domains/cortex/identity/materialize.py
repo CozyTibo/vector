@@ -1108,16 +1108,19 @@ def execute_identity_pass_for_tenant(
                         stats["rematched"] += 1
                     else:
                         stats["already_linked"] += 1
-                    try:
-                        from vector.domains.cortex.graph.enqueue import enqueue_graph_actor_for_enrich
+                    if outcome in ("seeded", "rematched"):
+                        try:
+                            from vector.domains.cortex.graph.enqueue import (
+                                enqueue_graph_actor_for_enrich,
+                            )
 
-                        enqueue_graph_actor_for_enrich(
-                            session,
-                            tenant_id=tenant_id,
-                            canon_entity_id=canon_entity.id,
-                        )
-                    except Exception:
-                        pass
+                            enqueue_graph_actor_for_enrich(
+                                session,
+                                tenant_id=tenant_id,
+                                canon_entity_id=canon_entity.id,
+                            )
+                        except Exception:
+                            pass
                     item.processed_at = utc_now()
                     item.last_error = None
                 except Exception as exc:

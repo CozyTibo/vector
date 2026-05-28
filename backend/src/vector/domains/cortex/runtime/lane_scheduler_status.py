@@ -12,12 +12,19 @@ from sqlalchemy.orm import Session
 from vector.domains.cortex.identity.scheduler_dedup import should_skip_scheduled_identity_pass
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.domains.cortex.runtime.lane_scheduler_tick import latest_lane_scheduler_tick_v1
-from vector.domains.cortex.runtime.pass_types import ACTIVE_STATUSES, CANON_PASS, IDENTITY_PASS
+from vector.domains.cortex.runtime.pass_types import (
+    ACTIVE_STATUSES,
+    CANON_PASS,
+    GRAPH_PROJECTION_PASS,
+    IDENTITY_PASS,
+)
 from vector.domains.cortex.runtime.plan import _tenant_canon_has_backlog
 from vector.infrastructure.db.models.canon_pass_run import CanonPassRun
 from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
 from vector.infrastructure.db.models.cortex_pass import CortexPass
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
+from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
+from vector.infrastructure.db.models.graph_scheduler_tick import GraphSchedulerTick
 from vector.infrastructure.db.models.identity_scheduler_tick import IdentitySchedulerTick
 from vector.infrastructure.db.models.orchestrator_run import OrchestratorRun
 
@@ -170,6 +177,63 @@ def build_canon_lane_scheduler_status(
         "last_tick": _tick_payload(last_tick),
         "last_orchestrator_run": _orchestrator_last_run_payload(session),
         "lane_stale": stale,
+    }
+
+
+def _tenant_graph_has_backlog(session: Session, tenant_id: uuid.UUID) -> bool:
+    from vector.domains.cortex.graph.materialize import tenant_has_canon_backlog
+    from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
+
+    pending = session.scalar(
+        select(GraphDirtyQueue.id)
+        .where(
+            GraphDirtyQueue.tenant_id == tenant_id,
+            GraphDirtyQueue.processed_at.is_(None),
+        )
+        .limit(1),
+    )
+    if pending is None:
+        return False
+    return not tenant_has_canon_backlog(session, tenant_id)
+
+
+def build_graph_lane_scheduler_status(
+    session: Session,
+    *,
+    tenant_id: Any,
+    enabled: bool,
+    interval_seconds: int,
+    orchestrator_interval_seconds: int,
+) -> dict[str, Any]:
+    from vector.domains.cortex.graph.scheduler_dedup import should_skip_scheduled_graph_pass
+
+    tid = tenant_id if isinstance(tenant_id, uuid.UUID) else uuid.UUID(str(tenant_id))
+    last_tick = latest_lane_scheduler_tick_v1(session, GraphSchedulerTick)
+    needs_work = _tenant_graph_has_backlog(session, tid)
+    stale = _compute_lane_stale(
+        session,
+        enabled=enabled,
+        tenant_id=tid,
+        pass_run_model=GraphPassRun,
+        pass_type=GRAPH_PROJECTION_PASS,
+        lane_interval_seconds=interval_seconds,
+        orchestrator_interval_seconds=orchestrator_interval_seconds,
+        tenant_needs_work=needs_work,
+    )
+    return {
+        "runtime_model": "orchestrator",
+        "enabled": enabled,
+        "interval_seconds": interval_seconds,
+        "orchestrator_interval_seconds": orchestrator_interval_seconds,
+        "tenant_needs_work": needs_work,
+        "last_tick": _tick_payload(last_tick),
+        "last_orchestrator_run": _orchestrator_last_run_payload(session),
+        "lane_stale": stale,
+        "scheduled_skip": should_skip_scheduled_graph_pass(
+            session,
+            tenant_id=tid,
+            interval_seconds=interval_seconds,
+        ),
     }
 
 

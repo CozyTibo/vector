@@ -25,6 +25,7 @@ GRAPH_SCOPED_ENTITY_TYPES = frozenset(
 )
 
 _ENRICH_ONLY_REASONS = frozenset({"identity_linked"})
+_EXTRACT_REASONS = frozenset({"canon_materialized", "rebuild"})
 
 
 def enqueue_graph_entity(
@@ -49,8 +50,11 @@ def enqueue_graph_entity(
         .limit(1),
     )
     if existing is not None:
-        if reason == "identity_linked" and existing.reason == "canon_materialized":
+        if reason in _EXTRACT_REASONS and existing.reason in _ENRICH_ONLY_REASONS:
             existing.reason = reason
+            return
+        if reason in _ENRICH_ONLY_REASONS and existing.reason in _EXTRACT_REASONS:
+            return
         return
     session.add(
         GraphDirtyQueue(

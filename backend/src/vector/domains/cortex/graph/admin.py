@@ -8,10 +8,12 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.graph.enqueue import GRAPH_SCOPED_ENTITY_TYPES
 from vector.domains.cortex.graph.extractor_version import (
     GRAPH_EXTRACTOR_VERSION,
     effective_graph_extractor_version,
 )
+from vector.domains.cortex.graph.materialize import tenant_has_canon_backlog
 from vector.domains.cortex.graph.pass_run_ops import abandon_stuck_running_graph_passes
 from vector.domains.cortex.graph.relationship_kinds import label_for_kind
 from vector.infrastructure.db.models.canon_entity import CanonEntity
@@ -70,12 +72,60 @@ def build_graph_readiness(
             "stats": latest.stats or {},
             "error_summary": latest.error_summary,
         }
+    dirty_by_reason_rows = session.execute(
+        select(GraphDirtyQueue.reason, func.count())
+        .where(
+            GraphDirtyQueue.tenant_id == tenant_id,
+            GraphDirtyQueue.processed_at.is_(None),
+        )
+        .group_by(GraphDirtyQueue.reason),
+    ).all()
+    dirty_by_reason = {str(reason): int(count) for reason, count in dirty_by_reason_rows}
+    extract_pending = sum(
+        dirty_by_reason.get(key, 0) for key in ("canon_materialized", "rebuild")
+    )
+    enrich_pending = int(dirty_by_reason.get("identity_linked", 0))
+    unresolved_refs = int(
+        session.scalar(
+            select(func.count())
+            .select_from(GraphUnresolvedReference)
+            .where(
+                GraphUnresolvedReference.tenant_id == tenant_id,
+                GraphUnresolvedReference.status == "unresolved",
+            ),
+        )
+        or 0,
+    )
+    scoped_entity_count = int(
+        session.scalar(
+            select(func.count())
+            .select_from(CanonEntity)
+            .where(
+                CanonEntity.tenant_id == tenant_id,
+                CanonEntity.entity_type.in_(tuple(sorted(GRAPH_SCOPED_ENTITY_TYPES))),
+            ),
+        )
+        or 0,
+    )
+    canon_backlog = tenant_has_canon_backlog(session, tenant_id)
+    graph_caught_up = (
+        not canon_backlog
+        and dirty_pending == 0
+        and (scheduler or {}).get("tenant_needs_work") is not True
+    )
     return {
         "tenant_id": str(tenant_id),
         "extractor_version": effective_graph_extractor_version(None),
         "extractor_version_code": GRAPH_EXTRACTOR_VERSION,
         "dirty_queue_pending": dirty_pending,
+        "dirty_queue_extract_pending": extract_pending,
+        "dirty_queue_enrich_pending": enrich_pending,
+        "dirty_queue_by_reason": dirty_by_reason,
         "active_relationship_count": active_edges,
+        "unresolved_reference_count": unresolved_refs,
+        "scoped_entity_count": scoped_entity_count,
+        "canon_backlog": canon_backlog,
+        "graph_caught_up": graph_caught_up,
         "latest_pass_run": latest_payload,
         "scheduler": scheduler or {},
     }

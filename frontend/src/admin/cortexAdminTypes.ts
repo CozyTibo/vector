@@ -437,12 +437,31 @@ export type CortexCanonicalControlPlane = {
   warnings: { must_not_assume: string[]; canonical_failure_sync: Record<string, unknown> };
 };
 
+export type GraphLaneScheduler = {
+  runtime_model?: string;
+  enabled?: boolean;
+  interval_seconds?: number;
+  orchestrator_interval_seconds?: number;
+  tenant_needs_work?: boolean;
+  lane_stale?: boolean;
+  scheduled_skip?: boolean;
+  last_tick?: Record<string, unknown> | null;
+  last_orchestrator_run?: Record<string, unknown> | null;
+};
+
 export type GraphReadiness = {
   tenant_id: string;
   extractor_version: number;
   extractor_version_code: number;
   dirty_queue_pending: number;
+  dirty_queue_extract_pending: number;
+  dirty_queue_enrich_pending: number;
+  dirty_queue_by_reason: Record<string, number>;
   active_relationship_count: number;
+  unresolved_reference_count: number;
+  scoped_entity_count: number;
+  canon_backlog: boolean;
+  graph_caught_up: boolean;
   latest_pass_run: {
     id: string;
     status: string;
@@ -452,7 +471,7 @@ export type GraphReadiness = {
     stats: Record<string, number>;
     error_summary: string | null;
   } | null;
-  scheduler: Record<string, unknown>;
+  scheduler: GraphLaneScheduler;
 };
 
 export type GraphRelationshipListItem = {
