@@ -9,7 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.identity.resolver_version import IDENTITY_RESOLVER_VERSION
-from vector.domains.cortex.identity.signals import extract_actor_signal
+from vector.domains.cortex.identity.signals import extract_actor_signal, normalize_email
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.canon_entity_source import CanonEntitySource
@@ -19,10 +19,29 @@ from vector.infrastructure.db.models.identity_entity import IdentityEntity
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
 from vector.infrastructure.db.models.identity_suggestion import IdentitySuggestion
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
+from vector.infrastructure.db.models.tenant import Tenant
 
 RUN_RUNNING = "RUNNING"
 RUN_COMPLETED = "COMPLETED"
 RUN_FAILED = "FAILED"
+
+
+def same_local_part_with_tenant_domain(
+    *,
+    left_email: str,
+    right_email: str,
+    tenant_domain: str | None,
+) -> bool:
+    domain = (tenant_domain or "").strip().lower()
+    if not domain:
+        return False
+    l = normalize_email(left_email)
+    r = normalize_email(right_email)
+    if not l or not r:
+        return False
+    if not l.endswith(f"@{domain}") or not r.endswith(f"@{domain}"):
+        return False
+    return l.split("@", 1)[0] == r.split("@", 1)[0]
 
 
 def enqueue_identity_actor(
@@ -125,26 +144,88 @@ def _seed_identity_for_actor(
         source_revision_key=source.source_revision_key,
         payload_body=payload,
     )
-    identity = IdentityEntity(
-        tenant_id=tenant_id,
-        kind="unknown",
-        display_name=canon_entity.display_label[:512],
-        primary_email=(next(iter(signal.emails)) if signal.emails else None),
-        resolver_version=IDENTITY_RESOLVER_VERSION,
-        status="active",
-        resolved_at=utc_now(),
-    )
-    session.add(identity)
-    session.flush()
+    tenant = session.get(Tenant, tenant_id)
+    tenant_domain = tenant.email_domain if tenant is not None else None
+    emails_sorted = sorted(signal.emails)
+    chosen_email = emails_sorted[0] if emails_sorted else None
+    link_tier = "seed"
+    link_rule = "seed_actor"
+    confidence = "low"
+
+    matched_identity: IdentityEntity | None = None
+    if chosen_email:
+        exact_ids = list(
+            session.scalars(
+                select(IdentityEntity)
+                .where(
+                    IdentityEntity.tenant_id == tenant_id,
+                    IdentityEntity.status == "active",
+                    IdentityEntity.primary_email == chosen_email,
+                )
+                .order_by(IdentityEntity.resolved_at.asc(), IdentityEntity.id.asc()),
+            ).all(),
+        )
+        if len(exact_ids) == 1:
+            matched_identity = exact_ids[0]
+            link_tier = "T1"
+            link_rule = "exact_email"
+            confidence = "certain"
+        elif len(exact_ids) == 0 and tenant_domain:
+            local_match = list(
+                session.scalars(
+                    select(IdentityEntity)
+                    .where(
+                        IdentityEntity.tenant_id == tenant_id,
+                        IdentityEntity.status == "active",
+                        IdentityEntity.primary_email.is_not(None),
+                    ),
+                ).all(),
+            )
+            cands = [
+                i
+                for i in local_match
+                if i.primary_email
+                and same_local_part_with_tenant_domain(
+                    left_email=chosen_email,
+                    right_email=i.primary_email,
+                    tenant_domain=tenant_domain,
+                )
+            ]
+            cands.sort(key=lambda i: (i.resolved_at, i.id))
+            if len(cands) == 1:
+                matched_identity = cands[0]
+                link_tier = "T2"
+                link_rule = "local_part_tenant_domain"
+                confidence = "high"
+
+    if matched_identity is None:
+        identity = IdentityEntity(
+            tenant_id=tenant_id,
+            kind="unknown",
+            display_name=canon_entity.display_label[:512],
+            primary_email=chosen_email,
+            resolver_version=IDENTITY_RESOLVER_VERSION,
+            status="active",
+            resolved_at=utc_now(),
+        )
+        session.add(identity)
+        session.flush()
+    else:
+        identity = matched_identity
+        if identity.primary_email is None and chosen_email is not None:
+            identity.primary_email = chosen_email
     evidence = {
         "seed": "actor",
         "connector": canon_entity.connector,
         "source_identity_key": source.source_identity_key,
-        "emails": sorted(signal.emails),
+        "emails": emails_sorted,
         "handles": sorted(signal.handles),
         "display_names": sorted(signal.display_names),
         "provider_ids": sorted(signal.provider_ids),
         "bot_reasons": signal.bot_reasons,
+        "tenant_email_domain": tenant_domain,
+        "match_tier": link_tier,
+        "match_rule": link_rule,
     }
     account = IdentityAccount(
         tenant_id=tenant_id,
@@ -152,9 +233,9 @@ def _seed_identity_for_actor(
         canon_entity_id=canon_entity.id,
         connector=canon_entity.connector,
         connection_id=canon_entity.connection_id,
-        link_tier="seed",
-        link_rule="seed_actor",
-        confidence="low",
+        link_tier=link_tier,
+        link_rule=link_rule,
+        confidence=confidence,
         evidence_json=evidence,
         linked_at=utc_now(),
     )

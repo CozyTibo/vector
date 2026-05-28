@@ -24,7 +24,7 @@ from vector.infrastructure.db.models.user import User
 pytestmark = pytest.mark.integration
 
 
-def _seed(db_session: Session) -> uuid.UUID:
+def _seed(db_session: Session, *, include_slack_same_email: bool = False) -> uuid.UUID:
     user = User(email=f"ident1-{uuid.uuid4().hex[:8]}@example.com", full_name="Identity1")
     tenant = Tenant(
         company_name="Identity1 Co",
@@ -44,6 +44,15 @@ def _seed(db_session: Session) -> uuid.UUID:
         connected_by_user_id=user.id,
     )
     db_session.add(conn)
+    slack_conn: TenantConnection | None = None
+    if include_slack_same_email:
+        slack_conn = TenantConnection(
+            tenant_id=tenant.id,
+            provider="slack",
+            status="active",
+            connected_by_user_id=user.id,
+        )
+        db_session.add(slack_conn)
     db_session.flush()
     run = IngestionRun(
         id=uuid.uuid4(),
@@ -58,6 +67,21 @@ def _seed(db_session: Session) -> uuid.UUID:
         started_at=datetime.now(UTC),
     )
     db_session.add(run)
+    slack_run: IngestionRun | None = None
+    if slack_conn is not None:
+        slack_run = IngestionRun(
+            id=uuid.uuid4(),
+            tenant_id=tenant.id,
+            connection_id=slack_conn.id,
+            connector="slack",
+            status="COMPLETED",
+            source_trigger="test",
+            sync_mode="incremental",
+            replay_mode=False,
+            replay_version=1,
+            started_at=datetime.now(UTC),
+        )
+        db_session.add(slack_run)
     db_session.flush()
     ctx = IngestionSyncContext.live_incremental()
     append_raw(
@@ -84,6 +108,36 @@ def _seed(db_session: Session) -> uuid.UUID:
         http_status=200,
         idempotency_key="id1:linear:user:1",
     )
+    if slack_conn is not None and slack_run is not None:
+        append_raw(
+            db_session,
+            ctx=ctx,
+            tenant_id=tenant.id,
+            connection_id=slack_conn.id,
+            connector="slack",
+            run_id=slack_run.id,
+            source_trigger="test",
+            resource_type="slack.user",
+            external_id="U1",
+            api_endpoint="https://slack.test/users.list",
+            query_params={},
+            payload_body={
+                **core_envelope_fields(
+                    connector="slack",
+                    connection_id=slack_conn.id,
+                    source_object_type="slack.user",
+                    source_object_id="U1",
+                ),
+                "member": {
+                    "id": "U1",
+                    "name": "tibo",
+                    "is_bot": False,
+                    "profile": {"email": "tibo@example.com", "real_name": "Tibo"},
+                },
+            },
+            http_status=200,
+            idempotency_key="id1:slack:user:1",
+        )
     db_session.commit()
     return tenant.id
 
@@ -117,4 +171,33 @@ def test_phase1_identity_seed_from_canon_actors(db_session: Session) -> None:
     assert out["stats"]["seeded"] >= 1
     assert int(db_session.scalar(select(func.count()).select_from(IdentityEntity).where(IdentityEntity.tenant_id == tenant_id)) or 0) >= 1
     assert int(db_session.scalar(select(func.count()).select_from(IdentityAccount).where(IdentityAccount.tenant_id == tenant_id)) or 0) >= 1
+
+
+def test_phase2_exact_email_links_to_existing_identity(db_session: Session) -> None:
+    tenant_id = _seed(db_session, include_slack_same_email=True)
+    execute_canon_pass_for_tenant(
+        db_session,
+        tenant_id=tenant_id,
+        source_trigger="test",
+        batch_limit=100,
+    )
+    db_session.commit()
+    out = execute_identity_pass_for_tenant(
+        db_session,
+        tenant_id=tenant_id,
+        source_trigger="test",
+        batch_limit=100,
+    )
+    db_session.commit()
+    assert out["status"] == "completed"
+    identities = int(
+        db_session.scalar(select(func.count()).select_from(IdentityEntity).where(IdentityEntity.tenant_id == tenant_id))
+        or 0
+    )
+    accounts = int(
+        db_session.scalar(select(func.count()).select_from(IdentityAccount).where(IdentityAccount.tenant_id == tenant_id))
+        or 0
+    )
+    assert accounts >= 2
+    assert identities == 1
 
