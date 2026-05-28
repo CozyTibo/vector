@@ -33,9 +33,11 @@ RUN_COMPLETED = "COMPLETED"
 RUN_FAILED = "FAILED"
 BOT_MARKERS = ("[bot]", "-bot", "dependabot", "githubactions", "github-actions", "slackbot")
 # Handles/local-parts shorter than this are too ambiguous for cross-actor auto-link (e.g. shared first names).
-MIN_CROSS_ACTOR_HANDLE_LEN = 10
-# Display-name tokens below this length are ignored for T4 (e.g. bare "julien", "camille").
-MIN_CROSS_ACTOR_NAME_TOKEN_LEN = MIN_CROSS_ACTOR_HANDLE_LEN
+MIN_CROSS_ACTOR_HANDLE_LEN = 12
+# Full collapsed display names must be at least this long for T4 (excludes short names).
+MIN_CROSS_ACTOR_FULL_NAME_LEN = 12
+# Isolated name fragments (e.g. surname "chambefort") must not link across actors.
+MIN_CROSS_ACTOR_NAME_WORD_LEN = MIN_CROSS_ACTOR_FULL_NAME_LEN
 # Email local-part must be at least this long to derive surname suffixes (e.g. cecile + veneziani).
 MIN_EMAIL_LOCAL_FOR_SUFFIX = 5
 MIN_SURNAME_SUFFIX_LEN = 8
@@ -99,7 +101,10 @@ def _cross_actor_match_handles(signal: ActorSignal) -> set[str]:
 
 
 def _significant_handle_overlap(left: set[str], right: set[str]) -> bool:
-    return bool(_significant_handle_tokens(left).intersection(_significant_handle_tokens(right)))
+    left_s = _significant_handle_tokens(left)
+    right_s = _significant_handle_tokens(right)
+    shared = left_s.intersection(right_s)
+    return any(len(token) >= MIN_CROSS_ACTOR_NAME_WORD_LEN for token in shared)
 
 
 def _edit_distance_at_most_one(a: str, b: str) -> bool:
@@ -203,19 +208,25 @@ def _name_token(raw: str) -> str | None:
     return token or None
 
 
-def _significant_display_name_tokens(raw: str) -> set[str]:
-    """Tokens safe for cross-actor display-name matching (excludes bare first names)."""
-    tokens: set[str] = set()
+def _cross_actor_full_display_name_tokens(raw: str) -> set[str]:
+    """Full collapsed display-name tokens only (no isolated first names or surnames)."""
     full = _name_token(raw)
-    if full and len(full) >= MIN_CROSS_ACTOR_NAME_TOKEN_LEN:
-        tokens.add(full)
-    folded = unicodedata.normalize("NFKD", raw)
-    ascii_only = "".join(ch for ch in folded if ord(ch) < 128)
-    for part in re.split(r"[\s._-]+", ascii_only.lower()):
-        word = "".join(ch for ch in part if ch.isalnum())
-        if word and len(word) >= MIN_CROSS_ACTOR_NAME_TOKEN_LEN:
-            tokens.add(word)
-    return tokens
+    if full and len(full) >= MIN_CROSS_ACTOR_FULL_NAME_LEN:
+        return {full}
+    return set()
+
+
+def _actor_has_tenant_email(signal: ActorSignal, tenant_domain: str | None) -> bool:
+    domain = (tenant_domain or "").strip().lower()
+    if not domain:
+        return False
+    suffix = f"@{domain}"
+    return any(email.endswith(suffix) for email in signal.emails)
+
+
+def _weak_cross_actor_merge_allowed(signal: ActorSignal, tenant_domain: str | None) -> bool:
+    """Slack-only actors without a tenant email must not weak-link into email-anchored identities."""
+    return _actor_has_tenant_email(signal, tenant_domain)
 
 
 def classify_identity_kind(
@@ -524,7 +535,8 @@ def _seed_identity_for_actor(
                 link_tier = "T2"
                 link_rule = "local_part_tenant_domain"
                 confidence = "high"
-    if matched_identity is None and signal.handles and tenant_domain:
+    weak_merge_ok = _weak_cross_actor_merge_allowed(signal, tenant_domain)
+    if matched_identity is None and weak_merge_ok and signal.handles and tenant_domain:
         handle_to_email_matches: set[uuid.UUID] = set()
         existing = list(
             session.scalars(
@@ -554,7 +566,7 @@ def _seed_identity_for_actor(
                 link_rule = "handle_to_email_local_part"
                 confidence = "medium"
     incoming_handles = _cross_actor_match_handles(signal)
-    if matched_identity is None and incoming_handles:
+    if matched_identity is None and weak_merge_ok and incoming_handles:
         handle_matches: dict[uuid.UUID, str] = {}
         rows = list(
             session.execute(
@@ -600,7 +612,7 @@ def _seed_identity_for_actor(
                 link_tier = "T3"
                 link_rule = handle_matches[target_id]
                 confidence = "medium"
-    if matched_identity is None and incoming_handles and tenant_domain:
+    if matched_identity is None and weak_merge_ok and incoming_handles and tenant_domain:
         initial_suffix_matches: set[uuid.UUID] = set()
         anchored_identities = list(
             session.scalars(
@@ -644,11 +656,11 @@ def _seed_identity_for_actor(
                 link_tier = "T3"
                 link_rule = "initial_plus_surname_suffix"
                 confidence = "medium"
-    if matched_identity is None and signal.display_names:
+    if matched_identity is None and weak_merge_ok and signal.display_names:
         name_matches: set[uuid.UUID] = set()
         incoming_name_tokens: set[str] = set()
         for name in signal.display_names:
-            incoming_name_tokens.update(_significant_display_name_tokens(name))
+            incoming_name_tokens.update(_cross_actor_full_display_name_tokens(name))
         if incoming_name_tokens:
             rows = list(
                 session.execute(
@@ -669,7 +681,7 @@ def _seed_identity_for_actor(
                     prior_names.add(identity.display_name)
                 prior_tokens: set[str] = set()
                 for name in prior_names:
-                    prior_tokens.update(_significant_display_name_tokens(name))
+                    prior_tokens.update(_cross_actor_full_display_name_tokens(name))
                 if prior_tokens.intersection(incoming_name_tokens):
                     name_matches.add(identity.id)
             if len(name_matches) == 1:

@@ -9,7 +9,7 @@ from vector.domains.cortex.identity.materialize import (
     _local_part_token,
     _matches_initial_plus_surname_suffix,
     _name_token,
-    _significant_display_name_tokens,
+    _cross_actor_full_display_name_tokens,
     _significant_handle_overlap,
     _significant_handles_edit_distance_one,
     _surname_suffixes_from_email_local,
@@ -49,8 +49,13 @@ def test_handle_matches_email_local_part_rejects_short_first_names() -> None:
     assert _handle_matches_email_local_part({"julienpeyruchat"}, "julienpeyruchat")
 
 
+def test_handle_matches_email_local_part_requires_long_local_part() -> None:
+    assert not _handle_matches_email_local_part({"camilleortholand"}, "camille")
+
+
 def test_significant_handle_overlap_ignores_short_shared_handles() -> None:
     assert not _significant_handle_overlap({"julien", "julienmaitre"}, {"julien", "juliendurieux"})
+    assert not _significant_handle_overlap({"julienmaire"}, {"julienpeyruchat"})
     assert _significant_handle_overlap({"julienpeyruchat"}, {"julienpeyruchat", "julien"})
 
 
@@ -94,16 +99,25 @@ def test_name_token_normalizes_accents_and_separators() -> None:
     assert _name_token("Cyril Clément") == "cyrilclement"
 
 
-def test_significant_display_name_tokens_reject_bare_first_names() -> None:
-    assert _significant_display_name_tokens("julien") == set()
-    assert _significant_display_name_tokens("camille") == set()
-    assert "julienpeyruchat" in _significant_display_name_tokens("Julien Peyruchat")
-    assert "camilleortholand" in _significant_display_name_tokens("Camille Ortholand")
-    assert "chambefort" in _significant_display_name_tokens("camille chambefort")
+def test_cross_actor_full_display_name_tokens_reject_bare_first_names() -> None:
+    assert _cross_actor_full_display_name_tokens("julien") == set()
+    assert _cross_actor_full_display_name_tokens("camille") == set()
+    assert "julienpeyruchat" in _cross_actor_full_display_name_tokens("Julien Peyruchat")
+    assert "camilleortholand" in _cross_actor_full_display_name_tokens("Camille Ortholand")
+    assert "camillechambefort" in _cross_actor_full_display_name_tokens("camille chambefort")
+    assert "chambefort" not in _cross_actor_full_display_name_tokens("camille chambefort")
 
 
 def test_bare_first_name_tokens_do_not_cross_match() -> None:
-    left = _significant_display_name_tokens("julien")
-    right = _significant_display_name_tokens("Julien Peyruchat")
+    left = _cross_actor_full_display_name_tokens("julien")
+    right = _cross_actor_full_display_name_tokens("Julien Peyruchat")
     assert not left.intersection(right)
+
+
+def test_chambefort_does_not_match_ortholand_display_names() -> None:
+    orth = _cross_actor_full_display_name_tokens("Camille Ortholand")
+    cham = _cross_actor_full_display_name_tokens("camille chambefort") | _cross_actor_full_display_name_tokens(
+        "chambefort.camille",
+    )
+    assert not orth.intersection(cham)
 
