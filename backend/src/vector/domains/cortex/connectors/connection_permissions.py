@@ -111,7 +111,10 @@ def slack_permission_snapshot(
     requested_raw = (
         requested_scopes_override
         if requested_scopes_override is not None
-        else (settings.slack_bot_scopes.strip() or "channels:read,chat:write,users:read")
+        else (
+            settings.slack_bot_scopes.strip()
+            or "channels:read,chat:write,users:read,users:read.email"
+        )
     )
     requested = parse_comma_scopes(requested_raw)
     granted_list = parse_comma_scopes(granted_scope)

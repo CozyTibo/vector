@@ -129,13 +129,14 @@ class Settings(BaseSettings):
             "channels:read,channels:history,channels:join,"
             "groups:read,groups:history,"
             "chat:write,im:history,im:write,"
-            "users:read,usergroups:read"
+            "users:read,users:read.email,usergroups:read"
         ),
         validation_alias="SLACK_BOT_SCOPES",
         description=(
             "Comma-separated bot scopes for oauth.v2.authorize (must match Slack app Bot Token Scopes). "
             "channels:history + groups:history required for conversations.history ingest; "
-            "groups:read for listing private channels; channels:join for onboarding; im:* for DMs."
+            "groups:read for listing private channels; channels:join for onboarding; im:* for DMs; "
+            "users:read.email for member email in identity resolution and onboarding."
         ),
     )
     admin_password: str = Field(
