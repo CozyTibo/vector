@@ -45,3 +45,45 @@ def test_extract_actor_signal_github_bot() -> None:
     assert "github_type_bot" in out.bot_reasons
     assert "dependabotbot" in out.handles
 
+
+def test_extract_actor_signal_slack_deleted_user_not_bot() -> None:
+    out = extract_actor_signal(
+        canon_entity_id=uuid.uuid4(),
+        connector="slack",
+        connection_id=uuid.uuid4(),
+        entity_key="x",
+        external_id="U123",
+        source_revision_key="r1",
+        payload_body={
+            "member": {
+                "id": "U123",
+                "name": "julien",
+                "is_bot": False,
+                "deleted": True,
+                "profile": {"real_name": "Julien Peyruchat"},
+            },
+        },
+    )
+    assert out.is_bot is not True
+    assert "slack_deleted_member" not in out.bot_reasons
+
+
+def test_extract_actor_signal_notion_adds_name_and_email_local_handles() -> None:
+    out = extract_actor_signal(
+        canon_entity_id=uuid.uuid4(),
+        connector="notion",
+        connection_id=uuid.uuid4(),
+        entity_key="x",
+        external_id="n1",
+        source_revision_key="r1",
+        payload_body={
+            "user": {
+                "id": "n1",
+                "name": "Julien Peyruchat",
+                "person": {"email": "julien.peyruchat@example.com"},
+                "type": "person",
+            },
+        },
+    )
+    assert "julienpeyruchat" in out.handles
+

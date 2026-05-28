@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+import unicodedata
 from typing import Any
 
 from sqlalchemy import delete, exists, select
@@ -51,6 +52,13 @@ def _local_part_token(email: str) -> str | None:
         return None
     local = norm.split("@", 1)[0]
     token = "".join(ch for ch in local if ch.isalnum())
+    return token or None
+
+
+def _name_token(raw: str) -> str | None:
+    folded = unicodedata.normalize("NFKD", raw)
+    ascii_only = "".join(ch for ch in folded if ord(ch) < 128)
+    token = "".join(ch for ch in ascii_only.lower() if ch.isalnum())
     return token or None
 
 
@@ -162,17 +170,17 @@ def _seed_identity_for_actor(
     raw: RawIngestionRecord,
     resolver_version: int | None = None,
 ) -> dict[str, Any]:
-    existing = session.scalar(
-        select(IdentityAccount)
+    existing_row = session.execute(
+        select(IdentityAccount, IdentityEntity)
+        .join(IdentityEntity, IdentityEntity.id == IdentityAccount.identity_entity_id)
         .where(
             IdentityAccount.tenant_id == tenant_id,
             IdentityAccount.canon_entity_id == canon_entity.id,
             IdentityAccount.unlinked_at.is_(None),
+            IdentityEntity.status == "active",
         )
         .limit(1),
-    )
-    if existing is not None:
-        return {"outcome": "already_linked", "identity_entity_id": str(existing.identity_entity_id)}
+    ).first()
 
     payload = dict(raw.payload_body) if isinstance(raw.payload_body, dict) else {}
     signal = extract_actor_signal(
@@ -186,6 +194,12 @@ def _seed_identity_for_actor(
     )
     tenant = session.get(Tenant, tenant_id)
     tenant_domain = tenant.email_domain if tenant is not None else None
+    resolved_version = get_identity_resolver_version(resolver_version)
+    if existing_row is not None:
+        existing_account, existing_identity = existing_row
+        if existing_identity.resolver_version >= resolved_version:
+            return {"outcome": "already_linked", "identity_entity_id": str(existing_account.identity_entity_id)}
+        existing_account.unlinked_at = utc_now()
     emails_sorted = sorted(signal.emails)
     chosen_email = emails_sorted[0] if emails_sorted else None
     kind, kind_reason = classify_identity_kind(
@@ -299,8 +313,40 @@ def _seed_identity_for_actor(
                 link_tier = "T3"
                 link_rule = "exact_normalized_handle"
                 confidence = "medium"
+    if matched_identity is None and signal.display_names:
+        name_matches: set[uuid.UUID] = set()
+        incoming_name_tokens = {_name_token(n) for n in signal.display_names}
+        incoming_name_tokens.discard(None)
+        if incoming_name_tokens:
+            rows = list(
+                session.execute(
+                    select(IdentityAccount, IdentityEntity)
+                    .join(IdentityEntity, IdentityEntity.id == IdentityAccount.identity_entity_id)
+                    .where(
+                        IdentityAccount.tenant_id == tenant_id,
+                        IdentityAccount.unlinked_at.is_(None),
+                        IdentityEntity.status == "active",
+                    ),
+                ).all(),
+            )
+            for account, identity in rows:
+                evidence = account.evidence_json if isinstance(account.evidence_json, dict) else {}
+                prev_names = evidence.get("display_names")
+                prior_names = {str(v) for v in prev_names} if isinstance(prev_names, list) else set()
+                if isinstance(identity.display_name, str) and identity.display_name.strip():
+                    prior_names.add(identity.display_name)
+                prior_tokens = {_name_token(name) for name in prior_names}
+                prior_tokens.discard(None)
+                if prior_tokens.intersection(incoming_name_tokens):
+                    name_matches.add(identity.id)
+            if len(name_matches) == 1:
+                target_id = next(iter(name_matches))
+                matched_identity = session.get(IdentityEntity, target_id)
+                if matched_identity is not None:
+                    link_tier = "T4"
+                    link_rule = "exact_normalized_display_name"
+                    confidence = "medium"
 
-    resolved_version = get_identity_resolver_version(resolver_version)
     if matched_identity is None:
         identity = IdentityEntity(
             tenant_id=tenant_id,

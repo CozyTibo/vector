@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from vector.domains.cortex.identity.materialize import _local_part_token, same_local_part_with_tenant_domain
+from vector.domains.cortex.identity.materialize import _local_part_token, _name_token, same_local_part_with_tenant_domain
 
 
 def test_same_local_part_with_tenant_domain_true() -> None:
@@ -27,4 +27,8 @@ def test_same_local_part_with_tenant_domain_false_when_domain_differs() -> None:
 
 def test_local_part_token_removes_non_alnum() -> None:
     assert _local_part_token("julien.siauvaud+eng@fizzer.com") == "juliensiauvaudeng"
+
+
+def test_name_token_normalizes_accents_and_separators() -> None:
+    assert _name_token("Cyril Clément") == "cyrilclement"
 

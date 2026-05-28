@@ -89,10 +89,13 @@ def _extract_slack(signal: ActorSignal, body: dict[str, Any]) -> None:
         return
     signal.add_provider_id(member.get("id"))
     signal.add_handle(member.get("name"))
+    signal.add_handle(member.get("real_name"))
     signal.add_name(member.get("real_name"))
     profile = member.get("profile")
     if isinstance(profile, dict):
         signal.add_email(profile.get("email"))
+        signal.add_handle(profile.get("display_name"))
+        signal.add_handle(profile.get("real_name"))
         signal.add_name(profile.get("display_name"))
         signal.add_name(profile.get("display_name_normalized"))
         signal.add_name(profile.get("real_name"))
@@ -102,8 +105,6 @@ def _extract_slack(signal: ActorSignal, body: dict[str, Any]) -> None:
     signal.add_email(member.get("email"))
     if bool(member.get("is_bot")):
         signal.mark_bot("slack_is_bot")
-    if bool(member.get("deleted")):
-        signal.mark_bot("slack_deleted_member")
 
 
 def _extract_github(signal: ActorSignal, body: dict[str, Any]) -> None:
@@ -142,10 +143,14 @@ def _extract_notion(signal: ActorSignal, body: dict[str, Any]) -> None:
     if not isinstance(user, dict):
         return
     signal.add_provider_id(user.get("id"))
+    signal.add_handle(user.get("name"))
     signal.add_name(user.get("name"))
     person = user.get("person")
     if isinstance(person, dict):
-        signal.add_email(person.get("email"))
+        email = person.get("email")
+        signal.add_email(email)
+        if isinstance(email, str) and "@" in email:
+            signal.add_handle(email.split("@", 1)[0])
     avatar = user.get("avatar_url")
     if isinstance(avatar, str) and avatar.strip():
         signal.avatar_url = avatar.strip()
