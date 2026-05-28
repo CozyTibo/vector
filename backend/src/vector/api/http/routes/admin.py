@@ -1829,21 +1829,6 @@ def build_admin_router() -> APIRouter:
         return AdminIdentityListResponse(items=items, total_count=total, offset=offset, limit=limit)
 
     @r.get(
-        "/tenants/{tenant_id}/cortex/identities/{identity_id}",
-        response_model=AdminIdentityDetailResponse,
-    )
-    def admin_cortex_identity_detail(
-        tenant_id: uuid.UUID,
-        identity_id: uuid.UUID,
-        db: Annotated[Session, Depends(get_db)],
-    ) -> AdminIdentityDetailResponse:
-        _assert_tenant(db, tenant_id)
-        raw = get_identity_detail(db, tenant_id, identity_id)
-        if raw is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Identity not found.")
-        return AdminIdentityDetailResponse.model_validate(raw)
-
-    @r.get(
         "/tenants/{tenant_id}/cortex/identities/unresolved-actors",
         response_model=AdminIdentityUnresolvedActorsResponse,
     )
@@ -1861,6 +1846,21 @@ def build_admin_router() -> APIRouter:
             offset=offset,
         )
         return AdminIdentityUnresolvedActorsResponse(items=items, total_count=total, offset=offset, limit=limit)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/identities/{identity_id}",
+        response_model=AdminIdentityDetailResponse,
+    )
+    def admin_cortex_identity_detail(
+        tenant_id: uuid.UUID,
+        identity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminIdentityDetailResponse:
+        _assert_tenant(db, tenant_id)
+        raw = get_identity_detail(db, tenant_id, identity_id)
+        if raw is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Identity not found.")
+        return AdminIdentityDetailResponse.model_validate(raw)
 
     @r.post(
         "/tenants/{tenant_id}/cortex/identities/actions/trigger-pass",

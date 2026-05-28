@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-_SCRIPT = _REPO_ROOT / "backend/scripts/ecs_set_worker_task_images.py"
+_THIS = Path(__file__).resolve()
+_BACKEND_ROOT = next((p for p in _THIS.parents if p.name == "backend"), _THIS.parents[0])
+_SCRIPT = _BACKEND_ROOT / "scripts/ecs_set_worker_task_images.py"
 
 
 def _load_apply():

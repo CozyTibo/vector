@@ -103,6 +103,7 @@ def probe_prod_ecs_deploy_v1(
     worker_service: str | None = None,
     substrate_worker_service: str | None = None,
     canon_worker_service: str | None = None,
+    identity_worker_service: str | None = None,
 ) -> dict[str, Any]:
     """Verify prod API + worker fleet images match ``expected_sha``."""
     region = (aws_region or os.environ.get("AWS_REGION", "eu-west-1")).strip()
@@ -117,6 +118,10 @@ def probe_prod_ecs_deploy_v1(
         canon_worker_service
         or os.environ.get("ECS_CANON_WORKER_SERVICE", "vector-canon-worker-service")
     ).strip()
+    identity_svc = (
+        identity_worker_service
+        or os.environ.get("ECS_IDENTITY_WORKER_SERVICE", "vector-identity-worker-service")
+    ).strip()
 
     api_td, api_image = _service_image(aws_region=region, ecs_cluster=cluster, service_name=api_svc)
     worker_td = _service_task_definition(aws_region=region, ecs_cluster=cluster, service_name=worker_svc)
@@ -129,28 +134,35 @@ def probe_prod_ecs_deploy_v1(
     substrate_images = _task_container_images(aws_region=region, task_definition=substrate_td)
     canon_td = _service_task_definition(aws_region=region, ecs_cluster=cluster, service_name=canon_svc)
     canon_images = _task_container_images(aws_region=region, task_definition=canon_td)
+    identity_td = _service_task_definition(aws_region=region, ecs_cluster=cluster, service_name=identity_svc)
+    identity_images = _task_container_images(aws_region=region, task_definition=identity_td)
     worker_image = worker_images[0] if worker_images else ""
     substrate_image = substrate_images[0] if substrate_images else ""
     canon_image = canon_images[0] if canon_images else ""
+    identity_image = identity_images[0] if identity_images else ""
 
     api_tag = _image_tag(api_image)
     worker_tag = _image_tag(worker_image)
     substrate_tag = _image_tag(substrate_image)
     canon_tag = _image_tag(canon_image)
+    identity_tag = _image_tag(identity_image)
     api_ok = _tag_matches_deploy(api_tag, expected_sha)
     worker_ok = _all_container_tags_match(images=worker_images, expected_sha=expected_sha)
     substrate_ok = _all_container_tags_match(images=substrate_images, expected_sha=expected_sha)
     canon_ok = _all_container_tags_match(images=canon_images, expected_sha=expected_sha)
+    identity_ok = _all_container_tags_match(images=identity_images, expected_sha=expected_sha)
     worker_tags = [_image_tag(i) for i in worker_images]
     substrate_tags = [_image_tag(i) for i in substrate_images]
     canon_tags = [_image_tag(i) for i in canon_images]
+    identity_tags = [_image_tag(i) for i in identity_images]
     same_tag = (
-        api_tag == worker_tag == substrate_tag == canon_tag
+        api_tag == worker_tag == substrate_tag == canon_tag == identity_tag
         and len(set(worker_tags)) <= 1
         and len(set(substrate_tags)) <= 1
         and len(set(canon_tags)) <= 1
+        and len(set(identity_tags)) <= 1
     )
-    closure_ok = api_ok and worker_ok and substrate_ok and canon_ok and same_tag
+    closure_ok = api_ok and worker_ok and substrate_ok and canon_ok and identity_ok and same_tag
 
     return {
         "recorded_at": datetime.now(UTC).isoformat(),
@@ -186,6 +198,14 @@ def probe_prod_ecs_deploy_v1(
             "container_images": canon_images,
             "container_image_tags": canon_tags,
         },
+        "identity_worker": {
+            "service": identity_svc,
+            "task_definition": identity_td,
+            "image": identity_image,
+            "image_tag": identity_tag,
+            "container_images": identity_images,
+            "container_image_tags": identity_tags,
+        },
         "git_sha_full": expected_sha,
         "git_sha_short": expected_sha[:12],
         "verification": {
@@ -196,6 +216,8 @@ def probe_prod_ecs_deploy_v1(
             "substrate_worker_all_containers_match_closure_sha": substrate_ok,
             "canon_worker_image_matches_closure_sha": canon_ok,
             "canon_worker_all_containers_match_closure_sha": canon_ok,
+            "identity_worker_image_matches_closure_sha": identity_ok,
+            "identity_worker_all_containers_match_closure_sha": identity_ok,
             "all_services_on_same_tag": same_tag,
             "deploy_matches_closure_sha": closure_ok,
         },

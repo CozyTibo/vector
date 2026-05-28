@@ -17,6 +17,8 @@ importlib.import_module("app.tasks.cortex_ingestion_scheduler")
 importlib.import_module("app.tasks.cortex_ingestion_verify")
 importlib.import_module("app.tasks.cortex_canon_sync")
 importlib.import_module("app.tasks.cortex_canon_scheduler")
+importlib.import_module("app.tasks.cortex_identity_sync")
+importlib.import_module("app.tasks.cortex_identity_scheduler")
 
 _REQUIRED_EMAIL_TASKS = (
     "vector.email.send",

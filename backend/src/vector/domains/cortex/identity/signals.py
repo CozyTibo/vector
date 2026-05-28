@@ -127,6 +127,8 @@ def _extract_linear(signal: ActorSignal, body: dict[str, Any]) -> None:
     if not isinstance(user, dict):
         return
     signal.add_provider_id(user.get("id"))
+    signal.add_handle(user.get("displayName"))
+    signal.add_handle(user.get("name"))
     signal.add_name(user.get("name"))
     signal.add_name(user.get("displayName"))
     signal.add_email(user.get("email"))

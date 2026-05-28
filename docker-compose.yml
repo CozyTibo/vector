@@ -164,7 +164,7 @@ services:
       - ./secrets:/run/secrets:ro
     command: >
       celery -A app.worker worker --loglevel=info
-      -Q vector,cortex_live,cortex_replay,cortex_canon
+      -Q vector,cortex_live,cortex_replay,cortex_canon,cortex_identity
 
   celery-beat:
     build:

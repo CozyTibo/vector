@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write ingestion, substrate, and canon ECS worker task definition JSON files."""
+"""Write ingestion, substrate, canon, and identity ECS worker task defs."""
 
 from __future__ import annotations
 
@@ -32,9 +32,11 @@ def main() -> int:
     parser.add_argument("ingestion_out", type=Path, help="Ingestion worker task def output")
     parser.add_argument("substrate_out", type=Path, help="Substrate worker task def output")
     parser.add_argument("canon_out", type=Path, help="Canon-only worker task def output")
+    parser.add_argument("identity_out", type=Path, help="Identity-only worker task def output")
     parser.add_argument("--ingestion-family", default="", help="Optional task family override")
     parser.add_argument("--substrate-family", default="vector-substrate-worker")
     parser.add_argument("--canon-family", default="vector-canon-worker")
+    parser.add_argument("--identity-family", default="vector-identity-worker")
     args = parser.parse_args()
 
     roles = _load_roles_module()
@@ -42,16 +44,20 @@ def main() -> int:
     ingestion = roles.apply_worker_role_to_task_definition_v1(task_def, role="ingestion")
     substrate = roles.apply_worker_role_to_task_definition_v1(task_def, role="substrate")
     canon = roles.apply_canon_worker_task_definition_v1(task_def)
+    identity = roles.apply_worker_role_to_task_definition_v1(task_def, role="identity")
     if args.ingestion_family:
         ingestion["family"] = args.ingestion_family
     if args.substrate_family:
         substrate["family"] = args.substrate_family
     if args.canon_family:
         canon["family"] = args.canon_family
+    if args.identity_family:
+        identity["family"] = args.identity_family
 
     args.ingestion_out.write_text(json.dumps(ingestion, indent=2) + "\n", encoding="utf-8")
     args.substrate_out.write_text(json.dumps(substrate, indent=2) + "\n", encoding="utf-8")
     args.canon_out.write_text(json.dumps(canon, indent=2) + "\n", encoding="utf-8")
+    args.identity_out.write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
     return 0
 
 
