@@ -46,6 +46,25 @@ def test_extract_actor_signal_github_bot() -> None:
     assert "dependabotbot" in out.handles
 
 
+def test_normalize_handle_folds_accents() -> None:
+    from vector.domains.cortex.identity.signals import normalize_handle
+
+    assert normalize_handle("Cécile Veneziani") == "cecileveneziani"
+
+
+def test_extract_actor_signal_github_sets_primary_handle() -> None:
+    out = extract_actor_signal(
+        canon_entity_id=uuid.uuid4(),
+        connector="github",
+        connection_id=uuid.uuid4(),
+        entity_key="x",
+        external_id="99",
+        source_revision_key="r1",
+        payload_body={"member": {"id": 99, "login": "cveneziani", "type": "User"}},
+    )
+    assert out.primary_handle == "cveneziani"
+
+
 def test_extract_actor_signal_slack_deleted_user_not_bot() -> None:
     out = extract_actor_signal(
         canon_entity_id=uuid.uuid4(),

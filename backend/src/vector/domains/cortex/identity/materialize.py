@@ -10,7 +10,12 @@ from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
-from vector.domains.cortex.identity.signals import ActorSignal, extract_actor_signal, normalize_email
+from vector.domains.cortex.identity.signals import (
+    ActorSignal,
+    extract_actor_signal,
+    normalize_email,
+    normalize_handle,
+)
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.canon_entity_source import CanonEntitySource
@@ -28,12 +33,17 @@ RUN_FAILED = "FAILED"
 BOT_MARKERS = ("[bot]", "-bot", "dependabot", "githubactions", "github-actions", "slackbot")
 # Handles/local-parts shorter than this are too ambiguous for cross-actor auto-link (e.g. shared first names).
 MIN_CROSS_ACTOR_HANDLE_LEN = 10
+# Email local-part must be at least this long to derive surname suffixes (e.g. cecile + veneziani).
+MIN_EMAIL_LOCAL_FOR_SUFFIX = 5
+MIN_SURNAME_SUFFIX_LEN = 8
 # Auto-links that may be invalidated when resolver rules tighten.
 REVOCABLE_WEAK_LINK_RULES = frozenset(
     {
         "handle_to_email_local_part",
         "exact_normalized_handle",
         "exact_normalized_display_name",
+        "initial_plus_surname_suffix",
+        "handle_edit_distance_one",
     },
 )
 
@@ -76,8 +86,111 @@ def _handle_matches_email_local_part(handle_tokens: set[str], local_tok: str) ->
     return local_tok in handle_tokens
 
 
+def _cross_actor_match_handles(signal: ActorSignal) -> set[str]:
+    """Provider login handle only — not every alias in ``handles`` (avoids first-name bleed)."""
+    if signal.primary_handle:
+        key = normalize_handle(signal.primary_handle)
+        if key and len(key) >= MIN_CROSS_ACTOR_HANDLE_LEN:
+            return {key}
+    return _significant_handle_tokens(signal.handles)
+
+
 def _significant_handle_overlap(left: set[str], right: set[str]) -> bool:
     return bool(_significant_handle_tokens(left).intersection(_significant_handle_tokens(right)))
+
+
+def _edit_distance_at_most_one(a: str, b: str) -> bool:
+    if a == b:
+        return False
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    if la > lb:
+        a, b = b, a
+        la, lb = lb, la
+    if la == lb:
+        mismatches = sum(1 for i in range(la) if a[i] != b[i])
+        return mismatches == 1
+    i = j = 0
+    skipped = False
+    while i < la and j < lb:
+        if a[i] == b[j]:
+            i += 1
+            j += 1
+        elif not skipped:
+            skipped = True
+            j += 1
+        else:
+            return False
+    return True
+
+
+def _significant_handles_edit_distance_one(left: set[str], right: set[str]) -> bool:
+    left_s = _significant_handle_tokens(left)
+    right_s = _significant_handle_tokens(right)
+    for a in left_s:
+        for b in right_s:
+            if _edit_distance_at_most_one(a, b):
+                return True
+    return False
+
+
+def _surname_suffixes_from_email_local(local_tok: str, handles: set[str]) -> set[str]:
+    if len(local_tok) < MIN_EMAIL_LOCAL_FOR_SUFFIX:
+        return set()
+    suffixes: set[str] = set()
+    for handle in handles:
+        if handle.startswith(local_tok) and len(handle) > len(local_tok):
+            suffix = handle[len(local_tok) :]
+            if len(suffix) >= MIN_SURNAME_SUFFIX_LEN:
+                suffixes.add(suffix)
+    return suffixes
+
+
+def _matches_initial_plus_surname_suffix(handle: str, local_tok: str, suffixes: set[str]) -> bool:
+    if len(handle) < MIN_CROSS_ACTOR_HANDLE_LEN or not suffixes:
+        return False
+    if len(local_tok) < MIN_EMAIL_LOCAL_FOR_SUFFIX:
+        return False
+    initial = local_tok[0]
+    return any(handle == initial + suffix for suffix in suffixes)
+
+
+def _handles_for_identity_entity(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    identity_id: uuid.UUID,
+) -> set[str]:
+    handles: set[str] = set()
+    rows = list(
+        session.execute(
+            select(IdentityAccount)
+            .where(
+                IdentityAccount.tenant_id == tenant_id,
+                IdentityAccount.identity_entity_id == identity_id,
+                IdentityAccount.unlinked_at.is_(None),
+            ),
+        ).scalars().all(),
+    )
+    for account in rows:
+        row = _latest_actor_payload(session, tenant_id=tenant_id, canon_entity_id=account.canon_entity_id)
+        if row is None:
+            continue
+        entity, source, raw = row
+        payload = dict(raw.payload_body) if isinstance(raw.payload_body, dict) else {}
+        sig = extract_actor_signal(
+            canon_entity_id=entity.id,
+            connector=entity.connector,
+            connection_id=entity.connection_id,
+            entity_key=entity.entity_key,
+            external_id=source.external_id,
+            source_revision_key=source.source_revision_key,
+            payload_body=payload,
+        )
+        handles.update(_cross_actor_match_handles(sig))
+        handles.update(_significant_handle_tokens(sig.handles))
+    return handles
 
 
 def _name_token(raw: str) -> str | None:
@@ -180,6 +293,45 @@ def _recompute_identity_kind(
         identity.kind = "inactive_human"
     else:
         identity.kind = "unknown"
+
+
+def _actor_has_verified_email(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    canon_entity_id: uuid.UUID,
+) -> bool:
+    row = _latest_actor_payload(session, tenant_id=tenant_id, canon_entity_id=canon_entity_id)
+    if row is None:
+        return False
+    canon_entity, source, raw = row
+    payload = dict(raw.payload_body) if isinstance(raw.payload_body, dict) else {}
+    signal = extract_actor_signal(
+        canon_entity_id=canon_entity.id,
+        connector=canon_entity.connector,
+        connection_id=canon_entity.connection_id,
+        entity_key=canon_entity.entity_key,
+        external_id=source.external_id,
+        source_revision_key=source.source_revision_key,
+        payload_body=payload,
+    )
+    return bool(signal.emails)
+
+
+def _sort_dirty_queue_email_first(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    items: list[IdentityDirtyQueue],
+) -> list[IdentityDirtyQueue]:
+    """Process email-anchored actors before handle-only logins (e.g. GitHub org members)."""
+    return sorted(
+        items,
+        key=lambda item: (
+            0 if _actor_has_verified_email(session, tenant_id=tenant_id, canon_entity_id=item.canon_entity_id) else 1,
+            item.enqueued_at,
+        ),
+    )
 
 
 def enqueue_identity_actor(
@@ -293,6 +445,7 @@ def _seed_identity_for_actor(
         if (
             existing_identity.resolver_version >= resolved_version
             and existing_account.link_rule != "seed_actor"
+            and existing_account.link_rule not in REVOCABLE_WEAK_LINK_RULES
         ):
             return {"outcome": "already_linked", "identity_entity_id": str(existing_account.identity_entity_id)}
     emails_sorted = sorted(signal.emails)
@@ -360,7 +513,7 @@ def _seed_identity_for_actor(
                 .order_by(IdentityEntity.resolved_at.asc(), IdentityEntity.id.asc()),
             ).all(),
         )
-        handle_tokens = {h for h in signal.handles if h}
+        handle_tokens = _cross_actor_match_handles(signal)
         for identity in existing:
             if not identity.primary_email:
                 continue
@@ -376,8 +529,9 @@ def _seed_identity_for_actor(
                 link_tier = "T3"
                 link_rule = "handle_to_email_local_part"
                 confidence = "medium"
-    if matched_identity is None and signal.handles:
-        handle_matches: set[uuid.UUID] = set()
+    incoming_handles = _cross_actor_match_handles(signal)
+    if matched_identity is None and incoming_handles:
+        handle_matches: dict[uuid.UUID, str] = {}
         rows = list(
             session.execute(
                 select(IdentityAccount, IdentityEntity)
@@ -390,17 +544,81 @@ def _seed_identity_for_actor(
             ).all(),
         )
         for account, identity in rows:
-            evidence = account.evidence_json if isinstance(account.evidence_json, dict) else {}
-            prev = evidence.get("handles")
-            prev_handles = {str(v).strip().lower() for v in prev} if isinstance(prev, list) else set()
-            if _significant_handle_overlap(prev_handles, signal.handles):
-                handle_matches.add(identity.id)
+            if account.canon_entity_id == canon_entity.id:
+                continue
+            prev_row = _latest_actor_payload(
+                session,
+                tenant_id=tenant_id,
+                canon_entity_id=account.canon_entity_id,
+            )
+            if prev_row is None:
+                continue
+            prev_entity, prev_source, prev_raw = prev_row
+            prev_payload = dict(prev_raw.payload_body) if isinstance(prev_raw.payload_body, dict) else {}
+            prev_signal = extract_actor_signal(
+                canon_entity_id=prev_entity.id,
+                connector=prev_entity.connector,
+                connection_id=prev_entity.connection_id,
+                entity_key=prev_entity.entity_key,
+                external_id=prev_source.external_id,
+                source_revision_key=prev_source.source_revision_key,
+                payload_body=prev_payload,
+            )
+            prev_handles = _cross_actor_match_handles(prev_signal)
+            if _significant_handle_overlap(prev_handles, incoming_handles):
+                handle_matches[identity.id] = "exact_normalized_handle"
+            elif _significant_handles_edit_distance_one(prev_handles, incoming_handles):
+                handle_matches[identity.id] = "handle_edit_distance_one"
         if len(handle_matches) == 1:
             target_id = next(iter(handle_matches))
             matched_identity = session.get(IdentityEntity, target_id)
             if matched_identity is not None:
                 link_tier = "T3"
-                link_rule = "exact_normalized_handle"
+                link_rule = handle_matches[target_id]
+                confidence = "medium"
+    if matched_identity is None and incoming_handles and tenant_domain:
+        initial_suffix_matches: set[uuid.UUID] = set()
+        anchored_identities = list(
+            session.scalars(
+                select(IdentityEntity)
+                .where(
+                    IdentityEntity.tenant_id == tenant_id,
+                    IdentityEntity.status == "active",
+                    IdentityEntity.primary_email.is_not(None),
+                )
+                .order_by(IdentityEntity.resolved_at.asc(), IdentityEntity.id.asc()),
+            ).all(),
+        )
+        for identity in anchored_identities:
+            if identity.primary_email is None or not identity.primary_email.endswith(f"@{tenant_domain}"):
+                continue
+            if (
+                chosen_email
+                and identity.primary_email
+                and normalize_email(chosen_email) != normalize_email(identity.primary_email)
+            ):
+                continue
+            local_tok = _local_part_token(identity.primary_email)
+            if not local_tok:
+                continue
+            identity_handles = _handles_for_identity_entity(
+                session,
+                tenant_id=tenant_id,
+                identity_id=identity.id,
+            )
+            suffixes = _surname_suffixes_from_email_local(local_tok, identity_handles)
+            if not suffixes:
+                continue
+            for handle in incoming_handles:
+                if _matches_initial_plus_surname_suffix(handle, local_tok, suffixes):
+                    initial_suffix_matches.add(identity.id)
+                    break
+        if len(initial_suffix_matches) == 1:
+            target_id = next(iter(initial_suffix_matches))
+            matched_identity = session.get(IdentityEntity, target_id)
+            if matched_identity is not None:
+                link_tier = "T3"
+                link_rule = "initial_plus_surname_suffix"
                 confidence = "medium"
     if matched_identity is None and signal.display_names:
         name_matches: set[uuid.UUID] = set()
@@ -478,6 +696,7 @@ def _seed_identity_for_actor(
         "source_identity_key": source.source_identity_key,
         "emails": emails_sorted,
         "handles": sorted(signal.handles),
+        "primary_handle": signal.primary_handle,
         "display_names": sorted(signal.display_names),
         "provider_ids": sorted(signal.provider_ids),
         "bot_reasons": signal.bot_reasons,
@@ -499,6 +718,7 @@ def _seed_identity_for_actor(
         existing_account.linked_at = utc_now()
         existing_account.unlinked_at = None
         _recompute_identity_kind(session, tenant_id=tenant_id, identity_id=identity.id)
+        session.flush()
         return {"outcome": "rematched", "identity_entity_id": str(identity.id)}
 
     account = IdentityAccount(
@@ -515,6 +735,7 @@ def _seed_identity_for_actor(
     )
     session.add(account)
     _recompute_identity_kind(session, tenant_id=tenant_id, identity_id=identity.id)
+    session.flush()
     return {"outcome": "seeded", "identity_entity_id": str(identity.id)}
 
 
@@ -646,6 +867,7 @@ def execute_identity_pass_for_tenant(
                 .limit(max(1, min(batch_limit, 5000))),
             ).all(),
         )
+        items = _sort_dirty_queue_email_first(session, tenant_id=tenant_id, items=items)
         if not items:
             if enqueue_periodic_identity_candidates(
                 session,
@@ -666,6 +888,7 @@ def execute_identity_pass_for_tenant(
                         .limit(max(1, min(batch_limit, 5000))),
                     ).all(),
                 )
+                items = _sort_dirty_queue_email_first(session, tenant_id=tenant_id, items=items)
         if not items:
             run.status = RUN_COMPLETED
             run.finished_at = utc_now()
