@@ -58,6 +58,11 @@ def cortex_worker_command_v1(*, concurrency: int = 3) -> list[str]:
     )
 
 
+def cortex_beat_command_v1() -> list[str]:
+    """Single-cluster Celery Beat (orchestrator + ingestion schedule)."""
+    return ["celery", "-A", "app.worker", "beat", "--loglevel", "info"]
+
+
 def substrate_worker_command_v1(*, concurrency: int = 3) -> list[str]:
     """Alias for cortex worker (ECS service name still vector-substrate-worker)."""
     return cortex_worker_command_v1(concurrency=concurrency)
@@ -99,28 +104,51 @@ def apply_ingestion_worker_task_definition_v1(
     )
 
 
+def _beat_sidecar_from_worker_v1(worker: dict[str, Any]) -> dict[str, Any]:
+    beat: dict[str, Any] = {
+        "name": "celery-beat",
+        "image": worker.get("image", ""),
+        "essential": True,
+        "command": cortex_beat_command_v1(),
+    }
+    for key in ("environment", "secrets", "mountPoints", "volumesFrom", "linuxParameters"):
+        if key in worker:
+            beat[key] = worker[key]
+    log_cfg = worker.get("logConfiguration")
+    if isinstance(log_cfg, dict):
+        beat_log = dict(log_cfg)
+        opts = dict(beat_log.get("options") or {})
+        opts["awslogs-stream-prefix"] = "beat"
+        beat_log["options"] = opts
+        beat["logConfiguration"] = beat_log
+    return beat
+
+
 def apply_cortex_worker_task_definition_v1(
     task_def: dict[str, Any],
     *,
     concurrency: int = 3,
 ) -> dict[str, Any]:
-    """Cortex worker; retains celery-beat sidecar when present."""
+    """Cortex worker + celery-beat sidecar (Beat injects when missing from source task def)."""
     out = dict(task_def)
-    containers = [dict(c) for c in out.get("containerDefinitions") or []]
-    if not containers:
+    if not out.get("containerDefinitions"):
         msg = "task definition has no containerDefinitions"
         raise ValueError(msg)
     worker = _worker_container_from_task_def(task_def)
     worker["command"] = cortex_worker_command_v1(concurrency=concurrency)
-    replaced = False
-    for i, raw in enumerate(containers):
-        if raw.get("name") == "worker" or (not replaced and raw.get("name") != "celery-beat"):
-            containers[i] = worker
-            replaced = True
+
+    beat: dict[str, Any] | None = None
+    for raw in out.get("containerDefinitions") or []:
+        if raw.get("name") == "celery-beat":
+            beat = dict(raw)
+            beat["command"] = cortex_beat_command_v1()
+            if not beat.get("image"):
+                beat["image"] = worker.get("image", "")
             break
-    if not replaced:
-        containers[0] = worker
-    out["containerDefinitions"] = containers
+    if beat is None:
+        beat = _beat_sidecar_from_worker_v1(worker)
+
+    out["containerDefinitions"] = [worker, beat]
     return out
 
 

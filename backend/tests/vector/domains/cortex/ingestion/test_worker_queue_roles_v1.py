@@ -46,3 +46,24 @@ def test_cortex_task_def_keeps_beat_sidecar() -> None:
     out = apply_cortex_worker_task_definition_v1(task_def)
     assert len(out["containerDefinitions"]) == 2
     assert out["containerDefinitions"][0]["command"][-1] == "vector"
+    assert out["containerDefinitions"][1]["command"][3] == "beat"
+
+
+def test_cortex_task_def_injects_beat_when_missing() -> None:
+    task_def = {
+        "containerDefinitions": [
+            {
+                "name": "worker",
+                "image": "img:1",
+                "command": ["old"],
+                "logConfiguration": {
+                    "logDriver": "awslogs",
+                    "options": {"awslogs-stream-prefix": "worker"},
+                },
+            },
+        ],
+    }
+    out = apply_cortex_worker_task_definition_v1(task_def)
+    assert len(out["containerDefinitions"]) == 2
+    assert out["containerDefinitions"][1]["name"] == "celery-beat"
+    assert out["containerDefinitions"][1]["command"][3] == "beat"
