@@ -437,6 +437,68 @@ export type CortexCanonicalControlPlane = {
   warnings: { must_not_assume: string[]; canonical_failure_sync: Record<string, unknown> };
 };
 
+export type GraphReadiness = {
+  tenant_id: string;
+  extractor_version: number;
+  extractor_version_code: number;
+  dirty_queue_pending: number;
+  active_relationship_count: number;
+  latest_pass_run: {
+    id: string;
+    status: string;
+    source_trigger: string;
+    started_at: string;
+    finished_at: string | null;
+    stats: Record<string, number>;
+    error_summary: string | null;
+  } | null;
+  scheduler: Record<string, unknown>;
+};
+
+export type GraphRelationshipListItem = {
+  id: string;
+  relationship_kind: string;
+  relationship_kind_label: string;
+  confidence: string;
+  extractor_rule: string;
+  observed_at: string;
+  from: { entity_id: string; display_label?: string; entity_type?: string; connector?: string };
+  to: { entity_id: string; display_label?: string; entity_type?: string; connector?: string };
+  from_identity: { identity_id: string; display_name: string } | null;
+  to_identity: { identity_id: string; display_name: string } | null;
+  evidence_snapshot: Record<string, unknown>;
+  source_raw_id: number | null;
+};
+
+export type GraphRelationshipList = {
+  items: GraphRelationshipListItem[];
+  total_count: number;
+  offset: number;
+  limit: number;
+};
+
+export type GraphStats = {
+  tenant_id: string;
+  by_kind: Array<{ relationship_kind: string; relationship_kind_label: string; count: number }>;
+};
+
+export type GraphPassRunItem = {
+  id: string;
+  source_trigger: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  stats: Record<string, number>;
+  error_summary: string | null;
+};
+
+export type GraphPassRuns = {
+  items: GraphPassRunItem[];
+  total_count: number;
+  offset: number;
+  limit: number;
+};
+
 export function titleConnector(connector: string): string {
   if (connector === "github") return "GitHub";
   if (connector === "calls") return "Calls";

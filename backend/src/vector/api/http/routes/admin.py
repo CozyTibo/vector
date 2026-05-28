@@ -66,6 +66,16 @@ from vector.contracts.admin import (
     AdminIdentityTriggerPassRequest,
     AdminIdentityTriggerPassResponse,
     AdminIdentityUnresolvedActorsResponse,
+    AdminGraphEntityLinksResponse,
+    AdminGraphReadinessResponse,
+    AdminGraphRebuildRequest,
+    AdminGraphRebuildResponse,
+    AdminGraphRelationshipDetailResponse,
+    AdminGraphRelationshipListResponse,
+    AdminGraphRecentPassRunsResponse,
+    AdminGraphStatsResponse,
+    AdminGraphTriggerPassRequest,
+    AdminGraphTriggerPassResponse,
     AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
     AdminCortexPassActionResponse,
@@ -2017,6 +2027,199 @@ def build_admin_router() -> APIRouter:
             tenant_id=tenant_id,
             enqueued_actor_count=int(out.get("enqueued", 0)),
             stats={k: int(v) for k, v in (out.get("stats") or {}).items()},
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/graph/readiness",
+        response_model=AdminGraphReadinessResponse,
+    )
+    def admin_cortex_graph_readiness(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminGraphReadinessResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import build_graph_readiness
+
+        return AdminGraphReadinessResponse.model_validate(build_graph_readiness(db, tenant_id))
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/graph/stats",
+        response_model=AdminGraphStatsResponse,
+    )
+    def admin_cortex_graph_stats(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminGraphStatsResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import graph_stats_by_kind
+
+        return AdminGraphStatsResponse(
+            tenant_id=tenant_id,
+            by_kind=graph_stats_by_kind(db, tenant_id),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/graph/relationships",
+        response_model=AdminGraphRelationshipListResponse,
+    )
+    def admin_cortex_graph_relationships(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        kind: Annotated[str | None, Query()] = None,
+        entity_id: Annotated[uuid.UUID | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+    ) -> AdminGraphRelationshipListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import list_relationships
+
+        items, total = list_relationships(
+            db,
+            tenant_id,
+            relationship_kind=kind,
+            entity_id=entity_id,
+            limit=limit,
+            offset=offset,
+        )
+        return AdminGraphRelationshipListResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/graph/relationships/{relationship_id}",
+        response_model=AdminGraphRelationshipDetailResponse,
+    )
+    def admin_cortex_graph_relationship_detail(
+        tenant_id: uuid.UUID,
+        relationship_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminGraphRelationshipDetailResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import get_relationship_detail
+
+        raw = get_relationship_detail(db, tenant_id, relationship_id)
+        if raw is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Relationship not found.")
+        return AdminGraphRelationshipDetailResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/graph/entities/{entity_id}/links",
+        response_model=AdminGraphEntityLinksResponse,
+    )
+    def admin_cortex_graph_entity_links(
+        tenant_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        direction: Annotated[str, Query()] = "both",
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminGraphEntityLinksResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import list_entity_links
+
+        raw = list_entity_links(
+            db,
+            tenant_id,
+            entity_id,
+            direction=direction,
+            limit=limit,
+        )
+        return AdminGraphEntityLinksResponse.model_validate(raw)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/graph/runs",
+        response_model=AdminGraphRecentPassRunsResponse,
+    )
+    def admin_cortex_graph_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+    ) -> AdminGraphRecentPassRunsResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import list_recent_graph_pass_runs
+
+        items, total = list_recent_graph_pass_runs(db, tenant_id, limit=limit, offset=offset)
+        return AdminGraphRecentPassRunsResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/graph/actions/trigger-pass",
+        response_model=AdminGraphTriggerPassResponse,
+    )
+    def admin_cortex_graph_trigger_pass(
+        tenant_id: uuid.UUID,
+        body: AdminGraphTriggerPassRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminGraphTriggerPassResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import (
+            MANUAL_GRAPH_PASS_CONFIRMATION,
+            prepare_graph_pass_trigger,
+        )
+        from vector.domains.cortex.runtime.pass_types import GRAPH_PROJECTION_PASS
+        from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
+
+        if body.confirmation != MANUAL_GRAPH_PASS_CONFIRMATION:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation must be exactly: {MANUAL_GRAPH_PASS_CONFIRMATION}",
+            )
+        prepare_graph_pass_trigger(
+            db,
+            tenant_id,
+            interval_seconds=settings.cortex_graph_scheduler_interval_seconds,
+        )
+        upsert_pending_pass_v1(
+            db,
+            tenant_id=tenant_id,
+            pass_type=GRAPH_PROJECTION_PASS,
+            source_trigger="manual_admin",
+            priority=100,
+        )
+        db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
+        return AdminGraphTriggerPassResponse(tenant_id=tenant_id)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/graph/actions/rebuild",
+        response_model=AdminGraphRebuildResponse,
+    )
+    def admin_cortex_graph_rebuild(
+        tenant_id: uuid.UUID,
+        body: AdminGraphRebuildRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminGraphRebuildResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.admin import MANUAL_GRAPH_REBUILD_CONFIRMATION
+        from vector.domains.cortex.graph.materialize import rebuild_graph_for_tenant
+
+        if body.confirmation != MANUAL_GRAPH_REBUILD_CONFIRMATION:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation must be exactly: {MANUAL_GRAPH_REBUILD_CONFIRMATION}",
+            )
+        out = rebuild_graph_for_tenant(
+            db,
+            tenant_id=tenant_id,
+            batch_limit=settings.cortex_graph_batch_entity_limit,
+            extractor_version=settings.cortex_graph_extractor_version,
+        )
+        db.commit()
+        return AdminGraphRebuildResponse(
+            tenant_id=tenant_id,
+            run_id=out.get("run_id"),
+            stats=dict(out.get("stats") or {}),
         )
 
     @r.get(

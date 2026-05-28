@@ -169,6 +169,18 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
         except Exception:
             # Identity queueing is best-effort and must not break canon materialization.
             _logger.exception("identity enqueue failed during canon materialization")
+    try:
+        from vector.domains.cortex.graph.enqueue import enqueue_graph_entity
+
+        enqueue_graph_entity(
+            session,
+            tenant_id=row.tenant_id,
+            canon_entity_id=entity.id,
+            reason="canon_materialized",
+            entity_type=draft.entity_type,
+        )
+    except Exception:
+        _logger.exception("graph enqueue failed during canon materialization")
 
     observed = datetime.fromisoformat(result.source.observed_at_iso.replace("Z", "+00:00"))
     session.execute(

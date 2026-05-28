@@ -4,8 +4,9 @@ from __future__ import annotations
 
 CANON_PASS = "canon_pass"
 IDENTITY_PASS = "identity_pass"
+GRAPH_PROJECTION_PASS = "graph_projection_pass"
 
-PASS_TYPES = frozenset({CANON_PASS, IDENTITY_PASS})
+PASS_TYPES = frozenset({CANON_PASS, IDENTITY_PASS, GRAPH_PROJECTION_PASS})
 
 STATUS_PENDING = "pending"
 STATUS_RUNNING = "running"

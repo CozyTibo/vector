@@ -9,6 +9,10 @@ from vector.infrastructure.db.models.canon_pass_run import CanonPassRun
 from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
 from vector.infrastructure.db.models.cortex_admin_continuity_snapshot import CortexAdminContinuitySnapshot
 from vector.infrastructure.db.models.cortex_pass import CortexPass
+from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
+from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
+from vector.infrastructure.db.models.graph_relationship import GraphRelationship
+from vector.infrastructure.db.models.graph_scheduler_tick import GraphSchedulerTick
 from vector.infrastructure.db.models.cortex_admin_graph_component_snapshot import (
     CortexAdminGraphComponentSnapshot,
 )
@@ -58,6 +62,10 @@ __all__ = [
     "ConnectorSyncState",
     "CortexAdminContinuitySnapshot",
     "CortexPass",
+    "GraphDirtyQueue",
+    "GraphPassRun",
+    "GraphRelationship",
+    "GraphSchedulerTick",
     "CortexAdminGraphComponentSnapshot",
     "CortexPhase09ReadinessSignoff",
     "GithubConnectionDetail",

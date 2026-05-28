@@ -37,6 +37,7 @@ def test_schedule_enqueues_pass_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CORTEX_POST_INGESTION_SUBSTRATE_REFRESH_ENABLED", "true")
     monkeypatch.setenv("CORTEX_CANON_SCHEDULER_ENABLED", "true")
     monkeypatch.setenv("CORTEX_IDENTITY_SCHEDULER_ENABLED", "true")
+    monkeypatch.setenv("CORTEX_GRAPH_SCHEDULER_ENABLED", "true")
 
     from vector.domains.cortex.ingestion.post_ingestion_refresh_dispatch import (
         schedule_post_ingestion_substrate_refresh,
@@ -71,5 +72,5 @@ def test_schedule_enqueues_pass_rows(monkeypatch: pytest.MonkeyPatch) -> None:
         get_settings.cache_clear()
 
     assert out["scheduled"] is True
-    assert out["enqueued"] == ["canon_pass", "identity_pass"]
-    assert upsert_calls == ["canon_pass", "identity_pass"]
+    assert out["enqueued"] == ["canon_pass", "identity_pass", "graph_projection_pass"]
+    assert upsert_calls == ["canon_pass", "identity_pass", "graph_projection_pass"]

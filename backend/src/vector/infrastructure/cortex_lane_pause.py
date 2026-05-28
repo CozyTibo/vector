@@ -17,6 +17,7 @@ _LANE_KEYS: Final[dict[str, str]] = {
     "ingestion": "vector:cortex_ingestion:scheduler_paused",
     "canon": "vector:cortex_canon:scheduler_paused",
     "identity": "vector:cortex_identity:scheduler_paused",
+    "graph": "vector:cortex_graph:scheduler_paused",
     "orchestrator": "vector:cortex_orchestrator:paused",
 }
 

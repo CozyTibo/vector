@@ -366,6 +366,38 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_IDENTITY_RESOLVER_VERSION",
         description="Resolver version override to force deterministic rematching/rescoring passes.",
     )
+    cortex_graph_scheduler_enabled: bool = Field(
+        default=True,
+        validation_alias="CORTEX_GRAPH_SCHEDULER_ENABLED",
+        description="Cortex graph projection: enqueue tenant graph passes on schedule and post-ingestion.",
+    )
+    cortex_graph_scheduler_interval_seconds: int = Field(
+        default=300,
+        ge=60,
+        validation_alias="CORTEX_GRAPH_SCHEDULER_INTERVAL_SECONDS",
+        description="Graph projection Beat cadence (seconds). Default 300.",
+    )
+    cortex_graph_batch_entity_limit: int = Field(
+        default=500,
+        ge=1,
+        le=5000,
+        validation_alias="CORTEX_GRAPH_BATCH_ENTITY_LIMIT",
+        description="Max dirty canon entities processed per graph pass batch.",
+    )
+    cortex_graph_max_attempts: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_GRAPH_MAX_ATTEMPTS",
+        description="Max retry attempts per graph dirty-queue row.",
+    )
+    cortex_graph_extractor_version: int = Field(
+        default=1,
+        ge=1,
+        le=1000,
+        validation_alias="CORTEX_GRAPH_EXTRACTOR_VERSION",
+        description="Graph extractor version override for replay/rebuild.",
+    )
     cortex_runtime_lease_ttl_seconds: int = Field(
         default=900,
         ge=60,

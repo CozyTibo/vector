@@ -6,7 +6,7 @@ import logging
 import uuid
 from typing import Any
 
-from vector.domains.cortex.runtime.pass_types import CANON_PASS, IDENTITY_PASS
+from vector.domains.cortex.runtime.pass_types import CANON_PASS, GRAPH_PROJECTION_PASS, IDENTITY_PASS
 from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
 from vector.infrastructure.db.session import session_scope
 from vector.settings import Settings, get_settings
@@ -45,6 +45,15 @@ def schedule_post_ingestion_substrate_refresh(
                 priority=10,
             )
             enqueued.append("identity_pass")
+        if cfg.cortex_graph_scheduler_enabled:
+            upsert_pending_pass_v1(
+                session,
+                tenant_id=tenant_id,
+                pass_type=GRAPH_PROJECTION_PASS,
+                source_trigger="ingestion_complete",
+                priority=10,
+            )
+            enqueued.append("graph_projection_pass")
 
     if not enqueued:
         return {"scheduled": False, "reason": "downstream_schedulers_disabled"}

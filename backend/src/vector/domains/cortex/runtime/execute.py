@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from datetime import timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.canon.materialize import execute_canon_pass_for_tenant, process_dirty_queue_batch
+from vector.domains.cortex.canon.materialize import (
+    execute_canon_pass_for_tenant,
+    process_dirty_queue_batch,
+)
 from vector.domains.cortex.identity.materialize import execute_identity_pass_for_tenant
 from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.domains.cortex.runtime.claim import extend_pass_lease_v1
 from vector.domains.cortex.runtime.pass_types import (
     CANON_PASS,
+    GRAPH_PROJECTION_PASS,
     IDENTITY_PASS,
     STATUS_COMPLETED,
     STATUS_FAILED,
@@ -38,6 +41,30 @@ def _run_canon_pass(session: Session, settings: Settings, row: CortexPass) -> di
     dirty_stats = process_dirty_queue_batch(session, tenant_id=row.tenant_id, batch_limit=batch)
     out["dirty_queue"] = dirty_stats
     return out
+
+
+def _run_graph_pass(session: Session, settings: Settings, row: CortexPass) -> dict[str, Any]:
+    from vector.domains.cortex.graph.extractor_version import effective_graph_extractor_version
+    from vector.domains.cortex.graph.materialize import execute_graph_projection_pass_for_tenant
+    from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
+
+    batch = settings.cortex_graph_batch_entity_limit
+    payload = row.payload_json if isinstance(row.payload_json, dict) else {}
+    drain = bool(payload.get("drain"))
+    mode = payload.get("mode") if isinstance(payload.get("mode"), str) else None
+    return execute_graph_projection_pass_for_tenant(
+        session,
+        tenant_id=row.tenant_id,
+        source_trigger=row.source_trigger,
+        batch_limit=batch,
+        max_attempts=settings.cortex_graph_max_attempts,
+        extractor_version=effective_graph_extractor_version(settings.cortex_graph_extractor_version),
+        identity_resolver_version=effective_identity_resolver_version(
+            settings.cortex_identity_resolver_version,
+        ),
+        drain=drain if drain else None,
+        mode=mode,
+    )
 
 
 def _run_identity_pass(session: Session, settings: Settings, row: CortexPass) -> dict[str, Any]:
@@ -69,6 +96,8 @@ def execute_claimed_pass_v1(
         stats = _run_canon_pass(session, settings, row)
     elif row.pass_type == IDENTITY_PASS:
         stats = _run_identity_pass(session, settings, row)
+    elif row.pass_type == GRAPH_PROJECTION_PASS:
+        stats = _run_graph_pass(session, settings, row)
     else:
         msg = f"unsupported_pass_type:{row.pass_type}"
         raise ValueError(msg)

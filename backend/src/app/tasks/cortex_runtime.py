@@ -18,6 +18,7 @@ from vector.domains.cortex.runtime.plan import plan_cortex_passes_v1
 from vector.domains.cortex.runtime.queue import recover_expired_leases_v1
 from vector.infrastructure.cortex_lane_pause import read_lane_paused_flag
 from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
+from vector.infrastructure.db.models.graph_scheduler_tick import GraphSchedulerTick
 from vector.infrastructure.db.models.identity_scheduler_tick import IdentitySchedulerTick
 from vector.infrastructure.db.models.orchestrator_run import OrchestratorRun
 from vector.infrastructure.db.session import session_scope
@@ -40,6 +41,7 @@ def plan_cortex_passes_task() -> dict[str, object]:
     settings = get_settings()
     canon_interval = max(60, int(settings.cortex_canon_scheduler_interval_seconds))
     identity_interval = max(60, int(settings.cortex_identity_scheduler_interval_seconds))
+    graph_interval = max(60, int(settings.cortex_graph_scheduler_interval_seconds))
 
     with session_scope() as session:
         canon_tick = CanonSchedulerTick(
@@ -52,17 +54,25 @@ def plan_cortex_passes_task() -> dict[str, object]:
             outcome="running",
             beat_interval_seconds=identity_interval,
         )
+        graph_tick = GraphSchedulerTick(
+            started_at=datetime.now(tz=UTC),
+            outcome="running",
+            beat_interval_seconds=graph_interval,
+        )
         session.add(canon_tick)
         session.add(identity_tick)
+        session.add(graph_tick)
         session.flush()
         canon_tick_id = canon_tick.id
         identity_tick_id = identity_tick.id
+        graph_tick_id = graph_tick.id
 
     with session_scope() as session:
         counts = plan_cortex_passes_v1(session, settings)
 
     canon_outcome = "enqueued" if counts["canon_planned"] else "noop"
     identity_outcome = "enqueued" if counts["identity_planned"] else "noop"
+    graph_outcome = "enqueued" if counts["graph_planned"] else "noop"
     with session_scope() as session:
         canon_tick = session.get(CanonSchedulerTick, canon_tick_id)
         if canon_tick is not None:
@@ -84,8 +94,23 @@ def plan_cortex_passes_task() -> dict[str, object]:
                 candidate_count=counts["identity_planned"] + counts["identity_skipped"],
                 skipped_count=counts["identity_skipped"],
             )
+        graph_tick = session.get(GraphSchedulerTick, graph_tick_id)
+        if graph_tick is not None:
+            complete_lane_scheduler_tick_v1(
+                session,
+                graph_tick,
+                outcome=graph_outcome,
+                enqueued_count=counts["graph_planned"],
+                candidate_count=counts["graph_planned"] + counts["graph_skipped"],
+                skipped_count=counts["graph_skipped"],
+            )
 
-    return {**counts, "canon_tick_id": str(canon_tick_id), "identity_tick_id": str(identity_tick_id)}
+    return {
+        **counts,
+        "canon_tick_id": str(canon_tick_id),
+        "identity_tick_id": str(identity_tick_id),
+        "graph_tick_id": str(graph_tick_id),
+    }
 
 
 @celery_app.task(name=_TASK_POLL, queue="vector")
@@ -179,8 +204,10 @@ def orchestrator_tick_task() -> dict[str, object]:
         poll_out = poll_cortex_passes_task()
         detail["plan"] = plan_out
         detail["poll"] = poll_out
-        passes_planned = int(plan_out.get("canon_planned") or 0) + int(
-            plan_out.get("identity_planned") or 0,
+        passes_planned = (
+            int(plan_out.get("canon_planned") or 0)
+            + int(plan_out.get("identity_planned") or 0)
+            + int(plan_out.get("graph_planned") or 0)
         )
         passes_processed = int(poll_out.get("processed") or 0)
     except Exception as exc:

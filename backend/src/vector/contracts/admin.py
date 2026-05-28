@@ -4985,3 +4985,107 @@ class AdminCanonEntityStatsResponse(BaseModel):
     resources: list[AdminCanonEntityStatRow]
 
 
+class AdminGraphReadinessResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: str
+    extractor_version: int
+    extractor_version_code: int
+    dirty_queue_pending: int
+    active_relationship_count: int
+    latest_pass_run: dict[str, Any] | None = None
+    scheduler: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminGraphStatsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    by_kind: list[dict[str, Any]]
+
+
+class AdminGraphRelationshipListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminGraphRelationshipDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False, populate_by_name=True)
+
+    id: str
+    relationship_kind: str
+    relationship_kind_label: str
+    confidence: str
+    extractor_rule: str
+    extractor_version: int
+    evidence_kind: str
+    evidence_ref: str
+    observed_at: str
+    status: str
+    from_: dict[str, Any] | None = Field(default=None, alias="from")
+    to: dict[str, Any] | None = None
+    from_identity: dict[str, Any] | None = None
+    to_identity: dict[str, Any] | None = None
+    evidence_snapshot: dict[str, Any] = Field(default_factory=dict)
+    source_raw_id: int | None = None
+    source_canon_source_id: str | None = None
+
+
+class AdminGraphEntityLinksResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    outbound: list[dict[str, Any]]
+    inbound: list[dict[str, Any]]
+
+
+class AdminGraphPassRunItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    source_trigger: str
+    status: str
+    started_at: str
+    finished_at: str | None = None
+    stats: dict[str, Any] = Field(default_factory=dict)
+    error_summary: str | None = None
+
+
+class AdminGraphRecentPassRunsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[AdminGraphPassRunItem]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminGraphTriggerPassRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str
+
+
+class AdminGraphTriggerPassResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+
+
+class AdminGraphRebuildRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str
+
+
+class AdminGraphRebuildResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    run_id: str | None = None
+    stats: dict[str, Any] = Field(default_factory=dict)
+
+

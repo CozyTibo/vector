@@ -61,6 +61,11 @@ export default function AdminTenantCortexLayout() {
           label="Identities"
           stale={identityStale}
         />
+        <CortexNavTab
+          to={`/admin/tenants/${tenantId}/cortex/links`}
+          label="Links"
+          stale={false}
+        />
       </nav>
 
       <Outlet />
