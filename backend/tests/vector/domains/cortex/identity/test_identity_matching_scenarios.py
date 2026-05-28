@@ -7,6 +7,8 @@ Matching tiers (see ``materialize._seed_identity_for_actor``):
   T3 exact_normalized_handle — shared provider login handle (>=12 chars); Slack email not required
   T3 initial_plus_surname_suffix — e.g. cecile + veneziani (incoming needs tenant email)
   T3 handle_edit_distance_one — fuzzy long handles (incoming needs tenant email)
+  T3 email_local_short_login — short login equals email local when anchor has no long handles (zakia@)
+  T3 email_local_prefix_login — short login matches email local + long anchor handle (melissa@)
   T4 exact_normalized_display_name — full collapsed display name (>=11 chars); Slack email not required
   seed — new identity when no match; resolver_split when revoking weak links
 """
@@ -72,7 +74,50 @@ def test_obvious_notion_slack_merge_julien_peyruchat(db_session: Session) -> Non
     )
     rules = {a.link_rule for a in accounts}
     assert "exact_normalized_handle" in rules
-    assert rules <= {"seed_actor", "exact_email", "exact_normalized_handle", "handle_to_email_local_part"}
+    assert rules <= {
+        "seed_actor",
+        "exact_email",
+        "exact_normalized_handle",
+        "handle_to_email_local_part",
+        "email_local_short_login",
+        "email_local_prefix_login",
+    }
+
+
+def test_zakia_notion_slack_merge_short_login(db_session: Session) -> None:
+    tenant_id = seed_fizzer_actors(
+        db_session,
+        notion=(NotionActorSpec("notion-zakia", "zakia", "zakia@fizzer.com"),),
+        slack=(SlackActorSpec("U-ZAKIA", "zakia", "zakia"),),
+    )
+    run_full_identity_pass(db_session, tenant_id)
+    identity_id = assert_same_identity(db_session, tenant_id=tenant_id, label_substrings=("zakia",))
+    assert identity_id_for_email(db_session, tenant_id=tenant_id, email="zakia@fizzer.com") == identity_id
+    assert len(canon_labels_for_identity(db_session, tenant_id=tenant_id, identity_id=identity_id)) == 2
+
+
+def test_melissa_pipolo_notion_slack_merge_short_login(db_session: Session) -> None:
+    tenant_id = seed_fizzer_actors(
+        db_session,
+        notion=(NotionActorSpec("notion-melissa", "Mélissa Pipolo", "melissa@fizzer.com"),),
+        slack=(SlackActorSpec("U-MELISSA", "melissa", "melissa"),),
+    )
+    run_full_identity_pass(db_session, tenant_id)
+    identity_id = assert_same_identity(
+        db_session,
+        tenant_id=tenant_id,
+        label_substrings=("Pipolo", "melissa"),
+    )
+    assert identity_id_for_email(db_session, tenant_id=tenant_id, email="melissa@fizzer.com") == identity_id
+    slack_account = db_session.scalar(
+        select(IdentityAccount).where(
+            IdentityAccount.tenant_id == tenant_id,
+            IdentityAccount.identity_entity_id == identity_id,
+            IdentityAccount.connector == "slack",
+        ),
+    )
+    assert slack_account is not None
+    assert slack_account.link_rule in {"email_local_prefix_login", "exact_normalized_handle", "exact_normalized_display_name"}
 
 
 def test_hugo_bonnome_notion_slack_merge_without_profile_email(db_session: Session) -> None:
@@ -111,6 +156,8 @@ def test_hugo_bonnome_notion_slack_merge_without_profile_email(db_session: Sessi
         "exact_normalized_handle",
         "exact_normalized_display_name",
         "handle_edit_distance_one",
+        "email_local_short_login",
+        "email_local_prefix_login",
     }
 
 

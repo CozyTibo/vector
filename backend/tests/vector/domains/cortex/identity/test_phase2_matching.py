@@ -6,7 +6,9 @@ from vector.domains.cortex.identity.materialize import (
     _actor_has_tenant_email,
     _cross_actor_match_handles,
     _edit_distance_at_most_one,
+    _email_local_login_matches,
     _handle_matches_email_local_part,
+    _incoming_short_logins,
     _local_part_token,
     _matches_initial_plus_surname_suffix,
     _name_token,
@@ -154,6 +156,83 @@ def test_chambefort_does_not_match_ortholand_display_names() -> None:
 def test_compact_full_name_token_links_at_eleven_chars() -> None:
     assert "hugobonnome" in _cross_actor_full_display_name_tokens("Hugo Bonnome")
     assert len("hugobonnome") == 11
+
+
+def test_email_local_short_login_for_zakia_shape() -> None:
+    uid = uuid.uuid4()
+    notion_handles = {"zakia"}
+    slack = ActorSignal(
+        canon_entity_id=uid,
+        connector="slack",
+        connection_id=uid,
+        entity_key="s",
+        primary_handle="zakia",
+    )
+    assert _email_local_login_matches(
+        signal=slack,
+        local_tok="zakia",
+        identity_handles=notion_handles,
+        short_logins=_incoming_short_logins(slack),
+    ) == "email_local_short_login"
+
+
+def test_email_local_prefix_login_for_melissa_shape() -> None:
+    uid = uuid.uuid4()
+    notion_handles = {"melissa", "melissapipolo"}
+    slack = ActorSignal(
+        canon_entity_id=uid,
+        connector="slack",
+        connection_id=uid,
+        entity_key="s",
+        primary_handle="melissa",
+    )
+    assert _email_local_login_matches(
+        signal=slack,
+        local_tok="melissa",
+        identity_handles=notion_handles,
+        short_logins=_incoming_short_logins(slack),
+    ) == "email_local_prefix_login"
+
+
+def test_email_local_prefix_login_rejects_camille_bigcheese_shape() -> None:
+    uid = uuid.uuid4()
+    ortholand_handles = {"camille", "camilleortholand"}
+    slack = ActorSignal(
+        canon_entity_id=uid,
+        connector="slack",
+        connection_id=uid,
+        entity_key="s",
+        primary_handle="camille",
+    )
+    slack.handles = {"camille", "camillebigcheese"}
+    slack.display_names.add("camille bigcheese")
+    assert _email_local_login_matches(
+        signal=slack,
+        local_tok="camille",
+        identity_handles=ortholand_handles,
+        short_logins=_incoming_short_logins(slack),
+    ) is None
+
+
+def test_email_local_login_rejects_julien_first_name_slack() -> None:
+    uid = uuid.uuid4()
+    peyruchat_handles = {"julien", "julienpeyruchat"}
+    slack = ActorSignal(
+        canon_entity_id=uid,
+        connector="slack",
+        connection_id=uid,
+        entity_key="s",
+        primary_handle="julien",
+    )
+    assert (
+        _email_local_login_matches(
+            signal=slack,
+            local_tok="julien",
+            identity_handles=peyruchat_handles,
+            short_logins=_incoming_short_logins(slack),
+        )
+        is None
+    )
 
 
 def test_hugobonnome_alias_overlap_without_tenant_email_on_slack() -> None:

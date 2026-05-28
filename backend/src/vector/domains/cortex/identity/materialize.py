@@ -42,6 +42,10 @@ MIN_CROSS_ACTOR_FULL_NAME_LEN = MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN
 MIN_CROSS_ACTOR_NAME_WORD_LEN = MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN
 # Email local-part must be at least this long to derive surname suffixes (e.g. cecile + veneziani).
 MIN_EMAIL_LOCAL_FOR_SUFFIX = 5
+# Short Slack logins may match email local-part when the anchor has no long handles (zakia@).
+MIN_EMAIL_LOCAL_SHORT_LOGIN_MAX = MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN
+# Prefix login (melissa -> melissapipolo) requires a longer local-part (excludes julien@).
+MIN_EMAIL_LOCAL_PREFIX_LOGIN_LEN = 7
 MIN_SURNAME_SUFFIX_LEN = 8
 # GitHub-style logins like ``cveneziani`` (9) are below general handle length but safe with surname suffix.
 MIN_INITIAL_SUFFIX_LOGIN_LEN = 9
@@ -53,6 +57,8 @@ REVOCABLE_WEAK_LINK_RULES = frozenset(
         "exact_normalized_display_name",
         "initial_plus_surname_suffix",
         "handle_edit_distance_one",
+        "email_local_short_login",
+        "email_local_prefix_login",
     },
 )
 
@@ -244,6 +250,82 @@ def _actor_has_tenant_email(signal: ActorSignal, tenant_domain: str | None) -> b
 def _weak_cross_actor_merge_allowed(signal: ActorSignal, tenant_domain: str | None) -> bool:
     """Slack-only actors without a tenant email must not weak-link into email-anchored identities."""
     return _actor_has_tenant_email(signal, tenant_domain)
+
+
+def _incoming_short_logins(signal: ActorSignal) -> set[str]:
+    """Normalized logins between suffix and alias thresholds (e.g. zakia, melissa)."""
+    tokens: set[str] = set()
+    if signal.primary_handle:
+        key = normalize_handle(signal.primary_handle)
+        if key and MIN_EMAIL_LOCAL_FOR_SUFFIX <= len(key) < MIN_EMAIL_LOCAL_SHORT_LOGIN_MAX:
+            tokens.add(key)
+    for handle in signal.handles:
+        if MIN_EMAIL_LOCAL_FOR_SUFFIX <= len(handle) < MIN_EMAIL_LOCAL_SHORT_LOGIN_MAX:
+            tokens.add(handle)
+    return tokens
+
+
+def _identity_handles_all_short(handles: set[str]) -> bool:
+    return not any(len(handle) >= MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN for handle in handles)
+
+
+def _long_handles_prefixed_by_local(handles: set[str], local_tok: str) -> set[str]:
+    return {
+        handle
+        for handle in handles
+        if len(handle) >= MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN
+        and handle.startswith(local_tok)
+        and len(handle) > len(local_tok)
+    }
+
+
+def _incoming_has_conflicting_long_handle(
+    signal: ActorSignal,
+    local_tok: str,
+    *,
+    identity_handles: set[str],
+) -> bool:
+    """True when incoming exposes a long handle incompatible with this email anchor."""
+    allowed_long = _long_handles_prefixed_by_local(identity_handles, local_tok)
+    long_handles: set[str] = set()
+    if signal.primary_handle:
+        primary = normalize_handle(signal.primary_handle)
+        if primary and len(primary) >= MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN:
+            long_handles.add(primary)
+    long_handles.update(_significant_handle_tokens(signal.handles))
+    for handle in long_handles:
+        if handle in allowed_long:
+            continue
+        if not handle.startswith(local_tok):
+            return True
+        # Same first name, different surname in handle (camillebigcheese vs camilleortholand).
+        return True
+    return False
+
+
+def _email_local_login_matches(
+    *,
+    signal: ActorSignal,
+    local_tok: str,
+    identity_handles: set[str],
+    short_logins: set[str],
+) -> str | None:
+    """Return link_rule when a short Slack login matches a tenant-email anchor (v12)."""
+    if local_tok not in short_logins:
+        return None
+    if _incoming_has_conflicting_long_handle(signal, local_tok, identity_handles=identity_handles):
+        return None
+    if (
+        MIN_EMAIL_LOCAL_FOR_SUFFIX <= len(local_tok) < MIN_EMAIL_LOCAL_SHORT_LOGIN_MAX
+        and _identity_handles_all_short(identity_handles)
+    ):
+        return "email_local_short_login"
+    if (
+        MIN_EMAIL_LOCAL_PREFIX_LOGIN_LEN <= len(local_tok) < MIN_EMAIL_LOCAL_SHORT_LOGIN_MAX
+        and _long_handles_prefixed_by_local(identity_handles, local_tok)
+    ):
+        return "email_local_prefix_login"
+    return None
 
 
 def classify_identity_kind(
@@ -581,6 +663,46 @@ def _seed_identity_for_actor(
             if matched_identity is not None:
                 link_tier = "T3"
                 link_rule = "handle_to_email_local_part"
+                confidence = "medium"
+    short_logins = _incoming_short_logins(signal)
+    if matched_identity is None and short_logins and tenant_domain:
+        email_local_login_matches: dict[uuid.UUID, str] = {}
+        anchored = list(
+            session.scalars(
+                select(IdentityEntity)
+                .where(
+                    IdentityEntity.tenant_id == tenant_id,
+                    IdentityEntity.status == "active",
+                    IdentityEntity.primary_email.is_not(None),
+                )
+                .order_by(IdentityEntity.resolved_at.asc(), IdentityEntity.id.asc()),
+            ).all(),
+        )
+        for identity in anchored:
+            if identity.primary_email is None or not identity.primary_email.endswith(f"@{tenant_domain}"):
+                continue
+            local_tok = _local_part_token(identity.primary_email)
+            if not local_tok:
+                continue
+            identity_handles = _handles_for_identity_entity(
+                session,
+                tenant_id=tenant_id,
+                identity_id=identity.id,
+            )
+            rule = _email_local_login_matches(
+                signal=signal,
+                local_tok=local_tok,
+                identity_handles=identity_handles,
+                short_logins=short_logins,
+            )
+            if rule is not None:
+                email_local_login_matches[identity.id] = rule
+        if len(email_local_login_matches) == 1:
+            target_id = next(iter(email_local_login_matches))
+            matched_identity = session.get(IdentityEntity, target_id)
+            if matched_identity is not None:
+                link_tier = "T3"
+                link_rule = email_local_login_matches[target_id]
                 confidence = "medium"
     incoming_handles = _cross_actor_match_handles(signal)
     # Cross-provider handle match (e.g. Notion email + Slack login) does not require Slack profile email.
