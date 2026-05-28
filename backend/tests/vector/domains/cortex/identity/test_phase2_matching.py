@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from vector.domains.cortex.identity.materialize import (
+    _actor_has_tenant_email,
     _cross_actor_match_handles,
     _edit_distance_at_most_one,
     _handle_matches_email_local_part,
@@ -13,6 +14,7 @@ from vector.domains.cortex.identity.materialize import (
     _significant_handle_overlap,
     _significant_handles_edit_distance_one,
     _surname_suffixes_from_email_local,
+    _weak_cross_actor_merge_allowed,
     same_local_part_with_tenant_domain,
 )
 from vector.domains.cortex.identity.signals import ActorSignal
@@ -112,6 +114,33 @@ def test_bare_first_name_tokens_do_not_cross_match() -> None:
     left = _cross_actor_full_display_name_tokens("julien")
     right = _cross_actor_full_display_name_tokens("Julien Peyruchat")
     assert not left.intersection(right)
+
+
+def test_slack_without_email_can_still_match_on_long_shared_handle() -> None:
+    uid = uuid.uuid4()
+    notion = ActorSignal(
+        canon_entity_id=uid,
+        connector="notion",
+        connection_id=uid,
+        entity_key="n",
+        primary_handle="julienpeyruchat",
+    )
+    notion.emails.add("julien@fizzer.com")
+    notion.handles = {"julienpeyruchat"}
+    slack = ActorSignal(
+        canon_entity_id=uid,
+        connector="slack",
+        connection_id=uid,
+        entity_key="s",
+        primary_handle="julienpeyruchat",
+    )
+    slack.handles = {"julien", "julienpeyruchat"}
+    assert not _actor_has_tenant_email(slack, "fizzer.com")
+    assert not _weak_cross_actor_merge_allowed(slack, "fizzer.com")
+    assert _significant_handle_overlap(
+        _cross_actor_match_handles(notion),
+        _cross_actor_match_handles(slack),
+    )
 
 
 def test_chambefort_does_not_match_ortholand_display_names() -> None:

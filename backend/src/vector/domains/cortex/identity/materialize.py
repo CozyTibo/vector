@@ -566,7 +566,8 @@ def _seed_identity_for_actor(
                 link_rule = "handle_to_email_local_part"
                 confidence = "medium"
     incoming_handles = _cross_actor_match_handles(signal)
-    if matched_identity is None and weak_merge_ok and incoming_handles:
+    # Cross-provider handle match (e.g. Notion email + Slack login) does not require Slack profile email.
+    if matched_identity is None and incoming_handles:
         handle_matches: dict[uuid.UUID, str] = {}
         rows = list(
             session.execute(
@@ -603,7 +604,7 @@ def _seed_identity_for_actor(
             prev_handles = _cross_actor_match_handles(prev_signal)
             if _significant_handle_overlap(prev_handles, incoming_handles):
                 handle_matches[identity.id] = "exact_normalized_handle"
-            elif _significant_handles_edit_distance_one(prev_handles, incoming_handles):
+            elif weak_merge_ok and _significant_handles_edit_distance_one(prev_handles, incoming_handles):
                 handle_matches[identity.id] = "handle_edit_distance_one"
         if len(handle_matches) == 1:
             target_id = next(iter(handle_matches))
