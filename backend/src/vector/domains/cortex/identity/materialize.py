@@ -45,8 +45,18 @@ def same_local_part_with_tenant_domain(
     return l.split("@", 1)[0] == r.split("@", 1)[0]
 
 
+def _local_part_token(email: str) -> str | None:
+    norm = normalize_email(email)
+    if not norm or "@" not in norm:
+        return None
+    local = norm.split("@", 1)[0]
+    token = "".join(ch for ch in local if ch.isalnum())
+    return token or None
+
+
 def classify_identity_kind(
     *,
+    connector: str,
     handles: set[str],
     display_names: set[str],
     emails: set[str],
@@ -54,6 +64,13 @@ def classify_identity_kind(
 ) -> tuple[str, str]:
     if signal_is_bot is True:
         return ("bot", "provider_bot_flag")
+    if connector in {"slack", "github", "linear", "notion"}:
+        # Provider actor feeds are person-first unless explicit bot flags are present.
+        if emails or display_names or handles:
+            merged = " ".join(sorted(handles.union(display_names)))
+            if any(m in merged for m in BOT_MARKERS):
+                return ("bot", "name_or_handle_bot_marker")
+            return ("human", "provider_actor_feed_default")
     merged = " ".join(sorted(handles.union(display_names)))
     if any(m in merged for m in BOT_MARKERS):
         return ("bot", "name_or_handle_bot_marker")
@@ -172,6 +189,7 @@ def _seed_identity_for_actor(
     emails_sorted = sorted(signal.emails)
     chosen_email = emails_sorted[0] if emails_sorted else None
     kind, kind_reason = classify_identity_kind(
+        connector=canon_entity.connector,
         handles=signal.handles,
         display_names=signal.display_names,
         emails=signal.emails,
@@ -226,6 +244,35 @@ def _seed_identity_for_actor(
                 link_tier = "T2"
                 link_rule = "local_part_tenant_domain"
                 confidence = "high"
+    if matched_identity is None and signal.handles and tenant_domain:
+        handle_to_email_matches: set[uuid.UUID] = set()
+        existing = list(
+            session.scalars(
+                select(IdentityEntity)
+                .where(
+                    IdentityEntity.tenant_id == tenant_id,
+                    IdentityEntity.status == "active",
+                    IdentityEntity.primary_email.is_not(None),
+                )
+                .order_by(IdentityEntity.resolved_at.asc(), IdentityEntity.id.asc()),
+            ).all(),
+        )
+        handle_tokens = {h for h in signal.handles if h}
+        for identity in existing:
+            if not identity.primary_email:
+                continue
+            if not identity.primary_email.endswith(f"@{tenant_domain}"):
+                continue
+            local_tok = _local_part_token(identity.primary_email)
+            if local_tok and local_tok in handle_tokens:
+                handle_to_email_matches.add(identity.id)
+        if len(handle_to_email_matches) == 1:
+            target_id = next(iter(handle_to_email_matches))
+            matched_identity = session.get(IdentityEntity, target_id)
+            if matched_identity is not None:
+                link_tier = "T3"
+                link_rule = "handle_to_email_local_part"
+                confidence = "medium"
     if matched_identity is None and signal.handles:
         handle_matches: set[uuid.UUID] = set()
         rows = list(
