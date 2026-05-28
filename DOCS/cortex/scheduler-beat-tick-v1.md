@@ -10,8 +10,8 @@ flowchart LR
   Beat --> CT[Canon tick]
   Beat --> IDT[Identity tick]
   IT -->|cortex_live| Ing[Ingestion workers]
-  CT -->|cortex_canon| Can[Canon workers]
-  IDT -->|cortex_identity| Id[Identity workers]
+  Plan -->|cortex_passes| Poll[poll_passes on vector queue]
+  Poll --> Exec[execute claimed pass]
 ```
 
 - **One Beat process** per cluster (substrate ECS service / local `celery-beat` beside substrate worker).
@@ -21,8 +21,8 @@ flowchart LR
 | Lane | Beat interval (default) | Tick task | Work task | Queue |
 |------|-------------------------|-----------|-----------|-------|
 | Ingestion | 120s | `vector.cortex.ingestion.scheduler_tick` | `vector.cortex.ingestion.run_sync` | `cortex_live` |
-| Canon | 300s | `vector.cortex.canon.scheduler_tick` | `vector.cortex.canon.run_pass` | `cortex_canon` |
-| Identity | 300s | `vector.cortex.identity.scheduler_tick` | `vector.cortex.identity.run_pass` | `cortex_identity` |
+| Pass plan | 300s | `vector.cortex.runtime.plan_passes` | upsert `cortex_passes` | `vector` |
+| Pass poll | 60s | `vector.cortex.runtime.poll_passes` | claim + execute pass | `vector` |
 
 Config: `backend/src/app/celery_app.py`, `backend/src/vector/settings.py`, prod roles in `worker_queue_roles_v1.py`.
 

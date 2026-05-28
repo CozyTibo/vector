@@ -17,11 +17,11 @@ def test_ingestion_worker_queues_exclude_pass_lanes() -> None:
     assert cmd[q_idx + 1] == "cortex_live,cortex_replay"
 
 
-def test_cortex_worker_queues_include_ticks_and_passes() -> None:
-    assert CELERY_CORTEX_QUEUES_V1 == ("vector", "cortex_canon", "cortex_identity")
+def test_cortex_worker_queues_vector_only() -> None:
+    assert CELERY_CORTEX_QUEUES_V1 == ("vector",)
     cmd = cortex_worker_command_v1()
     q_idx = cmd.index("-Q")
-    assert cmd[q_idx + 1] == "vector,cortex_canon,cortex_identity"
+    assert cmd[q_idx + 1] == "vector"
 
 
 def test_ingestion_task_def_single_container_without_beat() -> None:
@@ -45,4 +45,4 @@ def test_cortex_task_def_keeps_beat_sidecar() -> None:
     }
     out = apply_cortex_worker_task_definition_v1(task_def)
     assert len(out["containerDefinitions"]) == 2
-    assert "cortex_canon" in out["containerDefinitions"][0]["command"][-1]
+    assert out["containerDefinitions"][0]["command"][-1] == "vector"

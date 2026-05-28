@@ -9,16 +9,8 @@ CELERY_INGESTION_QUEUES_V1: Final[tuple[str, ...]] = (
     "cortex_live",
     "cortex_replay",
 )
-# Cortex lane: Beat ticks, email, and DB-backed pass execution (canon + identity).
-CELERY_CORTEX_QUEUES_V1: Final[tuple[str, ...]] = (
-    "vector",
-    "cortex_canon",
-    "cortex_identity",
-)
-
-# Legacy aliases (tests / scripts).
-CELERY_CANON_QUEUES_V1: Final[tuple[str, ...]] = ("cortex_canon",)
-CELERY_IDENTITY_QUEUES_V1: Final[tuple[str, ...]] = ("cortex_identity",)
+# Cortex lane: Beat ticks, email, and DB-backed pass poll/plan (vector queue only).
+CELERY_CORTEX_QUEUES_V1: Final[tuple[str, ...]] = ("vector",)
 CELERY_DEFAULT_WORKER_QUEUES_V1: Final[tuple[str, ...]] = ("vector",)
 CELERY_SUBSTRATE_QUEUES_V1 = CELERY_DEFAULT_WORKER_QUEUES_V1
 

@@ -190,7 +190,7 @@ services:
     command: >
       celery -A app.worker worker --loglevel=info
       --concurrency 3 --prefetch-multiplier=1
-      -Q vector,cortex_canon,cortex_identity
+      -Q vector
 
   celery-beat:
     build:
