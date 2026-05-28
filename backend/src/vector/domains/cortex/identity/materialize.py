@@ -334,6 +334,9 @@ def _sort_dirty_queue_email_first(
     )
 
 
+_RESOLVER_BUMP_QUEUE_REASONS = frozenset({"resolver_bump", "seed_rematch", "periodic_rescan"})
+
+
 def enqueue_identity_actor(
     session: Session,
     *,
@@ -341,8 +344,9 @@ def enqueue_identity_actor(
     canon_entity_id: uuid.UUID,
     reason: str,
 ) -> None:
+    reason = reason[:32]
     existing = session.scalar(
-        select(IdentityDirtyQueue.id)
+        select(IdentityDirtyQueue)
         .where(
             IdentityDirtyQueue.tenant_id == tenant_id,
             IdentityDirtyQueue.canon_entity_id == canon_entity_id,
@@ -351,12 +355,14 @@ def enqueue_identity_actor(
         .limit(1),
     )
     if existing is not None:
+        if reason in _RESOLVER_BUMP_QUEUE_REASONS and existing.reason not in _RESOLVER_BUMP_QUEUE_REASONS:
+            existing.reason = reason
         return
     session.add(
         IdentityDirtyQueue(
             tenant_id=tenant_id,
             canon_entity_id=canon_entity_id,
-            reason=reason[:32],
+            reason=reason,
         ),
     )
 
@@ -831,6 +837,30 @@ def enqueue_periodic_identity_candidates(
     return queued
 
 
+def _fetch_identity_dirty_batch(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    batch_limit: int,
+    max_attempts: int,
+) -> list[IdentityDirtyQueue]:
+    cap = max(1, min(batch_limit, 5000))
+    attempt_cap = max(1, min(max_attempts, 100))
+    items = list(
+        session.scalars(
+            select(IdentityDirtyQueue)
+            .where(
+                IdentityDirtyQueue.tenant_id == tenant_id,
+                IdentityDirtyQueue.processed_at.is_(None),
+                IdentityDirtyQueue.attempts < attempt_cap,
+            )
+            .order_by(IdentityDirtyQueue.enqueued_at.asc())
+            .limit(cap),
+        ).all(),
+    )
+    return _sort_dirty_queue_email_first(session, tenant_id=tenant_id, items=items)
+
+
 def execute_identity_pass_for_tenant(
     session: Session,
     *,
@@ -840,7 +870,10 @@ def execute_identity_pass_for_tenant(
     max_attempts: int = 5,
     periodic_rescan_limit: int = 200,
     resolver_version: int | None = None,
+    drain: bool | None = None,
 ) -> dict[str, Any]:
+    if drain is None:
+        drain = source_trigger == "manual_admin"
     run = IdentityPassRun(
         tenant_id=tenant_id,
         source_trigger=source_trigger,
@@ -852,79 +885,63 @@ def execute_identity_pass_for_tenant(
     stats: dict[str, int] = {
         "processed": 0,
         "seeded": 0,
+        "rematched": 0,
         "already_linked": 0,
         "missing_actor": 0,
         "errors": 0,
     }
+    rescan_cap = max(1, min(periodic_rescan_limit, 5000))
+    max_iterations = 100 if drain else 1
     try:
-        items = list(
-            session.scalars(
-                select(IdentityDirtyQueue)
-                .where(
-                    IdentityDirtyQueue.tenant_id == tenant_id,
-                    IdentityDirtyQueue.processed_at.is_(None),
-                    IdentityDirtyQueue.attempts < max(1, min(max_attempts, 100)),
-                )
-                .order_by(IdentityDirtyQueue.enqueued_at.asc())
-                .limit(max(1, min(batch_limit, 5000))),
-            ).all(),
-        )
-        items = _sort_dirty_queue_email_first(session, tenant_id=tenant_id, items=items)
-        if not items:
-            if enqueue_periodic_identity_candidates(
+        for _ in range(max_iterations):
+            enqueue_periodic_identity_candidates(
                 session,
                 tenant_id=tenant_id,
-                limit=max(1, min(periodic_rescan_limit, 5000)),
+                limit=rescan_cap,
                 resolver_version=resolver_version,
-            ) > 0:
-                session.flush()
-                items = list(
-                    session.scalars(
-                        select(IdentityDirtyQueue)
-                        .where(
-                            IdentityDirtyQueue.tenant_id == tenant_id,
-                            IdentityDirtyQueue.processed_at.is_(None),
-                            IdentityDirtyQueue.attempts < max(1, min(max_attempts, 100)),
-                        )
-                        .order_by(IdentityDirtyQueue.enqueued_at.asc())
-                        .limit(max(1, min(batch_limit, 5000))),
-                    ).all(),
-                )
-                items = _sort_dirty_queue_email_first(session, tenant_id=tenant_id, items=items)
-        if not items:
-            run.status = RUN_COMPLETED
-            run.finished_at = utc_now()
-            run.stats = stats
+            )
             session.flush()
-            return {"status": "completed", "run_id": str(run.id), "stats": stats}
-        for item in items:
-            stats["processed"] += 1
-            row = _latest_actor_payload(session, tenant_id=tenant_id, canon_entity_id=item.canon_entity_id)
-            if row is None:
-                stats["missing_actor"] += 1
-                item.processed_at = utc_now()
-                item.last_error = "actor_missing"
-                continue
-            canon_entity, source, raw = row
-            try:
-                out = _seed_identity_for_actor(
-                    session,
-                    tenant_id=tenant_id,
-                    canon_entity=canon_entity,
-                    source=source,
-                    raw=raw,
-                    resolver_version=resolver_version,
-                )
-                if out["outcome"] == "seeded":
-                    stats["seeded"] += 1
-                else:
-                    stats["already_linked"] += 1
-                item.processed_at = utc_now()
-                item.last_error = None
-            except Exception as exc:
-                stats["errors"] += 1
-                item.attempts += 1
-                item.last_error = str(exc)[:1000]
+            items = _fetch_identity_dirty_batch(
+                session,
+                tenant_id=tenant_id,
+                batch_limit=batch_limit,
+                max_attempts=max_attempts,
+            )
+            if not items:
+                break
+            for item in items:
+                stats["processed"] += 1
+                row = _latest_actor_payload(session, tenant_id=tenant_id, canon_entity_id=item.canon_entity_id)
+                if row is None:
+                    stats["missing_actor"] += 1
+                    item.processed_at = utc_now()
+                    item.last_error = "actor_missing"
+                    continue
+                canon_entity, source, raw = row
+                try:
+                    out = _seed_identity_for_actor(
+                        session,
+                        tenant_id=tenant_id,
+                        canon_entity=canon_entity,
+                        source=source,
+                        raw=raw,
+                        resolver_version=resolver_version,
+                    )
+                    outcome = out.get("outcome")
+                    if outcome == "seeded":
+                        stats["seeded"] += 1
+                    elif outcome == "rematched":
+                        stats["rematched"] += 1
+                    else:
+                        stats["already_linked"] += 1
+                    item.processed_at = utc_now()
+                    item.last_error = None
+                except Exception as exc:
+                    stats["errors"] += 1
+                    item.attempts += 1
+                    item.last_error = str(exc)[:1000]
+            if not drain:
+                break
         run.status = RUN_COMPLETED
         run.finished_at = utc_now()
         run.stats = stats
@@ -952,7 +969,14 @@ def rebuild_identities_for_tenant(
     session.execute(delete(IdentityEntity).where(IdentityEntity.tenant_id == tenant_id))
     session.execute(delete(IdentityDirtyQueue).where(IdentityDirtyQueue.tenant_id == tenant_id))
     enqueued = enqueue_all_actor_entities(session, tenant_id=tenant_id, reason="rebuild")
-    total_stats = {"processed": 0, "seeded": 0, "already_linked": 0, "missing_actor": 0, "errors": 0}
+    total_stats = {
+        "processed": 0,
+        "seeded": 0,
+        "rematched": 0,
+        "already_linked": 0,
+        "missing_actor": 0,
+        "errors": 0,
+    }
     while True:
         out = execute_identity_pass_for_tenant(
             session,

@@ -317,3 +317,65 @@ def test_periodic_rescan_processes_enqueued_items_in_same_pass(db_session: Sessi
         or 0,
     )
     assert upgraded >= 1
+
+
+def test_resolver_bump_enqueued_when_dirty_queue_already_has_pending_rows(db_session: Session) -> None:
+    """Pending incremental rows must not block resolver-bump top-up in the same pass."""
+    tenant_id = _seed_notion_then_slack(db_session)
+    execute_canon_pass_for_tenant(
+        db_session,
+        tenant_id=tenant_id,
+        source_trigger="test",
+        batch_limit=100,
+    )
+    db_session.commit()
+    execute_identity_pass_for_tenant(
+        db_session,
+        tenant_id=tenant_id,
+        source_trigger="test",
+        batch_limit=100,
+        resolver_version=1,
+    )
+    db_session.commit()
+
+    actor_ids = list(
+        db_session.scalars(
+            select(CanonEntity.id).where(
+                CanonEntity.tenant_id == tenant_id,
+                CanonEntity.entity_type == "actor",
+            ),
+        ).all(),
+    )
+    assert len(actor_ids) >= 2
+    db_session.add(
+        IdentityDirtyQueue(
+            tenant_id=tenant_id,
+            canon_entity_id=actor_ids[0],
+            reason="actor_updated",
+        ),
+    )
+    db_session.execute(
+        IdentityEntity.__table__.update()
+        .where(IdentityEntity.tenant_id == tenant_id)
+        .values(resolver_version=1),
+    )
+    db_session.commit()
+
+    out = execute_identity_pass_for_tenant(
+        db_session,
+        tenant_id=tenant_id,
+        source_trigger="test",
+        batch_limit=500,
+        periodic_rescan_limit=500,
+        resolver_version=2,
+    )
+    db_session.commit()
+
+    assert int(out["stats"]["processed"]) >= 2
+    max_version = int(
+        db_session.scalar(
+            select(func.max(IdentityEntity.resolver_version)).where(IdentityEntity.tenant_id == tenant_id),
+        )
+        or 0,
+    )
+    assert max_version >= 2
