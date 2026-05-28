@@ -14,10 +14,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Rebuild identities for one tenant.")
     parser.add_argument("--tenant", required=True, help="Tenant UUID")
     parser.add_argument("--batch-limit", type=int, default=1000)
+    parser.add_argument("--resolver-version", type=int, default=None)
     args = parser.parse_args()
     tenant_id = uuid.UUID(args.tenant)
     with session_scope() as session:
-        out = rebuild_identities_for_tenant(session, tenant_id=tenant_id, batch_limit=args.batch_limit)
+        out = rebuild_identities_for_tenant(
+            session,
+            tenant_id=tenant_id,
+            batch_limit=args.batch_limit,
+            resolver_version=args.resolver_version,
+        )
         session.commit()
     print(json.dumps(out, indent=2, sort_keys=True, default=str))
 

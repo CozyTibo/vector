@@ -5,10 +5,10 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.identity.resolver_version import IDENTITY_RESOLVER_VERSION
+from vector.domains.cortex.identity.resolver_version import get_identity_resolver_version
 from vector.domains.cortex.identity.signals import extract_actor_signal, normalize_email
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.canon_entity import CanonEntity
@@ -143,6 +143,7 @@ def _seed_identity_for_actor(
     canon_entity: CanonEntity,
     source: CanonEntitySource,
     raw: RawIngestionRecord,
+    resolver_version: int | None = None,
 ) -> dict[str, Any]:
     existing = session.scalar(
         select(IdentityAccount)
@@ -252,13 +253,14 @@ def _seed_identity_for_actor(
                 link_rule = "exact_normalized_handle"
                 confidence = "medium"
 
+    resolved_version = get_identity_resolver_version(resolver_version)
     if matched_identity is None:
         identity = IdentityEntity(
             tenant_id=tenant_id,
             kind=kind,
             display_name=canon_entity.display_label[:512],
             primary_email=chosen_email,
-            resolver_version=IDENTITY_RESOLVER_VERSION,
+            resolver_version=resolved_version,
             status="active",
             resolved_at=utc_now(),
         )
@@ -270,6 +272,9 @@ def _seed_identity_for_actor(
             identity.kind = kind
         if identity.primary_email is None and chosen_email is not None:
             identity.primary_email = chosen_email
+        if identity.resolver_version < resolved_version:
+            identity.resolver_version = resolved_version
+            identity.resolved_at = utc_now()
     evidence = {
         "seed": "actor",
         "connector": canon_entity.connector,
@@ -301,12 +306,80 @@ def _seed_identity_for_actor(
     return {"outcome": "seeded", "identity_entity_id": str(identity.id)}
 
 
+def enqueue_periodic_identity_candidates(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    limit: int,
+    resolver_version: int | None = None,
+) -> int:
+    """Queue unresolved actors and resolver-bump candidates when dirty queue is empty."""
+    limit = max(1, min(limit, 5000))
+    queued = 0
+    unresolved_actor_ids = list(
+        session.scalars(
+            select(CanonEntity.id)
+            .where(
+                CanonEntity.tenant_id == tenant_id,
+                CanonEntity.entity_type == "actor",
+                ~exists(
+                    select(IdentityAccount.id).where(
+                        IdentityAccount.tenant_id == tenant_id,
+                        IdentityAccount.canon_entity_id == CanonEntity.id,
+                        IdentityAccount.unlinked_at.is_(None),
+                    ),
+                ),
+            )
+            .order_by(CanonEntity.materialized_at.desc())
+            .limit(limit),
+        ).all(),
+    )
+    for eid in unresolved_actor_ids:
+        enqueue_identity_actor(
+            session,
+            tenant_id=tenant_id,
+            canon_entity_id=eid,
+            reason="periodic_rescan",
+        )
+        queued += 1
+    if queued >= limit:
+        return queued
+
+    resolved_version = get_identity_resolver_version(resolver_version)
+    stale_actor_ids = list(
+        session.scalars(
+            select(IdentityAccount.canon_entity_id)
+            .join(IdentityEntity, IdentityEntity.id == IdentityAccount.identity_entity_id)
+            .where(
+                IdentityAccount.tenant_id == tenant_id,
+                IdentityAccount.unlinked_at.is_(None),
+                IdentityEntity.status == "active",
+                IdentityEntity.resolver_version < resolved_version,
+            )
+            .order_by(IdentityEntity.resolved_at.asc())
+            .limit(limit - queued),
+        ).all(),
+    )
+    for eid in stale_actor_ids:
+        enqueue_identity_actor(
+            session,
+            tenant_id=tenant_id,
+            canon_entity_id=eid,
+            reason="resolver_bump",
+        )
+        queued += 1
+    return queued
+
+
 def execute_identity_pass_for_tenant(
     session: Session,
     *,
     tenant_id: uuid.UUID,
     source_trigger: str,
     batch_limit: int,
+    max_attempts: int = 5,
+    periodic_rescan_limit: int = 200,
+    resolver_version: int | None = None,
 ) -> dict[str, Any]:
     run = IdentityPassRun(
         tenant_id=tenant_id,
@@ -330,11 +403,31 @@ def execute_identity_pass_for_tenant(
                 .where(
                     IdentityDirtyQueue.tenant_id == tenant_id,
                     IdentityDirtyQueue.processed_at.is_(None),
+                    IdentityDirtyQueue.attempts < max(1, min(max_attempts, 100)),
                 )
                 .order_by(IdentityDirtyQueue.enqueued_at.asc())
                 .limit(max(1, min(batch_limit, 5000))),
             ).all(),
         )
+        if not items:
+            if enqueue_periodic_identity_candidates(
+                session,
+                tenant_id=tenant_id,
+                limit=max(1, min(periodic_rescan_limit, 5000)),
+                resolver_version=resolver_version,
+            ) > 0:
+                items = list(
+                    session.scalars(
+                        select(IdentityDirtyQueue)
+                        .where(
+                            IdentityDirtyQueue.tenant_id == tenant_id,
+                            IdentityDirtyQueue.processed_at.is_(None),
+                            IdentityDirtyQueue.attempts < max(1, min(max_attempts, 100)),
+                        )
+                        .order_by(IdentityDirtyQueue.enqueued_at.asc())
+                        .limit(max(1, min(batch_limit, 5000))),
+                    ).all(),
+                )
         if not items:
             run.status = RUN_COMPLETED
             run.finished_at = utc_now()
@@ -357,6 +450,7 @@ def execute_identity_pass_for_tenant(
                     canon_entity=canon_entity,
                     source=source,
                     raw=raw,
+                    resolver_version=resolver_version,
                 )
                 if out["outcome"] == "seeded":
                     stats["seeded"] += 1
@@ -388,6 +482,7 @@ def rebuild_identities_for_tenant(
     tenant_id: uuid.UUID,
     source_trigger: str = "manual_rebuild",
     batch_limit: int = 1000,
+    resolver_version: int | None = None,
 ) -> dict[str, Any]:
     session.execute(delete(IdentitySuggestion).where(IdentitySuggestion.tenant_id == tenant_id))
     session.execute(delete(IdentityAccount).where(IdentityAccount.tenant_id == tenant_id))
@@ -401,6 +496,7 @@ def rebuild_identities_for_tenant(
             tenant_id=tenant_id,
             source_trigger=source_trigger,
             batch_limit=batch_limit,
+            resolver_version=resolver_version,
         )
         stats = out.get("stats") if isinstance(out.get("stats"), dict) else {}
         for key in total_stats:

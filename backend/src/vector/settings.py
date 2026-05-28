@@ -344,6 +344,27 @@ class Settings(BaseSettings):
         validation_alias="CORTEX_IDENTITY_BATCH_ACTOR_LIMIT",
         description="Max actor rows processed per identity pass batch.",
     )
+    cortex_identity_max_attempts: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        validation_alias="CORTEX_IDENTITY_MAX_ATTEMPTS",
+        description="Max retry attempts for one identity dirty-queue row before skipping it.",
+    )
+    cortex_identity_periodic_rescan_limit: int = Field(
+        default=200,
+        ge=1,
+        le=5000,
+        validation_alias="CORTEX_IDENTITY_PERIODIC_RESCAN_LIMIT",
+        description="Max actors auto-enqueued per pass for periodic unresolved/resolver-bump rescan.",
+    )
+    cortex_identity_resolver_version: int = Field(
+        default=1,
+        ge=1,
+        le=1000,
+        validation_alias="CORTEX_IDENTITY_RESOLVER_VERSION",
+        description="Resolver version override to force deterministic rematching/rescoring passes.",
+    )
     cortex_ingestion_verify_after_sync: bool = Field(
         default=True,
         validation_alias="CORTEX_INGESTION_VERIFY_AFTER_SYNC",

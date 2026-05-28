@@ -18,12 +18,18 @@ def run_cortex_identity_pass_task(
     tid = uuid.UUID(tenant_id)
     settings = get_settings()
     batch = settings.cortex_identity_batch_actor_limit
+    max_attempts = settings.cortex_identity_max_attempts
+    periodic_rescan_limit = settings.cortex_identity_periodic_rescan_limit
+    resolver_version = settings.cortex_identity_resolver_version
     with session_scope() as session:
         out = execute_identity_pass_for_tenant(
             session,
             tenant_id=tid,
             source_trigger=source_trigger,
             batch_limit=batch,
+            max_attempts=max_attempts,
+            periodic_rescan_limit=periodic_rescan_limit,
+            resolver_version=resolver_version,
         )
         session.commit()
     return out
