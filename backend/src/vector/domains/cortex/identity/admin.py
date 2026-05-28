@@ -35,6 +35,18 @@ def build_identity_readiness(session: Session, tenant_id: uuid.UUID, *, schedule
         )
         or 0,
     )
+    inactive_human_count = int(
+        session.scalar(
+            select(func.count())
+            .select_from(IdentityEntity)
+            .where(
+                IdentityEntity.tenant_id == tenant_id,
+                IdentityEntity.status == "active",
+                IdentityEntity.kind == "inactive_human",
+            ),
+        )
+        or 0,
+    )
     linked_count = int(
         session.scalar(
             select(func.count())
@@ -76,6 +88,7 @@ def build_identity_readiness(session: Session, tenant_id: uuid.UUID, *, schedule
         "tenant_id": str(tenant_id),
         "actor_count": actor_count,
         "identity_count": identity_count,
+        "inactive_human_count": inactive_human_count,
         "linked_account_count": linked_count,
         "unresolved_actor_count": unresolved_count,
         "dirty_queue_depth": dirty_queue_depth,

@@ -4727,6 +4727,7 @@ class AdminIdentityReadinessResponse(BaseModel):
     tenant_id: str
     actor_count: int
     identity_count: int
+    inactive_human_count: int = 0
     linked_account_count: int
     unresolved_actor_count: int
     dirty_queue_depth: int

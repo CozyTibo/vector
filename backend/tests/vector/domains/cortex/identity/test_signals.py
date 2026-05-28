@@ -65,7 +65,8 @@ def test_extract_actor_signal_slack_deleted_user_not_bot() -> None:
         },
     )
     assert out.is_bot is not True
-    assert "slack_deleted_member" not in out.bot_reasons
+    assert out.is_inactive is True
+    assert "slack_deleted_member" in out.inactive_reasons
 
 
 def test_extract_actor_signal_notion_adds_name_and_email_local_handles() -> None:

@@ -121,6 +121,7 @@ export type IdentityReadiness = {
   tenant_id: string;
   actor_count: number;
   identity_count: number;
+  inactive_human_count?: number;
   linked_account_count: number;
   unresolved_actor_count: number;
   dirty_queue_depth: number;

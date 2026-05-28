@@ -10,7 +10,7 @@ from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
-from vector.domains.cortex.identity.signals import extract_actor_signal, normalize_email
+from vector.domains.cortex.identity.signals import ActorSignal, extract_actor_signal, normalize_email
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.canon_entity_source import CanonEntitySource
@@ -69,12 +69,16 @@ def classify_identity_kind(
     display_names: set[str],
     emails: set[str],
     signal_is_bot: bool | None,
+    signal_is_inactive: bool | None = None,
 ) -> tuple[str, str]:
     if signal_is_bot is True:
         return ("bot", "provider_bot_flag")
+    has_profile = bool(emails or display_names or handles)
+    if signal_is_inactive is True and has_profile:
+        return ("inactive_human", "provider_inactive_actor")
     if connector in {"slack", "github", "linear", "notion"}:
         # Provider actor feeds are person-first unless explicit bot flags are present.
-        if emails or display_names or handles:
+        if has_profile:
             merged = " ".join(sorted(handles.union(display_names)))
             if any(m in merged for m in BOT_MARKERS):
                 return ("bot", "name_or_handle_bot_marker")
@@ -88,7 +92,69 @@ def classify_identity_kind(
                 return ("bot", "github_noreply_bot_pattern")
     if emails or display_names:
         return ("human", "has_human_profile_signals")
+    if signal_is_inactive is True:
+        return ("inactive_human", "inactive_without_profile")
     return ("unknown", "insufficient_signals")
+
+
+def _classify_actor_signal(signal: ActorSignal, *, connector: str) -> tuple[str, str]:
+    return classify_identity_kind(
+        connector=connector,
+        handles=signal.handles,
+        display_names=signal.display_names,
+        emails=signal.emails,
+        signal_is_bot=signal.is_bot,
+        signal_is_inactive=signal.is_inactive,
+    )
+
+
+def _recompute_identity_kind(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    identity_id: uuid.UUID,
+) -> None:
+    """Aggregate kind across all linked accounts (bot > human > inactive_human > unknown)."""
+    identity = session.get(IdentityEntity, identity_id)
+    if identity is None or identity.tenant_id != tenant_id or identity.status != "active":
+        return
+    account_rows = list(
+        session.scalars(
+            select(IdentityAccount.canon_entity_id).where(
+                IdentityAccount.tenant_id == tenant_id,
+                IdentityAccount.identity_entity_id == identity_id,
+                IdentityAccount.unlinked_at.is_(None),
+            ),
+        ).all(),
+    )
+    kinds: list[str] = []
+    for canon_entity_id in account_rows:
+        row = _latest_actor_payload(session, tenant_id=tenant_id, canon_entity_id=canon_entity_id)
+        if row is None:
+            continue
+        canon_entity, source, raw = row
+        payload = dict(raw.payload_body) if isinstance(raw.payload_body, dict) else {}
+        signal = extract_actor_signal(
+            canon_entity_id=canon_entity.id,
+            connector=canon_entity.connector,
+            connection_id=canon_entity.connection_id,
+            entity_key=canon_entity.entity_key,
+            external_id=source.external_id,
+            source_revision_key=source.source_revision_key,
+            payload_body=payload,
+        )
+        kind, _ = _classify_actor_signal(signal, connector=canon_entity.connector)
+        kinds.append(kind)
+    if not kinds:
+        return
+    if "bot" in kinds:
+        identity.kind = "bot"
+    elif "human" in kinds:
+        identity.kind = "human"
+    elif "inactive_human" in kinds:
+        identity.kind = "inactive_human"
+    else:
+        identity.kind = "unknown"
 
 
 def enqueue_identity_actor(
@@ -206,13 +272,7 @@ def _seed_identity_for_actor(
             return {"outcome": "already_linked", "identity_entity_id": str(existing_account.identity_entity_id)}
     emails_sorted = sorted(signal.emails)
     chosen_email = emails_sorted[0] if emails_sorted else None
-    kind, kind_reason = classify_identity_kind(
-        connector=canon_entity.connector,
-        handles=signal.handles,
-        display_names=signal.display_names,
-        emails=signal.emails,
-        signal_is_bot=signal.is_bot,
-    )
+    kind, kind_reason = _classify_actor_signal(signal, connector=canon_entity.connector)
     link_tier = "seed"
     link_rule = "seed_actor"
     confidence = "low"
@@ -354,7 +414,6 @@ def _seed_identity_for_actor(
     if matched_identity is None:
         if existing_identity is not None:
             identity = existing_identity
-            identity.kind = kind
             identity.display_name = canon_entity.display_label[:512]
             if chosen_email is not None:
                 identity.primary_email = chosen_email
@@ -375,8 +434,6 @@ def _seed_identity_for_actor(
             session.flush()
     else:
         identity = matched_identity
-        if identity.kind == "unknown" and kind in {"human", "bot"}:
-            identity.kind = kind
         if identity.primary_email is None and chosen_email is not None:
             identity.primary_email = chosen_email
         if identity.resolver_version < resolved_version:
@@ -391,6 +448,7 @@ def _seed_identity_for_actor(
         "display_names": sorted(signal.display_names),
         "provider_ids": sorted(signal.provider_ids),
         "bot_reasons": signal.bot_reasons,
+        "inactive_reasons": signal.inactive_reasons,
         "tenant_email_domain": tenant_domain,
         "match_tier": link_tier,
         "match_rule": link_rule,
@@ -407,6 +465,7 @@ def _seed_identity_for_actor(
         existing_account.evidence_json = evidence
         existing_account.linked_at = utc_now()
         existing_account.unlinked_at = None
+        _recompute_identity_kind(session, tenant_id=tenant_id, identity_id=identity.id)
         return {"outcome": "rematched", "identity_entity_id": str(identity.id)}
 
     account = IdentityAccount(
@@ -422,6 +481,7 @@ def _seed_identity_for_actor(
         linked_at=utc_now(),
     )
     session.add(account)
+    _recompute_identity_kind(session, tenant_id=tenant_id, identity_id=identity.id)
     return {"outcome": "seeded", "identity_entity_id": str(identity.id)}
 
 

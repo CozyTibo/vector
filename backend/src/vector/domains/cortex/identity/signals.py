@@ -52,6 +52,8 @@ class ActorSignal:
     provider_ids: set[str] = field(default_factory=set)
     is_bot: bool | None = None
     bot_reasons: list[str] = field(default_factory=list)
+    is_inactive: bool | None = None
+    inactive_reasons: list[str] = field(default_factory=list)
     avatar_url: str | None = None
     source_revision_key: str | None = None
 
@@ -82,6 +84,11 @@ class ActorSignal:
         if reason not in self.bot_reasons:
             self.bot_reasons.append(reason)
 
+    def mark_inactive(self, reason: str) -> None:
+        self.is_inactive = True
+        if reason not in self.inactive_reasons:
+            self.inactive_reasons.append(reason)
+
 
 def _extract_slack(signal: ActorSignal, body: dict[str, Any]) -> None:
     member = body.get("member")
@@ -103,6 +110,8 @@ def _extract_slack(signal: ActorSignal, body: dict[str, Any]) -> None:
         if isinstance(img, str) and img.strip():
             signal.avatar_url = img.strip()
     signal.add_email(member.get("email"))
+    if bool(member.get("deleted")):
+        signal.mark_inactive("slack_deleted_member")
     if bool(member.get("is_bot")):
         signal.mark_bot("slack_is_bot")
 
@@ -157,6 +166,8 @@ def _extract_notion(signal: ActorSignal, body: dict[str, Any]) -> None:
     typ = user.get("type")
     if isinstance(typ, str) and typ.strip().lower() == "bot":
         signal.mark_bot("notion_type_bot")
+    elif isinstance(typ, str) and typ.strip().lower() == "person" and not signal.emails:
+        signal.mark_inactive("notion_person_without_email")
 
 
 def extract_actor_signal(
