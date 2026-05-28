@@ -150,3 +150,39 @@ def test_chambefort_does_not_match_ortholand_display_names() -> None:
     )
     assert not orth.intersection(cham)
 
+
+def test_compact_full_name_token_links_at_eleven_chars() -> None:
+    assert "hugobonnome" in _cross_actor_full_display_name_tokens("Hugo Bonnome")
+    assert len("hugobonnome") == 11
+
+
+def test_hugobonnome_alias_overlap_without_tenant_email_on_slack() -> None:
+    uid = uuid.uuid4()
+    notion = ActorSignal(
+        canon_entity_id=uid,
+        connector="notion",
+        connection_id=uid,
+        entity_key="n",
+        primary_handle="hugo",
+    )
+    notion.emails.add("hugo@fizzer.com")
+    notion.handles = {"hugo", "hugobonnome"}
+    notion.display_names.add("hugo bonnome")
+    slack = ActorSignal(
+        canon_entity_id=uid,
+        connector="slack",
+        connection_id=uid,
+        entity_key="s",
+        primary_handle="hugo",
+    )
+    slack.handles = {"hugo", "hugobonnome", "hugodeladata"}
+    slack.display_names.update({"hugo bonnome", "hugo deladata"})
+    assert not _weak_cross_actor_merge_allowed(slack, "fizzer.com")
+    assert _significant_handle_overlap(
+        _cross_actor_match_handles(notion),
+        _cross_actor_match_handles(slack),
+    )
+    notion_names = _cross_actor_full_display_name_tokens("Hugo Bonnome")
+    slack_names = _cross_actor_full_display_name_tokens("hugo bonnome")
+    assert notion_names.intersection(slack_names) == {"hugobonnome"}
+

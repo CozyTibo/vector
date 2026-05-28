@@ -32,12 +32,14 @@ RUN_RUNNING = "RUNNING"
 RUN_COMPLETED = "COMPLETED"
 RUN_FAILED = "FAILED"
 BOT_MARKERS = ("[bot]", "-bot", "dependabot", "githubactions", "github-actions", "slackbot")
-# Handles/local-parts shorter than this are too ambiguous for cross-actor auto-link (e.g. shared first names).
+# Provider login handles shorter than this are too ambiguous (e.g. shared first names).
 MIN_CROSS_ACTOR_HANDLE_LEN = 12
+# Alias handles / collapsed multi-word names (e.g. ``hugobonnome``) may link at 11+ chars.
+MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN = 11
 # Full collapsed display names must be at least this long for T4 (excludes short names).
-MIN_CROSS_ACTOR_FULL_NAME_LEN = 12
+MIN_CROSS_ACTOR_FULL_NAME_LEN = MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN
 # Isolated name fragments (e.g. surname "chambefort") must not link across actors.
-MIN_CROSS_ACTOR_NAME_WORD_LEN = MIN_CROSS_ACTOR_FULL_NAME_LEN
+MIN_CROSS_ACTOR_NAME_WORD_LEN = MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN
 # Email local-part must be at least this long to derive surname suffixes (e.g. cecile + veneziani).
 MIN_EMAIL_LOCAL_FOR_SUFFIX = 5
 MIN_SURNAME_SUFFIX_LEN = 8
@@ -83,7 +85,7 @@ def _local_part_token(email: str) -> str | None:
 
 
 def _significant_handle_tokens(handles: set[str]) -> set[str]:
-    return {h for h in handles if h and len(h) >= MIN_CROSS_ACTOR_HANDLE_LEN}
+    return {h for h in handles if h and len(h) >= MIN_CROSS_ACTOR_ALIAS_HANDLE_LEN}
 
 
 def _handle_matches_email_local_part(handle_tokens: set[str], local_tok: str) -> bool:
@@ -673,7 +675,8 @@ def _seed_identity_for_actor(
                 link_tier = "T3"
                 link_rule = "initial_plus_surname_suffix"
                 confidence = "medium"
-    if matched_identity is None and weak_merge_ok and signal.display_names:
+    # T4: full display-name tokens (e.g. hugobonnome) may link Slack without profile email.
+    if matched_identity is None and signal.display_names:
         name_matches: set[uuid.UUID] = set()
         incoming_name_tokens: set[str] = set()
         for name in signal.display_names:

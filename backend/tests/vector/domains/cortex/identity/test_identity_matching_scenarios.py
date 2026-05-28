@@ -7,7 +7,7 @@ Matching tiers (see ``materialize._seed_identity_for_actor``):
   T3 exact_normalized_handle — shared provider login handle (>=12 chars); Slack email not required
   T3 initial_plus_surname_suffix — e.g. cecile + veneziani (incoming needs tenant email)
   T3 handle_edit_distance_one — fuzzy long handles (incoming needs tenant email)
-  T4 exact_normalized_display_name — full collapsed display name only (>=12 chars, incoming needs email)
+  T4 exact_normalized_display_name — full collapsed display name (>=11 chars); Slack email not required
   seed — new identity when no match; resolver_split when revoking weak links
 """
 
@@ -73,6 +73,45 @@ def test_obvious_notion_slack_merge_julien_peyruchat(db_session: Session) -> Non
     rules = {a.link_rule for a in accounts}
     assert "exact_normalized_handle" in rules
     assert rules <= {"seed_actor", "exact_email", "exact_normalized_handle", "handle_to_email_local_part"}
+
+
+def test_hugo_bonnome_notion_slack_merge_without_profile_email(db_session: Session) -> None:
+    """Prod: hugo@fizzer.com on Notion + Slack login hugo with hugobonnome / hugo bonnome aliases."""
+    tenant_id = seed_fizzer_actors(
+        db_session,
+        notion=(NotionActorSpec("notion-hugo", "Hugo Bonnome", "hugo@fizzer.com"),),
+        slack=(
+            SlackActorSpec(
+                external_id="U-HUGO",
+                login="hugo",
+                real_name="hugo bonnome",
+                display_name="hugo deladata",
+            ),
+        ),
+    )
+    run_full_identity_pass(db_session, tenant_id)
+
+    identity_id = assert_same_identity(
+        db_session,
+        tenant_id=tenant_id,
+        label_substrings=("Bonnome", "hugo"),
+    )
+    assert identity_id_for_email(db_session, tenant_id=tenant_id, email="hugo@fizzer.com") == identity_id
+    assert len(canon_labels_for_identity(db_session, tenant_id=tenant_id, identity_id=identity_id)) == 2
+
+    slack_account = db_session.scalar(
+        select(IdentityAccount).where(
+            IdentityAccount.tenant_id == tenant_id,
+            IdentityAccount.identity_entity_id == identity_id,
+            IdentityAccount.connector == "slack",
+        ),
+    )
+    assert slack_account is not None
+    assert slack_account.link_rule in {
+        "exact_normalized_handle",
+        "exact_normalized_display_name",
+        "handle_edit_distance_one",
+    }
 
 
 def test_obvious_notion_slack_merge_camille_ortholand(db_session: Session) -> None:

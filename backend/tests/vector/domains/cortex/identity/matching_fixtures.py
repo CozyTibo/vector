@@ -38,6 +38,7 @@ class SlackActorSpec:
     login: str
     real_name: str
     profile_email: str | None = None
+    display_name: str | None = None
 
 
 def seed_fizzer_actors(
@@ -139,6 +140,8 @@ def seed_fizzer_actors(
 
     for actor in slack:
         profile: dict[str, Any] = {"real_name": actor.real_name}
+        if actor.display_name:
+            profile["display_name"] = actor.display_name
         if actor.profile_email:
             profile["email"] = actor.profile_email
         append_raw(
