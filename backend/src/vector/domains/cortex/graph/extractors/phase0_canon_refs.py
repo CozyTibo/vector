@@ -50,16 +50,27 @@ def extract_canon_ref_edges(
                 ref="author_entity_id",
             ),
         )
-    if entity.assignee_entity_id is not None and entity.entity_type == "work_item":
-        edges.append(
-            _edge(
-                kind="assigned_to",
-                from_id=eid,
-                to_id=entity.assignee_entity_id,
-                rule="canon.assignee_entity_id",
-                ref="assignee_entity_id",
-            ),
-        )
+    if entity.assignee_entity_id is not None:
+        if entity.entity_type == "work_item":
+            edges.append(
+                _edge(
+                    kind="assigned_to",
+                    from_id=eid,
+                    to_id=entity.assignee_entity_id,
+                    rule="canon.assignee_entity_id",
+                    ref="assignee_entity_id",
+                ),
+            )
+        elif entity.entity_type == "document" and entity.connector != "notion":
+            edges.append(
+                _edge(
+                    kind="assigned_to",
+                    from_id=eid,
+                    to_id=entity.assignee_entity_id,
+                    rule="canon.assignee_entity_id",
+                    ref="assignee_entity_id",
+                ),
+            )
     if entity.conversation_entity_id is not None:
         edges.append(
             _edge(

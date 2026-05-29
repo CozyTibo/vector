@@ -6,6 +6,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from vector.domains.cortex.canon.mappers.notion_people import iter_notion_people_assignments, notion_segment_properties
 from vector.domains.cortex.graph.edges import EdgeDraft
 from vector.domains.cortex.graph.extractors.phase0_provider_native import _latest_raw
 from vector.domains.cortex.graph.resolve import resolve_entity_id_by_source_identity_key
@@ -74,5 +75,39 @@ def extract_connector_native_edges(
                         confidence="certain",
                     ),
                 )
+
+    if entity.connector == "notion" and entity.entity_type == "document":
+        props = notion_segment_properties(payload)
+        for prop_name, notion_user_id in iter_notion_people_assignments(props):
+            user_key = derive_source_identity_key(
+                connector="notion",
+                resource_type="notion.user",
+                external_id=notion_user_id,
+            )
+            actor_id = resolve_entity_id_by_source_identity_key(
+                session,
+                tenant_id=tenant_id,
+                source_identity_key=user_key,
+            )
+            if actor_id is None:
+                continue
+            edges.append(
+                EdgeDraft(
+                    relationship_kind="assigned_to",
+                    from_entity_id=entity.id,
+                    to_entity_id=actor_id,
+                    extractor_rule=f"notion.property.{prop_name}.people",
+                    evidence_kind="provider_field",
+                    evidence_ref=f"properties.{prop_name}.people",
+                    evidence_snapshot={
+                        "property_name": prop_name,
+                        "notion_user_id": notion_user_id,
+                    },
+                    source_raw_id=int(raw.id),
+                    source_canon_source_id=source.id,
+                    observed_at=observed_at,
+                    confidence="certain",
+                ),
+            )
 
     return edges

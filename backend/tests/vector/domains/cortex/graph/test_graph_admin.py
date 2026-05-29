@@ -233,4 +233,4 @@ def test_rebuild_graph_links_for_entity_supersedes_and_reextracts(db_session: Se
         ).all(),
     )
     assert len(active) >= 1
-    assert all(e.extractor_version >= 8 for e in active)
+    assert all(e.extractor_version >= 9 for e in active)

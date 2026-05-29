@@ -7,6 +7,7 @@ from typing import Any
 
 from vector.domains.cortex.canon.mapper_types import CanonEntityDraft, CanonMapResult
 from vector.domains.cortex.canon.mappers._common import entity_key_for, label_from_payload, source_ref
+from vector.domains.cortex.canon.mappers.notion_people import notion_payload_segment, primary_notion_assignee_user_id
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
 
 
@@ -67,8 +68,9 @@ class _NotionMapper:
             resource_type=resource_type,
             external_id=external_id,
         )
-        segment = payload_body.get(self.payload_key)
-        label = label_from_payload(payload_body, self.payload_key)
+        segment = notion_payload_segment(payload_body, self.payload_key)
+        label_keys = (self.payload_key, "row") if self.payload_key == "database_row" else (self.payload_key,)
+        label = label_from_payload(payload_body, *label_keys)
         attrs: dict[str, Any] = {"external_id": external_id}
         draft = CanonEntityDraft(
             entity_type=self.entity_type,
@@ -86,6 +88,10 @@ class _NotionMapper:
             author_ref = _notion_user_ref(connector, created_by)
             if author_ref is not None and self.entity_type == "document":
                 draft.author_ref = author_ref
+            assignee_uid = primary_notion_assignee_user_id(segment)
+            assignee_ref = _notion_user_ref(connector, assignee_uid) if assignee_uid else None
+            if assignee_ref is not None and self.entity_type == "document":
+                draft.assignee_ref = assignee_ref
             parent = segment.get("parent")
             if isinstance(parent, dict):
                 pid = parent.get("page_id") or parent.get("database_id") or parent.get("block_id")
@@ -111,6 +117,6 @@ NOTION_MAPPERS: list[_NotionMapper] = [
     _NotionMapper("notion.user", "actor", "user"),
     _NotionMapper("notion.page", "document", "page"),
     _NotionMapper("notion.database", "project", "database"),
-    _NotionMapper("notion.database_row", "document", "database_row"),
+    _NotionMapper("notion.database_row", "document", "row"),
     _NotionMapper("notion.block", "document", "block"),
 ]

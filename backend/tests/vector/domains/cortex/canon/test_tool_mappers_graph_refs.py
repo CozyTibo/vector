@@ -131,3 +131,32 @@ def test_notion_page_has_created_by_author_ref() -> None:
     assert result.draft is not None
     assert result.draft.author_ref is not None
     assert "notion.user" in (result.draft.author_ref or "")
+
+
+def test_notion_database_row_maps_owner_people_property_to_assignee_ref() -> None:
+    mapper = _mapper(NOTION_MAPPERS, "notion.database_row")
+    result = mapper.map_row(
+        tenant_id=uuid.uuid4(),
+        connection_id=uuid.uuid4(),
+        connector="notion",
+        resource_type="notion.database_row",
+        external_id="row-1",
+        payload_body={
+            "row": {
+                "id": "row-1",
+                "properties": {
+                    "Product owner": {
+                        "type": "people",
+                        "people": [{"id": "user-owner"}],
+                    },
+                },
+            },
+        },
+        raw_id=6,
+        source_identity_key="notion:notion.database_row:row-1",
+        source_revision_key="h",
+        fetched_at_iso=datetime.now(UTC).isoformat(),
+    )
+    assert result.draft is not None
+    assert result.draft.assignee_ref is not None
+    assert result.draft.assignee_ref.endswith("user-owner")
