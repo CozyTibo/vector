@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 
-import { adminFetch, adminJson } from "../../lib/adminFetch";
+import { adminFetch, adminJson } from "../lib/adminFetch";
 import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
 import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
 import { useDeclaredDomainReadiness } from "./cortex/useDeclaredDomainReadiness";
