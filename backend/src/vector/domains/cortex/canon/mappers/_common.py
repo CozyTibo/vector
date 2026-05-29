@@ -85,12 +85,32 @@ def _first_str(*values: object) -> str | None:
     return None
 
 
+def notion_plain_text(value: object) -> str | None:
+    """Extract display text from a Notion string or rich_text / title array."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            plain = item.get("plain_text")
+            if isinstance(plain, str) and plain.strip():
+                parts.append(plain.strip())
+        if parts:
+            return " ".join(parts)
+    return None
+
+
 def label_from_payload(payload_body: dict[str, Any], *keys: str) -> str:
     for key in keys:
         segment = payload_body.get(key)
         if isinstance(segment, dict):
             for sub in ("title", "name", "login", "identifier", "text", "id"):
                 val = segment.get(sub)
+                rich = notion_plain_text(val)
+                if rich:
+                    return rich[:512]
                 if isinstance(val, str) and val.strip():
                     return val.strip()[:512]
         if isinstance(segment, str) and segment.strip():

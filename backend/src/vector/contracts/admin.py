@@ -5193,7 +5193,7 @@ class AdminDeclaredDomainTriggerPassResponse(BaseModel):
 class AdminNotionWorkContainerItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
-    canon_entity_id: str
+    canon_entity_id: str | None = None
     database_id: str
     display_name: str
     row_count: int

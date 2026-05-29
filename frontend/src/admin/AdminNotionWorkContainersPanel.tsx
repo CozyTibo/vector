@@ -5,7 +5,7 @@ import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 
 type WorkContainerItem = {
-  canon_entity_id: string;
+  canon_entity_id: string | null;
   database_id: string;
   display_name: string;
   row_count: number;

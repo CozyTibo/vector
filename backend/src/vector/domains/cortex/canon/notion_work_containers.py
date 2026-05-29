@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import re
 import uuid
-from datetime import UTC, datetime
+from collections import Counter
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canon.declared_container_registry import (
     ATTR_DECLARED_CONTAINER_EXTERNAL_ID,
     ATTR_DECLARED_CONTAINER_KIND,
 )
+from vector.domains.cortex.canon.mappers._common import notion_plain_text
 from vector.domains.cortex.canon.materialize import materialize_raw_row
 from vector.domains.cortex.declared_domains.enqueue import (
     REASON_MEMBER_MATERIALIZED,
@@ -77,44 +79,165 @@ def normalize_work_container_pins(
     return pins
 
 
+_NOTION_ID_RE = re.compile(
+    r"^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_notion_id(value: str) -> bool:
+    compact = value.replace("-", "")
+    return bool(_NOTION_ID_RE.match(value)) or (len(compact) == 32 and compact.isalnum())
+
+
+def notion_database_title_from_payload(payload_body: dict[str, Any]) -> str | None:
+    segment = payload_body.get("database")
+    if not isinstance(segment, dict):
+        return None
+    title = notion_plain_text(segment.get("title"))
+    if title:
+        return title
+    name = segment.get("name")
+    return name.strip() if isinstance(name, str) and name.strip() else None
+
+
+def _raw_notion_database_titles(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+) -> dict[str, str]:
+    """Latest ingested title per Notion database external_id."""
+    raws = session.scalars(
+        select(RawIngestionRecord)
+        .where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            RawIngestionRecord.connection_id == connection_id,
+            RawIngestionRecord.resource_type == "notion.database",
+            RawIngestionRecord.replay_job_id.is_(None),
+        )
+        .order_by(RawIngestionRecord.id.desc()),
+    ).all()
+    titles: dict[str, str] = {}
+    for raw in raws:
+        db_id = raw.external_id
+        if not isinstance(db_id, str) or not db_id.strip() or db_id in titles:
+            continue
+        body = raw.payload_body if isinstance(raw.payload_body, dict) else {}
+        title = notion_database_title_from_payload(body)
+        if title:
+            titles[db_id] = title
+    return titles
+
+
+def _raw_notion_database_row_counts(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    connection_id: uuid.UUID,
+) -> dict[str, int]:
+    """Row counts keyed by parent database_id from raw notion.database_row payloads."""
+    payloads = session.scalars(
+        select(RawIngestionRecord.payload_body).where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            RawIngestionRecord.connection_id == connection_id,
+            RawIngestionRecord.resource_type == "notion.database_row",
+            RawIngestionRecord.replay_job_id.is_(None),
+        ),
+    ).all()
+    counts: Counter[str] = Counter()
+    for body in payloads:
+        if not isinstance(body, dict):
+            continue
+        db_id = _raw_row_database_id(body)
+        if db_id:
+            counts[db_id] += 1
+    return dict(counts)
+
+
+def _pin_label_snapshots(pins: list | None) -> dict[str, str]:
+    labels: dict[str, str] = {}
+    if not isinstance(pins, list):
+        return labels
+    for pin in pins:
+        if not isinstance(pin, dict):
+            continue
+        db_id = pin.get("id")
+        label = pin.get("label_snapshot")
+        if isinstance(db_id, str) and isinstance(label, str) and label.strip():
+            labels[db_id.strip()] = label.strip()
+    return labels
+
+
+def _resolve_database_display_name(
+    *,
+    database_id: str,
+    raw_title: str | None,
+    pin_label: str | None,
+    canon_label: str | None,
+) -> str:
+    if raw_title:
+        return raw_title
+    if pin_label:
+        return pin_label
+    if canon_label and not _looks_like_notion_id(canon_label):
+        return canon_label
+    return database_id
+
+
 def list_notion_canon_databases(session: Session, *, tenant_id: uuid.UUID) -> list[dict[str, Any]]:
     link = notion_repo.get_notion_connection_for_tenant(session, tenant_id)
     pinned = pinned_database_ids(link.detail.work_container_pins) if link is not None else frozenset()
-    rows = session.scalars(
+    pin_labels = _pin_label_snapshots(link.detail.work_container_pins) if link is not None else {}
+
+    raw_titles: dict[str, str] = {}
+    row_counts: dict[str, int] = {}
+    if link is not None:
+        raw_titles = _raw_notion_database_titles(
+            session,
+            tenant_id=tenant_id,
+            connection_id=link.connection.id,
+        )
+        row_counts = _raw_notion_database_row_counts(
+            session,
+            tenant_id=tenant_id,
+            connection_id=link.connection.id,
+        )
+
+    canon_entities = session.scalars(
         select(CanonEntity).where(
             CanonEntity.tenant_id == tenant_id,
             CanonEntity.connector == "notion",
             CanonEntity.entity_type == "project",
         ),
     ).all()
-    out: list[dict[str, Any]] = []
-    for entity in rows:
+    canon_by_id: dict[str, CanonEntity] = {}
+    for entity in canon_entities:
         attrs = entity.attrs_json if isinstance(entity.attrs_json, dict) else {}
         external_id = attrs.get(ATTR_DECLARED_CONTAINER_EXTERNAL_ID) or attrs.get("external_id") or attrs.get(
             "notion_id",
         )
-        if not isinstance(external_id, str):
-            continue
-        row_count = int(
-            session.scalar(
-                select(func.count())
-                .select_from(CanonEntity)
-                .where(
-                    CanonEntity.tenant_id == tenant_id,
-                    CanonEntity.entity_type == "document",
-                    CanonEntity.connector == "notion",
-                    CanonEntity.attrs_json["database_id"].astext == external_id,
-                ),
-            )
-            or 0,
+        if isinstance(external_id, str) and external_id.strip():
+            canon_by_id[external_id.strip()] = entity
+
+    database_ids = set(canon_by_id) | set(raw_titles) | set(row_counts) | pinned
+    out: list[dict[str, Any]] = []
+    for database_id in database_ids:
+        entity = canon_by_id.get(database_id)
+        attrs = entity.attrs_json if entity is not None and isinstance(entity.attrs_json, dict) else {}
+        display_name = _resolve_database_display_name(
+            database_id=database_id,
+            raw_title=raw_titles.get(database_id),
+            pin_label=pin_labels.get(database_id),
+            canon_label=entity.display_label if entity is not None else None,
         )
         out.append(
             {
-                "canon_entity_id": str(entity.id),
-                "database_id": external_id,
-                "display_name": entity.display_label,
-                "row_count": row_count,
-                "is_pinned": external_id in pinned,
+                "canon_entity_id": str(entity.id) if entity is not None else None,
+                "database_id": database_id,
+                "display_name": display_name,
+                "row_count": int(row_counts.get(database_id, 0)),
+                "is_pinned": database_id in pinned,
                 "is_declared_seed": attrs.get(ATTR_DECLARED_CONTAINER_KIND) == "work_database",
             },
         )

@@ -72,3 +72,44 @@ def test_normalize_pins_enforces_max() -> None:
         assert "max_pins_exceeded" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_notion_plain_text_from_rich_title() -> None:
+    from vector.domains.cortex.canon.mappers._common import label_from_payload, notion_plain_text
+
+    title = [{"plain_text": "Global Roadmap", "type": "text"}]
+    assert notion_plain_text(title) == "Global Roadmap"
+    assert (
+        label_from_payload({"database": {"id": "db-1", "title": title}}, "database")
+        == "Global Roadmap"
+    )
+
+
+def test_notion_database_title_from_payload() -> None:
+    from vector.domains.cortex.canon.notion_work_containers import (
+        _looks_like_notion_id,
+        _raw_row_database_id,
+        _resolve_database_display_name,
+        notion_database_title_from_payload,
+    )
+
+    body = {"database": {"id": "db-1", "title": [{"plain_text": "Engineering backlog"}]}}
+    assert notion_database_title_from_payload(body) == "Engineering backlog"
+    assert _looks_like_notion_id("6320c3e7-1777-4077-905b-20ca7886bb5f")
+    assert not _looks_like_notion_id("Global Roadmap")
+    assert (
+        _resolve_database_display_name(
+            database_id="db-1",
+            raw_title="Roadmap",
+            pin_label=None,
+            canon_label="6320c3e7-1777-4077-905b-20ca7886bb5f",
+        )
+        == "Roadmap"
+    )
+    row_body = {
+        "row": {
+            "id": "row-1",
+            "parent": {"type": "database_id", "database_id": "db-1"},
+        },
+    }
+    assert _raw_row_database_id(row_body) == "db-1"
