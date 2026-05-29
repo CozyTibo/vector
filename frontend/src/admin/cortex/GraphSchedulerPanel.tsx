@@ -2,11 +2,22 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { adminFetch } from "../../lib/adminFetch";
+import { adminJson } from "../../lib/adminFetch";
+import AdminFeedbackBanner from "../ui/AdminFeedbackBanner";
 import { useGraphReadiness } from "./useGraphReadiness";
 
 const TRIGGER_PHRASE = "RUN GRAPH PROJECTION PASS";
 const REBUILD_PHRASE = "REBUILD GRAPH PROJECTIONS";
+
+type AdminFlash = { kind: "success" | "error"; message: string };
+
+type GraphTriggerPassResponse = { tenant_id: string };
+
+type GraphRebuildResponse = {
+  tenant_id: string;
+  pass_id?: string | null;
+  enqueued_entity_count?: number;
+};
 
 export function GraphSchedulerPanel() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
@@ -14,6 +25,7 @@ export function GraphSchedulerPanel() {
   const readinessQ = useGraphReadiness();
   const [confirm, setConfirm] = useState("");
   const [rebuildConfirm, setRebuildConfirm] = useState("");
+  const [flash, setFlash] = useState<AdminFlash | null>(null);
 
   const invalidateGraph = () => {
     void qc.invalidateQueries({ queryKey: ["admin-cortex-graph-readiness", tenantId] });
@@ -24,46 +36,53 @@ export function GraphSchedulerPanel() {
   };
 
   const triggerM = useMutation({
-    mutationFn: async () => {
-      const res = await adminFetch(
+    mutationFn: async () =>
+      adminJson<GraphTriggerPassResponse>(
         `/admin/tenants/${tenantId}/cortex/graph/actions/trigger-pass`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ confirmation: confirm }),
         },
-      );
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { detail?: string };
-        throw new Error(err.detail ?? res.statusText);
-      }
-      return res.json();
-    },
+      ),
     onSuccess: () => {
       invalidateGraph();
       setConfirm("");
+      setFlash({
+        kind: "success",
+        message: "Graph projection pass enqueued. Track progress on the Runs tab.",
+      });
+    },
+    onError: (err: Error) => {
+      setFlash({ kind: "error", message: err.message });
     },
   });
 
   const rebuildM = useMutation({
-    mutationFn: async () => {
-      const res = await adminFetch(
+    mutationFn: async () =>
+      adminJson<GraphRebuildResponse>(
         `/admin/tenants/${tenantId}/cortex/graph/actions/rebuild`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ confirmation: rebuildConfirm }),
         },
-      );
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { detail?: string };
-        throw new Error(err.detail ?? res.statusText);
-      }
-      return res.json();
-    },
-    onSuccess: () => {
+      ),
+    onSuccess: (data) => {
       invalidateGraph();
       setRebuildConfirm("");
+      const count = data.enqueued_entity_count ?? 0;
+      const passHint = data.pass_id ? ` Pass ${data.pass_id.slice(0, 8)}…` : "";
+      setFlash({
+        kind: "success",
+        message:
+          count > 0
+            ? `Full rebuild enqueued (${count.toLocaleString()} entities).${passHint} Track progress on the Runs tab.`
+            : `Full rebuild enqueued.${passHint} Track progress on the Runs tab.`,
+      });
+    },
+    onError: (err: Error) => {
+      setFlash({ kind: "error", message: err.message });
     },
   });
 
@@ -74,6 +93,15 @@ export function GraphSchedulerPanel() {
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-stone-900">Scheduler</h2>
+      {flash ? (
+        <div className="mt-3">
+          <AdminFeedbackBanner
+            kind={flash.kind}
+            message={flash.message}
+            onDismiss={() => setFlash(null)}
+          />
+        </div>
+      ) : null}
       <p className="mt-1 text-sm text-stone-600">
         Orchestrator plans graph passes every {sched.orchestrator_interval_seconds ?? 120}s (lane cadence{" "}
         {sched.interval_seconds}s) · mode{" "}
@@ -105,19 +133,19 @@ export function GraphSchedulerPanel() {
             type="button"
             className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             disabled={confirm !== TRIGGER_PHRASE || triggerM.isPending}
-            onClick={() => triggerM.mutate()}
+            onClick={() => {
+              setFlash(null);
+              triggerM.mutate();
+            }}
           >
-            Trigger pass
+            {triggerM.isPending ? "Enqueueing…" : "Trigger pass"}
           </button>
         </div>
-        {triggerM.isError ? (
-          <p className="mt-2 text-xs text-red-700">{(triggerM.error as Error).message}</p>
-        ) : null}
       </div>
 
       <div className="mt-3 rounded border border-stone-200 bg-stone-50/80 p-3">
         <p className="text-xs text-stone-700">
-          Full rebuild — type exactly: <code className="font-mono">{REBUILD_PHRASE}</code>
+          Full rebuild (async) — type exactly: <code className="font-mono">{REBUILD_PHRASE}</code>
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <input
@@ -129,14 +157,14 @@ export function GraphSchedulerPanel() {
             type="button"
             className="rounded border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 disabled:opacity-50"
             disabled={rebuildConfirm !== REBUILD_PHRASE || rebuildM.isPending}
-            onClick={() => rebuildM.mutate()}
+            onClick={() => {
+              setFlash(null);
+              rebuildM.mutate();
+            }}
           >
-            Rebuild
+            {rebuildM.isPending ? "Enqueueing…" : "Rebuild"}
           </button>
         </div>
-        {rebuildM.isError ? (
-          <p className="mt-2 text-xs text-red-700">{(rebuildM.error as Error).message}</p>
-        ) : null}
       </div>
     </section>
   );

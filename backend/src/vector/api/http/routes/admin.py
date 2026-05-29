@@ -2239,25 +2239,41 @@ def build_admin_router() -> APIRouter:
         settings: Annotated[Settings, Depends(settings_dep)],
     ) -> AdminGraphRebuildResponse:
         _assert_tenant(db, tenant_id)
-        from vector.domains.cortex.graph.admin import MANUAL_GRAPH_REBUILD_CONFIRMATION
-        from vector.domains.cortex.graph.materialize import rebuild_graph_for_tenant
+        from vector.domains.cortex.graph.admin import (
+            MANUAL_GRAPH_REBUILD_CONFIRMATION,
+            prepare_graph_pass_trigger,
+        )
+        from vector.domains.cortex.graph.materialize import prepare_graph_rebuild_for_tenant
+        from vector.domains.cortex.runtime.pass_types import GRAPH_PROJECTION_PASS
+        from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
 
         if body.confirmation != MANUAL_GRAPH_REBUILD_CONFIRMATION:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail=f"confirmation must be exactly: {MANUAL_GRAPH_REBUILD_CONFIRMATION}",
             )
-        out = rebuild_graph_for_tenant(
+        prepare_graph_pass_trigger(
+            db,
+            tenant_id,
+            interval_seconds=settings.cortex_graph_scheduler_interval_seconds,
+        )
+        prep = prepare_graph_rebuild_for_tenant(db, tenant_id=tenant_id)
+        pass_id = upsert_pending_pass_v1(
             db,
             tenant_id=tenant_id,
-            batch_limit=settings.cortex_graph_batch_entity_limit,
-            extractor_version=settings.cortex_graph_extractor_version,
+            pass_type=GRAPH_PROJECTION_PASS,
+            source_trigger="manual_rebuild_admin",
+            priority=100,
+            payload_json={"drain": True},
         )
         db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
         return AdminGraphRebuildResponse(
             tenant_id=tenant_id,
-            run_id=out.get("run_id"),
-            stats=dict(out.get("stats") or {}),
+            pass_id=str(pass_id),
+            enqueued_entity_count=int(prep.get("enqueued_entity_count") or 0),
         )
 
     @r.get(

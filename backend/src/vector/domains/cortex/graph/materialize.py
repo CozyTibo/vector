@@ -451,14 +451,12 @@ def execute_graph_projection_pass_for_tenant(
         raise
 
 
-def rebuild_graph_for_tenant(
+def prepare_graph_rebuild_for_tenant(
     session: Session,
     *,
     tenant_id: uuid.UUID,
-    source_trigger: str = "manual_rebuild",
-    batch_limit: int = 1000,
-    extractor_version: int | None = None,
 ) -> dict[str, Any]:
+    """Supersede active edges, clear dirty queue, and enqueue all scoped canon entities."""
     session.execute(
         update(GraphRelationship)
         .where(
@@ -485,7 +483,20 @@ def rebuild_graph_for_tenant(
             canon_entity_id=eid,
             reason="rebuild",
         )
-    return execute_graph_projection_pass_for_tenant(
+    return {"enqueued_entity_count": len(ids)}
+
+
+def rebuild_graph_for_tenant(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    source_trigger: str = "manual_rebuild",
+    batch_limit: int = 1000,
+    extractor_version: int | None = None,
+) -> dict[str, Any]:
+    """Synchronous rebuild (scripts/tests). Admin uses prepare + async cortex pass."""
+    prep = prepare_graph_rebuild_for_tenant(session, tenant_id=tenant_id)
+    out = execute_graph_projection_pass_for_tenant(
         session,
         tenant_id=tenant_id,
         source_trigger=source_trigger,
@@ -493,3 +504,5 @@ def rebuild_graph_for_tenant(
         extractor_version=extractor_version,
         drain=True,
     )
+    out["enqueued_entity_count"] = prep["enqueued_entity_count"]
+    return out

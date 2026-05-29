@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.graph.admin import (
@@ -13,6 +14,9 @@ from vector.domains.cortex.graph.admin import (
     count_unlinked_scoped_entities,
     graph_stats_by_kind,
 )
+from vector.domains.cortex.graph.materialize import prepare_graph_rebuild_for_tenant
+from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
+from vector.infrastructure.db.models.graph_relationship import STATUS_SUPERSEDED
 from vector.domains.cortex.graph.relationship_kinds import EXTRACTABLE_RELATIONSHIP_KINDS
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.graph_relationship import GraphRelationship
@@ -141,3 +145,33 @@ def test_graph_stats_by_kind_includes_zero_extractable_kinds(db_session: Session
     assert assigned["count"] == 0
     assert replies["count"] == 0
     assert references["count"] == 0
+
+
+def test_prepare_graph_rebuild_enqueues_scoped_entities(db_session: Session) -> None:
+    tenant, conn = _tenant(db_session)
+    now = datetime.now(UTC)
+    issue = _canon_entity(
+        tenant_id=tenant.id,
+        connection_id=conn.id,
+        entity_type="github.issue",
+        entity_key="i-1",
+        display_label="Issue",
+        materialized_at=now,
+    )
+    db_session.add(issue)
+    db_session.flush()
+
+    prep = prepare_graph_rebuild_for_tenant(db_session, tenant_id=tenant.id)
+    assert prep["enqueued_entity_count"] == 1
+
+    pending = db_session.scalars(
+        select(GraphDirtyQueue).where(
+            GraphDirtyQueue.tenant_id == tenant.id,
+            GraphDirtyQueue.processed_at.is_(None),
+        ),
+    ).all()
+    assert len(pending) == 1
+    assert pending[0].reason == "rebuild"
+
+    edge = db_session.scalar(select(GraphRelationship).where(GraphRelationship.tenant_id == tenant.id))
+    assert edge is None or edge.status == STATUS_SUPERSEDED

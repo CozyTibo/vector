@@ -5093,6 +5093,8 @@ class AdminGraphRebuildResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     tenant_id: uuid.UUID
+    pass_id: str | None = None
+    enqueued_entity_count: int = 0
     run_id: str | None = None
     stats: dict[str, Any] = Field(default_factory=dict)
 
