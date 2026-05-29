@@ -453,6 +453,8 @@ export type GraphReadiness = {
   tenant_id: string;
   extractor_version: number;
   extractor_version_code: number;
+  /** Effective CORTEX_GRAPH_BATCH_ENTITY_LIMIT on API/workers. */
+  batch_entity_limit: number;
   dirty_queue_pending: number;
   dirty_queue_extract_pending: number;
   dirty_queue_enrich_pending: number;

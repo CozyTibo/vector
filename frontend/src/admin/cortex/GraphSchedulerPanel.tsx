@@ -115,8 +115,9 @@ export function GraphSchedulerPanel() {
         ) : null}
       </p>
       <p className="mt-2 text-xs text-stone-500">
-        Extractor v{data.extractor_version} · {data.active_relationship_count.toLocaleString()} active links ·{" "}
-        {data.dirty_queue_pending} dirty ({data.dirty_queue_extract_pending} extract)
+        Extractor v{data.extractor_version} · batch {data.batch_entity_limit.toLocaleString()}/pass ·{" "}
+        {data.active_relationship_count.toLocaleString()} active links · {data.dirty_queue_pending} dirty (
+        {data.dirty_queue_extract_pending} extract)
       </p>
 
       <div className="mt-3 rounded border border-amber-100 bg-amber-50/80 p-3">

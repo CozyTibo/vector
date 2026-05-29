@@ -2045,19 +2045,19 @@ def build_admin_router() -> APIRouter:
 
         graph_interval = max(60, int(settings.cortex_graph_scheduler_interval_seconds))
         orch_interval = max(60, int(settings.cortex_orchestrator_interval_seconds))
-        return AdminGraphReadinessResponse.model_validate(
-            build_graph_readiness(
+        readiness = build_graph_readiness(
+            db,
+            tenant_id,
+            scheduler=build_graph_lane_scheduler_status(
                 db,
-                tenant_id,
-                scheduler=build_graph_lane_scheduler_status(
-                    db,
-                    tenant_id=tenant_id,
-                    enabled=settings.cortex_graph_scheduler_enabled,
-                    interval_seconds=graph_interval,
-                    orchestrator_interval_seconds=orch_interval,
-                ),
+                tenant_id=tenant_id,
+                enabled=settings.cortex_graph_scheduler_enabled,
+                interval_seconds=graph_interval,
+                orchestrator_interval_seconds=orch_interval,
             ),
         )
+        readiness["batch_entity_limit"] = max(1, int(settings.cortex_graph_batch_entity_limit))
+        return AdminGraphReadinessResponse.model_validate(readiness)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/graph/stats",

@@ -55,10 +55,18 @@ function ReadinessChecks({ data }: { data: GraphReadiness }) {
         label="Graph dirty queue empty"
         detail={
           data.dirty_queue_pending > 0
-            ? `${data.dirty_queue_pending.toLocaleString()} pending (${data.dirty_queue_extract_pending} extract · ${data.dirty_queue_enrich_pending} enrich)`
+            ? `${data.dirty_queue_pending.toLocaleString()} pending (${data.dirty_queue_extract_pending} extract · ${data.dirty_queue_enrich_pending} enrich) · batch cap ${data.batch_entity_limit.toLocaleString()}`
             : "No pending extract or enrich work"
         }
       />
+      {last &&
+      lastProcessed >= data.batch_entity_limit &&
+      data.dirty_queue_pending > 0 ? (
+        <li className="text-xs text-amber-900">
+          Last pass processed {lastProcessed.toLocaleString()} (at batch cap) — scheduler will need
+          more passes to drain the remaining queue.
+        </li>
+      ) : null}
       <CheckRow
         ok={data.graph_caught_up}
         label="Graph lane idle"
@@ -119,8 +127,10 @@ export function GraphStateTab() {
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-stone-900">Overall state</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Extractor v{data.extractor_version} (code v{data.extractor_version_code}) ·{" "}
-          {data.unresolved_reference_count.toLocaleString()} unresolved refs
+          Extractor v{data.extractor_version} (code v{data.extractor_version_code}) · pass batch{" "}
+          {data.batch_entity_limit.toLocaleString()} (
+          <code className="rounded bg-stone-100 px-1 py-0.5 text-xs">CORTEX_GRAPH_BATCH_ENTITY_LIMIT</code>
+          ) · {data.unresolved_reference_count.toLocaleString()} unresolved refs
         </p>
         <ReadinessChecks data={data} />
         {Object.keys(data.dirty_queue_by_reason).length > 0 ? (

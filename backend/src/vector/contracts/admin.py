@@ -4991,6 +4991,7 @@ class AdminGraphReadinessResponse(BaseModel):
     tenant_id: str
     extractor_version: int
     extractor_version_code: int
+    batch_entity_limit: int = 1500
     dirty_queue_pending: int
     dirty_queue_extract_pending: int = 0
     dirty_queue_enrich_pending: int = 0
