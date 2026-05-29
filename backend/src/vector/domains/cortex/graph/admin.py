@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.graph.enqueue import GRAPH_SCOPED_ENTITY_TYPES
@@ -15,7 +15,10 @@ from vector.domains.cortex.graph.extractor_version import (
 )
 from vector.domains.cortex.graph.materialize import tenant_has_canon_backlog
 from vector.domains.cortex.graph.pass_run_ops import abandon_stuck_running_graph_passes
-from vector.domains.cortex.graph.relationship_kinds import label_for_kind
+from vector.domains.cortex.graph.relationship_kinds import (
+    EXTRACTABLE_RELATIONSHIP_KINDS,
+    label_for_kind,
+)
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
 from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
@@ -25,6 +28,36 @@ from vector.infrastructure.db.models.identity_entity import IdentityEntity
 
 MANUAL_GRAPH_PASS_CONFIRMATION = "RUN GRAPH PROJECTION PASS"
 MANUAL_GRAPH_REBUILD_CONFIRMATION = "REBUILD GRAPH PROJECTIONS"
+
+_SCOPED_ENTITY_TYPES = tuple(sorted(GRAPH_SCOPED_ENTITY_TYPES))
+
+
+def count_unlinked_scoped_entities(session: Session, tenant_id: uuid.UUID) -> int:
+    """Scoped canon entities that do not appear on any active graph relationship."""
+    linked = exists(
+        select(1)
+        .select_from(GraphRelationship)
+        .where(
+            GraphRelationship.tenant_id == tenant_id,
+            GraphRelationship.status == STATUS_ACTIVE,
+            or_(
+                GraphRelationship.from_entity_id == CanonEntity.id,
+                GraphRelationship.to_entity_id == CanonEntity.id,
+            ),
+        ),
+    )
+    return int(
+        session.scalar(
+            select(func.count())
+            .select_from(CanonEntity)
+            .where(
+                CanonEntity.tenant_id == tenant_id,
+                CanonEntity.entity_type.in_(_SCOPED_ENTITY_TYPES),
+                ~linked,
+            ),
+        )
+        or 0,
+    )
 
 
 def build_graph_readiness(
@@ -102,11 +135,12 @@ def build_graph_readiness(
             .select_from(CanonEntity)
             .where(
                 CanonEntity.tenant_id == tenant_id,
-                CanonEntity.entity_type.in_(tuple(sorted(GRAPH_SCOPED_ENTITY_TYPES))),
+                CanonEntity.entity_type.in_(_SCOPED_ENTITY_TYPES),
             ),
         )
         or 0,
     )
+    unlinked_scoped_entity_count = count_unlinked_scoped_entities(session, tenant_id)
     canon_backlog = tenant_has_canon_backlog(session, tenant_id)
     graph_caught_up = (
         not canon_backlog
@@ -124,6 +158,7 @@ def build_graph_readiness(
         "active_relationship_count": active_edges,
         "unresolved_reference_count": unresolved_refs,
         "scoped_entity_count": scoped_entity_count,
+        "unlinked_scoped_entity_count": unlinked_scoped_entity_count,
         "canon_backlog": canon_backlog,
         "graph_caught_up": graph_caught_up,
         "latest_pass_run": latest_payload,
@@ -330,16 +365,16 @@ def graph_stats_by_kind(session: Session, tenant_id: uuid.UUID) -> list[dict[str
             GraphRelationship.tenant_id == tenant_id,
             GraphRelationship.status == STATUS_ACTIVE,
         )
-        .group_by(GraphRelationship.relationship_kind)
-        .order_by(func.count().desc()),
+        .group_by(GraphRelationship.relationship_kind),
     ).all()
+    counts = {str(kind): int(count) for kind, count in rows}
     return [
         {
             "relationship_kind": kind,
-            "relationship_kind_label": label_for_kind(str(kind)),
-            "count": int(count),
+            "relationship_kind_label": label_for_kind(kind),
+            "count": counts.get(kind, 0),
         }
-        for kind, count in rows
+        for kind in EXTRACTABLE_RELATIONSHIP_KINDS
     ]
 
 

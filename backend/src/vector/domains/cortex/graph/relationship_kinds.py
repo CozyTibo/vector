@@ -19,6 +19,22 @@ RELATIONSHIP_KIND_LABELS: dict[str, str] = {
     "contains_commit": "Contains commit",
 }
 
+# Kinds current extractors may materialize; admin stats always include these (count may be 0).
+EXTRACTABLE_RELATIONSHIP_KINDS: tuple[str, ...] = (
+    "authored_by",
+    "assigned_to",
+    "attached_to",
+    "replies_to",
+    "comments_on",
+    "belongs_to_repo",
+    "parent_of",
+    "relates_to",
+    "references",
+    "mentions",
+    "merged_as_commit",
+    "deploys",
+)
+
 
 def label_for_kind(kind: str) -> str:
     return RELATIONSHIP_KIND_LABELS.get(kind, kind.replace("_", " ").title())

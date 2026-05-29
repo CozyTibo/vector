@@ -460,6 +460,7 @@ export type GraphReadiness = {
   active_relationship_count: number;
   unresolved_reference_count: number;
   scoped_entity_count: number;
+  unlinked_scoped_entity_count: number;
   canon_backlog: boolean;
   graph_caught_up: boolean;
   latest_pass_run: {

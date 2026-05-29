@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { adminJson } from "../../lib/adminFetch";
 import type { GraphReadiness, GraphStats } from "../cortexAdminTypes";
@@ -75,6 +75,15 @@ function ReadinessChecks({ data }: { data: GraphReadiness }) {
         label="Active execution links"
         detail={`${data.active_relationship_count.toLocaleString()} active · ${data.scoped_entity_count.toLocaleString()} scoped canon entities`}
       />
+      <CheckRow
+        ok
+        label="Unlinked scoped entities"
+        detail={
+          data.scoped_entity_count === 0
+            ? "No scoped canon entities yet"
+            : `${data.unlinked_scoped_entity_count.toLocaleString()} with no active links · ${(data.scoped_entity_count - data.unlinked_scoped_entity_count).toLocaleString()} linked`
+        }
+      />
       {enrichOnlyDrain ? (
         <li className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           Recent passes processed entities but upserted no edges (likely actor enrich-only).
@@ -84,6 +93,11 @@ function ReadinessChecks({ data }: { data: GraphReadiness }) {
       ) : null}
     </ul>
   );
+}
+
+function kindBrowseHref(kind: string): string {
+  const params = new URLSearchParams({ tab: "data", kind });
+  return `?${params}`;
 }
 
 export function GraphStateTab() {
@@ -130,10 +144,11 @@ export function GraphStateTab() {
 
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-stone-900">Links by kind</h2>
+        <p className="mt-1 text-sm text-stone-600">
+          Open a kind to browse every active link and verify extraction accuracy.
+        </p>
         {statsQ.isPending ? (
           <p className="mt-2 text-sm text-stone-500">Loading…</p>
-        ) : (statsQ.data?.by_kind ?? []).length === 0 ? (
-          <p className="mt-2 text-sm text-stone-500">No active links yet.</p>
         ) : (
           <table className="mt-3 w-full max-w-lg text-sm">
             <thead>
@@ -143,12 +158,47 @@ export function GraphStateTab() {
               </tr>
             </thead>
             <tbody>
-              {(statsQ.data?.by_kind ?? []).map((row) => (
-                <tr key={row.relationship_kind} className="border-b border-stone-50">
-                  <td className="py-2 pr-4">{row.relationship_kind_label}</td>
-                  <td className="py-2 text-right tabular-nums">{row.count.toLocaleString()}</td>
-                </tr>
-              ))}
+              {(statsQ.data?.by_kind ?? []).map((row) => {
+                const browseTo = kindBrowseHref(row.relationship_kind);
+                return (
+                  <tr key={row.relationship_kind} className="border-b border-stone-50">
+                    <td className="py-2 pr-4">
+                      <Link
+                        className={[
+                          row.count === 0
+                            ? "text-stone-500 hover:text-stone-700"
+                            : "font-medium text-indigo-700",
+                          "hover:underline",
+                        ].join(" ")}
+                        to={browseTo}
+                      >
+                        {row.relationship_kind_label}
+                      </Link>
+                      <span className="ml-2 font-mono text-xs text-stone-400">
+                        {row.relationship_kind}
+                      </span>
+                    </td>
+                    <td
+                      className={[
+                        "py-2 text-right tabular-nums",
+                        row.count === 0 ? "text-stone-400" : "",
+                      ].join(" ")}
+                    >
+                      <Link
+                        className={[
+                          row.count === 0
+                            ? "text-stone-400 hover:text-stone-600"
+                            : "text-indigo-700",
+                          "hover:underline",
+                        ].join(" ")}
+                        to={browseTo}
+                      >
+                        {row.count.toLocaleString()}
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

@@ -12,6 +12,21 @@ import { SectionSkeleton } from "./SectionSkeleton";
 
 const PAGE_SIZE = 50;
 
+const KIND_BROWSE_PRESETS: { kind: string; label: string }[] = [
+  { kind: "authored_by", label: "Authored by" },
+  { kind: "assigned_to", label: "Assigned to" },
+  { kind: "attached_to", label: "Attached to" },
+  { kind: "replies_to", label: "Replies to" },
+  { kind: "comments_on", label: "Comments on" },
+  { kind: "belongs_to_repo", label: "Belongs to repo" },
+  { kind: "parent_of", label: "Parent of" },
+  { kind: "relates_to", label: "Relates to" },
+  { kind: "references", label: "References" },
+  { kind: "mentions", label: "Mentions" },
+  { kind: "merged_as_commit", label: "Merged as commit" },
+  { kind: "deploys", label: "Deploys" },
+];
+
 function formatWhen(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
@@ -68,6 +83,8 @@ export function GraphDataTab() {
     });
   };
 
+  const activeKindPreset = KIND_BROWSE_PRESETS.find((row) => row.kind === kindFilter);
+
   const setView = (next: "links" | "unresolved") => {
     patchParams({ view: next === "links" ? null : next, page: null });
   };
@@ -113,7 +130,53 @@ export function GraphDataTab() {
       </div>
 
       {view === "links" ? (
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 space-y-3">
+          {kindFilter ? (
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-4 py-3">
+              <p className="text-sm font-medium text-indigo-950">
+                Browsing{" "}
+                {activeKindPreset?.label ??
+                  kindFilter.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                <span className="ml-2 font-mono text-xs font-normal text-indigo-800/80">
+                  ({kindFilter})
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-indigo-900/80">
+                Review source → target pairs and extractor rules for this relationship kind.
+              </p>
+              <button
+                type="button"
+                className="mt-2 text-xs font-medium text-indigo-800 hover:underline"
+                onClick={() => patchParams({ kind: null, page: null })}
+              >
+                Clear kind filter
+              </button>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <span className="self-center text-xs text-stone-500">Browse by kind:</span>
+            {KIND_BROWSE_PRESETS.map((preset) => (
+              <button
+                key={preset.kind}
+                type="button"
+                className={[
+                  "rounded-md px-2.5 py-1 text-xs font-medium",
+                  kindFilter === preset.kind
+                    ? "bg-indigo-100 text-indigo-900 ring-1 ring-inset ring-indigo-200"
+                    : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50",
+                ].join(" ")}
+                onClick={() =>
+                  patchParams({
+                    kind: kindFilter === preset.kind ? null : preset.kind,
+                    page: null,
+                  })
+                }
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3">
           <label className="text-xs text-stone-600">
             Relationship kind
             <input
@@ -132,6 +195,7 @@ export function GraphDataTab() {
               onChange={(e) => patchParams({ entity_id: e.target.value || null, page: null })}
             />
           </label>
+          </div>
         </div>
       ) : null}
 

@@ -4998,6 +4998,7 @@ class AdminGraphReadinessResponse(BaseModel):
     active_relationship_count: int
     unresolved_reference_count: int = 0
     scoped_entity_count: int = 0
+    unlinked_scoped_entity_count: int = 0
     canon_backlog: bool = False
     graph_caught_up: bool = False
     latest_pass_run: dict[str, Any] | None = None
