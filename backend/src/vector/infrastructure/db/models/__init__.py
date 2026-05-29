@@ -9,6 +9,11 @@ from vector.infrastructure.db.models.canon_pass_run import CanonPassRun
 from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
 from vector.infrastructure.db.models.cortex_admin_continuity_snapshot import CortexAdminContinuitySnapshot
 from vector.infrastructure.db.models.cortex_pass import CortexPass
+from vector.infrastructure.db.models.declared_domain import DeclaredDomain
+from vector.infrastructure.db.models.declared_domain_dirty_queue import DeclaredDomainDirtyQueue
+from vector.infrastructure.db.models.declared_domain_membership import DeclaredDomainMembership
+from vector.infrastructure.db.models.declared_domain_pass_run import DeclaredDomainPassRun
+from vector.infrastructure.db.models.declared_domain_stats import DeclaredDomainStats
 from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
 from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
 from vector.infrastructure.db.models.graph_relationship import GraphRelationship
@@ -63,6 +68,11 @@ __all__ = [
     "ConnectorSyncState",
     "CortexAdminContinuitySnapshot",
     "CortexPass",
+    "DeclaredDomain",
+    "DeclaredDomainDirtyQueue",
+    "DeclaredDomainMembership",
+    "DeclaredDomainPassRun",
+    "DeclaredDomainStats",
     "GraphDirtyQueue",
     "GraphPassRun",
     "GraphRelationship",
