@@ -14,7 +14,10 @@ from vector.domains.cortex.graph.admin import (
     count_unlinked_scoped_entities,
     graph_stats_by_kind,
 )
-from vector.domains.cortex.graph.materialize import prepare_graph_rebuild_for_tenant
+from vector.domains.cortex.graph.materialize import (
+    prepare_graph_rebuild_for_tenant,
+    rebuild_graph_links_for_entity,
+)
 from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
 from vector.infrastructure.db.models.graph_relationship import STATUS_SUPERSEDED
 from vector.domains.cortex.graph.relationship_kinds import EXTRACTABLE_RELATIONSHIP_KINDS
@@ -175,3 +178,59 @@ def test_prepare_graph_rebuild_enqueues_scoped_entities(db_session: Session) -> 
 
     edge = db_session.scalar(select(GraphRelationship).where(GraphRelationship.tenant_id == tenant.id))
     assert edge is None or edge.status == STATUS_SUPERSEDED
+
+
+def test_rebuild_graph_links_for_entity_supersedes_and_reextracts(db_session: Session) -> None:
+    tenant, conn = _tenant(db_session)
+    now = datetime.now(UTC)
+    page = _canon_entity(
+        tenant_id=tenant.id,
+        connection_id=conn.id,
+        entity_type="document",
+        entity_key="page-1",
+        display_label="Page",
+        materialized_at=now,
+    )
+    parent = _canon_entity(
+        tenant_id=tenant.id,
+        connection_id=conn.id,
+        entity_type="document",
+        entity_key="page-parent",
+        display_label="Parent",
+        materialized_at=now,
+    )
+    db_session.add_all([page, parent])
+    db_session.flush()
+    page.parent_document_entity_id = parent.id
+    old_edge = GraphRelationship(
+        tenant_id=tenant.id,
+        relationship_kind="parent_of",
+        from_entity_id=page.id,
+        to_entity_id=parent.id,
+        confidence="certain",
+        extractor_version=1,
+        extractor_rule="canon.parent_document_entity_id",
+        evidence_kind="canon_ref",
+        evidence_ref="parent_document_entity_id",
+        observed_at=now,
+        status="active",
+        created_at=now,
+    )
+    db_session.add(old_edge)
+    db_session.flush()
+
+    out = rebuild_graph_links_for_entity(db_session, tenant_id=tenant.id, canon_entity_id=page.id)
+    assert out["status"] == "completed"
+    assert out["stats"]["edges_superseded"] == 1
+
+    active = list(
+        db_session.scalars(
+            select(GraphRelationship).where(
+                GraphRelationship.tenant_id == tenant.id,
+                GraphRelationship.status == "active",
+                GraphRelationship.from_entity_id == page.id,
+            ),
+        ).all(),
+    )
+    assert len(active) >= 1
+    assert all(e.extractor_version >= 7 for e in active)

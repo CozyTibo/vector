@@ -5051,6 +5051,18 @@ class AdminGraphEntityLinksResponse(BaseModel):
     inbound: list[dict[str, Any]]
 
 
+class AdminGraphEntityRebuildLinksResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    entity_id: uuid.UUID
+    status: str
+    reason: str | None = None
+    extractor_version: int | None = None
+    error_summary: str | None = None
+    stats: dict[str, Any] = Field(default_factory=dict)
+
+
 class AdminGraphPassRunItem(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

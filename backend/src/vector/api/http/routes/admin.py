@@ -68,6 +68,7 @@ from vector.contracts.admin import (
     AdminIdentityUnresolvedActorsResponse,
     AdminGraphEntityLinksResponse,
     AdminGraphReadinessResponse,
+    AdminGraphEntityRebuildLinksResponse,
     AdminGraphRebuildRequest,
     AdminGraphRebuildResponse,
     AdminGraphRelationshipDetailResponse,
@@ -2144,6 +2145,44 @@ def build_admin_router() -> APIRouter:
             limit=limit,
         )
         return AdminGraphEntityLinksResponse.model_validate(raw)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/graph/entities/{entity_id}/actions/rebuild-links",
+        response_model=AdminGraphEntityRebuildLinksResponse,
+    )
+    def admin_cortex_graph_entity_rebuild_links(
+        tenant_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminGraphEntityRebuildLinksResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.graph.materialize import rebuild_graph_links_for_entity
+
+        try:
+            out = rebuild_graph_links_for_entity(
+                db,
+                tenant_id=tenant_id,
+                canon_entity_id=entity_id,
+                extractor_version=settings.cortex_graph_extractor_version,
+                identity_resolver_version=settings.cortex_identity_resolver_version,
+            )
+        except ValueError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Canon entity not found.") from None
+        db.commit()
+        return AdminGraphEntityRebuildLinksResponse(
+            tenant_id=tenant_id,
+            entity_id=entity_id,
+            status=str(out.get("status") or "completed"),
+            reason=out.get("reason") if isinstance(out.get("reason"), str) else None,
+            extractor_version=(
+                int(out["extractor_version"]) if out.get("extractor_version") is not None else None
+            ),
+            error_summary=(
+                out.get("error_summary") if isinstance(out.get("error_summary"), str) else None
+            ),
+            stats=dict(out.get("stats") or {}),
+        )
 
     @r.get(
         "/tenants/{tenant_id}/cortex/graph/runs",

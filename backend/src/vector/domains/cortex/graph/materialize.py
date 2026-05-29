@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.graph.edges import EdgeDraft, UnresolvedRefDraft
@@ -449,6 +449,97 @@ def execute_graph_projection_pass_for_tenant(
         run.stats = stats
         session.flush()
         raise
+
+
+def rebuild_graph_links_for_entity(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    canon_entity_id: uuid.UUID,
+    extractor_version: int | None = None,
+    identity_resolver_version: int | None = None,
+) -> dict[str, Any]:
+    """Supersede this entity's active links and re-run graph extractors (admin single-entity)."""
+    entity = session.get(CanonEntity, canon_entity_id)
+    if entity is None or entity.tenant_id != tenant_id:
+        msg = "canon_entity_not_found"
+        raise ValueError(msg)
+
+    touch_filter = (
+        GraphRelationship.tenant_id == tenant_id,
+        GraphRelationship.status == STATUS_ACTIVE,
+        or_(
+            GraphRelationship.from_entity_id == canon_entity_id,
+            GraphRelationship.to_entity_id == canon_entity_id,
+        ),
+    )
+    edges_superseded = int(
+        session.scalar(select(func.count()).select_from(GraphRelationship).where(*touch_filter)) or 0,
+    )
+    session.execute(update(GraphRelationship).where(*touch_filter).values(status=STATUS_SUPERSEDED))
+    session.execute(
+        delete(GraphDirtyQueue).where(
+            GraphDirtyQueue.tenant_id == tenant_id,
+            GraphDirtyQueue.canon_entity_id == canon_entity_id,
+            GraphDirtyQueue.processed_at.is_(None),
+        ),
+    )
+
+    resolved_extractor = effective_graph_extractor_version(extractor_version)
+    resolved_identity = effective_identity_resolver_version(identity_resolver_version)
+    stats: dict[str, int] = {
+        "processed": 1,
+        "edges_upserted": 0,
+        "edges_unchanged": 0,
+        "edges_enriched": 0,
+        "unresolved_refs": 0,
+        "errors": 0,
+        "edges_superseded": edges_superseded,
+    }
+    if tenant_has_canon_backlog(session, tenant_id):
+        return {
+            "status": "skipped",
+            "reason": "canon_backlog",
+            "entity_id": str(canon_entity_id),
+            "stats": stats,
+        }
+    try:
+        if entity.entity_type in GRAPH_SCOPED_ENTITY_TYPES:
+            _process_entity_extract(
+                session,
+                tenant_id=tenant_id,
+                entity=entity,
+                extractor_version=resolved_extractor,
+                identity_resolver_version=resolved_identity,
+                stats=stats,
+            )
+        else:
+            _process_entity_enrich_only(
+                session,
+                tenant_id=tenant_id,
+                entity=entity,
+                resolver_version=resolved_identity,
+                stats=stats,
+            )
+    except Exception as exc:
+        stats["errors"] = 1
+        _logger.exception(
+            "graph entity link rebuild failed tenant=%s entity=%s",
+            tenant_id,
+            canon_entity_id,
+        )
+        return {
+            "status": "failed",
+            "entity_id": str(canon_entity_id),
+            "error_summary": str(exc)[:2000],
+            "stats": stats,
+        }
+    return {
+        "status": "completed",
+        "entity_id": str(canon_entity_id),
+        "extractor_version": resolved_extractor,
+        "stats": stats,
+    }
 
 
 def prepare_graph_rebuild_for_tenant(
