@@ -62,6 +62,11 @@ export default function AdminTenantCortexLayout() {
           stale={identityStale}
         />
         <CortexNavTab
+          to={`/admin/tenants/${tenantId}/cortex/declared-domains`}
+          label="Declared Domains"
+          stale={false}
+        />
+        <CortexNavTab
           to={`/admin/tenants/${tenantId}/cortex/links`}
           label="Links"
           stale={false}

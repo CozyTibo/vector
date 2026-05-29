@@ -8,6 +8,7 @@ import AdminCortexCanonEntityPage from "./admin/AdminCortexCanonEntityPage.tsx";
 import AdminCortexCanonPage from "./admin/AdminCortexCanonPage.tsx";
 import AdminCortexIdentitiesPage from "./admin/AdminCortexIdentitiesPage.tsx";
 import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
+import AdminCortexDeclaredDomainsPage from "./admin/AdminCortexDeclaredDomainsPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
@@ -86,6 +87,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="canon/entities/:entityId" element={<AdminCortexCanonEntityPage />} />
                 <Route path="identities" element={<AdminCortexIdentitiesPage />} />
                 <Route path="links" element={<AdminCortexGraphPage />} />
+                <Route path="declared-domains" element={<AdminCortexDeclaredDomainsPage />} />
                 <Route path="overview" element={<Navigate to="ingestion" replace />} />
                 <Route path="runtime" element={<Navigate to="ingestion" replace />} />
                 <Route path="queues" element={<Navigate to="ingestion" replace />} />

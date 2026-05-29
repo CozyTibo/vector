@@ -1,0 +1,316 @@
+"""Admin-facing declared domains read APIs."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from vector.domains.cortex.declared_domains.extractor_version import (
+    DECLARED_DOMAIN_EXTRACTOR_VERSION,
+    effective_declared_domain_extractor_version,
+)
+from vector.domains.cortex.declared_domains.materialize import tenant_has_graph_backlog
+from vector.domains.cortex.declared_domains.pass_run_ops import (
+    abandon_stuck_running_declared_domain_passes,
+    latest_declared_domain_pass_run,
+)
+from vector.domains.cortex.declared_domains.stats import sort_domains
+from vector.infrastructure.db.models.canon_entity import CanonEntity
+from vector.infrastructure.db.models.declared_domain import DeclaredDomain
+from vector.infrastructure.db.models.declared_domain_dirty_queue import DeclaredDomainDirtyQueue
+from vector.infrastructure.db.models.declared_domain_membership import (
+    DeclaredDomainMembership,
+    STATUS_ACTIVE,
+)
+from vector.infrastructure.db.models.declared_domain_pass_run import DeclaredDomainPassRun
+from vector.infrastructure.db.models.declared_domain_stats import DeclaredDomainStats
+
+MANUAL_DECLARED_DOMAIN_PASS_CONFIRMATION = "RUN DECLARED DOMAIN PASS"
+
+
+def prepare_declared_domain_pass_trigger(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    interval_seconds: int,
+) -> None:
+    abandon_stuck_running_declared_domain_passes(
+        session,
+        tenant_id=tenant_id,
+        interval_seconds=interval_seconds,
+    )
+
+
+def build_declared_domain_readiness(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    scheduler: dict[str, Any] | None = None,
+    batch_entity_limit: int,
+    activity_min_events: int,
+    momentum_min_baseline: int,
+) -> dict[str, Any]:
+    dirty_pending = int(
+        session.scalar(
+            select(func.count())
+            .select_from(DeclaredDomainDirtyQueue)
+            .where(
+                DeclaredDomainDirtyQueue.tenant_id == tenant_id,
+                DeclaredDomainDirtyQueue.processed_at.is_(None),
+            ),
+        )
+        or 0,
+    )
+    domain_count = int(
+        session.scalar(
+            select(func.count())
+            .select_from(DeclaredDomain)
+            .where(DeclaredDomain.tenant_id == tenant_id),
+        )
+        or 0,
+    )
+    active_memberships = int(
+        session.scalar(
+            select(func.count())
+            .select_from(DeclaredDomainMembership)
+            .where(
+                DeclaredDomainMembership.tenant_id == tenant_id,
+                DeclaredDomainMembership.status == STATUS_ACTIVE,
+            ),
+        )
+        or 0,
+    )
+    latest = latest_declared_domain_pass_run(session, tenant_id=tenant_id)
+    latest_payload: dict[str, Any] | None = None
+    if latest is not None:
+        latest_payload = {
+            "id": str(latest.id),
+            "status": latest.status,
+            "source_trigger": latest.source_trigger,
+            "started_at": latest.started_at.isoformat(),
+            "finished_at": latest.finished_at.isoformat() if latest.finished_at else None,
+            "stats": latest.stats or {},
+            "error_summary": latest.error_summary,
+        }
+    dirty_by_reason_rows = session.execute(
+        select(DeclaredDomainDirtyQueue.reason, func.count())
+        .where(
+            DeclaredDomainDirtyQueue.tenant_id == tenant_id,
+            DeclaredDomainDirtyQueue.processed_at.is_(None),
+        )
+        .group_by(DeclaredDomainDirtyQueue.reason),
+    ).all()
+    dirty_by_reason = {str(reason): int(count) for reason, count in dirty_by_reason_rows}
+    graph_behind = tenant_has_graph_backlog(session, tenant_id)
+    active_domains = int(
+        session.scalar(
+            select(func.count())
+            .select_from(DeclaredDomainStats)
+            .where(
+                DeclaredDomainStats.tenant_id == tenant_id,
+                DeclaredDomainStats.events_7d > 0,
+            ),
+        )
+        or 0,
+    )
+    return {
+        "tenant_id": str(tenant_id),
+        "extractor_version": effective_declared_domain_extractor_version(None),
+        "extractor_version_code": DECLARED_DOMAIN_EXTRACTOR_VERSION,
+        "batch_entity_limit": batch_entity_limit,
+        "activity_min_events": activity_min_events,
+        "momentum_min_baseline": momentum_min_baseline,
+        "dirty_queue_pending": dirty_pending,
+        "dirty_queue_by_reason": dirty_by_reason,
+        "declared_domain_count": domain_count,
+        "active_membership_count": active_memberships,
+        "active_domain_count": active_domains,
+        "graph_behind": graph_behind,
+        "level0_available": domain_count > 0,
+        "level1_advisory": graph_behind,
+        "latest_pass_run": latest_payload,
+        "scheduler": scheduler or {},
+    }
+
+
+def list_declared_domains(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    sort: str = "mass",
+    activity_min_events: int,
+    momentum_min_baseline: int,
+    offset: int = 0,
+    limit: int = 50,
+) -> tuple[list[dict[str, Any]], int]:
+    domains = list(
+        session.scalars(select(DeclaredDomain).where(DeclaredDomain.tenant_id == tenant_id)).all(),
+    )
+    stats_by_domain: dict[uuid.UUID, DeclaredDomainStats] = {}
+    if domains:
+        stats_rows = session.scalars(
+            select(DeclaredDomainStats).where(
+                DeclaredDomainStats.tenant_id == tenant_id,
+                DeclaredDomainStats.declared_domain_id.in_([d.id for d in domains]),
+            ),
+        ).all()
+        stats_by_domain = {row.declared_domain_id: row for row in stats_rows}
+
+    pairs = [(d, stats_by_domain.get(d.id)) for d in domains]
+    sorted_pairs = sort_domains(
+        pairs,
+        sort=sort,
+        activity_min_events=activity_min_events,
+        momentum_min_baseline=momentum_min_baseline,
+    )
+    total = len(sorted_pairs)
+    page = sorted_pairs[offset : offset + limit]
+    items: list[dict[str, Any]] = []
+    for domain, stats in page:
+        items.append(
+            {
+                "id": str(domain.id),
+                "display_name": domain.display_name,
+                "declared_container_kind": domain.declared_container_kind,
+                "seed_connector": domain.seed_connector,
+                "seed_resource_type": domain.seed_resource_type,
+                "seed_canon_entity_id": str(domain.seed_canon_entity_id),
+                "first_observed_at": domain.first_observed_at.isoformat(),
+                "last_activity_at": domain.last_activity_at.isoformat()
+                if domain.last_activity_at
+                else None,
+                "stats": _stats_payload(stats),
+            },
+        )
+    return items, total
+
+
+def get_declared_domain_detail(
+    session: Session,
+    tenant_id: uuid.UUID,
+    domain_id: uuid.UUID,
+    *,
+    membership_limit: int = 100,
+) -> dict[str, Any] | None:
+    domain = session.get(DeclaredDomain, domain_id)
+    if domain is None or domain.tenant_id != tenant_id:
+        return None
+    stats = session.get(DeclaredDomainStats, domain.id)
+    memberships = list(
+        session.scalars(
+            select(DeclaredDomainMembership)
+            .where(
+                DeclaredDomainMembership.tenant_id == tenant_id,
+                DeclaredDomainMembership.declared_domain_id == domain.id,
+                DeclaredDomainMembership.status == STATUS_ACTIVE,
+            )
+            .order_by(DeclaredDomainMembership.seed_distance.asc())
+            .limit(membership_limit),
+        ).all(),
+    )
+    member_entities: dict[uuid.UUID, CanonEntity] = {}
+    if memberships:
+        entity_ids = [m.canon_entity_id for m in memberships]
+        rows = session.scalars(
+            select(CanonEntity).where(
+                CanonEntity.tenant_id == tenant_id,
+                CanonEntity.id.in_(entity_ids),
+            ),
+        ).all()
+        member_entities = {row.id: row for row in rows}
+
+    membership_payload = []
+    for membership in memberships:
+        entity = member_entities.get(membership.canon_entity_id)
+        membership_payload.append(
+            {
+                "id": str(membership.id),
+                "canon_entity_id": str(membership.canon_entity_id),
+                "entity_type": entity.entity_type if entity else None,
+                "display_label": entity.display_label if entity else None,
+                "extractor_rule": membership.extractor_rule,
+                "expansion_level": membership.expansion_level,
+                "evidence_kind": membership.evidence_kind,
+                "evidence_ref": membership.evidence_ref,
+                "seed_distance": membership.seed_distance,
+                "observed_at": membership.observed_at.isoformat(),
+            },
+        )
+    return {
+        "id": str(domain.id),
+        "display_name": domain.display_name,
+        "declared_container_kind": domain.declared_container_kind,
+        "seed_connector": domain.seed_connector,
+        "seed_resource_type": domain.seed_resource_type,
+        "seed_canon_entity_id": str(domain.seed_canon_entity_id),
+        "stats": _stats_payload(stats),
+        "memberships": membership_payload,
+    }
+
+
+def list_declared_domain_pass_runs(
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    offset: int = 0,
+    limit: int = 50,
+) -> tuple[list[dict[str, Any]], int]:
+    total = int(
+        session.scalar(
+            select(func.count())
+            .select_from(DeclaredDomainPassRun)
+            .where(DeclaredDomainPassRun.tenant_id == tenant_id),
+        )
+        or 0,
+    )
+    rows = list(
+        session.scalars(
+            select(DeclaredDomainPassRun)
+            .where(DeclaredDomainPassRun.tenant_id == tenant_id)
+            .order_by(DeclaredDomainPassRun.started_at.desc())
+            .offset(offset)
+            .limit(limit),
+        ).all(),
+    )
+    items = [
+        {
+            "id": str(row.id),
+            "status": row.status,
+            "source_trigger": row.source_trigger,
+            "started_at": row.started_at.isoformat(),
+            "finished_at": row.finished_at.isoformat() if row.finished_at else None,
+            "stats": row.stats or {},
+            "error_summary": row.error_summary,
+        }
+        for row in rows
+    ]
+    return items, total
+
+
+def _stats_payload(stats: DeclaredDomainStats | None) -> dict[str, Any]:
+    if stats is None:
+        return {
+            "artifact_counts_json": {},
+            "participant_count": 0,
+            "events_7d": 0,
+            "events_prior_7d": 0,
+            "activity_delta_7d": 0,
+            "momentum_pct": None,
+            "mass_total": 0,
+            "expansion_level": "direct",
+            "computed_at": None,
+        }
+    return {
+        "artifact_counts_json": stats.artifact_counts_json or {},
+        "participant_count": stats.participant_count,
+        "events_7d": stats.events_7d,
+        "events_prior_7d": stats.events_prior_7d,
+        "activity_delta_7d": stats.activity_delta_7d,
+        "momentum_pct": float(stats.momentum_pct) if stats.momentum_pct is not None else None,
+        "mass_total": stats.mass_total,
+        "expansion_level": stats.expansion_level,
+        "computed_at": stats.computed_at.isoformat(),
+    }

@@ -78,6 +78,12 @@ from vector.contracts.admin import (
     AdminGraphTriggerPassRequest,
     AdminGraphTriggerPassResponse,
     AdminGraphUnresolvedListResponse,
+    AdminDeclaredDomainDetailResponse,
+    AdminDeclaredDomainListResponse,
+    AdminDeclaredDomainPassRunsResponse,
+    AdminDeclaredDomainReadinessResponse,
+    AdminDeclaredDomainTriggerPassRequest,
+    AdminDeclaredDomainTriggerPassResponse,
     AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
     AdminCortexPassActionResponse,
@@ -2314,6 +2320,162 @@ def build_admin_router() -> APIRouter:
             pass_id=str(pass_id),
             enqueued_entity_count=int(prep.get("enqueued_entity_count") or 0),
         )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/declared-domains/readiness",
+        response_model=AdminDeclaredDomainReadinessResponse,
+    )
+    def admin_cortex_declared_domains_readiness(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminDeclaredDomainReadinessResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.declared_domains.admin import build_declared_domain_readiness
+        from vector.domains.cortex.runtime.lane_scheduler_status import (
+            build_declared_domain_lane_scheduler_status,
+        )
+
+        interval = max(60, int(settings.cortex_declared_domain_scheduler_interval_seconds))
+        orch_interval = max(60, int(settings.cortex_orchestrator_interval_seconds))
+        readiness = build_declared_domain_readiness(
+            db,
+            tenant_id,
+            scheduler=build_declared_domain_lane_scheduler_status(
+                db,
+                tenant_id=tenant_id,
+                enabled=settings.cortex_declared_domain_scheduler_enabled,
+                interval_seconds=interval,
+                orchestrator_interval_seconds=orch_interval,
+            ),
+            batch_entity_limit=max(1, int(settings.cortex_declared_domain_batch_entity_limit)),
+            activity_min_events=settings.cortex_declared_domain_activity_min_events,
+            momentum_min_baseline=settings.cortex_declared_domain_momentum_min_baseline,
+        )
+        return AdminDeclaredDomainReadinessResponse.model_validate(readiness)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/declared-domains",
+        response_model=AdminDeclaredDomainListResponse,
+    )
+    def admin_cortex_declared_domains_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        sort: Annotated[str, Query()] = "mass",
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminDeclaredDomainListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.declared_domains.admin import list_declared_domains
+
+        items, total = list_declared_domains(
+            db,
+            tenant_id,
+            sort=sort,
+            activity_min_events=settings.cortex_declared_domain_activity_min_events,
+            momentum_min_baseline=settings.cortex_declared_domain_momentum_min_baseline,
+            offset=offset,
+            limit=limit,
+        )
+        return AdminDeclaredDomainListResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+            sort=sort,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/declared-domains/runs",
+        response_model=AdminDeclaredDomainPassRunsResponse,
+    )
+    def admin_cortex_declared_domain_runs(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminDeclaredDomainPassRunsResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.declared_domains.admin import list_declared_domain_pass_runs
+
+        items, total = list_declared_domain_pass_runs(
+            db,
+            tenant_id,
+            offset=offset,
+            limit=limit,
+        )
+        return AdminDeclaredDomainPassRunsResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/declared-domains/{domain_id}",
+        response_model=AdminDeclaredDomainDetailResponse,
+    )
+    def admin_cortex_declared_domain_detail(
+        tenant_id: uuid.UUID,
+        domain_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        membership_limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    ) -> AdminDeclaredDomainDetailResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.declared_domains.admin import get_declared_domain_detail
+
+        detail = get_declared_domain_detail(
+            db,
+            tenant_id,
+            domain_id,
+            membership_limit=membership_limit,
+        )
+        if detail is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="declared_domain_not_found")
+        return AdminDeclaredDomainDetailResponse.model_validate(detail)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/declared-domains/actions/trigger-pass",
+        response_model=AdminDeclaredDomainTriggerPassResponse,
+    )
+    def admin_cortex_declared_domain_trigger_pass(
+        tenant_id: uuid.UUID,
+        body: AdminDeclaredDomainTriggerPassRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminDeclaredDomainTriggerPassResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.declared_domains.admin import (
+            MANUAL_DECLARED_DOMAIN_PASS_CONFIRMATION,
+            prepare_declared_domain_pass_trigger,
+        )
+        from vector.domains.cortex.runtime.pass_types import DECLARED_DOMAIN_PASS
+        from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
+
+        if body.confirmation != MANUAL_DECLARED_DOMAIN_PASS_CONFIRMATION:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation must be exactly: {MANUAL_DECLARED_DOMAIN_PASS_CONFIRMATION}",
+            )
+        prepare_declared_domain_pass_trigger(
+            db,
+            tenant_id,
+            interval_seconds=settings.cortex_declared_domain_scheduler_interval_seconds,
+        )
+        upsert_pending_pass_v1(
+            db,
+            tenant_id=tenant_id,
+            pass_type=DECLARED_DOMAIN_PASS,
+            source_trigger="manual_admin",
+            priority=100,
+            payload_json={"drain": True},
+        )
+        db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
+        return AdminDeclaredDomainTriggerPassResponse(tenant_id=tenant_id)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/ingestion/connectors/{connector}/raw-records",

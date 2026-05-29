@@ -5121,3 +5121,68 @@ class AdminGraphUnresolvedListResponse(BaseModel):
     limit: int
 
 
+class AdminDeclaredDomainReadinessResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: str
+    extractor_version: int
+    extractor_version_code: int
+    batch_entity_limit: int = 500
+    activity_min_events: int = 3
+    momentum_min_baseline: int = 5
+    dirty_queue_pending: int
+    dirty_queue_by_reason: dict[str, int] = Field(default_factory=dict)
+    declared_domain_count: int
+    active_membership_count: int
+    active_domain_count: int
+    graph_behind: bool = False
+    level0_available: bool = False
+    level1_advisory: bool = False
+    latest_pass_run: dict[str, Any] | None = None
+    scheduler: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminDeclaredDomainListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+    sort: str
+
+
+class AdminDeclaredDomainDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    display_name: str
+    declared_container_kind: str
+    seed_connector: str
+    seed_resource_type: str
+    seed_canon_entity_id: str
+    stats: dict[str, Any]
+    memberships: list[dict[str, Any]]
+
+
+class AdminDeclaredDomainPassRunsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminDeclaredDomainTriggerPassRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str
+
+
+class AdminDeclaredDomainTriggerPassResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+
+
