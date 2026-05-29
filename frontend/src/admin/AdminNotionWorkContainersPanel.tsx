@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { AdminNotionWorkContainerRowPreviewModal } from "./AdminNotionWorkContainerRowPreviewModal";
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 
@@ -23,6 +24,7 @@ export function AdminNotionWorkContainersPanel({ tenantId }: { tenantId: string 
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [previewDatabaseId, setPreviewDatabaseId] = useState<string | null>(null);
   const listQ = useQuery({
     queryKey: ["admin-notion-work-containers", tenantId],
     queryFn: () =>
@@ -105,6 +107,18 @@ export function AdminNotionWorkContainersPanel({ tenantId }: { tenantId: string 
                 <p className="text-xs text-stone-600">
                   {item.row_count.toLocaleString()} rows
                   {item.is_declared_seed ? " · declared seed" : null}
+                  {item.row_count > 0 ? (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="text-indigo-700 underline decoration-indigo-300 hover:text-indigo-900"
+                        onClick={() => setPreviewDatabaseId(item.database_id)}
+                      >
+                        Preview rows
+                      </button>
+                    </>
+                  ) : null}
                 </p>
               </div>
             </li>
@@ -128,6 +142,14 @@ export function AdminNotionWorkContainersPanel({ tenantId }: { tenantId: string 
       >
         {saveMut.isPending ? "Saving…" : `Save pins (${selected.size})`}
       </button>
+      {previewDatabaseId ? (
+        <AdminNotionWorkContainerRowPreviewModal
+          tenantId={tenantId}
+          databaseId={previewDatabaseId}
+          open={Boolean(previewDatabaseId)}
+          onClose={() => setPreviewDatabaseId(null)}
+        />
+      ) : null}
     </div>
   );
 }

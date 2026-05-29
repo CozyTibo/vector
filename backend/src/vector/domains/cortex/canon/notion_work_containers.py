@@ -28,6 +28,8 @@ from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRec
 from vector.infrastructure.db.repositories import notion_connection as notion_repo
 
 MAX_NOTION_WORK_CONTAINER_PINS = 30
+DEFAULT_ROW_SAMPLE_LIMIT = 12
+MAX_ROW_SAMPLE_LIMIT = 25
 
 
 def notion_work_db_allowlist_for_connection(
@@ -99,6 +101,35 @@ def notion_database_title_from_payload(payload_body: dict[str, Any]) -> str | No
         return title
     name = segment.get("name")
     return name.strip() if isinstance(name, str) and name.strip() else None
+
+
+def notion_row_title_from_payload(payload_body: dict[str, Any]) -> str | None:
+    """Best-effort row title from a notion.database_row raw payload."""
+    for key in ("row", "database_row"):
+        segment = payload_body.get(key)
+        if not isinstance(segment, dict):
+            continue
+        props = segment.get("properties")
+        if not isinstance(props, dict):
+            continue
+        title_props = [
+            name
+            for name, prop in props.items()
+            if isinstance(prop, dict) and prop.get("type") == "title"
+        ]
+        for prop_name in sorted(title_props, key=str.lower):
+            prop = props[prop_name]
+            if isinstance(prop, dict):
+                text = notion_plain_text(prop.get("title"))
+                if text:
+                    return text
+        for prop_name in ("Name", "Title", "Task", "name", "title"):
+            prop = props.get(prop_name)
+            if isinstance(prop, dict):
+                text = notion_plain_text(prop.get("title")) or notion_plain_text(prop.get("rich_text"))
+                if text:
+                    return text
+    return None
 
 
 def _raw_notion_database_titles(
@@ -243,6 +274,86 @@ def list_notion_canon_databases(session: Session, *, tenant_id: uuid.UUID) -> li
         )
     out.sort(key=lambda item: (not item["is_pinned"], -item["row_count"], item["display_name"].lower()))
     return out
+
+
+def list_notion_database_row_samples(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    database_id: str,
+    limit: int = DEFAULT_ROW_SAMPLE_LIMIT,
+) -> dict[str, Any]:
+    """Recent distinct row titles for a Notion database (from raw ingestion)."""
+    link = notion_repo.get_notion_connection_for_tenant(session, tenant_id)
+    if link is None:
+        msg = "notion_not_connected"
+        raise ValueError(msg)
+    db_id = database_id.strip()
+    if not db_id:
+        msg = "database_id_required"
+        raise ValueError(msg)
+
+    resolved_limit = min(max(1, limit), MAX_ROW_SAMPLE_LIMIT)
+    row_counts = _raw_notion_database_row_counts(
+        session,
+        tenant_id=tenant_id,
+        connection_id=link.connection.id,
+    )
+    raw_titles = _raw_notion_database_titles(
+        session,
+        tenant_id=tenant_id,
+        connection_id=link.connection.id,
+    )
+    pin_labels = _pin_label_snapshots(link.detail.work_container_pins)
+    canon_entity = session.scalar(
+        select(CanonEntity).where(
+            CanonEntity.tenant_id == tenant_id,
+            CanonEntity.connector == "notion",
+            CanonEntity.entity_type == "project",
+            CanonEntity.attrs_json["external_id"].astext == db_id,
+        ),
+    )
+    display_name = _resolve_database_display_name(
+        database_id=db_id,
+        raw_title=raw_titles.get(db_id),
+        pin_label=pin_labels.get(db_id),
+        canon_label=canon_entity.display_label if canon_entity is not None else None,
+    )
+
+    raws = session.scalars(
+        select(RawIngestionRecord)
+        .where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            RawIngestionRecord.connection_id == link.connection.id,
+            RawIngestionRecord.resource_type == "notion.database_row",
+            RawIngestionRecord.replay_job_id.is_(None),
+            RawIngestionRecord.payload_body["row"]["parent"]["database_id"].astext == db_id,
+        )
+        .order_by(RawIngestionRecord.id.desc())
+        .limit(resolved_limit * 4),
+    ).all()
+
+    samples: list[dict[str, str]] = []
+    seen_titles: set[str] = set()
+    for raw in raws:
+        body = raw.payload_body if isinstance(raw.payload_body, dict) else {}
+        title = notion_row_title_from_payload(body)
+        if not title:
+            title = raw.external_id
+        norm = title.casefold()
+        if norm in seen_titles:
+            continue
+        seen_titles.add(norm)
+        samples.append({"row_id": raw.external_id, "title": title})
+        if len(samples) >= resolved_limit:
+            break
+
+    return {
+        "database_id": db_id,
+        "display_name": display_name,
+        "row_count": int(row_counts.get(db_id, 0)),
+        "samples": samples,
+    }
 
 
 def _raw_row_database_id(payload_body: dict[str, Any]) -> str | None:

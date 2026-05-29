@@ -113,3 +113,20 @@ def test_notion_database_title_from_payload() -> None:
         },
     }
     assert _raw_row_database_id(row_body) == "db-1"
+
+
+def test_notion_row_title_from_payload() -> None:
+    from vector.domains.cortex.canon.notion_work_containers import notion_row_title_from_payload
+
+    body = {
+        "row": {
+            "properties": {
+                "Name": {
+                    "type": "title",
+                    "title": [{"plain_text": "Ship checkout redesign"}],
+                },
+                "Status": {"type": "select", "select": {"name": "In progress"}},
+            },
+        },
+    }
+    assert notion_row_title_from_payload(body) == "Ship checkout redesign"

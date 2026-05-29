@@ -87,6 +87,7 @@ from vector.contracts.admin import (
     AdminDeclaredDomainRebuildRequest,
     AdminDeclaredDomainRebuildResponse,
     AdminNotionWorkContainerItem,
+    AdminNotionWorkContainerRowSamplesResponse,
     AdminNotionWorkContainersResponse,
     AdminNotionWorkContainersUpdateRequest,
     AdminNotionWorkContainersUpdateResponse,
@@ -2608,6 +2609,36 @@ def build_admin_router() -> APIRouter:
             affected_database_ids=list(out.get("affected_database_ids") or []),
             rematerialized_raw_rows=int(out.get("rematerialized_raw_rows") or 0),
             enqueued_declared_domain_entities=int(out.get("enqueued_declared_domain_entities") or 0),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/integrations/notion/work-containers/{database_id}/row-samples",
+        response_model=AdminNotionWorkContainerRowSamplesResponse,
+    )
+    def admin_notion_work_container_row_samples(
+        tenant_id: uuid.UUID,
+        database_id: str,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=25)] = 12,
+    ) -> AdminNotionWorkContainerRowSamplesResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canon.notion_work_containers import list_notion_database_row_samples
+
+        try:
+            out = list_notion_database_row_samples(
+                db,
+                tenant_id=tenant_id,
+                database_id=database_id,
+                limit=limit,
+            )
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return AdminNotionWorkContainerRowSamplesResponse(
+            tenant_id=tenant_id,
+            database_id=out["database_id"],
+            display_name=out["display_name"],
+            row_count=int(out["row_count"]),
+            samples=out["samples"],
         )
 
     @r.get(

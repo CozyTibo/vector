@@ -5225,6 +5225,23 @@ class AdminNotionWorkContainersUpdateResponse(BaseModel):
     enqueued_declared_domain_entities: int
 
 
+class AdminNotionWorkContainerRowSample(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    row_id: str
+    title: str
+
+
+class AdminNotionWorkContainerRowSamplesResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    database_id: str
+    display_name: str
+    row_count: int
+    samples: list[AdminNotionWorkContainerRowSample]
+
+
 class AdminDeclaredDomainRebuildRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
