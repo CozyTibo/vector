@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 from vector.domains.cortex.graph.edges import EdgeDraft
+from vector.domains.cortex.graph.linear_relations import relationship_kind_for_linear_relation
 from vector.domains.cortex.graph.resolve import resolve_linear_issue_id
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 
@@ -118,12 +119,13 @@ def extract_canon_ref_edges(
             right = resolve_linear_issue_id(session, tenant_id=tenant_id, issue_id=related_id)
             if right is not None:
                 rel_type = attrs.get("relation_type")
+                kind, rule = relationship_kind_for_linear_relation(rel_type)
                 edges.append(
                     EdgeDraft(
-                        relationship_kind="relates_to",
+                        relationship_kind=kind,
                         from_entity_id=left,
                         to_entity_id=right,
-                        extractor_rule="linear.issue_relation",
+                        extractor_rule=rule,
                         evidence_kind="provider_field",
                         evidence_ref="related_issue_id",
                         evidence_snapshot={

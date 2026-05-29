@@ -13,6 +13,9 @@ def test_extractable_kinds_include_cross_tool_and_thread_edges() -> None:
     assert "replies_to" in EXTRACTABLE_RELATIONSHIP_KINDS
     assert "mentions" in EXTRACTABLE_RELATIONSHIP_KINDS
     assert "authored_by" in EXTRACTABLE_RELATIONSHIP_KINDS
+    assert "blocks" in EXTRACTABLE_RELATIONSHIP_KINDS
+    assert "duplicates" in EXTRACTABLE_RELATIONSHIP_KINDS
+    assert "head_commit" in EXTRACTABLE_RELATIONSHIP_KINDS
 
 
 def test_label_for_kind_known_and_unknown() -> None:

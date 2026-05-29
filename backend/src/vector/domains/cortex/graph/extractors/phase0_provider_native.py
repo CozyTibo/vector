@@ -72,30 +72,50 @@ def extract_provider_native_edges(
     if entity.entity_type == "pull_request":
         pr = payload.get("pull_request")
         if isinstance(pr, dict):
-            merge_sha = pr.get("merge_commit_sha")
-            if isinstance(merge_sha, str) and merge_sha.strip():
+
+            def _append_pr_commit_edge(*, sha: str, kind: str, rule: str, evidence_ref: str) -> None:
                 commit_id = _resolve_commit_sha(
                     session,
                     tenant_id=tenant_id,
                     connector=entity.connector,
-                    sha=merge_sha.strip(),
+                    sha=sha,
                 )
-                if commit_id is not None:
-                    edges.append(
-                        EdgeDraft(
-                            relationship_kind="merged_as_commit",
-                            from_entity_id=entity.id,
-                            to_entity_id=commit_id,
-                            extractor_rule="github.pull_request.merge_commit_sha",
-                            evidence_kind="provider_field",
-                            evidence_ref="pull_request.merge_commit_sha",
-                            evidence_snapshot={"sha": merge_sha.strip()},
-                            source_raw_id=int(raw.id),
-                            source_canon_source_id=source.id,
-                            observed_at=observed_at,
-                            confidence="certain",
-                        ),
+                if commit_id is None:
+                    return
+                edges.append(
+                    EdgeDraft(
+                        relationship_kind=kind,
+                        from_entity_id=entity.id,
+                        to_entity_id=commit_id,
+                        extractor_rule=rule,
+                        evidence_kind="provider_field",
+                        evidence_ref=evidence_ref,
+                        evidence_snapshot={"sha": sha},
+                        source_raw_id=int(raw.id),
+                        source_canon_source_id=source.id,
+                        observed_at=observed_at,
+                        confidence="certain",
+                    ),
+                )
+
+            head = pr.get("head")
+            if isinstance(head, dict):
+                head_sha = head.get("sha")
+                if isinstance(head_sha, str) and head_sha.strip():
+                    _append_pr_commit_edge(
+                        sha=head_sha.strip(),
+                        kind="head_commit",
+                        rule="github.pull_request.head.sha",
+                        evidence_ref="pull_request.head.sha",
                     )
+            merge_sha = pr.get("merge_commit_sha")
+            if isinstance(merge_sha, str) and merge_sha.strip():
+                _append_pr_commit_edge(
+                    sha=merge_sha.strip(),
+                    kind="merged_as_commit",
+                    rule="github.pull_request.merge_commit_sha",
+                    evidence_ref="pull_request.merge_commit_sha",
+                )
 
     if entity.entity_type == "deployment":
         for key in ("deployment", "workflow_run"):
