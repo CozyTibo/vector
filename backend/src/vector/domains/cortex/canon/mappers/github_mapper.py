@@ -91,22 +91,42 @@ class _GitHubMapper:
             elif self.entity_type == "work_item":
                 attrs["number"] = segment.get("number")
                 attrs["state"] = segment.get("state")
+                creator = segment.get("user") or segment.get("creator")
+                if isinstance(creator, dict):
+                    draft.author_ref = _gh_user_ref(connector, creator)
                 assignee = segment.get("assignee")
                 if isinstance(assignee, dict):
                     draft.assignee_ref = _gh_user_ref(connector, assignee)
+                repo = segment.get("repository")
+                if isinstance(repo, dict):
+                    fn = repo.get("full_name")
+                    if isinstance(fn, str) and fn.strip():
+                        draft.repository_ref = derive_source_identity_key(
+                            connector=connector,
+                            resource_type="github.repository",
+                            external_id=fn.strip(),
+                        )
             elif self.entity_type == "commit":
                 attrs["sha"] = segment.get("sha")
             elif self.entity_type == "message":
                 user = segment.get("user")
                 if isinstance(user, dict):
                     draft.author_ref = _gh_user_ref(connector, user)
-                if resource_type in ("github.issue_comment", "github.pull_request_review_comment"):
+                if resource_type in (
+                    "github.issue_comment",
+                    "github.pull_request_review_comment",
+                    "github.pull_request_review",
+                ):
+                    pr_ext = external_id
+                    for marker in ("issue_comment", "review_comment", "review"):
+                        token = f":{marker}:"
+                        if token in external_id:
+                            pr_ext = external_id.split(token)[0]
+                            break
                     draft.work_item_ref = derive_source_identity_key(
                         connector=connector,
-                        resource_type="github.pull_request"
-                        if "pull_request" in resource_type
-                        else "github.issue",
-                        external_id=external_id.rsplit(":", 1)[0][:512],
+                        resource_type="github.pull_request",
+                        external_id=pr_ext[:512],
                     )
             elif self.entity_type == "actor":
                 attrs["login"] = segment.get("login")

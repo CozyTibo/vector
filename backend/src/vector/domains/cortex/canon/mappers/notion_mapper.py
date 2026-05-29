@@ -10,6 +10,23 @@ from vector.domains.cortex.canon.mappers._common import entity_key_for, label_fr
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
 
 
+def _notion_user_ref(connector: str, value: object) -> str | None:
+    uid: str | None = None
+    if isinstance(value, dict):
+        raw = value.get("id")
+        if isinstance(raw, str) and raw.strip():
+            uid = raw.strip()
+    elif isinstance(value, str) and value.strip():
+        uid = value.strip()
+    if not uid:
+        return None
+    return derive_source_identity_key(
+        connector=connector,
+        resource_type="notion.user",
+        external_id=uid,
+    )
+
+
 class _NotionMapper:
     resource_type: str
     entity_type: str
@@ -63,6 +80,12 @@ class _NotionMapper:
         )
         if isinstance(segment, dict):
             attrs["notion_id"] = segment.get("id")
+            created_by = segment.get("created_by")
+            if created_by is None and isinstance(segment.get("created_by_id"), str):
+                created_by = segment.get("created_by_id")
+            author_ref = _notion_user_ref(connector, created_by)
+            if author_ref is not None and self.entity_type == "document":
+                draft.author_ref = author_ref
             parent = segment.get("parent")
             if isinstance(parent, dict):
                 pid = parent.get("page_id") or parent.get("database_id") or parent.get("block_id")

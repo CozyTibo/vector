@@ -378,7 +378,7 @@ class Settings(BaseSettings):
         description="Graph projection Beat cadence (seconds). Default 300.",
     )
     cortex_graph_batch_entity_limit: int = Field(
-        default=500,
+        default=1500,
         ge=1,
         le=5000,
         validation_alias="CORTEX_GRAPH_BATCH_ENTITY_LIMIT",

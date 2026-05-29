@@ -10,6 +10,20 @@ from vector.domains.cortex.canon.mappers._common import entity_key_for, label_fr
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
 
 
+def _slack_message_segment(
+    payload_body: dict[str, Any],
+    resource_type: str,
+) -> dict[str, Any] | None:
+    if resource_type == "slack.message_reply":
+        reply = payload_body.get("reply")
+        return reply if isinstance(reply, dict) else None
+    for key in ("message", "reply"):
+        segment = payload_body.get(key)
+        if isinstance(segment, dict):
+            return segment
+    return None
+
+
 class _SlackMapper:
     resource_type: str
     entity_type: str
@@ -50,7 +64,12 @@ class _SlackMapper:
             resource_type=resource_type,
             external_id=external_id,
         )
-        label = label_from_payload(payload_body, self.payload_key, "channel", "message")
+        label_keys = ("message", "reply", "channel") if self.resource_type == "slack.message_reply" else (
+            self.payload_key,
+            "channel",
+            "message",
+        )
+        label = label_from_payload(payload_body, *label_keys)
         attrs: dict[str, Any] = {"external_id": external_id}
         draft = CanonEntityDraft(
             entity_type=self.entity_type,
@@ -65,7 +84,10 @@ class _SlackMapper:
             if isinstance(segment, dict):
                 attrs["slack_user_id"] = segment.get("id")
         elif self.entity_type == "message":
-            msg = payload_body.get("message")
+            msg = _slack_message_segment(payload_body, resource_type)
+            cid = payload_body.get("channel_id")
+            if not isinstance(cid, str):
+                cid = None
             if isinstance(msg, dict):
                 uid = msg.get("user")
                 if isinstance(uid, str):
@@ -74,20 +96,39 @@ class _SlackMapper:
                         resource_type="slack.user",
                         external_id=uid,
                     )
-                cid = payload_body.get("channel_id")
-                if isinstance(cid, str):
-                    draft.conversation_ref = derive_source_identity_key(
-                        connector=connector,
-                        resource_type="slack.conversation",
-                        external_id=cid,
-                    )
                 thread_ts = msg.get("thread_ts")
+                if resource_type == "slack.message_reply":
+                    body_thread_ts = payload_body.get("thread_ts")
+                    if isinstance(body_thread_ts, str) and body_thread_ts.strip():
+                        thread_ts = body_thread_ts.strip()
                 ts = msg.get("ts")
-                if isinstance(thread_ts, str) and isinstance(ts, str) and thread_ts != ts:
+                in_thread = (
+                    isinstance(thread_ts, str)
+                    and thread_ts.strip()
+                    and cid is not None
+                    and (
+                        resource_type == "slack.message_reply"
+                        or (isinstance(ts, str) and thread_ts != ts)
+                    )
+                )
+                if cid is not None:
+                    if in_thread:
+                        draft.conversation_ref = derive_source_identity_key(
+                            connector=connector,
+                            resource_type="slack.thread",
+                            external_id=f"{cid}:{thread_ts.strip()}",
+                        )
+                    else:
+                        draft.conversation_ref = derive_source_identity_key(
+                            connector=connector,
+                            resource_type="slack.conversation",
+                            external_id=cid,
+                        )
+                if in_thread:
                     draft.parent_message_ref = derive_source_identity_key(
                         connector=connector,
                         resource_type="slack.message",
-                        external_id=f"{cid}:{thread_ts}" if isinstance(cid, str) else f"x:{thread_ts}",
+                        external_id=f"{cid}:{thread_ts.strip()}",
                     )
         elif self.entity_type == "conversation":
             if resource_type == "slack.thread":

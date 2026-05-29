@@ -19,6 +19,8 @@ from vector.domains.cortex.graph.extractors import (
     extract_provider_native_edges,
     extract_text_references,
 )
+from vector.domains.cortex.graph.extractors.connector_native import extract_connector_native_edges
+from vector.domains.cortex.graph.extractors.slack_thread import extract_slack_thread_reply_edges
 from vector.domains.cortex.identity.resolver_version import effective_identity_resolver_version
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.canon_dirty_queue import CanonDirtyQueue
@@ -215,6 +217,8 @@ def _extract_edges_for_entity(
     entity: CanonEntity,
 ) -> tuple[list[EdgeDraft], list[UnresolvedRefDraft]]:
     drafts = extract_canon_ref_edges(session, tenant_id=tenant_id, entity=entity)
+    drafts.extend(extract_slack_thread_reply_edges(session, tenant_id=tenant_id, entity=entity))
+    drafts.extend(extract_connector_native_edges(session, tenant_id=tenant_id, entity=entity))
     drafts.extend(extract_provider_native_edges(session, tenant_id=tenant_id, entity=entity))
     text_out = extract_text_references(session, tenant_id=tenant_id, entity=entity)
     drafts.extend(text_out.edges)

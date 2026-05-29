@@ -93,6 +93,9 @@ class _LinearMapper:
                 attrs["state"] = state.get("name")
             elif state is not None:
                 attrs["state"] = state
+            creator = segment.get("creator")
+            if isinstance(creator, dict):
+                draft.author_ref = _linear_user_ref(connector, creator)
             assignee = segment.get("assignee")
             if isinstance(assignee, dict):
                 draft.assignee_ref = _linear_user_ref(connector, assignee)

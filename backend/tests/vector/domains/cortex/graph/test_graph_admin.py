@@ -116,6 +116,7 @@ def test_count_unlinked_scoped_entities_excludes_linked_endpoints(db_session: Se
             evidence_ref="author_entity_id",
             observed_at=now,
             status="active",
+            created_at=now,
         ),
     )
     db_session.flush()
@@ -134,5 +135,9 @@ def test_graph_stats_by_kind_includes_zero_extractable_kinds(db_session: Session
     assert kinds == list(EXTRACTABLE_RELATIONSHIP_KINDS)
     authored = next(row for row in stats if row["relationship_kind"] == "authored_by")
     assigned = next(row for row in stats if row["relationship_kind"] == "assigned_to")
+    replies = next(row for row in stats if row["relationship_kind"] == "replies_to")
+    references = next(row for row in stats if row["relationship_kind"] == "references")
     assert authored["count"] == 0
     assert assigned["count"] == 0
+    assert replies["count"] == 0
+    assert references["count"] == 0

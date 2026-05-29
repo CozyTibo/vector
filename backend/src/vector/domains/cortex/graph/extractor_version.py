@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-GRAPH_EXTRACTOR_VERSION = 3
+GRAPH_EXTRACTOR_VERSION = 7
 
 
 def effective_graph_extractor_version(override: int | None = None) -> int:
