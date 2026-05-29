@@ -18,6 +18,7 @@ _LANE_KEYS: Final[dict[str, str]] = {
     "canon": "vector:cortex_canon:scheduler_paused",
     "identity": "vector:cortex_identity:scheduler_paused",
     "graph": "vector:cortex_graph:scheduler_paused",
+    "declared_domains": "vector:cortex_declared_domains:scheduler_paused",
     "orchestrator": "vector:cortex_orchestrator:paused",
 }
 

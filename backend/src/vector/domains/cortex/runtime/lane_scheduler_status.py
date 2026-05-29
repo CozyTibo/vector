@@ -15,6 +15,7 @@ from vector.domains.cortex.runtime.lane_scheduler_tick import latest_lane_schedu
 from vector.domains.cortex.runtime.pass_types import (
     ACTIVE_STATUSES,
     CANON_PASS,
+    DECLARED_DOMAIN_PASS,
     GRAPH_PROJECTION_PASS,
     IDENTITY_PASS,
 )
@@ -25,6 +26,8 @@ from vector.infrastructure.db.models.cortex_pass import CortexPass
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
 from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
 from vector.infrastructure.db.models.graph_scheduler_tick import GraphSchedulerTick
+from vector.infrastructure.db.models.declared_domain_dirty_queue import DeclaredDomainDirtyQueue
+from vector.infrastructure.db.models.declared_domain_pass_run import DeclaredDomainPassRun
 from vector.infrastructure.db.models.identity_scheduler_tick import IdentitySchedulerTick
 from vector.infrastructure.db.models.orchestrator_run import OrchestratorRun
 
@@ -271,4 +274,60 @@ def build_identity_lane_scheduler_status(
         "last_tick": _tick_payload(last_tick),
         "last_orchestrator_run": _orchestrator_last_run_payload(session),
         "lane_stale": stale,
+    }
+
+
+def _tenant_declared_domain_has_backlog(session: Session, tenant_id: uuid.UUID) -> bool:
+    dirty = int(
+        session.scalar(
+            select(func.count())
+            .select_from(DeclaredDomainDirtyQueue)
+            .where(
+                DeclaredDomainDirtyQueue.tenant_id == tenant_id,
+                DeclaredDomainDirtyQueue.processed_at.is_(None),
+            ),
+        )
+        or 0,
+    )
+    return dirty > 0
+
+
+def build_declared_domain_lane_scheduler_status(
+    session: Session,
+    *,
+    tenant_id: Any,
+    enabled: bool,
+    interval_seconds: int,
+    orchestrator_interval_seconds: int,
+) -> dict[str, Any]:
+    from vector.domains.cortex.declared_domains.scheduler_dedup import (
+        should_skip_scheduled_declared_domain_pass,
+    )
+
+    tid = tenant_id if isinstance(tenant_id, uuid.UUID) else uuid.UUID(str(tenant_id))
+    needs_work = _tenant_declared_domain_has_backlog(session, tid)
+    stale = _compute_lane_stale(
+        session,
+        enabled=enabled,
+        tenant_id=tid,
+        pass_run_model=DeclaredDomainPassRun,
+        pass_type=DECLARED_DOMAIN_PASS,
+        lane_interval_seconds=interval_seconds,
+        orchestrator_interval_seconds=orchestrator_interval_seconds,
+        tenant_needs_work=needs_work,
+    )
+    return {
+        "runtime_model": "orchestrator",
+        "enabled": enabled,
+        "interval_seconds": interval_seconds,
+        "orchestrator_interval_seconds": orchestrator_interval_seconds,
+        "tenant_needs_work": needs_work,
+        "last_tick": None,
+        "last_orchestrator_run": _orchestrator_last_run_payload(session),
+        "lane_stale": stale,
+        "scheduled_skip": should_skip_scheduled_declared_domain_pass(
+            session,
+            tenant_id=tid,
+            interval_seconds=interval_seconds,
+        ),
     }

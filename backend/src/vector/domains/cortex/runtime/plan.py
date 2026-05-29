@@ -12,10 +12,15 @@ from vector.domains.cortex.canon.scheduler import iter_tenants_with_live_raw
 from vector.domains.cortex.canon.scheduler_dedup import should_skip_scheduled_canon_pass
 from vector.domains.cortex.graph.scheduler import iter_tenants_with_graph_backlog
 from vector.domains.cortex.graph.scheduler_dedup import should_skip_scheduled_graph_pass
+from vector.domains.cortex.declared_domains.scheduler import iter_tenants_with_declared_domain_backlog
+from vector.domains.cortex.declared_domains.scheduler_dedup import (
+    should_skip_scheduled_declared_domain_pass,
+)
 from vector.domains.cortex.identity.scheduler import iter_tenants_with_actor_entities
 from vector.domains.cortex.identity.scheduler_dedup import should_skip_scheduled_identity_pass
 from vector.domains.cortex.runtime.pass_types import (
     CANON_PASS,
+    DECLARED_DOMAIN_PASS,
     GRAPH_PROJECTION_PASS,
     IDENTITY_PASS,
 )
@@ -67,6 +72,8 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
             "identity_skipped": 0,
             "graph_planned": 0,
             "graph_skipped": 0,
+            "declared_domain_planned": 0,
+            "declared_domain_skipped": 0,
             "skipped_reason": "orchestrator_paused",
         }
     canon_planned = 0
@@ -75,9 +82,15 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
     identity_skipped = 0
     graph_planned = 0
     graph_skipped = 0
+    declared_domain_planned = 0
+    declared_domain_skipped = 0
     canon_interval = max(60, int(settings.cortex_canon_scheduler_interval_seconds))
     identity_interval = max(60, int(settings.cortex_identity_scheduler_interval_seconds))
     graph_interval = max(60, int(settings.cortex_graph_scheduler_interval_seconds))
+    declared_domain_interval = max(
+        60,
+        int(settings.cortex_declared_domain_scheduler_interval_seconds),
+    )
 
     if settings.cortex_canon_scheduler_enabled and not read_lane_paused_flag(settings, "canon"):
         for tid in iter_tenants_with_live_raw(session, settings):
@@ -132,6 +145,26 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
             )
             graph_planned += 1
 
+    if settings.cortex_declared_domain_scheduler_enabled and not read_lane_paused_flag(
+        settings,
+        "declared_domains",
+    ):
+        for tid in iter_tenants_with_declared_domain_backlog(session):
+            if should_skip_scheduled_declared_domain_pass(
+                session,
+                tenant_id=tid,
+                interval_seconds=declared_domain_interval,
+            ):
+                declared_domain_skipped += 1
+                continue
+            upsert_pending_pass_v1(
+                session,
+                tenant_id=tid,
+                pass_type=DECLARED_DOMAIN_PASS,
+                source_trigger="scheduled",
+            )
+            declared_domain_planned += 1
+
     return {
         "canon_planned": canon_planned,
         "canon_skipped": canon_skipped,
@@ -139,4 +172,6 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
         "identity_skipped": identity_skipped,
         "graph_planned": graph_planned,
         "graph_skipped": graph_skipped,
+        "declared_domain_planned": declared_domain_planned,
+        "declared_domain_skipped": declared_domain_skipped,
     }

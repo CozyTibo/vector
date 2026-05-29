@@ -18,6 +18,7 @@ from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.domains.cortex.runtime.claim import extend_pass_lease_v1
 from vector.domains.cortex.runtime.pass_types import (
     CANON_PASS,
+    DECLARED_DOMAIN_PASS,
     GRAPH_PROJECTION_PASS,
     IDENTITY_PASS,
     STATUS_COMPLETED,
@@ -67,6 +68,32 @@ def _run_graph_pass(session: Session, settings: Settings, row: CortexPass) -> di
     )
 
 
+def _run_declared_domain_pass(session: Session, settings: Settings, row: CortexPass) -> dict[str, Any]:
+    from vector.domains.cortex.declared_domains.extractor_version import (
+        effective_declared_domain_extractor_version,
+    )
+    from vector.domains.cortex.declared_domains.materialize import (
+        execute_declared_domain_pass_for_tenant,
+    )
+
+    batch = settings.cortex_declared_domain_batch_entity_limit
+    payload = row.payload_json if isinstance(row.payload_json, dict) else {}
+    drain = bool(payload.get("drain"))
+    return execute_declared_domain_pass_for_tenant(
+        session,
+        tenant_id=row.tenant_id,
+        source_trigger=row.source_trigger,
+        batch_limit=batch,
+        max_attempts=settings.cortex_declared_domain_max_attempts,
+        extractor_version=effective_declared_domain_extractor_version(
+            settings.cortex_declared_domain_extractor_version,
+        ),
+        drain=drain if drain else None,
+        expansion_max_depth=settings.cortex_declared_domain_expansion_max_depth,
+        momentum_min_baseline=settings.cortex_declared_domain_momentum_min_baseline,
+    )
+
+
 def _run_identity_pass(session: Session, settings: Settings, row: CortexPass) -> dict[str, Any]:
     batch = settings.cortex_identity_batch_actor_limit
     resolver_version = effective_identity_resolver_version(settings.cortex_identity_resolver_version)
@@ -98,6 +125,8 @@ def execute_claimed_pass_v1(
         stats = _run_identity_pass(session, settings, row)
     elif row.pass_type == GRAPH_PROJECTION_PASS:
         stats = _run_graph_pass(session, settings, row)
+    elif row.pass_type == DECLARED_DOMAIN_PASS:
+        stats = _run_declared_domain_pass(session, settings, row)
     else:
         msg = f"unsupported_pass_type:{row.pass_type}"
         raise ValueError(msg)
