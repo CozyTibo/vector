@@ -426,6 +426,23 @@ def execute_graph_projection_pass_for_tenant(
                         )
                     item.processed_at = utc_now()
                     item.last_error = None
+                    try:
+                        from vector.domains.cortex.declared_domains.enqueue import (
+                            REASON_GRAPH_UPDATED,
+                            enqueue_declared_domain_entity,
+                        )
+
+                        enqueue_declared_domain_entity(
+                            session,
+                            tenant_id=tenant_id,
+                            canon_entity_id=entity.id,
+                            reason=REASON_GRAPH_UPDATED,
+                        )
+                    except Exception:
+                        _logger.exception(
+                            "declared domain enqueue failed after graph entity tenant=%s",
+                            tenant_id,
+                        )
                 except Exception as exc:
                     stats["errors"] += 1
                     item.attempts += 1
