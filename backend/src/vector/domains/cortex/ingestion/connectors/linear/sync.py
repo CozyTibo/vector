@@ -117,6 +117,7 @@ query LinearIngestIssues($first: Int!, $after: String) {
       team { id name key }
       subscriberIds
       project { id name }
+      initiative { id name }
       cycle { id name }
       labels { nodes { id name color } }
       attachments { nodes { id title url } }
@@ -190,6 +191,7 @@ query LinearIngestProjectUpdates($first: Int!, $after: String) {
       updatedAt
       url
       project { id name }
+      initiative { id name }
     }
     pageInfo { hasNextPage endCursor }
   }

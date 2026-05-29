@@ -124,6 +124,13 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
     if result.draft is None:
         return {"outcome": "skipped_mapper", "reason": result.skip_reason}
     draft = result.draft
+    from vector.domains.cortex.canon.declared_container_registry import apply_declared_container_attrs
+
+    apply_declared_container_attrs(
+        resource_type=row.resource_type,
+        attrs_json=draft.attrs_json,
+        external_id=row.external_id,
+    )
     now = utc_now()
     entity = session.scalar(
         select(CanonEntity).where(
@@ -181,6 +188,32 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
         )
     except Exception:
         _logger.exception("graph enqueue failed during canon materialization")
+    try:
+        from vector.domains.cortex.canon.declared_container_registry import (
+            declared_container_kind_for_resource_type,
+        )
+        from vector.domains.cortex.declared_domains.enqueue import (
+            REASON_MEMBER_MATERIALIZED,
+            REASON_SEED_MATERIALIZED,
+            enqueue_declared_domain_entity,
+        )
+
+        if declared_container_kind_for_resource_type(row.resource_type):
+            enqueue_declared_domain_entity(
+                session,
+                tenant_id=row.tenant_id,
+                canon_entity_id=entity.id,
+                reason=REASON_SEED_MATERIALIZED,
+            )
+        elif draft.entity_type == "work_item":
+            enqueue_declared_domain_entity(
+                session,
+                tenant_id=row.tenant_id,
+                canon_entity_id=entity.id,
+                reason=REASON_MEMBER_MATERIALIZED,
+            )
+    except Exception:
+        _logger.exception("declared domain enqueue failed during canon materialization")
 
     observed = datetime.fromisoformat(result.source.observed_at_iso.replace("Z", "+00:00"))
     session.execute(

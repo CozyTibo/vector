@@ -111,6 +111,9 @@ class _LinearMapper:
             project = segment.get("project")
             if isinstance(project, dict) and isinstance(project.get("id"), str):
                 attrs["project_id"] = project["id"]
+            initiative = segment.get("initiative")
+            if isinstance(initiative, dict) and isinstance(initiative.get("id"), str):
+                attrs["initiative_id"] = initiative["id"]
             labels = segment.get("labels")
             label_nodes = labels.get("nodes") if isinstance(labels, dict) else None
             if isinstance(label_nodes, list):
