@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vector.infrastructure.db.base import Base
@@ -32,5 +32,6 @@ class NotionConnectionDetail(Base):
     owner_user_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     bot_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    work_container_pins: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
 
     connection: Mapped[TenantConnection] = relationship("TenantConnection")

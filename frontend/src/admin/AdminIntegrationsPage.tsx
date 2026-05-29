@@ -5,6 +5,7 @@ import { useParams } from "react-router-dom";
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 import AdminSlackChannelsModal from "./AdminSlackChannelsModal";
+import { AdminNotionWorkContainersPanel } from "./AdminNotionWorkContainersPanel";
 import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 import { StatusBadge } from "./ui/StatusBadge";
 
@@ -264,6 +265,9 @@ export default function AdminIntegrationsPage() {
                           </button>
                         </>
                       )}
+                      {provider === "notion" && c.status === "active" ? (
+                        <AdminNotionWorkContainersPanel tenantId={tenantId} />
+                      ) : null}
                       <button
                         type="button"
                         className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-50"

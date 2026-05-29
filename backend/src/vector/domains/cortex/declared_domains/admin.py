@@ -27,8 +27,47 @@ from vector.infrastructure.db.models.declared_domain_membership import (
 )
 from vector.infrastructure.db.models.declared_domain_pass_run import DeclaredDomainPassRun
 from vector.infrastructure.db.models.declared_domain_stats import DeclaredDomainStats
+from vector.infrastructure.db.models.tenant_connection import TenantConnection
+from vector.infrastructure.db.repositories import notion_connection as notion_repo
 
 MANUAL_DECLARED_DOMAIN_PASS_CONFIRMATION = "RUN DECLARED DOMAIN PASS"
+
+
+def _tenant_has_active_connection(session: Session, tenant_id: uuid.UUID, provider: str) -> bool:
+    found = session.scalar(
+        select(TenantConnection.id)
+        .where(
+            TenantConnection.tenant_id == tenant_id,
+            TenantConnection.provider == provider,
+            TenantConnection.status == "active",
+        )
+        .limit(1),
+    )
+    return found is not None
+
+
+def _empty_state_hint(
+    *,
+    domain_count: int,
+    notion_connected: bool,
+    linear_connected: bool,
+    work_container_pin_count: int,
+) -> str | None:
+    if domain_count > 0:
+        return None
+    if notion_connected and not linear_connected and work_container_pin_count == 0:
+        return (
+            "No declared work containers yet. Pin one or more Notion databases as work "
+            "containers in Integrations → Notion, then run a declared domain pass."
+        )
+    if linear_connected:
+        return (
+            "No declared domains yet. Ensure Linear initiatives or projects are materialized "
+            "in Canon, then run a declared domain pass."
+        )
+    if notion_connected and work_container_pin_count > 0:
+        return "Work databases are pinned. Run a declared domain pass to materialize domains."
+    return "No declared work containers in canon. Connect Linear or pin Notion work databases."
 
 
 def prepare_declared_domain_pass_trigger(
@@ -105,6 +144,22 @@ def build_declared_domain_readiness(
     ).all()
     dirty_by_reason = {str(reason): int(count) for reason, count in dirty_by_reason_rows}
     graph_behind = tenant_has_graph_backlog(session, tenant_id)
+    notion_connected = _tenant_has_active_connection(session, tenant_id, "notion")
+    linear_connected = _tenant_has_active_connection(session, tenant_id, "linear")
+    notion_link = notion_repo.get_notion_connection_for_tenant(session, tenant_id)
+    from vector.domains.cortex.canon.notion_work_containers import pinned_database_ids
+
+    work_container_pin_count = (
+        len(pinned_database_ids(notion_link.detail.work_container_pins))
+        if notion_link is not None
+        else 0
+    )
+    empty_state_hint = _empty_state_hint(
+        domain_count=domain_count,
+        notion_connected=notion_connected,
+        linear_connected=linear_connected,
+        work_container_pin_count=work_container_pin_count,
+    )
     active_domains = int(
         session.scalar(
             select(func.count())
@@ -131,6 +186,10 @@ def build_declared_domain_readiness(
         "graph_behind": graph_behind,
         "level0_available": domain_count > 0,
         "level1_advisory": graph_behind,
+        "notion_connected": notion_connected,
+        "linear_connected": linear_connected,
+        "work_container_pin_count": work_container_pin_count,
+        "empty_state_hint": empty_state_hint,
         "latest_pass_run": latest_payload,
         "scheduler": scheduler or {},
     }

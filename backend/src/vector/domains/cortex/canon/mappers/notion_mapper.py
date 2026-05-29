@@ -99,6 +99,7 @@ class _NotionMapper:
                     parent_rt = "notion.page"
                     if parent.get("type") == "database_id":
                         parent_rt = "notion.database"
+                        attrs["database_id"] = pid
                     elif parent.get("type") == "block_id":
                         parent_rt = "notion.block"
                     draft.parent_document_ref = derive_source_identity_key(
@@ -106,7 +107,11 @@ class _NotionMapper:
                         resource_type=parent_rt,
                         external_id=pid,
                     )
-            if self.entity_type == "actor":
+            if self.entity_type == "document" and self.resource_type == "notion.database_row":
+                direct_db = segment.get("database_id")
+                if isinstance(direct_db, str) and direct_db.strip():
+                    attrs["database_id"] = direct_db.strip()
+            elif self.entity_type == "actor":
                 name = segment.get("name")
                 if isinstance(name, list):
                     attrs["name"] = " ".join(str(x) for x in name)

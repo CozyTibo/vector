@@ -5138,6 +5138,10 @@ class AdminDeclaredDomainReadinessResponse(BaseModel):
     graph_behind: bool = False
     level0_available: bool = False
     level1_advisory: bool = False
+    notion_connected: bool = False
+    linear_connected: bool = False
+    work_container_pin_count: int = 0
+    empty_state_hint: str | None = None
     latest_pass_run: dict[str, Any] | None = None
     scheduler: dict[str, Any] = Field(default_factory=dict)
 
@@ -5184,5 +5188,55 @@ class AdminDeclaredDomainTriggerPassResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     tenant_id: uuid.UUID
+
+
+class AdminNotionWorkContainerItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    canon_entity_id: str
+    database_id: str
+    display_name: str
+    row_count: int
+    is_pinned: bool
+    is_declared_seed: bool
+
+
+class AdminNotionWorkContainersResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    max_pins: int
+    items: list[AdminNotionWorkContainerItem]
+
+
+class AdminNotionWorkContainersUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    database_ids: list[str] = Field(default_factory=list)
+
+
+class AdminNotionWorkContainersUpdateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    pinned_count: int
+    affected_database_ids: list[str]
+    rematerialized_raw_rows: int
+    enqueued_declared_domain_entities: int
+
+
+class AdminDeclaredDomainRebuildRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str
+
+
+class AdminDeclaredDomainRebuildResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    seeds_enqueued: int
+    members_enqueued: int
+    pass_id: str | None = None
 
 

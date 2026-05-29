@@ -26,9 +26,17 @@ function StateTab({ tenantId }: { tenantId: string }) {
         <li>
           {data.declared_domain_count} declared domains · {data.active_membership_count} active
           memberships · {data.dirty_queue_pending} dirty queue
+          {data.work_container_pin_count > 0
+            ? ` · ${data.work_container_pin_count} Notion work DB pins`
+            : null}
         </li>
+        {data.empty_state_hint ? (
+          <li className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+            {data.empty_state_hint}
+          </li>
+        ) : null}
         <li>
-          Level 0 always available when Linear initiatives/projects are materialized.
+          Level 0 uses declared seeds (Linear initiative/project or pinned Notion databases).
           {data.level1_advisory
             ? " Graph lane is behind — cross-tool expansion may be incomplete."
             : " Graph expansion is current."}
@@ -46,7 +54,44 @@ function StateTab({ tenantId }: { tenantId: string }) {
         )}
       </ul>
       <TriggerPassPanel tenantId={tenantId} />
+      <RebuildPanel tenantId={tenantId} />
     </div>
+  );
+}
+
+function RebuildPanel({ tenantId }: { tenantId: string }) {
+  return (
+    <form
+      className="mt-4 space-y-2 rounded border border-stone-200 bg-stone-50 p-4"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const confirmation = (form.elements.namedItem("rebuild_confirmation") as HTMLInputElement).value;
+        await adminFetch(`/admin/tenants/${tenantId}/cortex/declared-domains/actions/rebuild`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmation }),
+        });
+        window.location.reload();
+      }}
+    >
+      <p className="text-sm font-medium text-stone-900">Rebuild declared domains</p>
+      <p className="text-xs text-stone-600">
+        Type <code className="rounded bg-white px-1">REBUILD DECLARED DOMAINS</code> to clear projection
+        tables and replay from canon seeds.
+      </p>
+      <input
+        name="rebuild_confirmation"
+        className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+        placeholder="REBUILD DECLARED DOMAINS"
+      />
+      <button
+        type="submit"
+        className="rounded border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-stone-50"
+      >
+        Rebuild
+      </button>
+    </form>
   );
 }
 
@@ -260,8 +305,8 @@ export default function AdminCortexDeclaredDomainsPage() {
       <header className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold text-stone-900">Declared Domains</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Trusted execution containers (Linear initiatives and projects) with deterministic
-          membership and momentum.
+          Trusted execution containers (Linear initiatives/projects and pinned Notion databases) with
+          deterministic membership and momentum.
         </p>
         {data ? (
           <p className="mt-2 text-xs text-stone-500">

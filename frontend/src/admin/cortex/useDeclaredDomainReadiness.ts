@@ -11,6 +11,10 @@ export type DeclaredDomainReadiness = {
   dirty_queue_pending: number;
   graph_behind: boolean;
   level1_advisory: boolean;
+  notion_connected: boolean;
+  linear_connected: boolean;
+  work_container_pin_count: number;
+  empty_state_hint: string | null;
   batch_entity_limit: number;
   latest_pass_run: {
     id: string;

@@ -84,6 +84,12 @@ from vector.contracts.admin import (
     AdminDeclaredDomainReadinessResponse,
     AdminDeclaredDomainTriggerPassRequest,
     AdminDeclaredDomainTriggerPassResponse,
+    AdminDeclaredDomainRebuildRequest,
+    AdminDeclaredDomainRebuildResponse,
+    AdminNotionWorkContainerItem,
+    AdminNotionWorkContainersResponse,
+    AdminNotionWorkContainersUpdateRequest,
+    AdminNotionWorkContainersUpdateResponse,
     AdminCanonRegistryResponse,
     AdminCanonRecentPassRunsResponse,
     AdminCortexPassActionResponse,
@@ -2476,6 +2482,133 @@ def build_admin_router() -> APIRouter:
 
         poll_cortex_passes_task.delay()
         return AdminDeclaredDomainTriggerPassResponse(tenant_id=tenant_id)
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/declared-domains/actions/rebuild",
+        response_model=AdminDeclaredDomainRebuildResponse,
+    )
+    def admin_cortex_declared_domain_rebuild(
+        tenant_id: uuid.UUID,
+        body: AdminDeclaredDomainRebuildRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminDeclaredDomainRebuildResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.declared_domains.admin import prepare_declared_domain_pass_trigger
+        from vector.domains.cortex.declared_domains.materialize import (
+            MANUAL_DECLARED_DOMAIN_REBUILD_CONFIRMATION,
+            prepare_declared_domain_rebuild_for_tenant,
+        )
+        from vector.domains.cortex.runtime.pass_types import DECLARED_DOMAIN_PASS
+        from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
+
+        if body.confirmation != MANUAL_DECLARED_DOMAIN_REBUILD_CONFIRMATION:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"confirmation must be exactly: {MANUAL_DECLARED_DOMAIN_REBUILD_CONFIRMATION}",
+            )
+        prepare_declared_domain_pass_trigger(
+            db,
+            tenant_id,
+            interval_seconds=settings.cortex_declared_domain_scheduler_interval_seconds,
+        )
+        prep = prepare_declared_domain_rebuild_for_tenant(db, tenant_id=tenant_id)
+        pass_id = upsert_pending_pass_v1(
+            db,
+            tenant_id=tenant_id,
+            pass_type=DECLARED_DOMAIN_PASS,
+            source_trigger="manual_rebuild_admin",
+            priority=100,
+            payload_json={"drain": True},
+        )
+        db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
+        return AdminDeclaredDomainRebuildResponse(
+            tenant_id=tenant_id,
+            seeds_enqueued=int(prep.get("seeds_enqueued") or 0),
+            members_enqueued=int(prep.get("members_enqueued") or 0),
+            pass_id=str(pass_id),
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/integrations/notion/work-containers",
+        response_model=AdminNotionWorkContainersResponse,
+    )
+    def admin_notion_work_containers_list(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminNotionWorkContainersResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canon.notion_work_containers import (
+            MAX_NOTION_WORK_CONTAINER_PINS,
+            list_notion_canon_databases,
+        )
+
+        items = list_notion_canon_databases(db, tenant_id=tenant_id)
+        return AdminNotionWorkContainersResponse(
+            tenant_id=tenant_id,
+            max_pins=MAX_NOTION_WORK_CONTAINER_PINS,
+            items=[AdminNotionWorkContainerItem.model_validate(item) for item in items],
+        )
+
+    @r.put(
+        "/tenants/{tenant_id}/integrations/notion/work-containers",
+        response_model=AdminNotionWorkContainersUpdateResponse,
+    )
+    def admin_notion_work_containers_update(
+        tenant_id: uuid.UUID,
+        body: AdminNotionWorkContainersUpdateRequest,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminNotionWorkContainersUpdateResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.canon.notion_work_containers import (
+            list_notion_canon_databases,
+            update_notion_work_container_pins,
+        )
+        from vector.domains.cortex.declared_domains.admin import prepare_declared_domain_pass_trigger
+        from vector.domains.cortex.runtime.pass_types import DECLARED_DOMAIN_PASS
+        from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
+
+        try:
+            labels = {
+                item["database_id"]: item["display_name"]
+                for item in list_notion_canon_databases(db, tenant_id=tenant_id)
+            }
+            out = update_notion_work_container_pins(
+                db,
+                tenant_id=tenant_id,
+                database_ids=body.database_ids,
+                labels_by_id=labels,
+            )
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        prepare_declared_domain_pass_trigger(
+            db,
+            tenant_id,
+            interval_seconds=settings.cortex_declared_domain_scheduler_interval_seconds,
+        )
+        upsert_pending_pass_v1(
+            db,
+            tenant_id=tenant_id,
+            pass_type=DECLARED_DOMAIN_PASS,
+            source_trigger="manual_admin",
+            priority=100,
+            payload_json={"drain": True},
+        )
+        db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
+        return AdminNotionWorkContainersUpdateResponse(
+            tenant_id=tenant_id,
+            pinned_count=int(out.get("pinned_count") or 0),
+            affected_database_ids=list(out.get("affected_database_ids") or []),
+            rematerialized_raw_rows=int(out.get("rematerialized_raw_rows") or 0),
+            enqueued_declared_domain_entities=int(out.get("enqueued_declared_domain_entities") or 0),
+        )
 
     @r.get(
         "/tenants/{tenant_id}/cortex/ingestion/connectors/{connector}/raw-records",

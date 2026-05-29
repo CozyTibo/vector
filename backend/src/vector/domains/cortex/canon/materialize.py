@@ -124,12 +124,25 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
     if result.draft is None:
         return {"outcome": "skipped_mapper", "reason": result.skip_reason}
     draft = result.draft
-    from vector.domains.cortex.canon.declared_container_registry import apply_declared_container_attrs
+    from vector.domains.cortex.canon.declared_container_registry import (
+        ATTR_DECLARED_CONTAINER_KIND,
+        DIRECT_MEMBER_ENTITY_TYPES,
+        apply_declared_container_attrs,
+    )
+    from vector.domains.cortex.canon.notion_work_containers import (
+        notion_work_db_allowlist_for_connection,
+    )
 
+    notion_allowlist = (
+        notion_work_db_allowlist_for_connection(session, row.connection_id)
+        if row.connector == "notion"
+        else None
+    )
     apply_declared_container_attrs(
         resource_type=row.resource_type,
         attrs_json=draft.attrs_json,
         external_id=row.external_id,
+        notion_work_db_allowlist=notion_allowlist,
     )
     now = utc_now()
     entity = session.scalar(
@@ -189,23 +202,20 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
     except Exception:
         _logger.exception("graph enqueue failed during canon materialization")
     try:
-        from vector.domains.cortex.canon.declared_container_registry import (
-            declared_container_kind_for_resource_type,
-        )
         from vector.domains.cortex.declared_domains.enqueue import (
             REASON_MEMBER_MATERIALIZED,
             REASON_SEED_MATERIALIZED,
             enqueue_declared_domain_entity,
         )
 
-        if declared_container_kind_for_resource_type(row.resource_type):
+        if draft.attrs_json.get(ATTR_DECLARED_CONTAINER_KIND):
             enqueue_declared_domain_entity(
                 session,
                 tenant_id=row.tenant_id,
                 canon_entity_id=entity.id,
                 reason=REASON_SEED_MATERIALIZED,
             )
-        elif draft.entity_type == "work_item":
+        elif draft.entity_type in DIRECT_MEMBER_ENTITY_TYPES:
             enqueue_declared_domain_entity(
                 session,
                 tenant_id=row.tenant_id,

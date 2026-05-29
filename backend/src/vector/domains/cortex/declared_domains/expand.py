@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canon.declared_container_registry import (
     ATTR_DECLARED_CONTAINER_EXTERNAL_ID,
-    work_item_matches_container,
+    member_attrs_match_container,
 )
 from vector.domains.cortex.ingestion.sync_shared import utc_now
 from vector.infrastructure.db.models.canon_entity import CanonEntity
@@ -118,22 +118,22 @@ def _collect_level0_memberships(
             ),
         )
 
-    work_items = session.scalars(
+    members = session.scalars(
         select(CanonEntity).where(
             CanonEntity.tenant_id == tenant_id,
-            CanonEntity.entity_type == "work_item",
+            CanonEntity.entity_type.in_(("work_item", "document")),
         ),
     ).all()
-    for work_item in work_items:
-        attrs = work_item.attrs_json if isinstance(work_item.attrs_json, dict) else {}
-        if work_item_matches_container(
+    for member in members:
+        attrs = member.attrs_json if isinstance(member.attrs_json, dict) else {}
+        if member_attrs_match_container(
             attrs,
             container_kind=domain.declared_container_kind,
             container_external_id=container_external_id,
         ):
             drafts.append(
                 MembershipDraft(
-                    canon_entity_id=work_item.id,
+                    canon_entity_id=member.id,
                     extractor_rule=RULE_DIRECT_CONTAINER_REF,
                     expansion_level=EXPANSION_DIRECT,
                     evidence_kind="container_ref",

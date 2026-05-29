@@ -10,8 +10,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from vector.domains.cortex.canon.declared_container_registry import (
+    ATTR_DECLARED_CONTAINER_EXTERNAL_ID,
     ATTR_DECLARED_CONTAINER_KIND,
-    declared_container_kind_for_resource_type,
+    DIRECT_MEMBER_ENTITY_TYPES,
+    member_attrs_match_container,
 )
 from vector.domains.cortex.declared_domains.expand import refresh_domain_memberships
 from vector.domains.cortex.declared_domains.extractor_version import effective_declared_domain_extractor_version
@@ -129,7 +131,7 @@ def _domains_for_dirty_entity(
     ).all()
     domain_ids.update(memberships)
 
-    if entity.entity_type == "work_item":
+    if entity.entity_type in DIRECT_MEMBER_ENTITY_TYPES:
         for domain in session.scalars(
             select(DeclaredDomain).where(DeclaredDomain.tenant_id == tenant_id),
         ).all():
@@ -137,13 +139,8 @@ def _domains_for_dirty_entity(
             if seed is None:
                 continue
             seed_attrs = seed.attrs_json if isinstance(seed.attrs_json, dict) else {}
-            from vector.domains.cortex.canon.declared_container_registry import (
-                ATTR_DECLARED_CONTAINER_EXTERNAL_ID,
-                work_item_matches_container,
-            )
-
             ext = seed_attrs.get(ATTR_DECLARED_CONTAINER_EXTERNAL_ID)
-            if isinstance(ext, str) and work_item_matches_container(
+            if isinstance(ext, str) and member_attrs_match_container(
                 attrs,
                 container_kind=domain.declared_container_kind,
                 container_external_id=ext,
@@ -353,3 +350,53 @@ def enqueue_all_seeds_for_tenant(
         )
         count += 1
     return count
+
+
+MANUAL_DECLARED_DOMAIN_REBUILD_CONFIRMATION = "REBUILD DECLARED DOMAINS"
+
+
+def prepare_declared_domain_rebuild_for_tenant(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+) -> dict[str, int]:
+    """Clear declared-domain projection tables and enqueue seeds + member entities."""
+    from sqlalchemy import delete
+
+    from vector.domains.cortex.declared_domains.enqueue import (
+        REASON_EXTRACTOR_BUMP,
+        REASON_MEMBER_MATERIALIZED,
+        enqueue_declared_domain_entity,
+    )
+
+    session.execute(
+        delete(DeclaredDomainMembership).where(DeclaredDomainMembership.tenant_id == tenant_id),
+    )
+    session.execute(delete(DeclaredDomainStats).where(DeclaredDomainStats.tenant_id == tenant_id))
+    session.execute(delete(DeclaredDomain).where(DeclaredDomain.tenant_id == tenant_id))
+    session.execute(
+        delete(DeclaredDomainDirtyQueue).where(DeclaredDomainDirtyQueue.tenant_id == tenant_id),
+    )
+    seeds_enqueued = enqueue_all_seeds_for_tenant(
+        session,
+        tenant_id=tenant_id,
+        reason=REASON_EXTRACTOR_BUMP,
+    )
+    members_enqueued = 0
+    for entity in session.scalars(
+        select(CanonEntity).where(
+            CanonEntity.tenant_id == tenant_id,
+            CanonEntity.entity_type.in_(tuple(sorted(DIRECT_MEMBER_ENTITY_TYPES))),
+        ),
+    ).all():
+        enqueue_declared_domain_entity(
+            session,
+            tenant_id=tenant_id,
+            canon_entity_id=entity.id,
+            reason=REASON_MEMBER_MATERIALIZED,
+        )
+        members_enqueued += 1
+    return {
+        "seeds_enqueued": seeds_enqueued,
+        "members_enqueued": members_enqueued,
+    }
