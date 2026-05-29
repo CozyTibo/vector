@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
