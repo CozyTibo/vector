@@ -31,6 +31,8 @@ from vector.contracts.admin import (
     AdminCortexIngestionSchedulerBeatsResponse,
     AdminCortexIngestionResetStreamRequest,
     AdminCortexIngestionResetStreamResponse,
+    AdminCortexClearDerivedRequest,
+    AdminCortexClearDerivedResponse,
     AdminCortexIngestionTriggerReplayRequest,
     AdminCortexIngestionTriggerReplayResponse,
     AdminCortexIngestionTriggerSyncRequest,
@@ -1721,6 +1723,43 @@ def build_admin_router() -> APIRouter:
             total_count=total,
             offset=offset,
             limit=limit,
+        )
+
+    @r.post(
+        "/tenants/{tenant_id}/cortex/actions/clear-derived",
+        response_model=AdminCortexClearDerivedResponse,
+    )
+    def admin_cortex_clear_derived(
+        tenant_id: uuid.UUID,
+        body: AdminCortexClearDerivedRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminCortexClearDerivedResponse:
+        """Delete derived Cortex substrate for a tenant; keep raw ingestion rows and re-enqueue canon pass."""
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.clear_derived import CLEAR_DERIVED_CORTEX_CONFIRMATION_PHRASE
+
+        if body.confirmation != CLEAR_DERIVED_CORTEX_CONFIRMATION_PHRASE:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Confirmation phrase does not match.",
+            ) from None
+        from vector.domains.cortex.clear_derived import (
+            clear_derived_cortex_for_tenant,
+            enqueue_cortex_rematerialization_after_clear,
+        )
+
+        out = clear_derived_cortex_for_tenant(db, tenant_id=tenant_id)
+        pass_id = enqueue_cortex_rematerialization_after_clear(db, tenant_id=tenant_id)
+        db.commit()
+        from app.tasks.cortex_runtime import poll_cortex_passes_task
+
+        poll_cortex_passes_task.delay()
+        return AdminCortexClearDerivedResponse(
+            tenant_id=tenant_id,
+            canon_pass_id=pass_id,
+            deleted_rows_total=int(out["deleted_rows_total"]),
+            deleted_rows_by_table=dict(out["deleted_rows_by_table"]),
+            raw_ingestion_rows_remaining=int(out["raw_ingestion_rows_remaining"]),
         )
 
     @r.post(

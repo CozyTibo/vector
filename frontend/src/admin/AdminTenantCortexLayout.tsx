@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 
+import { CortexClearDerivedPanel } from "./cortex/CortexClearDerivedPanel";
 import { IdentityPassStaleBadge } from "./cortex/IdentityPassStaleBadge";
 import { useCortexPassRunHealth } from "./cortex/useCortexPassRunHealth";
 
@@ -45,6 +46,8 @@ export default function AdminTenantCortexLayout() {
           materialization, and lane operations.
         </p>
       </header>
+
+      <CortexClearDerivedPanel />
 
       <nav className="flex flex-wrap gap-2 border-b border-stone-200 pb-3">
         <CortexNavTab

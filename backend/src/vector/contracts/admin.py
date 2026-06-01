@@ -675,6 +675,25 @@ class AdminCortexIngestionResetStreamResponse(BaseModel):
     reset_applied: bool
 
 
+class AdminCortexClearDerivedRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation: str = Field(
+        ...,
+        description="Must exactly match CLEAR DERIVED CORTEX EXECUTION OUTPUTS.",
+    )
+
+
+class AdminCortexClearDerivedResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    tenant_id: uuid.UUID
+    canon_pass_id: uuid.UUID
+    deleted_rows_total: int
+    deleted_rows_by_table: dict[str, int]
+    raw_ingestion_rows_remaining: int
+
+
 class AdminCortexIngestionTriggerReplayRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
