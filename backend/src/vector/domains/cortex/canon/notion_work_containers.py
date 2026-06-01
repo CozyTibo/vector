@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import uuid
 from collections import Counter
 from typing import Any
@@ -14,8 +13,12 @@ from vector.domains.cortex.canon.declared_container_registry import (
     ATTR_DECLARED_CONTAINER_EXTERNAL_ID,
     ATTR_DECLARED_CONTAINER_KIND,
 )
-from vector.domains.cortex.canon.mappers._common import notion_plain_text
 from vector.domains.cortex.canon.materialize import materialize_raw_row
+from vector.domains.cortex.canon.notion_display_labels import (
+    looks_like_notion_id,
+    notion_database_title_from_payload,
+    notion_row_title_from_payload,
+)
 from vector.domains.cortex.declared_domains.enqueue import (
     REASON_MEMBER_MATERIALIZED,
     REASON_SEED_MATERIALIZED,
@@ -79,57 +82,6 @@ def normalize_work_container_pins(
             },
         )
     return pins
-
-
-_NOTION_ID_RE = re.compile(
-    r"^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$",
-    re.IGNORECASE,
-)
-
-
-def _looks_like_notion_id(value: str) -> bool:
-    compact = value.replace("-", "")
-    return bool(_NOTION_ID_RE.match(value)) or (len(compact) == 32 and compact.isalnum())
-
-
-def notion_database_title_from_payload(payload_body: dict[str, Any]) -> str | None:
-    segment = payload_body.get("database")
-    if not isinstance(segment, dict):
-        return None
-    title = notion_plain_text(segment.get("title"))
-    if title:
-        return title
-    name = segment.get("name")
-    return name.strip() if isinstance(name, str) and name.strip() else None
-
-
-def notion_row_title_from_payload(payload_body: dict[str, Any]) -> str | None:
-    """Best-effort row title from a notion.database_row raw payload."""
-    for key in ("row", "database_row"):
-        segment = payload_body.get(key)
-        if not isinstance(segment, dict):
-            continue
-        props = segment.get("properties")
-        if not isinstance(props, dict):
-            continue
-        title_props = [
-            name
-            for name, prop in props.items()
-            if isinstance(prop, dict) and prop.get("type") == "title"
-        ]
-        for prop_name in sorted(title_props, key=str.lower):
-            prop = props[prop_name]
-            if isinstance(prop, dict):
-                text = notion_plain_text(prop.get("title"))
-                if text:
-                    return text
-        for prop_name in ("Name", "Title", "Task", "name", "title"):
-            prop = props.get(prop_name)
-            if isinstance(prop, dict):
-                text = notion_plain_text(prop.get("title")) or notion_plain_text(prop.get("rich_text"))
-                if text:
-                    return text
-    return None
 
 
 def _raw_notion_database_titles(
@@ -211,7 +163,7 @@ def _resolve_database_display_name(
         return raw_title
     if pin_label:
         return pin_label
-    if canon_label and not _looks_like_notion_id(canon_label):
+    if canon_label and not looks_like_notion_id(canon_label):
         return canon_label
     return database_id
 

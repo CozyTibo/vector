@@ -12,6 +12,8 @@ from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.canon_entity_source import CanonEntitySource
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 
+from vector.domains.cortex.canon.notion_display_labels import enrich_notion_display_labels
+
 MANUAL_CANON_PASS_CONFIRMATION = "RUN CANON MATERIALIZATION PASS"
 
 
@@ -47,15 +49,16 @@ def list_canon_entities(
             stmt.order_by(CanonEntity.materialized_at.desc()).offset(offset).limit(limit),
         ).all(),
     )
-    return [_entity_summary(e) for e in rows], total
+    labels = enrich_notion_display_labels(session, rows)
+    return [_entity_summary(e, display_label=labels.get(e.id, e.display_label)) for e in rows], total
 
 
-def _entity_summary(e: CanonEntity) -> dict[str, Any]:
+def _entity_summary(e: CanonEntity, *, display_label: str | None = None) -> dict[str, Any]:
     return {
         "id": str(e.id),
         "entity_type": e.entity_type,
         "entity_key": e.entity_key,
-        "display_label": e.display_label,
+        "display_label": display_label if display_label is not None else e.display_label,
         "connector": e.connector,
         "connection_id": str(e.connection_id),
         "materialized_at": e.materialized_at.isoformat(),
@@ -106,7 +109,10 @@ def get_canon_entity_detail(
                 "payload_preview": _preview_payload(raw.payload_body if raw else {}),
             },
         )
-    out = _entity_summary(entity)
+    out = _entity_summary(
+        entity,
+        display_label=enrich_notion_display_labels(session, [entity]).get(entity.id, entity.display_label),
+    )
     out["attrs_json"] = dict(entity.attrs_json)
     out["sources"] = source_payloads
     return out

@@ -18,6 +18,7 @@ from vector.domains.cortex.declared_domains.pass_run_ops import (
     latest_declared_domain_pass_run,
 )
 from vector.domains.cortex.declared_domains.stats import sort_domains
+from vector.domains.cortex.canon.notion_display_labels import enrich_notion_display_labels
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.declared_domain import DeclaredDomain
 from vector.infrastructure.db.models.declared_domain_dirty_queue import DeclaredDomainDirtyQueue
@@ -227,12 +228,26 @@ def list_declared_domains(
     )
     total = len(sorted_pairs)
     page = sorted_pairs[offset : offset + limit]
+    seed_entities = session.scalars(
+        select(CanonEntity).where(
+            CanonEntity.tenant_id == tenant_id,
+            CanonEntity.id.in_([domain.seed_canon_entity_id for domain, _ in page]),
+        ),
+    ).all()
+    seed_labels = enrich_notion_display_labels(session, seed_entities)
+    seed_by_id = {entity.id: entity for entity in seed_entities}
     items: list[dict[str, Any]] = []
     for domain, stats in page:
+        seed_entity = seed_by_id.get(domain.seed_canon_entity_id)
+        display_name = (
+            seed_labels.get(seed_entity.id, seed_entity.display_label)
+            if seed_entity is not None
+            else domain.display_name
+        )
         items.append(
             {
                 "id": str(domain.id),
-                "display_name": domain.display_name,
+                "display_name": display_name,
                 "declared_container_kind": domain.declared_container_kind,
                 "seed_connector": domain.seed_connector,
                 "seed_resource_type": domain.seed_resource_type,
@@ -281,6 +296,15 @@ def get_declared_domain_detail(
         ).all()
         member_entities = {row.id: row for row in rows}
 
+    labels = enrich_notion_display_labels(session, member_entities.values())
+    seed_entity = session.get(CanonEntity, domain.seed_canon_entity_id)
+    seed_labels = enrich_notion_display_labels(session, [seed_entity]) if seed_entity else {}
+    display_name = (
+        seed_labels.get(seed_entity.id, seed_entity.display_label)
+        if seed_entity is not None
+        else domain.display_name
+    )
+
     membership_payload = []
     for membership in memberships:
         entity = member_entities.get(membership.canon_entity_id)
@@ -289,7 +313,7 @@ def get_declared_domain_detail(
                 "id": str(membership.id),
                 "canon_entity_id": str(membership.canon_entity_id),
                 "entity_type": entity.entity_type if entity else None,
-                "display_label": entity.display_label if entity else None,
+                "display_label": labels.get(entity.id, entity.display_label) if entity else None,
                 "extractor_rule": membership.extractor_rule,
                 "expansion_level": membership.expansion_level,
                 "evidence_kind": membership.evidence_kind,
@@ -300,7 +324,7 @@ def get_declared_domain_detail(
         )
     return {
         "id": str(domain.id),
-        "display_name": domain.display_name,
+        "display_name": display_name,
         "declared_container_kind": domain.declared_container_kind,
         "seed_connector": domain.seed_connector,
         "seed_resource_type": domain.seed_resource_type,

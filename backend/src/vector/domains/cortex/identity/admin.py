@@ -13,6 +13,7 @@ from vector.infrastructure.db.models.identity_account import IdentityAccount
 from vector.infrastructure.db.models.identity_dirty_queue import IdentityDirtyQueue
 from vector.infrastructure.db.models.identity_entity import IdentityEntity
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
+from vector.domains.cortex.canon.notion_display_labels import enrich_notion_display_labels
 from vector.domains.cortex.identity.materialize import _latest_actor_payload
 from vector.domains.cortex.identity.pass_run_ops import abandon_stuck_running_identity_passes
 from vector.domains.cortex.identity.signals import extract_actor_signal
@@ -286,6 +287,8 @@ def get_identity_detail(session: Session, tenant_id: uuid.UUID, identity_id: uui
         ).all(),
     )
     out_accounts: list[dict[str, Any]] = []
+    account_entities = [entity for _, entity in accounts]
+    labels = enrich_notion_display_labels(session, account_entities)
     for account, entity in accounts:
         out_accounts.append(
             {
@@ -293,7 +296,7 @@ def get_identity_detail(session: Session, tenant_id: uuid.UUID, identity_id: uui
                 "canon_entity_id": str(entity.id),
                 "connector": account.connector,
                 "connection_id": str(account.connection_id),
-                "display_label": entity.display_label,
+                "display_label": labels.get(entity.id, entity.display_label),
                 "entity_key": entity.entity_key,
                 "link_tier": account.link_tier,
                 "link_rule": account.link_rule,
@@ -335,11 +338,12 @@ def list_unresolved_actor_entities(
         session.scalars(base.order_by(CanonEntity.materialized_at.desc()).offset(offset).limit(limit)).all(),
     )
     total = int(session.scalar(select(func.count()).select_from(base.subquery())) or 0)
+    labels = enrich_notion_display_labels(session, rows)
     items = [
         {
             "canon_entity_id": str(r.id),
             "connector": r.connector,
-            "display_label": r.display_label,
+            "display_label": labels.get(r.id, r.display_label),
             "entity_key": r.entity_key,
             "materialized_at": r.materialized_at.isoformat(),
         }

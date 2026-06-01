@@ -86,8 +86,12 @@ def test_notion_plain_text_from_rich_title() -> None:
 
 
 def test_notion_database_title_from_payload() -> None:
+    from vector.domains.cortex.canon.notion_display_labels import (
+        looks_like_notion_id,
+        notion_row_title_from_payload,
+        notion_title_from_payload,
+    )
     from vector.domains.cortex.canon.notion_work_containers import (
-        _looks_like_notion_id,
         _raw_row_database_id,
         _resolve_database_display_name,
         notion_database_title_from_payload,
@@ -95,8 +99,8 @@ def test_notion_database_title_from_payload() -> None:
 
     body = {"database": {"id": "db-1", "title": [{"plain_text": "Engineering backlog"}]}}
     assert notion_database_title_from_payload(body) == "Engineering backlog"
-    assert _looks_like_notion_id("6320c3e7-1777-4077-905b-20ca7886bb5f")
-    assert not _looks_like_notion_id("Global Roadmap")
+    assert looks_like_notion_id("6320c3e7-1777-4077-905b-20ca7886bb5f")
+    assert not looks_like_notion_id("Global Roadmap")
     assert (
         _resolve_database_display_name(
             database_id="db-1",
@@ -116,7 +120,7 @@ def test_notion_database_title_from_payload() -> None:
 
 
 def test_notion_row_title_from_payload() -> None:
-    from vector.domains.cortex.canon.notion_work_containers import notion_row_title_from_payload
+    from vector.domains.cortex.canon.notion_display_labels import notion_row_title_from_payload
 
     body = {
         "row": {
@@ -130,3 +134,17 @@ def test_notion_row_title_from_payload() -> None:
         },
     }
     assert notion_row_title_from_payload(body) == "Ship checkout redesign"
+
+
+def test_notion_block_title_from_payload() -> None:
+    from vector.domains.cortex.canon.notion_display_labels import notion_title_from_payload
+
+    body = {
+        "block": {
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [{"plain_text": "Fix delivery tracking"}],
+            },
+        },
+    }
+    assert notion_title_from_payload(resource_type="notion.block", payload_body=body) == "Fix delivery tracking"

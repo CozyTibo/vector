@@ -19,6 +19,7 @@ from vector.domains.cortex.graph.relationship_kinds import (
     EXTRACTABLE_RELATIONSHIP_KINDS,
     label_for_kind,
 )
+from vector.domains.cortex.canon.notion_display_labels import enrich_notion_display_labels
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
 from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
@@ -166,12 +167,12 @@ def build_graph_readiness(
     }
 
 
-def _entity_summary(entity: CanonEntity) -> dict[str, Any]:
+def _entity_summary(entity: CanonEntity, *, display_label: str | None = None) -> dict[str, Any]:
     return {
         "entity_id": str(entity.id),
         "entity_type": entity.entity_type,
         "connector": entity.connector,
-        "display_label": entity.display_label,
+        "display_label": display_label if display_label is not None else entity.display_label,
         "entity_key": entity.entity_key,
     }
 
@@ -234,6 +235,7 @@ def list_relationships(
     if entity_ids:
         for ent in session.scalars(select(CanonEntity).where(CanonEntity.id.in_(entity_ids))).all():
             entities[ent.id] = ent
+    labels = enrich_notion_display_labels(session, entities.values())
 
     items: list[dict[str, Any]] = []
     for row in rows:
@@ -248,12 +250,20 @@ def list_relationships(
                 "extractor_rule": row.extractor_rule,
                 "observed_at": row.observed_at.isoformat(),
                 "from": (
-                    _entity_summary(from_ent)
+                    _entity_summary(
+                        from_ent,
+                        display_label=labels.get(from_ent.id, from_ent.display_label),
+                    )
                     if from_ent
                     else {"entity_id": str(row.from_entity_id)}
                 ),
                 "to": (
-                    _entity_summary(to_ent) if to_ent else {"entity_id": str(row.to_entity_id)}
+                    _entity_summary(
+                        to_ent,
+                        display_label=labels.get(to_ent.id, to_ent.display_label),
+                    )
+                    if to_ent
+                    else {"entity_id": str(row.to_entity_id)}
                 ),
                 "from_identity": _identity_summary(session, row.from_identity_id),
                 "to_identity": _identity_summary(session, row.to_identity_id),
@@ -274,6 +284,7 @@ def get_relationship_detail(
         return None
     from_ent = session.get(CanonEntity, row.from_entity_id)
     to_ent = session.get(CanonEntity, row.to_entity_id)
+    labels = enrich_notion_display_labels(session, [e for e in (from_ent, to_ent) if e is not None])
     return {
         "id": str(row.id),
         "relationship_kind": row.relationship_kind,
@@ -285,8 +296,22 @@ def get_relationship_detail(
         "evidence_ref": row.evidence_ref,
         "observed_at": row.observed_at.isoformat(),
         "status": row.status,
-        "from": _entity_summary(from_ent) if from_ent else None,
-        "to": _entity_summary(to_ent) if to_ent else None,
+        "from": (
+            _entity_summary(
+                from_ent,
+                display_label=labels.get(from_ent.id, from_ent.display_label),
+            )
+            if from_ent
+            else None
+        ),
+        "to": (
+            _entity_summary(
+                to_ent,
+                display_label=labels.get(to_ent.id, to_ent.display_label),
+            )
+            if to_ent
+            else None
+        ),
         "from_identity": _identity_summary(session, row.from_identity_id),
         "to_identity": _identity_summary(session, row.to_identity_id),
         "evidence_snapshot": row.evidence_snapshot or {},
@@ -333,6 +358,7 @@ def list_entity_links(
                 select(CanonEntity).where(CanonEntity.id.in_(entity_ids)),
             ).all()
         }
+        labels = enrich_notion_display_labels(session, entities.values())
         for row in rows:
             from_ent = entities.get(row.from_entity_id)
             inbound.append(
@@ -344,7 +370,10 @@ def list_entity_links(
                     "extractor_rule": row.extractor_rule,
                     "observed_at": row.observed_at.isoformat(),
                     "from": (
-                        _entity_summary(from_ent)
+                        _entity_summary(
+                            from_ent,
+                            display_label=labels.get(from_ent.id, from_ent.display_label),
+                        )
                         if from_ent
                         else {"entity_id": str(row.from_entity_id)}
                     ),
