@@ -9,6 +9,7 @@ import AdminCortexCanonPage from "./admin/AdminCortexCanonPage.tsx";
 import AdminCortexIdentitiesPage from "./admin/AdminCortexIdentitiesPage.tsx";
 import AdminCortexGraphPage from "./admin/AdminCortexGraphPage.tsx";
 import AdminCortexDeclaredDomainsPage from "./admin/AdminCortexDeclaredDomainsPage.tsx";
+import AdminCortexExecutionSurfacesPage from "./admin/AdminCortexExecutionSurfacesPage.tsx";
 import AdminCortexIngestionPage from "./admin/AdminCortexIngestionPage.tsx";
 import AdminIntegrationsPage from "./admin/AdminIntegrationsPage.tsx";
 import AdminTenantCortexLayout from "./admin/AdminTenantCortexLayout.tsx";
@@ -80,8 +81,17 @@ createRoot(document.getElementById("root")!).render(
               <Route path="overview" element={<RedirectTenantToWorkspace />} />
               <Route path="integrations" element={<AdminIntegrationsPage />} />
               <Route path="cortex-ingestion" element={<Navigate to="../cortex/ingestion" replace />} />
-              <Route path="cortex" element={<AdminTenantCortexLayout />}>
-                <Route index element={<Navigate to="ingestion" replace />} />
+                <Route path="cortex" element={<AdminTenantCortexLayout />}>
+                <Route index element={<Navigate to="execution-surfaces" replace />} />
+                <Route path="execution-surfaces" element={<AdminCortexExecutionSurfacesPage />} />
+                <Route
+                  path="execution-surfaces/domains/:domainId"
+                  element={<AdminCortexExecutionSurfacesPage />}
+                />
+                <Route
+                  path="execution-surfaces/work/:artifactId"
+                  element={<AdminCortexExecutionSurfacesPage />}
+                />
                 <Route path="ingestion" element={<AdminCortexIngestionPage />} />
                 <Route path="canon" element={<AdminCortexCanonPage />} />
                 <Route path="canon/entities/:entityId" element={<AdminCortexCanonEntityPage />} />

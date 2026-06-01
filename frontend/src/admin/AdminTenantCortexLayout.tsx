@@ -41,11 +41,17 @@ export default function AdminTenantCortexLayout() {
         <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Cortex</p>
         <h1 className="mt-1 text-xl font-semibold text-stone-900">Cortex</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Raw ingestion and deterministic canon materialization for this workspace.
+          Execution Surfaces is the human view of organizational execution. Substrate tabs below are for ingestion,
+          materialization, and lane operations.
         </p>
       </header>
 
       <nav className="flex flex-wrap gap-2 border-b border-stone-200 pb-3">
+        <CortexNavTab
+          to={`/admin/tenants/${tenantId}/cortex/execution-surfaces`}
+          label="Execution Surfaces"
+          stale={false}
+        />
         <CortexNavTab
           to={`/admin/tenants/${tenantId}/cortex/ingestion`}
           label="Ingestion"
