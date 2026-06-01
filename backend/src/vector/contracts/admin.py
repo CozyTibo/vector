@@ -5141,6 +5141,8 @@ class AdminDeclaredDomainReadinessResponse(BaseModel):
     notion_connected: bool = False
     linear_connected: bool = False
     work_container_pin_count: int = 0
+    notion_pins: list[dict[str, Any]] = Field(default_factory=list)
+    operational_status: str = "needs_setup"
     empty_state_hint: str | None = None
     latest_pass_run: dict[str, Any] | None = None
     scheduler: dict[str, Any] = Field(default_factory=dict)

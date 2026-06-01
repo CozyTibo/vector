@@ -17,8 +17,9 @@ from vector.domains.cortex.declared_domains.pass_run_ops import (
     abandon_stuck_running_declared_domain_passes,
     latest_declared_domain_pass_run,
 )
-from vector.domains.cortex.declared_domains.stats import sort_domains
+from vector.domains.cortex.declared_domains.stats import recompute_domain_stats, sort_domains
 from vector.domains.cortex.canon.notion_display_labels import enrich_notion_display_labels
+from vector.domains.cortex.canon.notion_work_containers import list_notion_canon_databases
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.declared_domain import DeclaredDomain
 from vector.infrastructure.db.models.declared_domain_dirty_queue import DeclaredDomainDirtyQueue
@@ -32,6 +33,81 @@ from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.repositories import notion_connection as notion_repo
 
 MANUAL_DECLARED_DOMAIN_PASS_CONFIRMATION = "RUN DECLARED DOMAIN PASS"
+
+
+def _membership_summary(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    domain_id: uuid.UUID,
+) -> dict[str, Any]:
+    rows = session.execute(
+        select(
+            DeclaredDomainMembership.expansion_level,
+            DeclaredDomainMembership.extractor_rule,
+            func.count(),
+        )
+        .where(
+            DeclaredDomainMembership.tenant_id == tenant_id,
+            DeclaredDomainMembership.declared_domain_id == domain_id,
+            DeclaredDomainMembership.status == STATUS_ACTIVE,
+        )
+        .group_by(
+            DeclaredDomainMembership.expansion_level,
+            DeclaredDomainMembership.extractor_rule,
+        ),
+    ).all()
+    direct = 0
+    graph = 0
+    by_rule: dict[str, int] = {}
+    for expansion_level, rule, count in rows:
+        if expansion_level == "direct":
+            direct += int(count)
+        elif expansion_level == "graph":
+            graph += int(count)
+        by_rule[str(rule)] = int(count)
+    return {
+        "total": direct + graph,
+        "direct": direct,
+        "graph": graph,
+        "by_rule": by_rule,
+    }
+
+
+def _notion_pin_summaries(session: Session, *, tenant_id: uuid.UUID) -> list[dict[str, Any]]:
+    items = list_notion_canon_databases(session, tenant_id=tenant_id)
+    return [
+        {
+            "database_id": item["database_id"],
+            "display_name": item["display_name"],
+            "row_count": item["row_count"],
+            "is_pinned": item["is_pinned"],
+            "is_declared_seed": item["is_declared_seed"],
+        }
+        for item in items
+        if item["is_pinned"]
+    ]
+
+
+def _operational_status(
+    *,
+    domain_count: int,
+    active_membership_count: int,
+    work_container_pin_count: int,
+    dirty_queue_pending: int,
+    latest_pass_status: str | None,
+) -> str:
+    if domain_count == 0:
+        if work_container_pin_count > 0 or dirty_queue_pending > 0:
+            return "processing"
+        return "needs_setup"
+    if active_membership_count == 0:
+        return "processing"
+    if dirty_queue_pending > 0:
+        return "catching_up"
+    if latest_pass_status == "FAILED":
+        return "failed"
+    return "healthy"
 
 
 def _tenant_has_active_connection(session: Session, tenant_id: uuid.UUID, provider: str) -> bool:
@@ -161,6 +237,14 @@ def build_declared_domain_readiness(
         linear_connected=linear_connected,
         work_container_pin_count=work_container_pin_count,
     )
+    operational_status = _operational_status(
+        domain_count=domain_count,
+        active_membership_count=active_memberships,
+        work_container_pin_count=work_container_pin_count,
+        dirty_queue_pending=dirty_pending,
+        latest_pass_status=latest.status if latest is not None else None,
+    )
+    notion_pins = _notion_pin_summaries(session, tenant_id=tenant_id) if notion_connected else []
     active_domains = int(
         session.scalar(
             select(func.count())
@@ -190,6 +274,8 @@ def build_declared_domain_readiness(
         "notion_connected": notion_connected,
         "linear_connected": linear_connected,
         "work_container_pin_count": work_container_pin_count,
+        "notion_pins": notion_pins,
+        "operational_status": operational_status,
         "empty_state_hint": empty_state_hint,
         "latest_pass_run": latest_payload,
         "scheduler": scheduler or {},
@@ -244,6 +330,7 @@ def list_declared_domains(
             if seed_entity is not None
             else domain.display_name
         )
+        membership_summary = _membership_summary(session, tenant_id=tenant_id, domain_id=domain.id)
         items.append(
             {
                 "id": str(domain.id),
@@ -252,6 +339,8 @@ def list_declared_domains(
                 "seed_connector": domain.seed_connector,
                 "seed_resource_type": domain.seed_resource_type,
                 "seed_canon_entity_id": str(domain.seed_canon_entity_id),
+                "active_membership_count": membership_summary["total"],
+                "membership_summary": membership_summary,
                 "first_observed_at": domain.first_observed_at.isoformat(),
                 "last_activity_at": domain.last_activity_at.isoformat()
                 if domain.last_activity_at
@@ -273,6 +362,27 @@ def get_declared_domain_detail(
     if domain is None or domain.tenant_id != tenant_id:
         return None
     stats = session.get(DeclaredDomainStats, domain.id)
+    if stats is not None and stats.mass_total == 0:
+        pending_members = int(
+            session.scalar(
+                select(func.count())
+                .select_from(DeclaredDomainMembership)
+                .where(
+                    DeclaredDomainMembership.tenant_id == tenant_id,
+                    DeclaredDomainMembership.declared_domain_id == domain.id,
+                    DeclaredDomainMembership.status == STATUS_ACTIVE,
+                ),
+            )
+            or 0,
+        )
+        if pending_members > 0:
+            stats = recompute_domain_stats(
+                session,
+                tenant_id=tenant_id,
+                domain=domain,
+                expansion_level=stats.expansion_level or "direct",
+                momentum_min_baseline=5,
+            )
     memberships = list(
         session.scalars(
             select(DeclaredDomainMembership)
@@ -304,15 +414,23 @@ def get_declared_domain_detail(
         if seed_entity is not None
         else domain.display_name
     )
+    membership_summary = _membership_summary(session, tenant_id=tenant_id, domain_id=domain.id)
 
     membership_payload = []
     for membership in memberships:
         entity = member_entities.get(membership.canon_entity_id)
+        resource_type = None
+        if entity is not None:
+            parts = entity.entity_key.split(":")
+            if len(parts) >= 3:
+                resource_type = parts[2]
         membership_payload.append(
             {
                 "id": str(membership.id),
                 "canon_entity_id": str(membership.canon_entity_id),
                 "entity_type": entity.entity_type if entity else None,
+                "resource_type": resource_type,
+                "connector": entity.connector if entity else None,
                 "display_label": labels.get(entity.id, entity.display_label) if entity else None,
                 "extractor_rule": membership.extractor_rule,
                 "expansion_level": membership.expansion_level,
@@ -330,6 +448,7 @@ def get_declared_domain_detail(
         "seed_resource_type": domain.seed_resource_type,
         "seed_canon_entity_id": str(domain.seed_canon_entity_id),
         "stats": _stats_payload(stats),
+        "membership_summary": membership_summary,
         "memberships": membership_payload,
     }
 

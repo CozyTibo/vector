@@ -14,11 +14,20 @@ export type DeclaredDomainReadiness = {
   notion_connected: boolean;
   linear_connected: boolean;
   work_container_pin_count: number;
+  notion_pins?: Array<{
+    database_id: string;
+    display_name: string;
+    row_count: number;
+    is_pinned: boolean;
+    is_declared_seed: boolean;
+  }>;
+  operational_status?: string;
   empty_state_hint: string | null;
   batch_entity_limit: number;
   latest_pass_run: {
     id: string;
     status: string;
+    source_trigger?: string;
     stats: Record<string, unknown>;
   } | null;
   scheduler: {

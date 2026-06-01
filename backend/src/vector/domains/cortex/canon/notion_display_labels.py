@@ -141,6 +141,71 @@ def notion_display_label_needs_enrichment(entity: CanonEntity) -> bool:
     return looks_like_notion_id(label)
 
 
+def _external_id_from_entity(entity: CanonEntity) -> str | None:
+    attrs = entity.attrs_json if isinstance(entity.attrs_json, dict) else {}
+    for key in ("external_id", "notion_id", "declared_container_external_id"):
+        value = attrs.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    parts = entity.entity_key.split(":")
+    if len(parts) >= 4 and parts[3].strip():
+        return parts[3].strip()
+    return None
+
+
+def _resource_type_from_entity(entity: CanonEntity) -> str | None:
+    return resource_type_from_entity_key(entity.entity_key)
+
+
+def _latest_source_for_entity(
+    session: Session,
+    entity_id: uuid.UUID,
+) -> CanonEntitySource | None:
+    preferred = session.scalar(
+        select(CanonEntitySource)
+        .where(
+            CanonEntitySource.canon_entity_id == entity_id,
+            CanonEntitySource.is_latest.is_(True),
+        )
+        .limit(1),
+    )
+    if preferred is not None:
+        return preferred
+    return session.scalar(
+        select(CanonEntitySource)
+        .where(CanonEntitySource.canon_entity_id == entity_id)
+        .order_by(CanonEntitySource.observed_at.desc(), CanonEntitySource.raw_id.desc())
+        .limit(1),
+    )
+
+
+def _title_from_raw_lookup(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    entity: CanonEntity,
+) -> str | None:
+    resource_type = _resource_type_from_entity(entity)
+    external_id = _external_id_from_entity(entity)
+    if resource_type is None or external_id is None:
+        return None
+    raw = session.scalar(
+        select(RawIngestionRecord)
+        .where(
+            RawIngestionRecord.tenant_id == tenant_id,
+            RawIngestionRecord.resource_type == resource_type,
+            RawIngestionRecord.external_id == external_id,
+            RawIngestionRecord.replay_job_id.is_(None),
+        )
+        .order_by(RawIngestionRecord.id.desc())
+        .limit(1),
+    )
+    if raw is None:
+        return None
+    body = raw.payload_body if isinstance(raw.payload_body, dict) else {}
+    return notion_title_from_payload(resource_type=resource_type, payload_body=body)
+
+
 def enrich_notion_display_labels(
     session: Session,
     entities: Iterable[CanonEntity],
@@ -167,6 +232,12 @@ def enrich_notion_display_labels(
             ),
         ).all()
     }
+    for entity in need:
+        if entity.id not in sources:
+            src = _latest_source_for_entity(session, entity.id)
+            if src is not None:
+                sources[entity.id] = src
+
     raw_ids = {src.raw_id for src in sources.values()}
     raws: dict[int, RawIngestionRecord] = {}
     if raw_ids:
@@ -180,12 +251,15 @@ def enrich_notion_display_labels(
     for entity in need:
         label = entity.display_label
         src = sources.get(entity.id)
+        title: str | None = None
         if src is not None:
             raw = raws.get(src.raw_id)
             body = raw.payload_body if raw is not None and isinstance(raw.payload_body, dict) else {}
             title = notion_title_from_payload(resource_type=src.resource_type, payload_body=body)
-            if title:
-                label = title[:512]
+        if not title:
+            title = _title_from_raw_lookup(session, tenant_id=entity.tenant_id, entity=entity)
+        if title:
+            label = title[:512]
         resolved[entity.id] = label
 
     return resolved

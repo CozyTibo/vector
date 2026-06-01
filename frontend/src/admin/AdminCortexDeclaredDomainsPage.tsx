@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { adminFetch, adminJson } from "../lib/adminFetch";
 import { CortexPageSkeleton } from "./cortex/CortexPageSkeleton";
@@ -8,10 +8,69 @@ import { useDeclaredDomainReadiness } from "./cortex/useDeclaredDomainReadiness"
 
 type Tab = "state" | "runs" | "data";
 
+type NotionPin = {
+  database_id: string;
+  display_name: string;
+  row_count: number;
+  is_pinned: boolean;
+  is_declared_seed: boolean;
+};
+
+const STATUS_LABELS: Record<string, { label: string; className: string; help: string }> = {
+  healthy: {
+    label: "Working",
+    className: "bg-emerald-100 text-emerald-900 ring-emerald-200",
+    help: "Declared domains exist with active memberships and no pending backlog.",
+  },
+  processing: {
+    label: "Processing",
+    className: "bg-amber-100 text-amber-950 ring-amber-200",
+    help: "Pins or backlog detected — run a pass or wait for the scheduler.",
+  },
+  catching_up: {
+    label: "Catching up",
+    className: "bg-amber-100 text-amber-950 ring-amber-200",
+    help: "Dirty queue has pending work; passes are still draining.",
+  },
+  needs_setup: {
+    label: "Needs setup",
+    className: "bg-stone-100 text-stone-800 ring-stone-200",
+    help: "Pin Notion work databases in Integrations or connect Linear, then run a pass.",
+  },
+  failed: {
+    label: "Last pass failed",
+    className: "bg-red-100 text-red-900 ring-red-200",
+    help: "Check Runs tab for errors, then trigger a new pass.",
+  },
+};
+
 function resolveTab(tabParam: string | null): Tab {
   if (tabParam === "runs") return "runs";
   if (tabParam === "data") return "data";
   return "state";
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const meta = STATUS_LABELS[status] ?? STATUS_LABELS.needs_setup;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${meta.className}`}
+      title={meta.help}
+    >
+      {meta.label}
+    </span>
+  );
+}
+
+function formatPassStats(stats: Record<string, unknown> | undefined): string {
+  if (!stats) return "—";
+  const parts = [
+    `synced ${String(stats.domains_synced ?? 0)}`,
+    `refreshed ${String(stats.domains_refreshed ?? 0)}`,
+    `processed ${String(stats.processed ?? 0)} dirty`,
+  ];
+  if (Number(stats.errors ?? 0) > 0) parts.push(`${String(stats.errors)} errors`);
+  return parts.join(" · ");
 }
 
 function StateTab({ tenantId }: { tenantId: string }) {
@@ -19,40 +78,75 @@ function StateTab({ tenantId }: { tenantId: string }) {
   const data = readinessQ.data;
   if (!data) return null;
   const last = data.latest_pass_run;
+  const pins = (data.notion_pins ?? []) as NotionPin[];
+  const status = data.operational_status ?? "needs_setup";
+
   return (
-    <div className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-stone-900">Overall state</h2>
-      <ul className="space-y-2 text-sm text-stone-700">
-        <li>
-          {data.declared_domain_count} declared domains · {data.active_membership_count} active
-          memberships · {data.dirty_queue_pending} dirty queue
-          {data.work_container_pin_count > 0
-            ? ` · ${data.work_container_pin_count} Notion work DB pins`
-            : null}
-        </li>
-        {data.empty_state_hint ? (
-          <li className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
-            {data.empty_state_hint}
-          </li>
-        ) : null}
-        <li>
-          Level 0 uses declared seeds (Linear initiative/project or pinned Notion databases).
-          {data.level1_advisory
-            ? " Graph lane is behind — cross-tool expansion may be incomplete."
-            : " Graph expansion is current."}
-        </li>
-        {last ? (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-semibold text-stone-900">Overall state</h2>
+          <StatusBadge status={status} />
+        </div>
+        <p className="mt-2 text-sm text-stone-600">{(STATUS_LABELS[status] ?? STATUS_LABELS.needs_setup).help}</p>
+        <ul className="mt-4 space-y-2 text-sm text-stone-700">
           <li>
-            Last pass {last.status} · processed{" "}
-            {typeof last.stats?.processed === "number" ? last.stats.processed : 0} dirty rows ·
-            refreshed{" "}
-            {typeof last.stats?.domains_refreshed === "number" ? last.stats.domains_refreshed : 0}{" "}
-            domains
+            <span className="font-medium text-stone-900">{data.declared_domain_count}</span> declared domains ·{" "}
+            <span className="font-medium text-stone-900">{data.active_membership_count}</span> active memberships ·{" "}
+            {data.dirty_queue_pending} dirty queue
           </li>
+          {last ? (
+            <li>
+              Last pass <span className="font-medium">{last.status}</span> ({String(last.source_trigger ?? "—")}) ·{" "}
+              {formatPassStats(last.stats as Record<string, unknown>)}
+            </li>
+          ) : (
+            <li>No pass runs yet.</li>
+          )}
+          <li>
+            Level 0 = pinned seeds (Notion DB or Linear initiative/project). Level 1 = graph expansion (advisory when
+            graph is behind).
+          </li>
+        </ul>
+      </div>
+
+      <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-semibold text-stone-900">Configured seeds (Integrations)</h3>
+          <Link
+            to={`/admin/tenants/${tenantId}/integrations`}
+            className="text-sm text-indigo-700 hover:underline"
+          >
+            Open Integrations →
+          </Link>
+        </div>
+        {pins.length === 0 ? (
+          <p className="mt-2 text-sm text-stone-600">
+            No Notion work databases pinned. Pin databases under Integrations → Notion → Declared work containers.
+          </p>
         ) : (
-          <li>No pass runs yet.</li>
+          <ul className="mt-3 space-y-2">
+            {pins.map((pin) => (
+              <li
+                key={pin.database_id}
+                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-sm"
+              >
+                <div>
+                  <span className="font-medium text-stone-900">{pin.display_name}</span>
+                  <span className="ml-2 text-xs text-stone-500">{pin.row_count.toLocaleString()} rows in canon</span>
+                </div>
+                <span className="text-xs text-emerald-800">
+                  {pin.is_declared_seed ? "declared domain seed" : "pinned · pass pending"}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
-      </ul>
+        {data.linear_connected ? (
+          <p className="mt-3 text-xs text-stone-500">Linear is connected — initiatives/projects can also become seeds.</p>
+        ) : null}
+      </div>
+
       <TriggerPassPanel tenantId={tenantId} />
       <RebuildPanel tenantId={tenantId} />
     </div>
@@ -62,7 +156,7 @@ function StateTab({ tenantId }: { tenantId: string }) {
 function RebuildPanel({ tenantId }: { tenantId: string }) {
   return (
     <form
-      className="mt-4 space-y-2 rounded border border-stone-200 bg-stone-50 p-4"
+      className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-4"
       onSubmit={async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -77,8 +171,8 @@ function RebuildPanel({ tenantId }: { tenantId: string }) {
     >
       <p className="text-sm font-medium text-stone-900">Rebuild declared domains</p>
       <p className="text-xs text-stone-600">
-        Type <code className="rounded bg-white px-1">REBUILD DECLARED DOMAINS</code> to clear projection
-        tables and replay from canon seeds.
+        Type <code className="rounded bg-white px-1">REBUILD DECLARED DOMAINS</code> to clear projection tables and replay
+        from canon seeds.
       </p>
       <input
         name="rebuild_confirmation"
@@ -98,7 +192,7 @@ function RebuildPanel({ tenantId }: { tenantId: string }) {
 function TriggerPassPanel({ tenantId }: { tenantId: string }) {
   return (
     <form
-      className="mt-4 space-y-2 rounded border border-stone-200 bg-stone-50 p-4"
+      className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-4"
       onSubmit={async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
@@ -113,8 +207,8 @@ function TriggerPassPanel({ tenantId }: { tenantId: string }) {
     >
       <p className="text-sm font-medium text-stone-900">Run declared domain pass</p>
       <p className="text-xs text-stone-600">
-        Type <code className="rounded bg-white px-1">RUN DECLARED DOMAIN PASS</code> to enqueue a
-        drain pass.
+        Type <code className="rounded bg-white px-1">RUN DECLARED DOMAIN PASS</code> to sync seeds and refresh
+        memberships.
       </p>
       <input
         name="confirmation"
@@ -149,20 +243,70 @@ function RunsTab({ tenantId }: { tenantId: string }) {
             <th className="px-4 py-2">Started</th>
             <th className="px-4 py-2">Status</th>
             <th className="px-4 py-2">Trigger</th>
-            <th className="px-4 py-2">Stats</th>
+            <th className="px-4 py-2">Outcome</th>
           </tr>
         </thead>
         <tbody>
           {items.map((row) => (
             <tr key={String(row.id)} className="border-t border-stone-100">
-              <td className="px-4 py-2">{String(row.started_at)}</td>
+              <td className="px-4 py-2 whitespace-nowrap">{String(row.started_at)}</td>
               <td className="px-4 py-2">{String(row.status)}</td>
               <td className="px-4 py-2">{String(row.source_trigger)}</td>
-              <td className="px-4 py-2 font-mono text-xs">{JSON.stringify(row.stats ?? {})}</td>
+              <td className="px-4 py-2 text-stone-700">
+                {formatPassStats(row.stats as Record<string, unknown>)}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+type MembershipSummary = { total: number; direct: number; graph: number; by_rule?: Record<string, number> };
+
+function MembershipList({
+  tenantId,
+  memberships,
+}: {
+  tenantId: string;
+  memberships: Array<Record<string, unknown>>;
+}) {
+  const direct = memberships.filter((m) => m.expansion_level === "direct");
+  const graph = memberships.filter((m) => m.expansion_level === "graph");
+
+  const renderGroup = (title: string, items: Array<Record<string, unknown>>) => (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+        {title} ({items.length})
+      </p>
+      <ul className="mt-1 space-y-1">
+        {items.slice(0, 40).map((m) => (
+          <li key={String(m.id)} className="rounded bg-stone-50 px-2 py-1.5 text-sm">
+            <Link
+              className="font-medium text-indigo-700 hover:underline"
+              to={`/admin/tenants/${tenantId}/cortex/canon/entities/${String(m.canon_entity_id)}`}
+            >
+              {String(m.display_label ?? m.canon_entity_id)}
+            </Link>
+            <span className="text-xs text-stone-500">
+              {" "}
+              · {String(m.entity_type ?? "entity")}
+              {m.resource_type ? ` / ${String(m.resource_type)}` : ""} · {String(m.extractor_rule)}
+            </span>
+          </li>
+        ))}
+        {items.length > 40 ? (
+          <li className="px-2 py-1 text-xs text-stone-500">… and {items.length - 40} more</li>
+        ) : null}
+      </ul>
+    </div>
+  );
+
+  return (
+    <div className="mt-3 max-h-[28rem] space-y-4 overflow-y-auto">
+      {direct.length > 0 ? renderGroup("Direct (Level 0)", direct) : null}
+      {graph.length > 0 ? renderGroup("Graph expanded (Level 1)", graph) : null}
     </div>
   );
 }
@@ -191,6 +335,10 @@ function DataTab({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-stone-600">
+        Each row is one declared domain (seed). Click a domain to inspect its members — Notion rows linked directly, plus
+        optional graph-expanded artifacts.
+      </p>
       <div className="flex flex-wrap gap-2">
         {(["mass", "activity", "growing", "shrinking", "name"] as const).map((key) => (
           <button
@@ -219,18 +367,21 @@ function DataTab({ tenantId }: { tenantId: string }) {
               <tr>
                 <th className="px-4 py-2">Domain</th>
                 <th className="px-4 py-2">Kind</th>
+                <th className="px-4 py-2">Members</th>
                 <th className="px-4 py-2">Mass</th>
                 <th className="px-4 py-2">7d</th>
-                <th className="px-4 py-2">Δ</th>
               </tr>
             </thead>
             <tbody>
               {(listQ.data?.items ?? []).map((row) => {
                 const stats = (row.stats ?? {}) as Record<string, unknown>;
+                const summary = (row.membership_summary ?? {}) as MembershipSummary;
                 return (
                   <tr
                     key={String(row.id)}
-                    className="cursor-pointer border-t border-stone-100 hover:bg-stone-50"
+                    className={`cursor-pointer border-t border-stone-100 hover:bg-stone-50 ${
+                      domainId === String(row.id) ? "bg-indigo-50" : ""
+                    }`}
                     onClick={() =>
                       setSearchParams((prev) => {
                         const p = new URLSearchParams(prev);
@@ -241,10 +392,17 @@ function DataTab({ tenantId }: { tenantId: string }) {
                     }
                   >
                     <td className="px-4 py-2 font-medium">{String(row.display_name)}</td>
-                    <td className="px-4 py-2">{String(row.declared_container_kind)}</td>
+                    <td className="px-4 py-2 text-xs">{String(row.declared_container_kind)}</td>
+                    <td className="px-4 py-2">
+                      {summary.total ?? row.active_membership_count ?? 0}
+                      {summary.direct != null ? (
+                        <span className="block text-xs text-stone-500">
+                          {summary.direct} direct · {summary.graph} graph
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="px-4 py-2">{String(stats.mass_total ?? 0)}</td>
                     <td className="px-4 py-2">{String(stats.events_7d ?? 0)}</td>
-                    <td className="px-4 py-2">{String(stats.activity_delta_7d ?? 0)}</td>
                   </tr>
                 );
               })}
@@ -255,19 +413,28 @@ function DataTab({ tenantId }: { tenantId: string }) {
           <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
             <h3 className="text-lg font-semibold">{String(detailQ.data.display_name)}</h3>
             <p className="text-sm text-stone-600">
-              {String(detailQ.data.declared_container_kind)} · expansion{" "}
-              {String((detailQ.data.stats as Record<string, unknown>)?.expansion_level ?? "direct")}
+              {String(detailQ.data.declared_container_kind)} · seed {String(detailQ.data.seed_resource_type)}
             </p>
-            <ul className="mt-3 max-h-96 space-y-1 overflow-y-auto text-sm">
-              {((detailQ.data.memberships as Array<Record<string, unknown>>) ?? []).map((m) => (
-                <li key={String(m.id)} className="rounded bg-stone-50 px-2 py-1">
-                  {String(m.display_label ?? m.canon_entity_id)} · {String(m.extractor_rule)} · d
-                  {String(m.seed_distance)}
-                </li>
-              ))}
-            </ul>
+            {(() => {
+              const summary = (detailQ.data.membership_summary ?? {}) as MembershipSummary;
+              const stats = (detailQ.data.stats ?? {}) as Record<string, unknown>;
+              return (
+                <p className="mt-2 text-sm text-stone-700">
+                  <span className="font-medium">{summary.total ?? 0}</span> members ({summary.direct ?? 0} direct Notion
+                  / canon rows, {summary.graph ?? 0} via graph) · mass {String(stats.mass_total ?? 0)}
+                </p>
+              );
+            })()}
+            <MembershipList
+              tenantId={tenantId}
+              memberships={(detailQ.data.memberships as Array<Record<string, unknown>>) ?? []}
+            />
           </div>
-        ) : null}
+        ) : (
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-stone-200 p-8 text-sm text-stone-500">
+            Select a domain to inspect members
+          </div>
+        )}
       </div>
     </div>
   );
@@ -303,14 +470,18 @@ export default function AdminCortexDeclaredDomainsPage() {
   return (
     <div className="space-y-6">
       <header className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h1 className="text-xl font-semibold text-stone-900">Declared Domains</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-xl font-semibold text-stone-900">Declared Domains</h1>
+          {data?.operational_status ? <StatusBadge status={data.operational_status} /> : null}
+        </div>
         <p className="mt-1 text-sm text-stone-600">
-          Trusted execution containers (Linear initiatives/projects and pinned Notion databases) with
-          deterministic membership and momentum.
+          Trusted execution containers (Linear initiatives/projects and pinned Notion databases) with deterministic
+          membership and momentum.
         </p>
         {data ? (
           <p className="mt-2 text-xs text-stone-500">
-            {data.declared_domain_count} domains · {data.dirty_queue_pending} dirty
+            {data.declared_domain_count} domains · {data.active_membership_count} members · {data.dirty_queue_pending}{" "}
+            dirty
             {data.graph_behind ? " · graph behind (Level 1 advisory)" : null}
           </p>
         ) : null}
