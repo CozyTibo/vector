@@ -55,6 +55,7 @@ from vector.contracts.admin import (
     AdminCanonCoverageResponse,
     AdminCanonEntityDetailResponse,
     AdminCanonEntityListResponse,
+    AdminNotionDatabaseMembersResponse,
     AdminCanonEntityStatsResponse,
     AdminIdentityDetailResponse,
     AdminIdentityListResponse,
@@ -86,6 +87,14 @@ from vector.contracts.admin import (
     AdminDeclaredDomainTriggerPassResponse,
     AdminDeclaredDomainRebuildRequest,
     AdminDeclaredDomainRebuildResponse,
+    AdminExecutionSurfaceActivityListResponse,
+    AdminExecutionSurfaceDomainDetailResponse,
+    AdminExecutionSurfaceDomainListResponse,
+    AdminExecutionSurfaceOverviewResponse,
+    AdminExecutionSurfacePeopleListResponse,
+    AdminExecutionSurfacePersonDetailResponse,
+    AdminExecutionSurfaceWorkDetailResponse,
+    AdminExecutionSurfaceWorkListResponse,
     AdminNotionWorkContainerItem,
     AdminNotionWorkContainerRowSamplesResponse,
     AdminNotionWorkContainersResponse,
@@ -159,6 +168,8 @@ from vector.domains.cortex.canon.admin_entities import (
     MANUAL_CANON_PASS_CONFIRMATION,
     get_canon_entity_detail,
     list_canon_entities,
+    list_notion_database_members,
+    notion_database_id_from_entity,
 )
 from vector.domains.cortex.canon.admin_readiness import (
     build_canon_admin_readiness,
@@ -1824,6 +1835,56 @@ def build_admin_router() -> APIRouter:
         return AdminCanonEntityDetailResponse.model_validate(raw)
 
     @r.get(
+        "/tenants/{tenant_id}/cortex/canon/entities/{entity_id}/database-members",
+        response_model=AdminNotionDatabaseMembersResponse,
+    )
+    def admin_cortex_notion_database_members(
+        tenant_id: uuid.UUID,
+        entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        offset: Annotated[int, Query(ge=0, le=50_000)] = 0,
+        search: Annotated[str | None, Query()] = None,
+    ) -> AdminNotionDatabaseMembersResponse:
+        from sqlalchemy import select
+
+        from vector.domains.cortex.canon.notion_display_labels import enrich_notion_display_labels
+        from vector.infrastructure.db.models.canon_entity import CanonEntity
+
+        _assert_tenant(db, tenant_id)
+        entity = db.scalar(
+            select(CanonEntity).where(
+                CanonEntity.tenant_id == tenant_id,
+                CanonEntity.id == entity_id,
+            ),
+        )
+        if entity is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Canon entity not found.")
+        database_id = notion_database_id_from_entity(entity)
+        if database_id is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Entity is not a Notion database work container.",
+            )
+        display_name = enrich_notion_display_labels(db, [entity]).get(entity.id, entity.display_label)
+        items, total = list_notion_database_members(
+            db,
+            tenant_id,
+            database_id,
+            limit=limit,
+            offset=offset,
+            search=search,
+        )
+        return AdminNotionDatabaseMembersResponse(
+            database_id=database_id,
+            database_display_name=display_name,
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
         "/tenants/{tenant_id}/cortex/canon/registry",
         response_model=AdminCanonRegistryResponse,
     )
@@ -2327,6 +2388,197 @@ def build_admin_router() -> APIRouter:
             pass_id=str(pass_id),
             enqueued_entity_count=int(prep.get("enqueued_entity_count") or 0),
         )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/overview",
+        response_model=AdminExecutionSurfaceOverviewResponse,
+    )
+    def admin_cortex_execution_surfaces_overview(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> AdminExecutionSurfaceOverviewResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import build_execution_surfaces_overview
+
+        payload = build_execution_surfaces_overview(
+            db,
+            tenant_id,
+            activity_min_events=settings.cortex_declared_domain_activity_min_events,
+            momentum_min_baseline=settings.cortex_declared_domain_momentum_min_baseline,
+        )
+        return AdminExecutionSurfaceOverviewResponse.model_validate(payload)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/domains",
+        response_model=AdminExecutionSurfaceDomainListResponse,
+    )
+    def admin_cortex_execution_surfaces_domains(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        sort: Annotated[str, Query()] = "activity",
+        lifecycle: Annotated[str | None, Query()] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminExecutionSurfaceDomainListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import list_execution_surface_domains
+
+        items, total = list_execution_surface_domains(
+            db,
+            tenant_id,
+            sort=sort,
+            lifecycle=lifecycle,
+            activity_min_events=settings.cortex_declared_domain_activity_min_events,
+            momentum_min_baseline=settings.cortex_declared_domain_momentum_min_baseline,
+            offset=offset,
+            limit=limit,
+        )
+        return AdminExecutionSurfaceDomainListResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+            sort=sort,
+            lifecycle=lifecycle,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/activity",
+        response_model=AdminExecutionSurfaceActivityListResponse,
+    )
+    def admin_cortex_execution_surfaces_activity(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        identity_id: Annotated[uuid.UUID | None, Query()] = None,
+        domain_id: Annotated[uuid.UUID | None, Query()] = None,
+        entity_type: Annotated[str | None, Query()] = None,
+        hours: Annotated[int, Query(ge=1, le=720)] = 168,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> AdminExecutionSurfaceActivityListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import list_execution_surface_activity
+
+        payload = list_execution_surface_activity(
+            db,
+            tenant_id,
+            identity_id=identity_id,
+            domain_id=domain_id,
+            entity_type=entity_type,
+            hours=hours,
+            offset=offset,
+            limit=limit,
+        )
+        return AdminExecutionSurfaceActivityListResponse.model_validate(payload)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/domains/{domain_id}",
+        response_model=AdminExecutionSurfaceDomainDetailResponse,
+    )
+    def admin_cortex_execution_surfaces_domain_detail(
+        tenant_id: uuid.UUID,
+        domain_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminExecutionSurfaceDomainDetailResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import get_execution_surface_domain
+
+        detail = get_execution_surface_domain(db, tenant_id, domain_id)
+        if detail is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="declared_domain_not_found")
+        return AdminExecutionSurfaceDomainDetailResponse.model_validate(detail)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/people",
+        response_model=AdminExecutionSurfacePeopleListResponse,
+    )
+    def admin_cortex_execution_surfaces_people(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        search: Annotated[str | None, Query()] = None,
+    ) -> AdminExecutionSurfacePeopleListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import list_execution_surface_people
+
+        items, total = list_execution_surface_people(
+            db, tenant_id, offset=offset, limit=limit, search=search
+        )
+        return AdminExecutionSurfacePeopleListResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/people/{identity_id}",
+        response_model=AdminExecutionSurfacePersonDetailResponse,
+    )
+    def admin_cortex_execution_surfaces_person_detail(
+        tenant_id: uuid.UUID,
+        identity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminExecutionSurfacePersonDetailResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import get_execution_surface_person
+
+        detail = get_execution_surface_person(db, tenant_id, identity_id)
+        if detail is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="identity_not_found")
+        return AdminExecutionSurfacePersonDetailResponse.model_validate(detail)
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/work",
+        response_model=AdminExecutionSurfaceWorkListResponse,
+    )
+    def admin_cortex_execution_surfaces_work(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        entity_type: Annotated[str | None, Query()] = None,
+        connector: Annotated[str | None, Query()] = None,
+        domain_id: Annotated[uuid.UUID | None, Query()] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    ) -> AdminExecutionSurfaceWorkListResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import list_execution_surface_work
+
+        items, total = list_execution_surface_work(
+            db,
+            tenant_id,
+            entity_type=entity_type,
+            connector=connector,
+            domain_id=domain_id,
+            offset=offset,
+            limit=limit,
+        )
+        return AdminExecutionSurfaceWorkListResponse(
+            items=items,
+            total_count=total,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces/work/{canon_entity_id}",
+        response_model=AdminExecutionSurfaceWorkDetailResponse,
+    )
+    def admin_cortex_execution_surfaces_work_detail(
+        tenant_id: uuid.UUID,
+        canon_entity_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminExecutionSurfaceWorkDetailResponse:
+        _assert_tenant(db, tenant_id)
+        from vector.domains.cortex.execution_surfaces.admin import get_execution_surface_work
+
+        detail = get_execution_surface_work(db, tenant_id, canon_entity_id)
+        if detail is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="artifact_not_found")
+        return AdminExecutionSurfaceWorkDetailResponse.model_validate(detail)
 
     @r.get(
         "/tenants/{tenant_id}/cortex/declared-domains/readiness",

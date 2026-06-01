@@ -4931,6 +4931,17 @@ class AdminCanonEntityListResponse(BaseModel):
     limit: int
 
 
+class AdminNotionDatabaseMembersResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    database_id: str
+    database_display_name: str
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
 class AdminCanonEntityDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
@@ -5257,5 +5268,102 @@ class AdminDeclaredDomainRebuildResponse(BaseModel):
     seeds_enqueued: int
     members_enqueued: int
     pass_id: str | None = None
+
+
+class AdminExecutionSurfaceOverviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    substrate: dict[str, Any]
+    observation_footnote: str
+    active_domains: list[dict[str, Any]]
+    active_people: list[dict[str, Any]]
+    recent_observation_activity: list[dict[str, Any]] = Field(default_factory=list)
+    activity_meta: dict[str, Any] = Field(default_factory=dict)
+    connected_work: dict[str, Any] = Field(default_factory=dict)
+    hero_route_hint: str
+
+
+class AdminExecutionSurfaceDomainListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+    sort: str
+    lifecycle: str | None = None
+
+
+class AdminExecutionSurfaceDomainDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: str
+    display_name: str
+    lifecycle_bucket: str
+    declared_container_kind: str
+    seed_connector: str
+    seed_resource_type: str
+    seed_canon_entity_id: str
+    seed_provider_status: str | None = None
+    why_belong_together: str
+    summary: dict[str, Any]
+    current_work: dict[str, Any]
+    people: dict[str, Any]
+    activity: dict[str, Any]
+    conversations: dict[str, Any]
+    connected_work: dict[str, Any]
+    evidence: dict[str, Any]
+
+
+class AdminExecutionSurfacePeopleListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminExecutionSurfacePersonDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False, extra="allow")
+
+    id: str
+    display_name: str
+    kind: str
+    accounts: list[dict[str, Any]]
+    participation: dict[str, Any]
+    domains: list[dict[str, Any]]
+
+
+class AdminExecutionSurfaceWorkListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+
+
+class AdminExecutionSurfaceWorkDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    entity: dict[str, Any]
+    people: dict[str, Any]
+    connected_artifacts: dict[str, Any]
+    discussions: dict[str, Any]
+    domain_memberships: list[dict[str, Any]]
+    activity: dict[str, Any]
+
+
+class AdminExecutionSurfaceActivityListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    items: list[dict[str, Any]]
+    total_count: int
+    offset: int
+    limit: int
+    execution_timeline_available: bool
+    footnote: str
+    window_hours: int
 
 
