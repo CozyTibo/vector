@@ -14,7 +14,6 @@ from vector.infrastructure.db.models.canon_dirty_queue import CanonDirtyQueue
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.canon_materialization_cursor import CanonMaterializationCursor
 from vector.infrastructure.db.models.canon_pass_run import CanonPassRun
-from vector.infrastructure.db.models.canon_scheduler_tick import CanonSchedulerTick
 from vector.infrastructure.db.models.cortex_admin_continuity_snapshot import CortexAdminContinuitySnapshot
 from vector.infrastructure.db.models.cortex_admin_graph_component_snapshot import (
     CortexAdminGraphComponentSnapshot,
@@ -28,13 +27,11 @@ from vector.infrastructure.db.models.declared_domain_stats import DeclaredDomain
 from vector.infrastructure.db.models.graph_dirty_queue import GraphDirtyQueue
 from vector.infrastructure.db.models.graph_pass_run import GraphPassRun
 from vector.infrastructure.db.models.graph_relationship import GraphRelationship
-from vector.infrastructure.db.models.graph_scheduler_tick import GraphSchedulerTick
 from vector.infrastructure.db.models.graph_unresolved_reference import GraphUnresolvedReference
 from vector.infrastructure.db.models.identity_account import IdentityAccount
 from vector.infrastructure.db.models.identity_dirty_queue import IdentityDirtyQueue
 from vector.infrastructure.db.models.identity_entity import IdentityEntity
 from vector.infrastructure.db.models.identity_pass_run import IdentityPassRun
-from vector.infrastructure.db.models.identity_scheduler_tick import IdentitySchedulerTick
 from vector.infrastructure.db.models.identity_suggestion import IdentitySuggestion
 from vector.infrastructure.db.models.raw_ingestion_record import RawIngestionRecord
 from vector.infrastructure.db.models.raw_memory_archive_catalog import RawMemoryArchiveCatalog
@@ -71,14 +68,12 @@ def clear_derived_cortex_for_tenant(session: Session, *, tenant_id: uuid.UUID) -
     _del(GraphUnresolvedReference, "graph_unresolved_references")
     _del(GraphDirtyQueue, "graph_dirty_queue")
     _del(GraphPassRun, "graph_pass_runs")
-    _del(GraphSchedulerTick, "graph_scheduler_ticks")
 
     _del(IdentitySuggestion, "identity_suggestions")
     _del(IdentityAccount, "identity_accounts")
     _del(IdentityEntity, "identity_entities")
     _del(IdentityDirtyQueue, "identity_dirty_queue")
     _del(IdentityPassRun, "identity_pass_runs")
-    _del(IdentitySchedulerTick, "identity_scheduler_ticks")
 
     _del(CanonEntity, "canon_entities")
     _del(CanonDirtyQueue, "canon_dirty_queue")
@@ -87,7 +82,6 @@ def clear_derived_cortex_for_tenant(session: Session, *, tenant_id: uuid.UUID) -
         session,
         delete(CanonMaterializationCursor).where(CanonMaterializationCursor.tenant_id == tenant_id),
     )
-    _del(CanonSchedulerTick, "canon_scheduler_ticks")
 
     _del(CortexPass, "cortex_passes")
     deleted["cortex_admin_continuity_snapshot"] = _delete_count(
