@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { DomainDetailView } from "./executionSurfaces/DomainDetailView";
@@ -18,13 +20,20 @@ function resolveTab(tabParam: string | null): Tab {
 }
 
 export default function AdminCortexExecutionSurfacesPage() {
-  const { domainId, artifactId } = useParams<{
+  const { tenantId = "", domainId, artifactId } = useParams<{
     tenantId: string;
     domainId?: string;
     artifactId?: string;
   }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = resolveTab(searchParams.get("tab"));
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (domainId || artifactId) {
+      void queryClient.cancelQueries({ queryKey: ["execution-surface-overview", tenantId] });
+    }
+  }, [artifactId, domainId, queryClient, tenantId]);
 
   if (domainId) {
     return <DomainDetailView domainId={domainId} />;
@@ -61,11 +70,15 @@ export default function AdminCortexExecutionSurfacesPage() {
               tab === key ? "bg-indigo-100 text-indigo-900" : "text-stone-700 hover:bg-stone-100"
             }`}
             onClick={() =>
-              setSearchParams((prev) => {
-                const p = new URLSearchParams(prev);
+              setSearchParams(() => {
+                const p = new URLSearchParams();
                 p.set("tab", key);
-                p.delete("domain_id");
-                p.delete("person_id");
+                if (key === "domains") {
+                  p.set("sort", "activity");
+                }
+                if (key === "activity") {
+                  p.set("hours", "168");
+                }
                 return p;
               })
             }

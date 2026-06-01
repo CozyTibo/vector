@@ -25,8 +25,14 @@ export function OverviewTab() {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const q = useQuery({
     queryKey: ["execution-surface-overview", tenantId],
+    enabled: Boolean(tenantId),
+    refetchOnWindowFocus: false,
     queryFn: () =>
-      adminJson<Overview>(`/admin/tenants/${tenantId}/cortex/execution-surfaces/overview`),
+      adminJson<Overview>(
+        `/admin/tenants/${tenantId}/cortex/execution-surfaces/overview`,
+        undefined,
+        { tenantIdHint: tenantId },
+      ),
   });
 
   if (q.isLoading) return <CortexPageSkeleton label="Loading overview" />;

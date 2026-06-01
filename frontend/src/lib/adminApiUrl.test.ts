@@ -50,6 +50,24 @@ describe("adminApiUrl", () => {
     expect(resolveAdminRequestUrl(path)).toBe(`https://api.myvector.co${path}`);
   });
 
+  it("maps SPA execution-surfaces route query to overview API path", () => {
+    vi.spyOn(canonicalApi, "getApiBase").mockReturnValue("https://api.myvector.co");
+    const spaPath = `/admin/tenants/${TID}/cortex/execution-surfaces?tab=overview&sort=name&entity_type=deployment&hours=720`;
+    expect(resolveAdminRequestUrl(spaPath, TID)).toBe(
+      `https://api.myvector.co/admin/tenants/${TID}/cortex/execution-surfaces/overview`,
+    );
+  });
+
+  it("repairs malformed /admin/surfaces paths from misconfigured tenant bases", () => {
+    vi.spyOn(canonicalApi, "getApiBase").mockReturnValue("https://api.myvector.co/admin");
+    expect(resolveAdminRequestUrl("/admin/surfaces/overview", TID)).toBe(
+      `https://api.myvector.co/admin/tenants/${TID}/cortex/execution-surfaces/overview`,
+    );
+    expect(resolveAdminRequestUrl("/surfaces/overview", TID)).toBe(
+      `https://api.myvector.co/admin/tenants/${TID}/cortex/execution-surfaces/overview`,
+    );
+  });
+
   it("maps overview slice suffixes when API base ends in cortex overview", () => {
     vi.spyOn(canonicalApi, "getApiBase").mockReturnValue(
       `http://localhost:8080/admin/tenants/${TID}/cortex/overview`,

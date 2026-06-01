@@ -24,6 +24,81 @@ const TENANT_IN_PATH_RE = new RegExp(`^/admin/tenants/(${TENANT_UUID})`, "i");
 const OVERVIEW_SLICE_SUFFIX_RE =
   /^\/(?:phases|ingestion)(?:\/|$)|^\/execution\/(?!surfaces)(?:\/|$)/;
 
+/** API resource present (``…/execution-surfaces/overview``, not SPA ``…/execution-surfaces?tab=``). */
+const EXECUTION_SURFACES_PATH_RE = /\/cortex\/execution-surfaces\/[a-z]+/i;
+
+/** SPA route mistaken for an API path when ``?tab=`` is used without a resource segment. */
+const EXECUTION_SURFACES_SPA_ROUTE_RE = new RegExp(
+  `^/admin/tenants/(${TENANT_UUID})/cortex/execution-surfaces/?$`,
+  "i",
+);
+
+/** Broken URL produced when a misconfigured API base strips ``/tenants/{id}/cortex/execution-``. */
+const MALFORMED_ADMIN_SURFACES_RE = /^\/admin\/surfaces\/(.*)$/i;
+
+const BARE_SURFACES_SUFFIX_RE = /^\/surfaces(?:\/|$)/;
+
+function resolveExecutionSurfacesSpaPath(path: string, tenantIdHint?: string): string {
+  const qIndex = path.indexOf("?");
+  const pathOnly = qIndex >= 0 ? path.slice(0, qIndex) : path;
+  if (!EXECUTION_SURFACES_SPA_ROUTE_RE.test(pathOnly)) {
+    return path;
+  }
+  const tid = tenantIdHint ?? _tenantIdFromPath(pathOnly) ?? tenantIdFromApiBase();
+  if (!tid) {
+    return path;
+  }
+  const qs = new URLSearchParams(qIndex >= 0 ? path.slice(qIndex + 1) : "");
+  const tab = qs.get("tab") ?? "overview";
+  qs.delete("tab");
+  qs.delete("domain_id");
+  qs.delete("person_id");
+  qs.delete("artifact_id");
+
+  const resource =
+    tab === "domains" || tab === "people" || tab === "work" || tab === "activity"
+      ? tab
+      : "overview";
+  const apiQs = new URLSearchParams();
+  if (resource === "domains") {
+    for (const key of ["sort", "lifecycle", "limit"] as const) {
+      const value = qs.get(key);
+      if (value) apiQs.set(key, value);
+    }
+  } else if (resource === "activity") {
+    for (const key of ["hours", "entity_type", "entity_id", "limit"] as const) {
+      const value = qs.get(key);
+      if (value) apiQs.set(key, value);
+    }
+  } else if (resource === "people") {
+    const limit = qs.get("limit");
+    if (limit) apiQs.set("limit", limit);
+  } else if (resource === "work") {
+    for (const key of ["entity_type", "q", "limit"] as const) {
+      const value = qs.get(key);
+      if (value) apiQs.set(key, value);
+    }
+  }
+  const query = apiQs.toString();
+  return `/admin/tenants/${tid}/cortex/execution-surfaces/${resource}${query ? `?${query}` : ""}`;
+}
+
+function repairMalformedExecutionSurfacesPath(path: string, tenantIdHint?: string): string {
+  const malformed = path.match(MALFORMED_ADMIN_SURFACES_RE);
+  const bare = BARE_SURFACES_SUFFIX_RE.test(path);
+  if (!malformed && !bare) {
+    return path;
+  }
+  const tid = tenantIdHint ?? _tenantIdFromPath(path) ?? tenantIdFromApiBase();
+  if (!tid) {
+    return path;
+  }
+  const suffix = malformed
+    ? malformed[1]
+    : path.replace(/^\//, "").replace(/^surfaces\//, "");
+  return `/admin/tenants/${tid}/cortex/execution-surfaces/${suffix}`;
+}
+
 function rewriteCortexOverviewPath(path: string): string {
   if (path === "/cortex/overview" || path.startsWith("/cortex/overview/")) {
     return path.replace("/cortex/overview", "/cortex/pipeline/overview");
@@ -36,7 +111,12 @@ function rewriteCortexOverviewPath(path: string): string {
 
 /** API origin only — strips accidental per-tenant suffixes from VITE_API_BASE_URL. */
 export function normalizeApiBase(): string {
-  return getApiBase().replace(/\/$/, "").replace(TENANT_SCOPED_TAIL_RE, "");
+  let base = getApiBase().replace(/\/$/, "").replace(TENANT_SCOPED_TAIL_RE, "");
+  // Misconfigured bases sometimes end at ``/admin`` without a tenant id.
+  if (base.endsWith("/admin") && !TENANT_ID_IN_BASE_RE.test(base)) {
+    base = base.slice(0, -"/admin".length);
+  }
+  return base;
 }
 
 /** Tenant id embedded in a misconfigured ``VITE_API_BASE_URL`` (per-tenant base). */
@@ -56,6 +136,11 @@ function _tenantIdFromPath(path: string): string | null {
  */
 export function resolveAdminRequestPath(path: string, tenantIdHint?: string): string {
   let p = path.startsWith("/") ? path : `/${path}`;
+  p = repairMalformedExecutionSurfacesPath(p, tenantIdHint);
+  p = resolveExecutionSurfacesSpaPath(p, tenantIdHint);
+  if (EXECUTION_SURFACES_PATH_RE.test(p)) {
+    return p;
+  }
   p = rewriteCortexOverviewPath(p);
   const tid = tenantIdHint ?? _tenantIdFromPath(p) ?? tenantIdFromApiBase();
 

@@ -4,10 +4,16 @@ import { readErrorDetail } from "./canonicalApi";
 
 const ADMIN_FETCH_TIMEOUT_MS = 45_000;
 
+export type AdminFetchOptions = {
+  timeoutMs?: number;
+  /** Route tenant id — stabilizes URL resolution when ``VITE_API_BASE_URL`` embeds a tenant path. */
+  tenantIdHint?: string;
+};
+
 export async function adminFetch(
   path: string,
   init?: RequestInit,
-  options?: { timeoutMs?: number },
+  options?: AdminFetchOptions,
 ): Promise<Response> {
   const pw = getAdminPassword();
   if (!pw) {
@@ -19,7 +25,7 @@ export async function adminFetch(
   const timeoutMs = options?.timeoutMs ?? ADMIN_FETCH_TIMEOUT_MS;
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(resolveAdminRequestUrl(path), {
+    return await fetch(resolveAdminRequestUrl(path, options?.tenantIdHint), {
       ...init,
       headers,
       signal: init?.signal ?? controller.signal,
@@ -37,7 +43,7 @@ export async function adminFetch(
 export async function adminJson<T>(
   path: string,
   init?: RequestInit,
-  options?: { timeoutMs?: number },
+  options?: AdminFetchOptions,
 ): Promise<T> {
   const res = await adminFetch(path, init, options);
   if (res.status === 401) {
