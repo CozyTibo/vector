@@ -23,6 +23,10 @@ flowchart LR
 | Ingestion | every orchestrator tick | `vector.cortex.ingestion.run_sync` | `cortex_live` / `cortex_replay` |
 | Canon | 300s when raw backlog | canon materialization pass | `vector` |
 | Identity | 300s when due | identity reconciliation pass | `vector` |
+| Graph | 300s when dirty/backlog | graph projection pass | `vector` |
+| Declared Domains | 300s when dirty | `declared_domain_pass` | `vector` |
+
+**Admin UI:** Cortex tenant default route is **Execution Surfaces** (read composition). Substrate lanes above remain ops/debug — see [`admin-navigation.md`](admin-navigation.md).
 
 Prod ECS (2 workers): `vector-worker-service` (ingestion queues only), `vector-substrate-worker-service` (Beat + `vector` queue). Legacy `vector-canon-worker-service` and `vector-identity-worker-service` are deleted on deploy.
 

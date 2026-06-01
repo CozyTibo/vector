@@ -6,6 +6,8 @@ Use this checklist before approving architecture, schema, or phase-level changes
 - [ ] New terms map to canonical ontology vocabulary.
 - [ ] Deprecated/forbidden wording is not introduced.
 - [ ] `project`, `initiative`, `thread`, `discussion`, `ownership`, `responsibility` are used consistently.
+- [ ] Execution scope uses **Declared Domain** (V1) or **Emergent Domain** (future) — not `topic`, `topic materialization`, or `declared work rollup`.
+- [ ] **Execution Surfaces** remain read-only consumers — no new passes, queues, or materialization tables in surface modules.
 
 ## Contract Drift
 - [ ] Field names follow canonical naming conventions.

@@ -10,11 +10,24 @@ Cortex implementation is strictly isolated under `backend/domains/cortex/`. Upst
 4. `canonical` -> tool-agnostic organizational event model.
 5. `entity_resolution` -> cross-tool identity linkage.
 6. `graph` -> temporal relation graph construction.
-7. `memory` -> compressed and derived memory representations.
-8. `reasoning` -> deterministic + bounded AI inference artifacts.
-9. `retrieval` -> evidence-grounded query planning and context packs.
-10. `synthesis` -> explainable narrative assembly from evidence.
-11. `admin`/`observability` -> controls, replay operations, governance.
+7. `declared_domains` -> cross-tool rollups of declared work containers (initiative/project seeds) with momentum. **V1 execution-scope layer.** See [`declared-domains-v1-plan.md`](../declared-domains-v1-plan.md).
+8. `memory` -> compressed and derived memory representations.
+9. `reasoning` -> deterministic + bounded AI inference artifacts.
+10. `retrieval` -> evidence-grounded query planning and context packs.
+11. `synthesis` -> explainable narrative assembly from evidence.
+12. `admin`/`observability` -> controls, replay operations, governance.
+
+**Future (not in layer topology yet):** `emergent_domains` — hybrid materialization of undeclared concerns; **sibling** to `declared_domains`. **Execution Intelligence** consumes scope layers; it is not a materialization layer.
+
+**Deprecated naming:** `topic materialization`, `declared work rollup`, `execution domain` (V1) — use **Declared Domain**.
+
+## Execution Surfaces (first product consumer)
+
+**Execution Surfaces** are a **read-only composition layer** over substrate outputs (canon, identity, graph, declared domains). They are the first human-facing execution-reality consumer — not a new pass, scheduler, or store.
+
+- **Admin V1 plan:** [`execution-surfaces-v1-admin-plan.md`](../execution-surfaces-v1-admin-plan.md)
+- **Substrate tabs** (Ingestion, Canon, Identities, Declared Domains ops, Links) remain operator/debug views.
+- **Execution Intelligence** (future) interprets scope; surfaces show state only.
 
 ## Hard Architecture Boundaries
 - No phase may write into non-adjacent downstream stores.

@@ -11,8 +11,14 @@ This document defines Cortex's canonical vocabulary and flags deprecated or forb
 - `risk` and `concern` were sometimes interchangeable; clarified as related but distinct concepts.
 
 ## Canonical Terms (Preferred)
-- `Project`: bounded execution container with scope, timeline, ownership.
-- `Initiative`: strategic container spanning multiple projects.
+- `Project`: bounded execution container with scope, timeline, ownership. Canon entity; may seed a **Declared Domain**.
+- `Initiative`: strategic container spanning multiple projects. Canon entity; may seed a **Declared Domain**.
+- `Execution Scope`: umbrella for materialized concern groupings — always qualify **Declared** vs **Emergent**.
+- `Declared Domain`: deterministic cross-tool projection from a declared container seed. **V1.** Code: `declared_domains`, pass `declared_domain_pass`.
+- `Declared container` / `declared_container_kind`: provider-agnostic seed classification set in **canon** (`canon/declared_container_registry.py`). Declared Domains reads this; no per-connector logic in domain module.
+- `Emergent Domain`: future hybrid projection for undeclared organizational concerns. **Not V1.** Sibling to Declared Domains.
+- `Execution Intelligence`: inferred interpretation (risk, drift, delivery) **on** scope layers — not scope materialization.
+- `Execution Surface` / `Execution Surfaces`: read-only admin (and future product) composition over canon, identity, graph, and declared domains — human execution reality; not a substrate pass.
 - `Artifact`: durable work object (code, doc, ticket, transcript, runbook).
 - `Concern`: unresolved objection, risk signal, or uncertainty raised by participants.
 - `Risk`: projected negative outcome; modeled as a concern subtype when evidence is predictive.
@@ -34,6 +40,12 @@ This document defines Cortex's canonical vocabulary and flags deprecated or forb
 - `summary truth` -> use `synthesis artifact` (non-authoritative).
 - `AI result` -> use `inference artifact` with confidence semantics.
 
+## Forbidden Terms (execution scope)
+- `Topic` / `Topic Materialization` for execution-scope layers.
+- `Declared Work Rollup` — renamed to **Declared Domain**.
+- `Execution Domain` as V1 name — use **Declared Domain**; reserve umbrella for **Execution Scope**.
+- `Emergent Execution Domain` — use **Emergent Domain**.
+
 ## Forbidden Terms
 - `AI truth`
 - `autonomous memory`
@@ -42,6 +54,9 @@ This document defines Cortex's canonical vocabulary and flags deprecated or forb
 - `context dump` as retrieval strategy
 
 ## Overload Resolution Rules
+- `Declared Domain` vs `Initiative`/`Project`: initiative/project are **canon seeds**; Declared Domain is the **cross-tool projection**.
+- `Declared Domain` vs `Emergent Domain`: declared = provider seed + deterministic expansion; emergent = no seed, hybrid (future).
+- `Execution Scope` vs `Execution Intelligence`: scope = what belongs together; intelligence = what it means for delivery/risk.
 - `Project` vs `Initiative`: project is execution-bounded; initiative is strategic and multi-project.
 - `Discussion` vs `Thread`: discussion is broad communication set; thread is linked sub-sequence.
 - `Ownership` vs `Responsibility`: ownership implies accountability relation; responsibility implies expected action scope.
