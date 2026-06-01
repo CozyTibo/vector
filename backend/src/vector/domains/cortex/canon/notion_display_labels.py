@@ -157,53 +157,173 @@ def _resource_type_from_entity(entity: CanonEntity) -> str | None:
     return resource_type_from_entity_key(entity.entity_key)
 
 
-def _latest_source_for_entity(
-    session: Session,
-    entity_id: uuid.UUID,
-) -> CanonEntitySource | None:
-    preferred = session.scalar(
-        select(CanonEntitySource)
-        .where(
-            CanonEntitySource.canon_entity_id == entity_id,
-            CanonEntitySource.is_latest.is_(True),
-        )
-        .limit(1),
-    )
-    if preferred is not None:
-        return preferred
-    return session.scalar(
-        select(CanonEntitySource)
-        .where(CanonEntitySource.canon_entity_id == entity_id)
-        .order_by(CanonEntitySource.observed_at.desc(), CanonEntitySource.raw_id.desc())
-        .limit(1),
-    )
+NOTION_RAW_TITLE_RESOURCE_TYPES: tuple[str, ...] = (
+    "notion.database_row",
+    "notion.page",
+    "notion.block",
+    "notion.database",
+)
 
 
-def _title_from_raw_lookup(
+def _parent_page_id_from_block_segment(segment: dict[str, Any]) -> str | None:
+    parent = segment.get("parent")
+    if isinstance(parent, dict) and parent.get("type") == "page_id":
+        page_id = parent.get("page_id")
+        if isinstance(page_id, str) and page_id.strip():
+            return page_id.strip()
+    parent_id = segment.get("parent_id")
+    if isinstance(parent_id, str) and parent_id.strip():
+        return parent_id.strip()
+    return None
+
+
+def _title_from_raw_record(raw: RawIngestionRecord) -> str | None:
+    body = raw.payload_body if isinstance(raw.payload_body, dict) else {}
+    return notion_title_from_payload(resource_type=raw.resource_type, payload_body=body)
+
+
+def _title_from_raw_by_external_id(
     session: Session,
     *,
     tenant_id: uuid.UUID,
+    external_id: str,
+    preferred_resource_types: tuple[str, ...] = NOTION_RAW_TITLE_RESOURCE_TYPES,
+) -> str | None:
+    for resource_type in preferred_resource_types:
+        raw = session.scalar(
+            select(RawIngestionRecord)
+            .where(
+                RawIngestionRecord.tenant_id == tenant_id,
+                RawIngestionRecord.resource_type == resource_type,
+                RawIngestionRecord.external_id == external_id,
+                RawIngestionRecord.replay_job_id.is_(None),
+            )
+            .order_by(RawIngestionRecord.id.desc())
+            .limit(1),
+        )
+        if raw is None:
+            continue
+        title = _title_from_raw_record(raw)
+        if title:
+            return title
+    return None
+
+
+def _title_from_block_with_parent_context(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    segment: dict[str, Any],
+) -> str | None:
+    direct = notion_block_title_from_segment(segment)
+    if direct:
+        return direct
+    parent_page_id = _parent_page_id_from_block_segment(segment)
+    if parent_page_id is None:
+        return None
+    parent_title = _title_from_raw_by_external_id(
+        session,
+        tenant_id=tenant_id,
+        external_id=parent_page_id,
+    )
+    if not parent_title:
+        return None
+    block_type = segment.get("type")
+    if block_type == "paragraph":
+        return f"{parent_title} (paragraph)"
+    if isinstance(block_type, str) and block_type:
+        return f"{parent_title} ({block_type.replace('_', ' ')})"
+    return parent_title
+
+
+def _title_from_entity_sources(session: Session, entity_id: uuid.UUID) -> str | None:
+    sources = session.scalars(
+        select(CanonEntitySource)
+        .where(CanonEntitySource.canon_entity_id == entity_id)
+        .order_by(
+            CanonEntitySource.is_latest.desc(),
+            CanonEntitySource.observed_at.desc(),
+            CanonEntitySource.raw_id.desc(),
+        ),
+    ).all()
+    raw_ids = [src.raw_id for src in sources]
+    if not raw_ids:
+        return None
+    raws = {
+        row.id: row
+        for row in session.scalars(
+            select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids)),
+        ).all()
+    }
+    for src in sources:
+        raw = raws.get(src.raw_id)
+        if raw is None:
+            continue
+        title = _title_from_raw_record(raw)
+        if title:
+            return title
+    return None
+
+
+def resolve_notion_display_title(
+    session: Session,
     entity: CanonEntity,
 ) -> str | None:
-    resource_type = _resource_type_from_entity(entity)
+    """Best-effort human title for a Notion canon entity."""
+    if entity.connector != "notion":
+        return None
+
+    title = _title_from_entity_sources(session, entity.id)
+    if title:
+        return title[:512]
+
     external_id = _external_id_from_entity(entity)
-    if resource_type is None or external_id is None:
+    if external_id is None:
         return None
-    raw = session.scalar(
-        select(RawIngestionRecord)
-        .where(
-            RawIngestionRecord.tenant_id == tenant_id,
-            RawIngestionRecord.resource_type == resource_type,
-            RawIngestionRecord.external_id == external_id,
-            RawIngestionRecord.replay_job_id.is_(None),
-        )
-        .order_by(RawIngestionRecord.id.desc())
-        .limit(1),
+
+    resource_type = _resource_type_from_entity(entity)
+    preferred_types: tuple[str, ...]
+    if resource_type == "notion.block":
+        preferred_types = ("notion.block", "notion.database_row", "notion.page")
+    elif resource_type is not None:
+        preferred_types = (resource_type, "notion.database_row", "notion.page", "notion.block")
+    else:
+        preferred_types = NOTION_RAW_TITLE_RESOURCE_TYPES
+
+    title = _title_from_raw_by_external_id(
+        session,
+        tenant_id=entity.tenant_id,
+        external_id=external_id,
+        preferred_resource_types=preferred_types,
     )
-    if raw is None:
-        return None
-    body = raw.payload_body if isinstance(raw.payload_body, dict) else {}
-    return notion_title_from_payload(resource_type=resource_type, payload_body=body)
+    if title:
+        return title[:512]
+
+    if resource_type == "notion.block":
+        raw = session.scalar(
+            select(RawIngestionRecord)
+            .where(
+                RawIngestionRecord.tenant_id == entity.tenant_id,
+                RawIngestionRecord.resource_type == "notion.block",
+                RawIngestionRecord.external_id == external_id,
+                RawIngestionRecord.replay_job_id.is_(None),
+            )
+            .order_by(RawIngestionRecord.id.desc())
+            .limit(1),
+        )
+        if raw is not None:
+            body = raw.payload_body if isinstance(raw.payload_body, dict) else {}
+            segment = body.get("block")
+            if isinstance(segment, dict):
+                contextual = _title_from_block_with_parent_context(
+                    session,
+                    tenant_id=entity.tenant_id,
+                    segment=segment,
+                )
+                if contextual:
+                    return contextual[:512]
+
+    return None
 
 
 def enrich_notion_display_labels(
@@ -222,44 +342,8 @@ def enrich_notion_display_labels(
     if not need:
         return resolved
 
-    entity_ids = [entity.id for entity in need]
-    sources = {
-        row.canon_entity_id: row
-        for row in session.scalars(
-            select(CanonEntitySource).where(
-                CanonEntitySource.canon_entity_id.in_(entity_ids),
-                CanonEntitySource.is_latest.is_(True),
-            ),
-        ).all()
-    }
     for entity in need:
-        if entity.id not in sources:
-            src = _latest_source_for_entity(session, entity.id)
-            if src is not None:
-                sources[entity.id] = src
-
-    raw_ids = {src.raw_id for src in sources.values()}
-    raws: dict[int, RawIngestionRecord] = {}
-    if raw_ids:
-        raws = {
-            row.id: row
-            for row in session.scalars(
-                select(RawIngestionRecord).where(RawIngestionRecord.id.in_(raw_ids)),
-            ).all()
-        }
-
-    for entity in need:
-        label = entity.display_label
-        src = sources.get(entity.id)
-        title: str | None = None
-        if src is not None:
-            raw = raws.get(src.raw_id)
-            body = raw.payload_body if raw is not None and isinstance(raw.payload_body, dict) else {}
-            title = notion_title_from_payload(resource_type=src.resource_type, payload_body=body)
-        if not title:
-            title = _title_from_raw_lookup(session, tenant_id=entity.tenant_id, entity=entity)
-        if title:
-            label = title[:512]
-        resolved[entity.id] = label
+        title = resolve_notion_display_title(session, entity)
+        resolved[entity.id] = title[:512] if title else entity.display_label
 
     return resolved

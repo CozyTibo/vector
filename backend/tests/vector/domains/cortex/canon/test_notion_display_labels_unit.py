@@ -33,6 +33,23 @@ def test_notion_page_title_from_payload() -> None:
     )
 
 
+def test_resolve_notion_display_title_from_database_row_source() -> None:
+    body = {
+        "row": {
+            "properties": {
+                "Name": {
+                    "type": "title",
+                    "title": [{"plain_text": "Connexion via JWT"}],
+                },
+            },
+        },
+    }
+    assert (
+        notion_title_from_payload(resource_type="notion.database_row", payload_body=body)
+        == "Connexion via JWT"
+    )
+
+
 def test_enrich_notion_display_labels_empty() -> None:
     class _Session:
         pass

@@ -44,3 +44,32 @@ def resolve_linear_issue_id(
         tenant_id=tenant_id,
         source_identity_key=key,
     )
+
+
+def resolve_notion_external_id(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    external_id: str,
+) -> uuid.UUID | None:
+    """Resolve a Notion page/row/block id to a canon entity id."""
+    needle = external_id.replace("-", "").lower()
+    if not needle:
+        return None
+    rows = list(
+        session.scalars(
+            select(CanonEntity).where(
+                CanonEntity.tenant_id == tenant_id,
+                CanonEntity.connector == "notion",
+                CanonEntity.entity_type.in_(("document", "work_item", "project")),
+            ),
+        ).all(),
+    )
+    for ent in rows:
+        attrs = ent.attrs_json if isinstance(ent.attrs_json, dict) else {}
+        for raw_id in (attrs.get("notion_id"), attrs.get("external_id")):
+            if isinstance(raw_id, str) and raw_id.replace("-", "").lower() == needle:
+                return ent.id
+        if ent.entity_key.endswith(f":{external_id}") or ent.entity_key.endswith(f":{needle}"):
+            return ent.id
+    return None

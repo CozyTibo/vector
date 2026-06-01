@@ -141,6 +141,15 @@ export type CanonEntityDetail = CanonEntityItem & {
   }>;
 };
 
+export type NotionDatabaseMembers = {
+  database_id: string;
+  database_display_name: string;
+  items: CanonEntityItem[];
+  total_count: number;
+  offset: number;
+  limit: number;
+};
+
 export type IdentityLatestPassRun = {
   id: string;
   status: string;

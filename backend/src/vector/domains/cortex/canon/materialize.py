@@ -144,11 +144,16 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
         external_id=row.external_id,
         notion_work_db_allowlist=notion_allowlist,
     )
+    if (
+        row.resource_type == "notion.database_row"
+        and notion_allowlist
+        and draft.attrs_json.get("database_id") in notion_allowlist
+    ):
+        draft.entity_type = "work_item"
     now = utc_now()
     entity = session.scalar(
         select(CanonEntity).where(
             CanonEntity.tenant_id == row.tenant_id,
-            CanonEntity.entity_type == draft.entity_type,
             CanonEntity.entity_key == draft.entity_key,
         ),
     )
@@ -169,6 +174,7 @@ def materialize_raw_row(session: Session, row: RawIngestionRecord) -> dict[str, 
         session.flush()
     else:
         entity.display_label = draft.display_label
+        entity.entity_type = draft.entity_type
         entity.attrs_json = dict(draft.attrs_json)
         entity.mapper_version = CANON_MAPPER_VERSION
         entity.materialized_at = now

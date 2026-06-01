@@ -34,3 +34,13 @@ Execution intelligence identifies how execution reality deviates from plan over 
 ## Architectural Dependencies
 
 Phases 01-09 with strong requirements on 04 (identity), 05 (graph), 06 (memory), 07 (reasoning), 08 (retrieval), 09 (synthesis).
+
+**Execution scope (materialization, not intelligence):**
+
+| Layer | Role | V1 |
+|-------|------|-----|
+| **Declared Domain** | Cross-tool rollup of declared initiative/project + momentum | Yes |
+| **Emergent Domain** | Undeclared concerns (Authentication, Hiring, …) | Future |
+| **Execution Intelligence** | Risk, drift, delivery on scope | Future |
+
+See [`execution-scope-architecture.md`](../execution-scope-architecture.md) and [`declared-domains-v1-plan.md`](../declared-domains-v1-plan.md).

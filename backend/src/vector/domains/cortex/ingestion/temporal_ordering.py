@@ -33,6 +33,8 @@ def _parse_iso_or_epoch(value: Any) -> datetime | None:
 def derive_provider_event_timestamp(payload_body: dict[str, Any]) -> datetime | None:
     candidates = (
         payload_body.get("provider_event_timestamp"),
+        payload_body.get("provider_updated_at"),
+        payload_body.get("provider_created_at"),
         payload_body.get("updated_at"),
         payload_body.get("updatedAt"),
         payload_body.get("created_at"),

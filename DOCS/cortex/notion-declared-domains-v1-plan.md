@@ -8,6 +8,34 @@
 
 **Goal:** Let Notion-primary workspaces declare **which databases are work containers** and get the same deterministic rollups (mass, activity, momentum, graph expansion) as Linear initiative/project seeds — **without** auto-seeding every `notion.database`.
 
+**Read first:** [`execution-scope-architecture.md`](execution-scope-architecture.md) §Container vs Domain — pinned Notion databases are **container seeds**, not proof of domain granularity.
+
+---
+
+## Notion compatibility bridge
+
+**Normative framing for contributors:** Pinned Notion databases are a **deterministic compatibility bridge** for Notion-first tenants (e.g. no Linear). They reuse the Declared Domains runtime without claiming Notion schema ≡ Linear schema.
+
+**This bridge exists to deliver:**
+
+| Goal | V1.1 |
+|------|------|
+| Non-empty Declared Domains for Notion-only workspaces | Yes — after operator pins 1+ databases |
+| Cross-tool rollups from backlog rows | Yes — Level 0 + graph expansion |
+| Activity / mass visibility on pinned scope | Yes |
+
+**This bridge does NOT deliver:**
+
+| Non-goal | Why |
+|----------|-----|
+| Automatic identification of the org’s “true” execution scopes | Container granularity is **database**, not row |
+| Proof that each pinned database ≡ Linear project/initiative | Roadmap DBs are often **portfolios** |
+| Row-level declared domains | Deferred — see below |
+
+When a tenant pins **Global Roadmap**, V1.1 produces **one declared domain** for the database and **members** for each row. That is correct for the bridge; it is **not** a claim that “Global Roadmap” is the domain EM’s care about.
+
+**Future extension (documentation only):** When roadmap rows represent meaningful execution scopes (shaped bets, epics, initiatives), future **qualified row-level seed kinds** (e.g. `roadmap_item`) may be added via the canon registry — same Declared Domains pass, finer seed qualification. See parent plan §Future seed kinds (extension point).
+
 ---
 
 ## 1. Principles (unchanged from parent plan)
@@ -60,6 +88,7 @@ ELSE do not set declared_container_kind
 |------|------|
 | **Structural gate** | When we document 1–2 Notion “work DB” property templates (Status + Assignee + Due, etc.) and can match deterministically |
 | **Per-row work_item canon type** | If we later map `notion.database_row` → `work_item` instead of `document` for allowlisted DBs only |
+| **Row-level domain seeds** | When roadmap rows represent execution scopes — new `declared_container_kind` (e.g. `roadmap_item`) via registry; not Emergent Domains |
 | **Workspace-wide default** | Never — always explicit pin |
 
 ---

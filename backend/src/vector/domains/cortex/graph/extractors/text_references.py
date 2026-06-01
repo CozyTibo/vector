@@ -65,24 +65,9 @@ def _normalize_notion_page_id(page_id: str) -> str:
 
 
 def _resolve_notion_page(session: Session, *, tenant_id: uuid.UUID, page_id: str) -> uuid.UUID | None:
-    needle = _normalize_notion_page_id(page_id)
-    rows = list(
-        session.scalars(
-            select(CanonEntity).where(
-                CanonEntity.tenant_id == tenant_id,
-                CanonEntity.entity_type == "document",
-                CanonEntity.connector == "notion",
-            ),
-        ).all(),
-    )
-    for ent in rows:
-        attrs = ent.attrs_json if isinstance(ent.attrs_json, dict) else {}
-        for raw_id in (attrs.get("notion_id"), attrs.get("external_id")):
-            if isinstance(raw_id, str) and _normalize_notion_page_id(raw_id) == needle:
-                return ent.id
-        if needle in ent.entity_key.replace("-", "").lower():
-            return ent.id
-    return None
+    from vector.domains.cortex.graph.resolve import resolve_notion_external_id
+
+    return resolve_notion_external_id(session, tenant_id=tenant_id, external_id=page_id)
 
 
 def _resolve_linear_identifier(

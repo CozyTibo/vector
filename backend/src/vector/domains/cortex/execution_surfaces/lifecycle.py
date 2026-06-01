@@ -4,25 +4,24 @@ from __future__ import annotations
 
 from typing import Any
 
+from vector.domains.cortex.canon.lifecycle_substrate import (
+    LIFECYCLE_PHASE_ACTIVE,
+    LIFECYCLE_PHASE_ARCHIVED,
+    LIFECYCLE_PHASE_COMPLETED,
+    LIFECYCLE_PHASE_DORMANT,
+    LIFECYCLE_PHASE_PLANNED,
+    LIFECYCLE_PHASE_UNKNOWN,
+    derive_lifecycle_phase,
+)
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 from vector.infrastructure.db.models.declared_domain_stats import DeclaredDomainStats
 
-# Provider status sets (extend per connector in registry later)
-LINEAR_COMPLETED = frozenset({"completed", "done", "canceled", "cancelled"})
-LINEAR_PLANNED = frozenset({"planned", "backlog", "triage", "unstarted"})
-LINEAR_ACTIVE = frozenset({"started", "in progress", "in_progress", "active"})
-
-LIFECYCLE_ACTIVE = "active"
-LIFECYCLE_PLANNED = "planned"
-LIFECYCLE_COMPLETED = "completed"
-LIFECYCLE_DORMANT = "dormant"
-LIFECYCLE_UNKNOWN = "unknown"
-
-
-def _normalize_status(raw: object) -> str | None:
-    if raw is None:
-        return None
-    return str(raw).strip().lower()
+# Backward-compatible aliases
+LIFECYCLE_ACTIVE = LIFECYCLE_PHASE_ACTIVE
+LIFECYCLE_PLANNED = LIFECYCLE_PHASE_PLANNED
+LIFECYCLE_COMPLETED = LIFECYCLE_PHASE_COMPLETED
+LIFECYCLE_DORMANT = LIFECYCLE_PHASE_DORMANT
+LIFECYCLE_UNKNOWN = LIFECYCLE_PHASE_UNKNOWN
 
 
 def lifecycle_bucket_for_domain(
@@ -32,34 +31,40 @@ def lifecycle_bucket_for_domain(
     events_30d: int | None = None,
 ) -> str:
     """Classify domain without inferring health or risk."""
-    status: str | None = None
     if seed_entity is not None and isinstance(seed_entity.attrs_json, dict):
-        for key in ("state", "status", "workflow_state"):
-            if key in seed_entity.attrs_json:
-                status = _normalize_status(seed_entity.attrs_json[key])
-                break
+        explicit = seed_entity.attrs_json.get("lifecycle_phase")
+        if isinstance(explicit, str) and explicit:
+            if explicit == LIFECYCLE_PHASE_ARCHIVED:
+                return LIFECYCLE_DORMANT
+            return explicit
 
     events_7d = stats.events_7d if stats is not None else 0
     mass = stats.mass_total if stats is not None else 0
 
-    if status in LINEAR_COMPLETED:
-        return LIFECYCLE_COMPLETED
-    if status in LINEAR_PLANNED and events_7d == 0:
-        return LIFECYCLE_PLANNED
+    if seed_entity is not None and isinstance(seed_entity.attrs_json, dict):
+        derived = derive_lifecycle_phase(seed_entity.attrs_json)
+        if derived == LIFECYCLE_PHASE_COMPLETED:
+            return LIFECYCLE_COMPLETED
+        if derived == LIFECYCLE_PHASE_ARCHIVED:
+            return LIFECYCLE_DORMANT
+        if derived == LIFECYCLE_PHASE_PLANNED and events_7d == 0:
+            return LIFECYCLE_PLANNED
+        if derived == LIFECYCLE_PHASE_ACTIVE:
+            return LIFECYCLE_ACTIVE
+
     if events_7d > 0:
-        return LIFECYCLE_ACTIVE
-    if status in LINEAR_ACTIVE:
         return LIFECYCLE_ACTIVE
 
     if events_30d is None:
-        # Approximate dormant: no 7d activity but has mass
         if events_7d == 0 and mass > 0:
             return LIFECYCLE_DORMANT
     elif events_30d == 0 and mass > 0:
         return LIFECYCLE_DORMANT
 
-    if status in LINEAR_PLANNED:
-        return LIFECYCLE_PLANNED
+    if seed_entity is not None and isinstance(seed_entity.attrs_json, dict):
+        derived = derive_lifecycle_phase(seed_entity.attrs_json)
+        if derived == LIFECYCLE_PHASE_PLANNED:
+            return LIFECYCLE_PLANNED
     return LIFECYCLE_UNKNOWN
 
 

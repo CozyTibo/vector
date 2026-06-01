@@ -5,9 +5,15 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from vector.domains.cortex.canon.lifecycle_substrate import finalize_execution_attrs
 from vector.domains.cortex.canon.mapper_types import CanonEntityDraft, CanonMapResult
 from vector.domains.cortex.canon.mappers._common import entity_key_for, label_from_payload, source_ref
+from vector.domains.cortex.canon.mappers.notion_execution_properties import apply_notion_execution_properties
 from vector.domains.cortex.canon.mappers.notion_people import notion_payload_segment, primary_notion_assignee_user_id
+from vector.domains.cortex.canon.mappers.notion_temporal import (
+    apply_notion_object_temporal_attrs,
+    enrich_payload_with_notion_timestamps,
+)
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
 
 
@@ -52,6 +58,7 @@ class _NotionMapper:
         source_revision_key: str,
         fetched_at_iso: str,
     ) -> CanonMapResult:
+        enriched_payload = enrich_payload_with_notion_timestamps(payload_body)
         src = source_ref(
             raw_id=raw_id,
             connector=connector,
@@ -59,7 +66,7 @@ class _NotionMapper:
             external_id=external_id,
             source_identity_key=source_identity_key,
             source_revision_key=source_revision_key,
-            payload_body=payload_body,
+            payload_body=enriched_payload,
             fetched_at_iso=fetched_at_iso,
         )
         key = entity_key_for(
@@ -68,9 +75,9 @@ class _NotionMapper:
             resource_type=resource_type,
             external_id=external_id,
         )
-        segment = notion_payload_segment(payload_body, self.payload_key)
+        segment = notion_payload_segment(enriched_payload, self.payload_key)
         label_keys = (self.payload_key, "row") if self.payload_key == "database_row" else (self.payload_key,)
-        label = label_from_payload(payload_body, *label_keys)
+        label = label_from_payload(enriched_payload, *label_keys)
         attrs: dict[str, Any] = {"external_id": external_id}
         draft = CanonEntityDraft(
             entity_type=self.entity_type,
@@ -82,15 +89,18 @@ class _NotionMapper:
         )
         if isinstance(segment, dict):
             attrs["notion_id"] = segment.get("id")
+            apply_notion_object_temporal_attrs(segment, attrs)
+            finalize_execution_attrs(attrs)
             created_by = segment.get("created_by")
             if created_by is None and isinstance(segment.get("created_by_id"), str):
                 created_by = segment.get("created_by_id")
             author_ref = _notion_user_ref(connector, created_by)
-            if author_ref is not None and self.entity_type == "document":
+            is_document_like = self.entity_type in ("document", "work_item")
+            if author_ref is not None and is_document_like:
                 draft.author_ref = author_ref
             assignee_uid = primary_notion_assignee_user_id(segment)
             assignee_ref = _notion_user_ref(connector, assignee_uid) if assignee_uid else None
-            if assignee_ref is not None and self.entity_type == "document":
+            if assignee_ref is not None and is_document_like:
                 draft.assignee_ref = assignee_ref
             parent = segment.get("parent")
             if isinstance(parent, dict):
@@ -107,10 +117,11 @@ class _NotionMapper:
                         resource_type=parent_rt,
                         external_id=pid,
                     )
-            if self.entity_type == "document" and self.resource_type == "notion.database_row":
+            if self.resource_type == "notion.database_row":
                 direct_db = segment.get("database_id")
                 if isinstance(direct_db, str) and direct_db.strip():
                     attrs["database_id"] = direct_db.strip()
+                apply_notion_execution_properties(segment, attrs)
             elif self.entity_type == "actor":
                 name = segment.get("name")
                 if isinstance(name, list):

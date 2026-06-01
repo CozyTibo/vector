@@ -6,10 +6,15 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from vector.domains.cortex.canon.mappers.notion_people import iter_notion_people_assignments, notion_segment_properties
+from vector.domains.cortex.canon.mappers.notion_people import (
+    iter_notion_people_assignments,
+    iter_notion_people_involvements,
+    iter_notion_relation_targets,
+    notion_segment_properties,
+)
 from vector.domains.cortex.graph.edges import EdgeDraft
 from vector.domains.cortex.graph.extractors.phase0_provider_native import _latest_raw
-from vector.domains.cortex.graph.resolve import resolve_entity_id_by_source_identity_key
+from vector.domains.cortex.graph.resolve import resolve_entity_id_by_source_identity_key, resolve_notion_external_id
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
 from vector.infrastructure.db.models.canon_entity import CanonEntity
 
@@ -19,6 +24,35 @@ def _pr_external_id_from_child(external_id: str, marker: str) -> str | None:
     if token in external_id:
         return external_id.split(token)[0]
     return None
+
+
+def _notion_people_edge(
+    *,
+    entity: CanonEntity,
+    actor_id: uuid.UUID,
+    prop_name: str,
+    notion_user_id: str,
+    relationship_kind: str,
+    source,
+    raw,
+    observed_at,
+) -> EdgeDraft:
+    return EdgeDraft(
+        relationship_kind=relationship_kind,
+        from_entity_id=entity.id,
+        to_entity_id=actor_id,
+        extractor_rule=f"notion.property.{prop_name}.people",
+        evidence_kind="provider_field",
+        evidence_ref=f"properties.{prop_name}.people",
+        evidence_snapshot={
+            "property_name": prop_name,
+            "notion_user_id": notion_user_id,
+        },
+        source_raw_id=int(raw.id),
+        source_canon_source_id=source.id,
+        observed_at=observed_at,
+        confidence="certain",
+    )
 
 
 def extract_connector_native_edges(
@@ -76,7 +110,7 @@ def extract_connector_native_edges(
                     ),
                 )
 
-    if entity.connector == "notion" and entity.entity_type == "document":
+    if entity.connector == "notion" and entity.entity_type in ("document", "work_item"):
         props = notion_segment_properties(payload)
         for prop_name, notion_user_id in iter_notion_people_assignments(props):
             user_key = derive_source_identity_key(
@@ -92,16 +126,61 @@ def extract_connector_native_edges(
             if actor_id is None:
                 continue
             edges.append(
-                EdgeDraft(
+                _notion_people_edge(
+                    entity=entity,
+                    actor_id=actor_id,
+                    prop_name=prop_name,
+                    notion_user_id=notion_user_id,
                     relationship_kind="assigned_to",
+                    source=source,
+                    raw=raw,
+                    observed_at=observed_at,
+                ),
+            )
+        for prop_name, notion_user_id in iter_notion_people_involvements(props):
+            user_key = derive_source_identity_key(
+                connector="notion",
+                resource_type="notion.user",
+                external_id=notion_user_id,
+            )
+            actor_id = resolve_entity_id_by_source_identity_key(
+                session,
+                tenant_id=tenant_id,
+                source_identity_key=user_key,
+            )
+            if actor_id is None:
+                continue
+            edges.append(
+                _notion_people_edge(
+                    entity=entity,
+                    actor_id=actor_id,
+                    prop_name=prop_name,
+                    notion_user_id=notion_user_id,
+                    relationship_kind="involves",
+                    source=source,
+                    raw=raw,
+                    observed_at=observed_at,
+                ),
+            )
+        for prop_name, target_id in iter_notion_relation_targets(props):
+            target_entity_id = resolve_notion_external_id(
+                session,
+                tenant_id=tenant_id,
+                external_id=target_id,
+            )
+            if target_entity_id is None:
+                continue
+            edges.append(
+                EdgeDraft(
+                    relationship_kind="references",
                     from_entity_id=entity.id,
-                    to_entity_id=actor_id,
-                    extractor_rule=f"notion.property.{prop_name}.people",
+                    to_entity_id=target_entity_id,
+                    extractor_rule=f"notion.property.{prop_name}.relation",
                     evidence_kind="provider_field",
-                    evidence_ref=f"properties.{prop_name}.people",
+                    evidence_ref=f"properties.{prop_name}.relation",
                     evidence_snapshot={
                         "property_name": prop_name,
-                        "notion_user_id": notion_user_id,
+                        "target_notion_id": target_id,
                     },
                     source_raw_id=int(raw.id),
                     source_canon_source_id=source.id,

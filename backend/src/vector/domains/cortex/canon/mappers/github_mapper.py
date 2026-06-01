@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from vector.domains.cortex.canon.lifecycle_substrate import apply_status_attrs, apply_temporal_attrs, finalize_execution_attrs
 from vector.domains.cortex.canon.mapper_types import CanonEntityDraft, CanonMapResult
 from vector.domains.cortex.canon.mappers._common import entity_key_for, label_from_payload, source_ref
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
@@ -73,7 +74,13 @@ class _GitHubMapper:
         if isinstance(segment, dict):
             if self.entity_type == "pull_request":
                 attrs["number"] = segment.get("number")
-                attrs["state"] = segment.get("state")
+                apply_status_attrs(attrs, status_name=segment.get("state"))
+                apply_temporal_attrs(
+                    attrs,
+                    provider_created_at=segment.get("created_at") if isinstance(segment.get("created_at"), str) else None,
+                    provider_updated_at=segment.get("updated_at") if isinstance(segment.get("updated_at"), str) else None,
+                )
+                finalize_execution_attrs(attrs)
                 user = segment.get("user")
                 if isinstance(user, dict):
                     draft.author_ref = _gh_user_ref(connector, user)
@@ -90,7 +97,13 @@ class _GitHubMapper:
                             )
             elif self.entity_type == "work_item":
                 attrs["number"] = segment.get("number")
-                attrs["state"] = segment.get("state")
+                apply_status_attrs(attrs, status_name=segment.get("state"))
+                apply_temporal_attrs(
+                    attrs,
+                    provider_created_at=segment.get("created_at") if isinstance(segment.get("created_at"), str) else None,
+                    provider_updated_at=segment.get("updated_at") if isinstance(segment.get("updated_at"), str) else None,
+                )
+                finalize_execution_attrs(attrs)
                 creator = segment.get("user") or segment.get("creator")
                 if isinstance(creator, dict):
                     draft.author_ref = _gh_user_ref(connector, creator)

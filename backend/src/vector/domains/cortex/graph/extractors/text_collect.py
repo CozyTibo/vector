@@ -28,6 +28,18 @@ def _rich_text_plain(properties: dict[str, Any]) -> list[str]:
     return out
 
 
+def _rich_text_list(value: object) -> list[str]:
+    out: list[str] = []
+    if not isinstance(value, list):
+        return out
+    for block in value:
+        if isinstance(block, dict):
+            plain = block.get("plain_text") or block.get("text", {}).get("content")
+            if isinstance(plain, str) and plain.strip():
+                out.append(plain.strip())
+    return out
+
+
 def collect_scannable_text(
     payload: dict[str, Any],
     *,
@@ -47,6 +59,23 @@ def collect_scannable_text(
 
     if entity_type == "document" and connector == "notion":
         for key in ("page", "database_row", "block"):
+            segment = payload.get(key)
+            if not isinstance(segment, dict):
+                continue
+            _append_text(blobs, f"{key}.url", segment.get("url"))
+            props = segment.get("properties")
+            if isinstance(props, dict):
+                for i, plain in enumerate(_rich_text_plain(props)):
+                    _append_text(blobs, f"{key}.properties.{i}", plain)
+            block_type = segment.get("type")
+            if isinstance(block_type, str):
+                content = segment.get(block_type)
+                if isinstance(content, dict):
+                    for i, plain in enumerate(_rich_text_list(content.get("rich_text"))):
+                        _append_text(blobs, f"{key}.{block_type}.{i}", plain)
+
+    if entity_type == "work_item" and connector == "notion":
+        for key in ("row", "database_row"):
             segment = payload.get(key)
             if not isinstance(segment, dict):
                 continue

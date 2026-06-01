@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from vector.domains.cortex.canon.lifecycle_substrate import apply_temporal_attrs, apply_status_attrs, finalize_execution_attrs
 from vector.domains.cortex.canon.mapper_types import CanonEntityDraft, CanonMapResult
 from vector.domains.cortex.canon.mappers._common import entity_key_for, label_from_payload, source_ref
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
@@ -88,11 +89,17 @@ class _LinearMapper:
         )
         if self.entity_type == "work_item":
             attrs["identifier"] = segment.get("identifier")
+            apply_temporal_attrs(
+                attrs,
+                provider_created_at=segment.get("createdAt") if isinstance(segment.get("createdAt"), str) else None,
+                provider_updated_at=segment.get("updatedAt") if isinstance(segment.get("updatedAt"), str) else None,
+            )
             state = segment.get("state")
             if isinstance(state, dict):
-                attrs["state"] = state.get("name")
+                apply_status_attrs(attrs, status_name=state.get("name"), workflow_state=state.get("type"))
             elif state is not None:
-                attrs["state"] = state
+                apply_status_attrs(attrs, status_name=str(state))
+            finalize_execution_attrs(attrs)
             creator = segment.get("creator")
             if isinstance(creator, dict):
                 draft.author_ref = _linear_user_ref(connector, creator)

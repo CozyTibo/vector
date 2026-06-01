@@ -7,6 +7,7 @@
 **Related docs:**
 
 - [`scheduler-beat-tick-v1.md`](../scheduler-beat-tick-v1.md) — current Beat/tick/lane model  
+- [`declared-domains-v1-plan.md`](../declared-domains-v1-plan.md) — declared domains pass integration  
 - [`RUNTIME_SIMPLIFICATION_AUDIT.md`](RUNTIME_SIMPLIFICATION_AUDIT.md) — historical convergence substrate audit (partially superseded by canon/identity lanes)  
 - [`identity-resolution-v1-plan.md`](../identity-resolution-v1-plan.md) — identity domain design  
 
@@ -95,7 +96,8 @@ flowchart TB
   DB --> W
   H --> Canon[canon domain]
   H --> Identity[identity domain]
-  H --> Graph[future graph / projection]
+  H --> Graph[graph domain]
+  H --> DeclDomains[declared_domains domain]
   Ing --> Raw[(raw_ingestion_records)]
   Raw --> Plan
 ```
@@ -108,7 +110,7 @@ Conceptual columns:
 |--------|---------|
 | `id` | Primary key |
 | `tenant_id` | Tenant scope |
-| `pass_type` | `ingestion_sync`, `canon_pass`, `identity_pass`, `graph_export_pass`, … |
+| `pass_type` | `ingestion_sync`, `canon_pass`, `identity_pass`, `graph_projection_pass`, `declared_domain_pass`, … |
 | `status` | `pending`, `running`, `completed`, `failed`, `cancelled` |
 | `priority` | Planner fairness |
 | `scheduled_at` | When eligible to run |

@@ -5,6 +5,7 @@ from __future__ import annotations
 RELATIONSHIP_KIND_LABELS: dict[str, str] = {
     "authored_by": "Authored by",
     "assigned_to": "Assigned to",
+    "involves": "Involves",
     "reviewed_by": "Reviewed by",
     "comments_on": "Comments on",
     "attached_to": "Attached to",
@@ -26,6 +27,7 @@ RELATIONSHIP_KIND_LABELS: dict[str, str] = {
 EXTRACTABLE_RELATIONSHIP_KINDS: tuple[str, ...] = (
     "authored_by",
     "assigned_to",
+    "involves",
     "attached_to",
     "replies_to",
     "comments_on",

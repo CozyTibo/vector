@@ -103,6 +103,30 @@ Adding Jira later = **one registry entry + mapper** — no Declared Domains rede
 
 **Rename in domain tables:** `seed_kind` → `declared_container_kind` (provider-agnostic).
 
+### Future seed kinds (extension point)
+
+**The Declared Domains pass must remain agnostic to seed type.** All provider-specific qualification lives in **canon** (`declared_container_registry.py` + materialize rules). The pass reads `declared_container_kind` and registry membership paths only.
+
+**V1 / V1.1 seed kinds (shipped or planned):**
+
+| `declared_container_kind` | Typical source |
+|---------------------------|----------------|
+| `initiative` | Linear initiative |
+| `project` | Linear project |
+| `work_database` | Pinned Notion database (qualified allowlist) |
+
+**Future seed kinds (documentation only — not V1 scope):**
+
+| Kind (illustrative) | Purpose |
+|---------------------|---------|
+| `roadmap_item` | Qualified Notion (or other) row representing a strategic bet / epic |
+| `work_item_seed` | Qualified single work item as its own container seed |
+| Other provider-qualified kinds | Jira epic, GitHub Project, etc. — one registry entry + mapper each |
+
+Adding a seed kind = **registry entry + canon materialize qualification + membership attr paths**. No Declared Domains pass redesign.
+
+**Invariant:** `declared_domains` rows are projections; `declared_container_kind` on canon entities are seeds. V1 uses 1:1 seed→domain; future kinds may change qualification rules but not the pass’s provider-agnostic shape.
+
 ### 0.3 Graph dependency — Level 0 / Level 1 (no starvation)
 
 **Reject:** blocking Declared Domains until graph is caught up. That creates starvation during graph backlog, rebuild, or failure.
@@ -181,6 +205,25 @@ Seeds are **provider-agnostic** — classified in `canon/declared_container_regi
 ### Honest positioning
 
 Cortex adds **cross-tool aggregation**, **participant rollup**, and **activity trends** on containers the org already declared in their PM tools. **V1 seeds: Linear initiatives and projects only.** When no qualified seeds exist in canon, the tab is **empty by design** — not a failure.
+
+### Semantic caveat
+
+**A Declared Domain V1 must not be interpreted as proof that the underlying seed represents the correct execution-scope granularity for every tenant.**
+
+V1 materializes the **declared container boundary** the canon registry qualified — one projection row per seed. It does **not** assert that every seed is a “domain” in the sense an EM would use in conversation.
+
+| Seed | Typical alignment with human execution scope |
+|------|-----------------------------------------------|
+| Linear project | **Often close** — bounded body of work with scoped issues |
+| Linear initiative | **Often close** — strategic theme spanning projects |
+| Pinned Notion roadmap database (`work_database`) | **Often a portfolio container** — rows inside may be closer to “domains” than the database itself |
+
+**Examples:**
+
+- **Linear Project “Billing Rewrite”** → declared domain rollup is usually meaningful at project granularity.
+- **Pinned Notion database “Global Roadmap”** → declared domain rollup is a **backlog/portfolio scope**; individual rows (JWT Authentication, Android Hiring, …) are **members**, not separate declared domains in V1.
+
+Future versions may add **finer-grained seed kinds** (e.g. qualified row-level seeds) via the canon registry — without changing the Declared Domains pass architecture. See §Future seed kinds (extension point).
 
 ---
 

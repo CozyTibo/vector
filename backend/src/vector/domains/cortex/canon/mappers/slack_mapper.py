@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from vector.domains.cortex.canon.lifecycle_substrate import apply_temporal_attrs
 from vector.domains.cortex.canon.mapper_types import CanonEntityDraft, CanonMapResult
 from vector.domains.cortex.canon.mappers._common import entity_key_for, label_from_payload, source_ref
 from vector.domains.cortex.ingestion.live_idempotency import derive_source_identity_key
@@ -102,6 +103,8 @@ class _SlackMapper:
                     if isinstance(body_thread_ts, str) and body_thread_ts.strip():
                         thread_ts = body_thread_ts.strip()
                 ts = msg.get("ts")
+                if isinstance(ts, str) and ts.strip():
+                    apply_temporal_attrs(attrs, provider_created_at=ts.strip(), provider_updated_at=ts.strip())
                 in_thread = (
                     isinstance(thread_ts, str)
                     and thread_ts.strip()

@@ -51,7 +51,7 @@ def extract_canon_ref_edges(
             ),
         )
     if entity.assignee_entity_id is not None:
-        if entity.entity_type == "work_item":
+        if entity.entity_type == "work_item" and entity.connector != "notion":
             edges.append(
                 _edge(
                     kind="assigned_to",

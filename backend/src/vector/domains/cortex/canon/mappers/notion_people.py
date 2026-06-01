@@ -1,4 +1,4 @@
-"""Deterministic Notion people-property parsing for assignee refs."""
+"""Notion people-property parsing for assignee refs and graph edges."""
 
 from __future__ import annotations
 
@@ -30,14 +30,12 @@ def _properties_from_notion_segment(segment: dict) -> dict:
     return props if isinstance(props, dict) else {}
 
 
-def iter_notion_people_assignments(properties: dict) -> list[tuple[str, str]]:
-    """Return (property_name, notion_user_id) in stable order."""
+def iter_notion_people_properties(properties: dict) -> list[tuple[str, str]]:
+    """Return (property_name, notion_user_id) for all people-type properties."""
     out: list[tuple[str, str]] = []
     if not isinstance(properties, dict):
         return out
     for prop_name in sorted(properties.keys()):
-        if not _is_assignee_property_name(str(prop_name)):
-            continue
         prop = properties[prop_name]
         if not isinstance(prop, dict) or prop.get("type") != "people":
             continue
@@ -54,6 +52,16 @@ def iter_notion_people_assignments(properties: dict) -> list[tuple[str, str]]:
         for uid in sorted(user_ids):
             out.append((str(prop_name), uid))
     return out
+
+
+def iter_notion_people_assignments(properties: dict) -> list[tuple[str, str]]:
+    """Return (property_name, notion_user_id) for assignee-like people columns only."""
+    return [(name, uid) for name, uid in iter_notion_people_properties(properties) if _is_assignee_property_name(name)]
+
+
+def iter_notion_people_involvements(properties: dict) -> list[tuple[str, str]]:
+    """Return people assignments that are not assignee-like (attendees, voters, etc.)."""
+    return [(name, uid) for name, uid in iter_notion_people_properties(properties) if not _is_assignee_property_name(name)]
 
 
 def primary_notion_assignee_user_id(segment: dict) -> str | None:
@@ -84,3 +92,24 @@ def notion_segment_properties(payload: dict) -> dict:
             if props:
                 return props
     return {}
+
+
+def iter_notion_relation_targets(properties: dict) -> list[tuple[str, str]]:
+    """Return (property_name, target_notion_id) for relation-type properties."""
+    out: list[tuple[str, str]] = []
+    if not isinstance(properties, dict):
+        return out
+    for prop_name in sorted(properties.keys()):
+        prop = properties[prop_name]
+        if not isinstance(prop, dict) or prop.get("type") != "relation":
+            continue
+        relation = prop.get("relation")
+        if not isinstance(relation, list):
+            continue
+        for item in relation:
+            if not isinstance(item, dict):
+                continue
+            target_id = item.get("id")
+            if isinstance(target_id, str) and target_id.strip():
+                out.append((str(prop_name), target_id.strip()))
+    return out

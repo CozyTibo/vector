@@ -162,6 +162,18 @@ def test_pinned_notion_database_creates_domain_and_row_membership(db_session: Se
     db_session.commit()
     assert update_notion_work_container_backfill["pinned_count"] == 1
 
+    materialize_raw_row(db_session, row_raw)
+    db_session.commit()
+    row_entity = db_session.scalar(
+        select(CanonEntity).where(
+            CanonEntity.tenant_id == tenant.id,
+            CanonEntity.entity_key.like(f"%:{row_raw.external_id}"),
+        ),
+    )
+    assert row_entity is not None
+    assert row_entity.entity_type == "work_item"
+    assert row_entity.attrs_json.get("database_id") == db_id
+
     seed = db_session.scalar(
         select(CanonEntity).where(
             CanonEntity.tenant_id == tenant.id,

@@ -5,10 +5,19 @@
 - Concepts must support temporal state transitions.
 - Concepts must map to deterministic contracts before AI inference.
 
+## Execution scope concepts (materialized projections)
+
+These are **not** canon entity types. They are **projections** over canon + identity + graph. See [`execution-scope-architecture.md`](../execution-scope-architecture.md).
+
+- **Declared Domain**: deterministic cross-tool rollup of a **declared container** with participants, mass, activity, momentum. **V1.** Materialized from canon seeds with `declared_container_kind`.
+- **Declared container**: provider-agnostic work container (initiative, project, work database, …) — classified in canon, not in Declared Domains code.
+- **Emergent Domain**: materialized grouping around a concern that may **never** be declared (e.g. Authentication, Hiring). **Future — hybrid.**
+- **Execution Scope**: umbrella for Declared Domains + Emergent Domains.
+
 ## Core Concepts
-- **Project**: bounded execution container with explicit scope, timeline, and ownership.
-- **Initiative**: multi-project strategic intent spanning time and teams.
-- **Topic**: recurring semantic theme emerging from discussions, docs, and tickets.
+- **Project**: bounded execution container with explicit scope, timeline, and ownership. May seed a **Declared Domain**.
+- **Initiative**: multi-project strategic intent spanning time and teams. May seed a **Declared Domain**.
+- **Topic** (canonical / legacy): recurring semantic theme in discussions — **not** execution scope. Do **not** use for Declared or Emergent Domains.
 - **Decision**: explicit choice among alternatives with rationale and consequences.
 - **Blocker**: condition materially preventing expected execution progress.
 - **Ownership**: accountable relationship between actor/team and artifact, project, or concern.
