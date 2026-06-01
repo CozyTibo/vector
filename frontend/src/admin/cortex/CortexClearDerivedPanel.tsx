@@ -6,11 +6,10 @@ import { CORTEX_CLEAR_DERIVED_CONFIRM_PHRASE } from "../adminConstants";
 import { adminFetch } from "../../lib/adminFetch";
 
 type ClearDerivedResponse = {
+  accepted: boolean;
   tenant_id: string;
-  canon_pass_id: string;
-  deleted_rows_total: number;
-  deleted_rows_by_table: Record<string, number>;
-  raw_ingestion_rows_remaining: number;
+  task_id: string;
+  queue: string;
 };
 
 export function CortexClearDerivedPanel() {
@@ -50,9 +49,9 @@ export function CortexClearDerivedPanel() {
       <p className="mt-1 text-sm text-rose-900/90">
         Deletes canonical entities, identities, graph links, declared domains, pass queues, and raw-memory
         indexes for this tenant.{" "}
-        <span className="font-medium">Raw ingestion records are kept.</span> A canon pass is enqueued
-        immediately; the scheduler will continue identity, graph, and declared-domain lanes as materialization
-        catches up.
+        <span className="font-medium">Raw ingestion records are kept.</span> Work runs in the background; a
+        canon pass is enqueued when the wipe finishes, then the scheduler continues identity, graph, and
+        declared-domain lanes.
       </p>
       <div className="mt-3 rounded border border-rose-200 bg-white/80 p-3">
         <p className="text-xs text-rose-950">
@@ -72,7 +71,7 @@ export function CortexClearDerivedPanel() {
             onClick={() => clearM.mutate()}
             className="rounded-md bg-rose-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-800 disabled:opacity-50"
           >
-            {clearM.isPending ? "Clearing…" : "Clear derived & rematerialize"}
+            {clearM.isPending ? "Enqueueing…" : "Clear derived & rematerialize"}
           </button>
         </div>
         {clearM.isError ? (
@@ -80,9 +79,9 @@ export function CortexClearDerivedPanel() {
         ) : null}
         {lastResult ? (
           <p className="mt-2 text-xs text-rose-900">
-            Cleared {lastResult.deleted_rows_total.toLocaleString()} derived rows;{" "}
-            {lastResult.raw_ingestion_rows_remaining.toLocaleString()} raw rows kept. Canon pass{" "}
-            <code className="font-mono">{lastResult.canon_pass_id}</code> enqueued.
+            Background job enqueued on queue <code className="font-mono">{lastResult.queue}</code> (task{" "}
+            <code className="font-mono">{lastResult.task_id}</code>). Derived counts will drop as the worker
+            runs; refresh substrate tabs after a few minutes.
           </p>
         ) : null}
       </div>

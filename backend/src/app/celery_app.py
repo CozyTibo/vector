@@ -71,6 +71,7 @@ celery_app.conf.task_routes = {
     "vector.cortex.runtime.orchestrator_tick": {"queue": "vector"},
     "vector.cortex.runtime.plan_passes": {"queue": "vector"},
     "vector.cortex.runtime.poll_passes": {"queue": "vector"},
+    "vector.cortex.admin.clear_derived": {"queue": "vector"},
 }
 
 _orchestrator_seconds = max(

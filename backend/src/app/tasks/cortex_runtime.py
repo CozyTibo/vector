@@ -29,6 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 _TASK_PLAN = "vector.cortex.runtime.plan_passes"
 _TASK_POLL = "vector.cortex.runtime.poll_passes"
 _TASK_ORCHESTRATOR = "vector.cortex.runtime.orchestrator_tick"
+_TASK_CLEAR_DERIVED = "vector.cortex.admin.clear_derived"
 
 
 def _worker_id() -> str:
@@ -231,4 +232,28 @@ def orchestrator_tick_task() -> dict[str, object]:
         "outcome": outcome,
         "ingestion_enqueued": ingestion_enqueued,
         "detail": detail,
+    }
+
+
+@celery_app.task(name=_TASK_CLEAR_DERIVED, queue="vector")
+def clear_derived_cortex_task(tenant_id: str) -> dict[str, object]:
+    """Delete derived Cortex rows for one tenant, then enqueue canon rematerialization."""
+    import uuid as uuid_mod
+
+    from vector.domains.cortex.clear_derived import (
+        clear_derived_cortex_for_tenant,
+        enqueue_cortex_rematerialization_after_clear,
+    )
+
+    tid = uuid_mod.UUID(tenant_id)
+    with session_scope() as session:
+        out = clear_derived_cortex_for_tenant(session, tenant_id=tid)
+        pass_id = enqueue_cortex_rematerialization_after_clear(session, tenant_id=tid)
+    poll_cortex_passes_task.delay()
+    return {
+        "tenant_id": str(tid),
+        "canon_pass_id": str(pass_id),
+        "deleted_rows_total": out["deleted_rows_total"],
+        "deleted_rows_by_table": out["deleted_rows_by_table"],
+        "raw_ingestion_rows_remaining": out["raw_ingestion_rows_remaining"],
     }

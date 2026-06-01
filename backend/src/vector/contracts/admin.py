@@ -687,11 +687,10 @@ class AdminCortexClearDerivedRequest(BaseModel):
 class AdminCortexClearDerivedResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
+    accepted: bool = True
     tenant_id: uuid.UUID
-    canon_pass_id: uuid.UUID
-    deleted_rows_total: int
-    deleted_rows_by_table: dict[str, int]
-    raw_ingestion_rows_remaining: int
+    task_id: str
+    queue: Literal["vector"] = "vector"
 
 
 class AdminCortexIngestionTriggerReplayRequest(BaseModel):

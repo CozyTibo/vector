@@ -1743,23 +1743,12 @@ def build_admin_router() -> APIRouter:
                 status.HTTP_400_BAD_REQUEST,
                 detail="Confirmation phrase does not match.",
             ) from None
-        from vector.domains.cortex.clear_derived import (
-            clear_derived_cortex_for_tenant,
-            enqueue_cortex_rematerialization_after_clear,
-        )
+        from app.tasks.cortex_runtime import clear_derived_cortex_task
 
-        out = clear_derived_cortex_for_tenant(db, tenant_id=tenant_id)
-        pass_id = enqueue_cortex_rematerialization_after_clear(db, tenant_id=tenant_id)
-        db.commit()
-        from app.tasks.cortex_runtime import poll_cortex_passes_task
-
-        poll_cortex_passes_task.delay()
+        async_result = clear_derived_cortex_task.delay(str(tenant_id))
         return AdminCortexClearDerivedResponse(
             tenant_id=tenant_id,
-            canon_pass_id=pass_id,
-            deleted_rows_total=int(out["deleted_rows_total"]),
-            deleted_rows_by_table=dict(out["deleted_rows_by_table"]),
-            raw_ingestion_rows_remaining=int(out["raw_ingestion_rows_remaining"]),
+            task_id=str(async_result.id),
         )
 
     @r.post(
