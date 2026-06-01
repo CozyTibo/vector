@@ -44,6 +44,12 @@ describe("adminApiUrl", () => {
     );
   });
 
+  it("does not rewrite execution-surfaces API paths", () => {
+    vi.spyOn(canonicalApi, "getApiBase").mockReturnValue("https://api.myvector.co");
+    const path = `/admin/tenants/${TID}/cortex/execution-surfaces/overview`;
+    expect(resolveAdminRequestUrl(path)).toBe(`https://api.myvector.co${path}`);
+  });
+
   it("maps overview slice suffixes when API base ends in cortex overview", () => {
     vi.spyOn(canonicalApi, "getApiBase").mockReturnValue(
       `http://localhost:8080/admin/tenants/${TID}/cortex/overview`,

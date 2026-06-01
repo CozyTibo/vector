@@ -30,6 +30,14 @@ export function OverviewTab() {
   });
 
   if (q.isLoading) return <CortexPageSkeleton label="Loading overview" />;
+  if (q.isError) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+        <p className="font-medium">Could not load execution overview</p>
+        <p className="mt-1">{q.error instanceof Error ? q.error.message : "Request failed"}</p>
+      </div>
+    );
+  }
   if (!q.data) return null;
 
   return (

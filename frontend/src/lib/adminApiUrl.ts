@@ -20,7 +20,9 @@ const LEGACY_CORTEX_OVERVIEW_RE = new RegExp(
 
 const TENANT_IN_PATH_RE = new RegExp(`^/admin/tenants/(${TENANT_UUID})`, "i");
 
-const OVERVIEW_SLICE_SUFFIX_RE = /^\/(?:phases|execution|ingestion)(?:\/|$)/;
+/** Legacy pipeline overview slices only — must not match ``/execution-surfaces/...``. */
+const OVERVIEW_SLICE_SUFFIX_RE =
+  /^\/(?:phases|ingestion)(?:\/|$)|^\/execution\/(?!surfaces)(?:\/|$)/;
 
 function rewriteCortexOverviewPath(path: string): string {
   if (path === "/cortex/overview" || path.startsWith("/cortex/overview/")) {
