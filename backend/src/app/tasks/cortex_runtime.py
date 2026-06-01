@@ -235,19 +235,27 @@ def orchestrator_tick_task() -> dict[str, object]:
     }
 
 
-@celery_app.task(name=_TASK_CLEAR_DERIVED, queue="vector")
-def clear_derived_cortex_task(tenant_id: str) -> dict[str, object]:
+@celery_app.task(name=_TASK_CLEAR_DERIVED, queue="vector", bind=True, max_retries=2, default_retry_delay=30)
+def clear_derived_cortex_task(self, tenant_id: str) -> dict[str, object]:
     """Delete derived Cortex rows for one tenant, then enqueue canon rematerialization."""
     import uuid as uuid_mod
 
+    from sqlalchemy.exc import OperationalError
+
     from vector.domains.cortex.clear_derived import (
-        clear_derived_cortex_for_tenant,
+        _is_deadlock,
         enqueue_cortex_rematerialization_after_clear,
+        execute_clear_derived_cortex_for_tenant,
     )
 
     tid = uuid_mod.UUID(tenant_id)
+    try:
+        out = execute_clear_derived_cortex_for_tenant(tenant_id=tid)
+    except OperationalError as exc:
+        if _is_deadlock(exc) and self.request.retries < self.max_retries:
+            raise self.retry(exc=exc) from exc
+        raise
     with session_scope() as session:
-        out = clear_derived_cortex_for_tenant(session, tenant_id=tid)
         pass_id = enqueue_cortex_rematerialization_after_clear(session, tenant_id=tid)
     poll_cortex_passes_task.delay()
     return {

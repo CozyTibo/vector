@@ -80,8 +80,8 @@ export function CortexClearDerivedPanel() {
         {lastResult ? (
           <p className="mt-2 text-xs text-rose-900">
             Background job enqueued on queue <code className="font-mono">{lastResult.queue}</code> (task{" "}
-            <code className="font-mono">{lastResult.task_id}</code>). Derived counts will drop as the worker
-            runs; refresh substrate tabs after a few minutes.
+            <code className="font-mono">{lastResult.task_id}</code>). Large tenants may take 5–15 minutes;
+            refresh substrate tabs once counts drop.
           </p>
         ) : null}
       </div>
