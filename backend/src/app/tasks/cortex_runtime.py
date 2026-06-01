@@ -128,11 +128,22 @@ def poll_cortex_passes_task() -> dict[str, object]:
     with session_scope() as session:
         recover_expired_leases_v1(session, lease_ttl_seconds=lease_ttl)
 
+    from vector.domains.cortex.clear_derived_lock import tenant_clear_derived_in_progress
+    from vector.domains.cortex.runtime.pass_types import STATUS_PENDING
+
     while processed < batch_limit:
         with session_scope() as session:
             row = claim_next_pass_v1(session, worker_id=worker, lease_ttl_seconds=lease_ttl)
             if row is None:
                 break
+            if tenant_clear_derived_in_progress(settings, row.tenant_id):
+                row.status = STATUS_PENDING
+                row.locked_by = None
+                row.locked_until = None
+                row.started_at = None
+                row.scheduled_at = utc_now() + timedelta(seconds=30)
+                session.flush()
+                continue
             pass_id = row.id
             try:
                 stats = execute_claimed_pass_v1(

@@ -25,6 +25,7 @@ from vector.domains.cortex.runtime.pass_types import (
     IDENTITY_PASS,
 )
 from vector.domains.cortex.runtime.queue import upsert_pending_pass_v1
+from vector.domains.cortex.clear_derived_lock import tenant_clear_derived_in_progress
 from vector.infrastructure.cortex_lane_pause import read_lane_paused_flag
 from vector.infrastructure.db.models.canon_dirty_queue import CanonDirtyQueue
 from vector.infrastructure.db.models.canon_materialization_cursor import CanonMaterializationCursor
@@ -62,6 +63,10 @@ def _tenant_canon_has_backlog(session: Session, tenant_id: uuid.UUID) -> bool:
     return int(max_raw or 0) > last_raw
 
 
+def _skip_tenant_during_clear_derived(settings: Settings, tenant_id: uuid.UUID) -> bool:
+    return tenant_clear_derived_in_progress(settings, tenant_id)
+
+
 def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any]:
     """Enqueue pending pass rows for tenants that need work (no Celery fan-out)."""
     if read_lane_paused_flag(settings, "orchestrator"):
@@ -94,6 +99,8 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
 
     if settings.cortex_canon_scheduler_enabled and not read_lane_paused_flag(settings, "canon"):
         for tid in iter_tenants_with_live_raw(session, settings):
+            if _skip_tenant_during_clear_derived(settings, tid):
+                continue
             if not _tenant_canon_has_backlog(session, tid):
                 continue
             if should_skip_scheduled_canon_pass(
@@ -113,6 +120,8 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
 
     if settings.cortex_identity_scheduler_enabled and not read_lane_paused_flag(settings, "identity"):
         for tid in iter_tenants_with_actor_entities(session):
+            if _skip_tenant_during_clear_derived(settings, tid):
+                continue
             if should_skip_scheduled_identity_pass(
                 session,
                 tenant_id=tid,
@@ -130,6 +139,8 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
 
     if settings.cortex_graph_scheduler_enabled and not read_lane_paused_flag(settings, "graph"):
         for tid in iter_tenants_with_graph_backlog(session):
+            if _skip_tenant_during_clear_derived(settings, tid):
+                continue
             if should_skip_scheduled_graph_pass(
                 session,
                 tenant_id=tid,
@@ -150,6 +161,8 @@ def plan_cortex_passes_v1(session: Session, settings: Settings) -> dict[str, Any
         "declared_domains",
     ):
         for tid in iter_tenants_with_declared_domain_backlog(session):
+            if _skip_tenant_during_clear_derived(settings, tid):
+                continue
             if should_skip_scheduled_declared_domain_pass(
                 session,
                 tenant_id=tid,

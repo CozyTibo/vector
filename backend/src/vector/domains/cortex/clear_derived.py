@@ -55,7 +55,7 @@ from vector.infrastructure.db.session import session_scope
 CLEAR_DERIVED_CORTEX_CONFIRMATION_PHRASE = "CLEAR DERIVED CORTEX EXECUTION OUTPUTS"
 _DEADLOCK_MAX_ATTEMPTS = 5
 _RELATIONSHIP_DELETE_BATCH = 2_000
-_CANON_ENTITY_DELETE_BATCH = 2_000
+_CANON_ENTITY_DELETE_BATCH = 5_000
 
 _logger = logging.getLogger(__name__)
 
@@ -230,12 +230,14 @@ def _clear_raw_memory_indexes(session: Session, *, tenant_id: uuid.UUID) -> dict
     return deleted
 
 
+# Canon first: batched canon deletes CASCADE graph edges and declared memberships so
+# schedulers cannot rebuild domains while canon rows still exist.
 _CLEAR_STEPS: list[tuple[str, Callable[[Session, uuid.UUID], dict[str, int]]]] = [
     ("cancel_active_passes", lambda s, tid: {"cortex_passes_cancelled": _cancel_active_passes_for_tenant(s, tenant_id=tid)}),
-    ("declared_domains", lambda s, tid: _clear_declared_domains(s, tenant_id=tid)),
-    ("graph", lambda s, tid: _clear_graph(s, tenant_id=tid)),
-    ("identity", lambda s, tid: _clear_identity(s, tenant_id=tid)),
     ("canon", lambda s, tid: _clear_canon(s, tenant_id=tid)),
+    ("declared_domains", lambda s, tid: _clear_declared_domains(s, tenant_id=tid)),
+    ("identity", lambda s, tid: _clear_identity(s, tenant_id=tid)),
+    ("graph", lambda s, tid: _clear_graph(s, tenant_id=tid)),
     ("passes_and_snapshots", lambda s, tid: _clear_passes_and_admin_snapshots(s, tenant_id=tid)),
     ("raw_memory_indexes", lambda s, tid: _clear_raw_memory_indexes(s, tenant_id=tid)),
 ]
@@ -252,7 +254,9 @@ def _run_step_with_deadlock_retry(
             with session_scope() as session:
                 counts = step_fn(session, tenant_id)
             _logger.info(
-                "clear_derived step completed",
+                "clear_derived step completed: %s deleted=%s",
+                step_name,
+                sum(counts.values()),
                 extra={"tenant_id": str(tenant_id), "step": step_name, "counts": counts},
             )
             return counts
@@ -276,9 +280,17 @@ def _run_step_with_deadlock_retry(
 
 def execute_clear_derived_cortex_for_tenant(*, tenant_id: uuid.UUID) -> dict[str, Any]:
     """Delete derived substrate in committed phases to avoid long transactions and deadlocks."""
+    from vector.domains.cortex.clear_derived_lock import set_tenant_clear_derived_in_progress
+    from vector.settings import get_settings
+
+    settings = get_settings()
+    set_tenant_clear_derived_in_progress(settings, tenant_id=tenant_id, active=True)
     deleted: dict[str, int] = {}
-    for step_name, step_fn in _CLEAR_STEPS:
-        deleted.update(_run_step_with_deadlock_retry(step_name, step_fn, tenant_id=tenant_id))
+    try:
+        for step_name, step_fn in _CLEAR_STEPS:
+            deleted.update(_run_step_with_deadlock_retry(step_name, step_fn, tenant_id=tenant_id))
+    finally:
+        set_tenant_clear_derived_in_progress(settings, tenant_id=tenant_id, active=False)
 
     with session_scope() as session:
         raw_rows_remaining = int(
