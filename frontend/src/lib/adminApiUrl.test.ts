@@ -58,6 +58,28 @@ describe("adminApiUrl", () => {
     );
   });
 
+  it("builds execution-surfaces paths without pipeline rewrite", () => {
+    vi.spyOn(canonicalApi, "getApiBase").mockReturnValue("https://api.myvector.co");
+    expect(adminApiPath(TID, "/execution-surfaces/overview")).toBe(
+      `/admin/tenants/${TID}/cortex/execution-surfaces/overview`,
+    );
+    expect(
+      resolveAdminRequestUrl(
+        `/admin/tenants/${TID}/cortex/execution-surfaces/overview`,
+        TID,
+      ),
+    ).toBe(`https://api.myvector.co/admin/tenants/${TID}/cortex/execution-surfaces/overview`);
+    vi.spyOn(canonicalApi, "getApiBase").mockReturnValue(
+      `https://api.myvector.co/admin/tenants/${TID}/cortex/execution-surfaces`,
+    );
+    expect(
+      resolveAdminRequestUrl(
+        `/admin/tenants/${TID}/cortex/execution-surfaces?tab=overview&sort=name`,
+        TID,
+      ),
+    ).toBe(`https://api.myvector.co/admin/tenants/${TID}/cortex/execution-surfaces/overview`);
+  });
+
   it("repairs malformed /admin/surfaces paths from misconfigured tenant bases", () => {
     vi.spyOn(canonicalApi, "getApiBase").mockReturnValue("https://api.myvector.co/admin");
     expect(resolveAdminRequestUrl("/admin/surfaces/overview", TID)).toBe(

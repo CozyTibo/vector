@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
+import { executionSurfacesAdminPath } from "../../lib/adminApiUrl";
 import { adminJson } from "../../lib/adminFetch";
 import { CortexPageSkeleton } from "../cortex/CortexPageSkeleton";
 import { DomainDetailView } from "./DomainDetailView";
@@ -16,11 +17,14 @@ export function DomainsTab() {
 
   const listQ = useQuery({
     queryKey: ["execution-surface-domains", tenantId, sort, lifecycle],
+    enabled: Boolean(tenantId),
     queryFn: () => {
       const params = new URLSearchParams({ sort, limit: "100" });
       if (lifecycle) params.set("lifecycle", lifecycle);
       return adminJson<{ items: DomainListItem[] }>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/domains?${params}`,
+        executionSurfacesAdminPath(tenantId, "domains", params),
+        undefined,
+        { tenantIdHint: tenantId },
       );
     },
   });

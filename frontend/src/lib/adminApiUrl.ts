@@ -160,9 +160,23 @@ export function resolveAdminRequestPath(path: string, tenantIdHint?: string): st
  * Build an admin API path. Accepts full `/admin/tenants/...` paths or tenant-relative
  * cortex paths such as `/cortex/pipeline/overview/execution`.
  */
+export function executionSurfacesAdminPath(
+  tenantId: string,
+  resource: string,
+  query?: URLSearchParams | string,
+): string {
+  const qs =
+    query === undefined ? "" : typeof query === "string" ? query.replace(/^\?/, "") : query.toString();
+  return `/admin/tenants/${tenantId}/cortex/execution-surfaces/${resource}${qs ? `?${qs}` : ""}`;
+}
+
 export function adminApiPath(tenantId: string, path: string): string {
   let p = path.startsWith("/") ? path : `/${path}`;
   p = rewriteCortexOverviewPath(p);
+
+  if (p.startsWith("/execution-surfaces/") || p === "/execution-surfaces") {
+    return `/admin/tenants/${tenantId}/cortex${p.startsWith("/") ? p : `/${p}`}`;
+  }
 
   if (LEGACY_TENANT_OVERVIEW_RE.test(p)) {
     return `/admin/tenants/${tenantId}/cortex/pipeline/overview`;

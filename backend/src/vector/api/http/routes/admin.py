@@ -2418,6 +2418,65 @@ def build_admin_router() -> APIRouter:
         )
 
     @r.get(
+        "/tenants/{tenant_id}/cortex/execution-surfaces",
+        response_model=AdminExecutionSurfaceOverviewResponse
+        | AdminExecutionSurfaceDomainListResponse
+        | AdminExecutionSurfacePeopleListResponse
+        | AdminExecutionSurfaceWorkListResponse
+        | AdminExecutionSurfaceActivityListResponse,
+    )
+    def admin_cortex_execution_surfaces_spa_compat(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+        tab: Annotated[str, Query()] = "domains",
+        sort: Annotated[str, Query()] = "activity",
+        lifecycle: Annotated[str | None, Query()] = None,
+        hours: Annotated[int, Query(ge=1, le=720)] = 168,
+        entity_type: Annotated[str | None, Query()] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    ) -> (
+        AdminExecutionSurfaceOverviewResponse
+        | AdminExecutionSurfaceDomainListResponse
+        | AdminExecutionSurfacePeopleListResponse
+        | AdminExecutionSurfaceWorkListResponse
+        | AdminExecutionSurfaceActivityListResponse
+    ):
+        """Compat for SPA-style ``?tab=`` URLs mistaken as API paths (legacy admin bundles)."""
+        _assert_tenant(db, tenant_id)
+        if tab == "overview":
+            return admin_cortex_execution_surfaces_overview(tenant_id, db, settings)
+        if tab == "people":
+            return admin_cortex_execution_surfaces_people(
+                tenant_id, db, offset=offset, limit=limit, search=None
+            )
+        if tab == "work":
+            return admin_cortex_execution_surfaces_work(
+                tenant_id, db, entity_type=entity_type, connector=None, domain_id=None, offset=offset, limit=limit
+            )
+        if tab == "activity":
+            return admin_cortex_execution_surfaces_activity(
+                tenant_id,
+                db,
+                identity_id=None,
+                domain_id=None,
+                entity_type=entity_type,
+                hours=hours,
+                offset=offset,
+                limit=limit,
+            )
+        return admin_cortex_execution_surfaces_domains(
+            tenant_id,
+            db,
+            settings,
+            sort=sort,
+            lifecycle=lifecycle,
+            offset=offset,
+            limit=limit,
+        )
+
+    @r.get(
         "/tenants/{tenant_id}/cortex/execution-surfaces/overview",
         response_model=AdminExecutionSurfaceOverviewResponse,
     )

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
+import { executionSurfacesAdminPath } from "../../lib/adminApiUrl";
 import { adminJson } from "../../lib/adminFetch";
 import { CortexPageSkeleton } from "../cortex/CortexPageSkeleton";
 import { ConnectedWorkChains } from "./ConnectedWorkChains";
@@ -28,11 +29,9 @@ export function OverviewTab() {
     enabled: Boolean(tenantId),
     refetchOnWindowFocus: false,
     queryFn: () =>
-      adminJson<Overview>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/overview`,
-        undefined,
-        { tenantIdHint: tenantId },
-      ),
+      adminJson<Overview>(executionSurfacesAdminPath(tenantId, "overview"), undefined, {
+        tenantIdHint: tenantId,
+      }),
   });
 
   if (q.isLoading) return <CortexPageSkeleton label="Loading overview" />;

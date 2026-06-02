@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
+import { executionSurfacesAdminPath } from "../../lib/adminApiUrl";
 import { adminJson } from "../../lib/adminFetch";
 import { CortexPageSkeleton } from "../cortex/CortexPageSkeleton";
 import { ConnectedWorkChains } from "./ConnectedWorkChains";
@@ -45,9 +46,12 @@ export function DomainDetailView({ domainId }: { domainId: string }) {
   const { tenantId = "" } = useParams<{ tenantId: string }>();
   const q = useQuery({
     queryKey: ["execution-surface-domain", tenantId, domainId],
+    enabled: Boolean(tenantId && domainId),
     queryFn: () =>
       adminJson<DomainSurfaceDetail>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/domains/${domainId}`,
+        executionSurfacesAdminPath(tenantId, `domains/${domainId}`),
+        undefined,
+        { tenantIdHint: tenantId },
       ),
   });
 

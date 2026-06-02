@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router-dom";
 
+import { executionSurfacesAdminPath } from "../../lib/adminApiUrl";
 import { adminJson } from "../../lib/adminFetch";
 import { CortexPageSkeleton } from "../cortex/CortexPageSkeleton";
 import { ObservationFootnote, OmissionBanner } from "./OmissionBanner";
@@ -21,11 +22,14 @@ export function ActivityTab() {
 
   const q = useQuery({
     queryKey: ["execution-surface-activity", tenantId, hours, entityType],
+    enabled: Boolean(tenantId),
     queryFn: () => {
       const params = new URLSearchParams({ hours: String(hours), limit: "80" });
       if (entityType) params.set("entity_type", entityType);
       return adminJson<ActivityResponse>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/activity?${params}`,
+        executionSurfacesAdminPath(tenantId, "activity", params),
+        undefined,
+        { tenantIdHint: tenantId },
       );
     },
   });

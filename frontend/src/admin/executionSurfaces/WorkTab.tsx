@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
+import { executionSurfacesAdminPath } from "../../lib/adminApiUrl";
 import { adminJson } from "../../lib/adminFetch";
 import { CortexPageSkeleton } from "../cortex/CortexPageSkeleton";
 import { ExecutionArtifactLinks } from "./ExecutionArtifactLinks";
@@ -18,19 +19,23 @@ export function WorkTab() {
       const params = new URLSearchParams({ limit: "80" });
       if (entityType) params.set("entity_type", entityType);
       return adminJson<{ items: Array<Record<string, unknown>> }>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/work?${params}`,
+        executionSurfacesAdminPath(tenantId, "work", params),
+        undefined,
+        { tenantIdHint: tenantId },
       );
     },
-    enabled: !artifactId,
+    enabled: Boolean(tenantId) && !artifactId,
   });
 
   const detailQ = useQuery({
     queryKey: ["execution-surface-work-detail", tenantId, artifactId],
     queryFn: () =>
       adminJson<Record<string, unknown>>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/work/${artifactId}`,
+        executionSurfacesAdminPath(tenantId, `work/${artifactId}`),
+        undefined,
+        { tenantIdHint: tenantId },
       ),
-    enabled: Boolean(artifactId),
+    enabled: Boolean(tenantId && artifactId),
   });
 
   if (artifactId) {

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
+import { executionSurfacesAdminPath } from "../../lib/adminApiUrl";
 import { adminJson } from "../../lib/adminFetch";
 import { CortexPageSkeleton } from "../cortex/CortexPageSkeleton";
 import { ObservationFootnote, OmissionBanner } from "./OmissionBanner";
@@ -14,18 +15,22 @@ export function PeopleTab() {
     queryKey: ["execution-surface-people", tenantId],
     queryFn: () =>
       adminJson<{ items: Array<Record<string, unknown>> }>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/people?limit=80`,
+        executionSurfacesAdminPath(tenantId, "people", "limit=80"),
+        undefined,
+        { tenantIdHint: tenantId },
       ),
-    enabled: !personId,
+    enabled: Boolean(tenantId) && !personId,
   });
 
   const detailQ = useQuery({
     queryKey: ["execution-surface-person", tenantId, personId],
     queryFn: () =>
       adminJson<Record<string, unknown>>(
-        `/admin/tenants/${tenantId}/cortex/execution-surfaces/people/${personId}`,
+        executionSurfacesAdminPath(tenantId, `people/${personId}`),
+        undefined,
+        { tenantIdHint: tenantId },
       ),
-    enabled: Boolean(personId),
+    enabled: Boolean(tenantId && personId),
   });
 
   if (personId) {
