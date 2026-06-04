@@ -114,7 +114,8 @@ export function usePendingTenantDeletes() {
   }, []);
 
   const visibleTenants = useCallback(
-    (items: TenantListItem[]) => items.filter((t) => !pending.some((p) => p.id === t.id)),
+    <T extends { id: string }>(items: T[]): T[] =>
+      items.filter((t) => !pending.some((p) => p.id === t.id)),
     [pending],
   );
 
