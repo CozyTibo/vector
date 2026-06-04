@@ -102,9 +102,13 @@ def test_scheduler_tick_passes_connection_scope_to_sync_task(monkeypatch: pytest
     monkeypatch.setattr(sched_mod, "read_scheduler_paused_flag", lambda _settings: False)
     monkeypatch.setattr(
         sched_mod,
-        "iter_routed_live_sync_jobs",
-        lambda _session, _settings: [RoutedSyncJob(tenant_id=tid, connection_id=cid, connector_id="slack")],
+        "select_sync_jobs_to_enqueue",
+        lambda _session, _settings: (
+            [RoutedSyncJob(tenant_id=tid, connection_id=cid, connector_id="slack")],
+            [RoutedSyncJob(tenant_id=tid, connection_id=cid, connector_id="slack")],
+        ),
     )
+    monkeypatch.setattr(sched_mod, "reserve_live_queue_pending", lambda *_a, **_k: True)
     monkeypatch.setattr("app.tasks.cortex_ingestion_sync.run_cortex_connector_sync_task", _DummyTask())
 
     get_settings.cache_clear()

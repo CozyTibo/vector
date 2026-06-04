@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import NamedTuple
 
@@ -14,6 +15,7 @@ from vector.domains.cortex.connectors.cortex_ingestion_policy import (
     should_route_ingestion_to_cortex,
 )
 from vector.domains.cortex.ingestion.checkpoint_contract import checkpoint_last_incremental_at
+from vector.domains.cortex.ingestion.live_queue_pending import is_live_queue_pending
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
@@ -124,3 +126,64 @@ def iter_routed_live_sync_jobs(session: Session, settings: Settings) -> list[Rou
             continue
         out.append(RoutedSyncJob(tenant_id=tc.tenant_id, connection_id=tc.id, connector_id=tc.provider))
     return out
+
+
+def filter_jobs_without_broker_pending(
+    jobs: list[RoutedSyncJob],
+    settings: Settings,
+) -> list[RoutedSyncJob]:
+    """Drop tenant×connector pairs that already have a ``cortex_live`` reservation."""
+    return [
+        job
+        for job in jobs
+        if not is_live_queue_pending(
+            settings,
+            tenant_id=job.tenant_id,
+            connection_id=job.connection_id,
+        )
+    ]
+
+
+def apply_per_tenant_fair_enqueue_cap(
+    jobs: list[RoutedSyncJob],
+    settings: Settings,
+) -> list[RoutedSyncJob]:
+    """Round-robin across tenants so one workspace cannot monopolize FIFO ``cortex_live``."""
+    if not jobs:
+        return []
+    cap = max(1, int(settings.cortex_ingestion_scheduler_max_jobs_per_tenant_per_tick))
+    by_tenant: dict[uuid.UUID, list[RoutedSyncJob]] = defaultdict(list)
+    for job in jobs:
+        by_tenant[job.tenant_id].append(job)
+    for bucket in by_tenant.values():
+        bucket.sort(key=lambda j: (j.connector_id, str(j.connection_id)))
+
+    tenant_ids = sorted(by_tenant.keys(), key=str)
+    taken: dict[uuid.UUID, int] = dict.fromkeys(tenant_ids, 0)
+    out: list[RoutedSyncJob] = []
+    while True:
+        progressed = False
+        for tenant_id in tenant_ids:
+            if taken[tenant_id] >= cap:
+                continue
+            bucket = by_tenant[tenant_id]
+            idx = taken[tenant_id]
+            if idx >= len(bucket):
+                continue
+            out.append(bucket[idx])
+            taken[tenant_id] += 1
+            progressed = True
+        if not progressed:
+            break
+    return out
+
+
+def select_sync_jobs_to_enqueue(
+    session: Session,
+    settings: Settings,
+) -> tuple[list[RoutedSyncJob], list[RoutedSyncJob]]:
+    """Eligible jobs after DB checks, broker-pending filter, and per-tenant fair cap."""
+    candidates = iter_routed_live_sync_jobs(session, settings)
+    eligible = filter_jobs_without_broker_pending(candidates, settings)
+    to_enqueue = apply_per_tenant_fair_enqueue_cap(eligible, settings)
+    return candidates, to_enqueue

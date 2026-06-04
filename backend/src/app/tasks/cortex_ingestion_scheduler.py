@@ -8,7 +8,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.celery_app import celery_app
-from vector.domains.cortex.ingestion.scheduler import iter_routed_live_sync_jobs
+from vector.domains.cortex.ingestion.live_queue_pending import (
+    clear_live_queue_pending,
+    reserve_live_queue_pending,
+)
+from vector.domains.cortex.ingestion.scheduler import select_sync_jobs_to_enqueue
 from vector.domains.cortex.ingestion.scheduler_tick_history import complete_scheduler_tick_v1
 from vector.infrastructure.cortex_scheduler_pause import read_scheduler_paused_flag
 from vector.infrastructure.db.models.ingestion_scheduler_tick import IngestionSchedulerTick
@@ -70,22 +74,36 @@ def tick_cortex_ingestion_scheduler() -> dict[str, object]:
     from app.tasks.cortex_ingestion_sync import run_cortex_connector_sync_task
 
     with session_scope() as session:
-        jobs = iter_routed_live_sync_jobs(session, settings)
+        candidates, jobs = select_sync_jobs_to_enqueue(session, settings)
 
     enqueued_jobs: list[dict[str, Any]] = []
     enqueued = 0
     for job in jobs:
-        run_cortex_connector_sync_task.apply_async(
-            args=[
-                str(job.tenant_id),
-                job.connector_id,
-                "scheduled_lane",
-                "incremental",
-                str(job.connection_id),
-            ],
-            kwargs={"scheduler_tick_id": str(tick_id)},
-            queue="cortex_live",
-        )
+        if not reserve_live_queue_pending(
+            settings,
+            tenant_id=job.tenant_id,
+            connection_id=job.connection_id,
+        ):
+            continue
+        try:
+            run_cortex_connector_sync_task.apply_async(
+                args=[
+                    str(job.tenant_id),
+                    job.connector_id,
+                    "scheduled_lane",
+                    "incremental",
+                    str(job.connection_id),
+                ],
+                kwargs={"scheduler_tick_id": str(tick_id)},
+                queue="cortex_live",
+            )
+        except Exception:
+            clear_live_queue_pending(
+                settings,
+                tenant_id=job.tenant_id,
+                connection_id=job.connection_id,
+            )
+            raise
         enqueued += 1
         enqueued_jobs.append(
             {
@@ -102,7 +120,7 @@ def tick_cortex_ingestion_scheduler() -> dict[str, object]:
             tick_id,
             outcome=outcome,
             enqueued_count=enqueued,
-            candidate_count=len(jobs),
+            candidate_count=len(candidates),
             enqueued_jobs=enqueued_jobs,
         )
 
@@ -114,12 +132,12 @@ def tick_cortex_ingestion_scheduler() -> dict[str, object]:
         phase=PHASE_STEP1,
         outcome=outcome,
         enqueued=enqueued,
-        candidates=len(jobs),
+        candidates=len(candidates),
         tick_id=str(tick_id),
     )
     return {
         "tick_id": str(tick_id),
         "enqueued": enqueued,
-        "candidates": len(jobs),
+        "candidates": len(candidates),
         "beat_interval_seconds": beat_interval,
     }

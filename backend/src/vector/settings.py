@@ -309,6 +309,25 @@ class Settings(BaseSettings):
             "(uses connector_sync_state.last_incremental_at)."
         ),
     )
+    cortex_ingestion_scheduler_max_jobs_per_tenant_per_tick: int = Field(
+        default=2,
+        ge=1,
+        le=20,
+        validation_alias="CORTEX_INGESTION_SCHEDULER_MAX_JOBS_PER_TENANT_PER_TICK",
+        description=(
+            "Max scheduled live-lane syncs enqueued per tenant per Beat tick (round-robin "
+            "across tenants when more connectors are eligible)."
+        ),
+    )
+    cortex_ingestion_live_pending_ttl_seconds: int = Field(
+        default=7200,
+        ge=300,
+        validation_alias="CORTEX_INGESTION_LIVE_PENDING_TTL_SECONDS",
+        description=(
+            "Redis TTL for cortex_live pending reservations (scheduler set, worker clear). "
+            "Safety net if a worker dies before releasing."
+        ),
+    )
     cortex_canon_scheduler_enabled: bool = Field(
         default=True,
         validation_alias="CORTEX_CANON_SCHEDULER_ENABLED",

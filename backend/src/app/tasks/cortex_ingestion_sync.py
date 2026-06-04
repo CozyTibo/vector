@@ -15,6 +15,7 @@ _LOGGER = logging.getLogger(__name__)
 
 _TASK_RUN_SYNC = "vector.cortex.ingestion.run_sync"
 _TASK_RUN_REPLAY = "vector.cortex.ingestion.run_sync_replay"
+_SCHEDULED_LANE_TRIGGERS = frozenset({"scheduled", "scheduled_lane"})
 
 
 def _maybe_enqueue_post_ingestion_substrate_refresh(
@@ -57,23 +58,30 @@ def run_cortex_connector_sync_task(
         else IngestionSyncContext.live_incremental()
     )
     settings = get_settings()
-    with session_scope() as session:
-        out = execute_connector_sync(
-            session,
-            settings,
+    conn_id = uuid.UUID(connection_id) if connection_id else None
+    try:
+        with session_scope() as session:
+            out = execute_connector_sync(
+                session,
+                settings,
+                tenant_id=tid,
+                connector_id=connector_id,
+                source_trigger=source_trigger,
+                ingestion_sync_context=ctx,
+                connection_id=conn_id,
+                scheduler_tick_id=tick_id,
+            )
+        _maybe_enqueue_post_ingestion_substrate_refresh(
             tenant_id=tid,
-            connector_id=connector_id,
-            source_trigger=source_trigger,
-            ingestion_sync_context=ctx,
-            connection_id=uuid.UUID(connection_id) if connection_id else None,
-            scheduler_tick_id=tick_id,
+            sync_result=out,
+            sync_mode=sync_mode,
         )
-    _maybe_enqueue_post_ingestion_substrate_refresh(
-        tenant_id=tid,
-        sync_result=out,
-        sync_mode=sync_mode,
-    )
-    return out
+        return out
+    finally:
+        if source_trigger in _SCHEDULED_LANE_TRIGGERS and conn_id is not None:
+            from vector.domains.cortex.ingestion.live_queue_pending import clear_live_queue_pending
+
+            clear_live_queue_pending(settings, tenant_id=tid, connection_id=conn_id)
 
 
 @celery_app.task(name=_TASK_RUN_REPLAY, queue="cortex_replay")
