@@ -482,6 +482,43 @@ class AdminHardDeleteTenantsBulkResponse(BaseModel):
     results: list[AdminHardDeleteTenantResponse]
 
 
+class AdminHardDeleteTenantAcceptedResponse(BaseModel):
+    """Immediate response after validation; deletion runs on the vector queue."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    accepted: bool = True
+    tenant_id: uuid.UUID
+    company_name: str
+    task_id: str
+    queue: Literal["vector"] = "vector"
+
+
+class AdminHardDeleteTenantsBulkAcceptedResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    accepted: bool = True
+    task_id: str
+    queue: Literal["vector"] = "vector"
+    tenant_count: int
+    tenant_ids: list[uuid.UUID]
+    company_names: list[str]
+
+
+class AdminHardDeleteJobStatusResponse(BaseModel):
+    """Celery AsyncResult snapshot for admin hard-delete jobs."""
+
+    model_config = ConfigDict(from_attributes=False)
+
+    task_id: str
+    celery_state: str
+    ready: bool
+    deleted_count: int | None = None
+    deleted: list[dict[str, str]] | None = None
+    errors: list[dict[str, str]] | None = None
+    error: str | None = None
+
+
 class AdminHardDeleteOrphanUserRequest(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 

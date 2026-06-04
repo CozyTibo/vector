@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { adminJson } from "../lib/adminFetch";
 import AdminTenantsBulkHardDelete from "./AdminTenantsBulkHardDelete";
+import { usePendingTenantDeletes } from "./usePendingTenantDeletes";
 import AdminFeedbackBanner from "./ui/AdminFeedbackBanner";
 import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 import { StatusBadge } from "./ui/StatusBadge";
@@ -30,6 +31,22 @@ export default function AdminWorkspacesPage() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
   const [flash, setFlash] = useState<AdminFlash | null>(null);
+  const { pending, jobError, enqueue, dismissJobError, visibleTenants, isDeleting } =
+    usePendingTenantDeletes();
+  const prevPendingCount = useRef(0);
+
+  useEffect(() => {
+    if (prevPendingCount.current > 0 && pending.length === 0 && !jobError) {
+      setFlash({
+        kind: "success",
+        text:
+          prevPendingCount.current === 1
+            ? "Workspace deletion finished."
+            : "All workspace deletions finished.",
+      });
+    }
+    prevPendingCount.current = pending.length;
+  }, [pending.length, jobError]);
 
   useEffect(() => {
     const st = location.state as { adminFlash?: AdminFlash } | null | undefined;
@@ -87,6 +104,25 @@ export default function AdminWorkspacesPage() {
           onDismiss={() => setFlash(null)}
         />
       ) : null}
+      {isDeleting ? (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-950 shadow-sm"
+          role="status"
+        >
+          <p className="min-w-0 flex-1 leading-relaxed">
+            {pending.length === 1
+              ? `Deleting “${pending[0]?.company_name}” in the background… The card will disappear when finished.`
+              : `Deleting ${pending.length} workspaces in the background (${pending.map((p) => p.company_name).join(", ")})… Cards disappear as each completes.`}
+          </p>
+        </div>
+      ) : null}
+      {jobError ? (
+        <AdminFeedbackBanner
+          kind="error"
+          message={`Workspace delete job failed: ${jobError}`}
+          onDismiss={dismissJobError}
+        />
+      ) : null}
       <OperatorIntro title="Workspaces">
         Each workspace is one company using Vector. Open a card to see health, onboarding, and pipeline
         state — this is the main operator entry point after you pick who you are helping.
@@ -124,7 +160,7 @@ export default function AdminWorkspacesPage() {
           {q.data.items.length === 0 ? (
             <p className="text-sm text-stone-500">No workspaces yet.</p>
           ) : (
-            q.data.items.map((t) => (
+            visibleTenants(q.data.items).map((t) => (
               <div
                 key={t.id}
                 className="flex gap-2 rounded-xl border border-stone-200 bg-white shadow-sm transition hover:border-stone-300 hover:shadow"
@@ -176,15 +212,16 @@ export default function AdminWorkspacesPage() {
         <AdminTenantsBulkHardDelete
           tenants={selectedTenants.map((t) => ({ id: t.id, company_name: t.company_name }))}
           onCancel={() => setBulkOpen(false)}
-          onCompleted={({ deletedCount }) => {
+          onAccepted={({ pending: rows }) => {
             setBulkOpen(false);
             clearSelection();
+            enqueue(rows);
             setFlash({
               kind: "success",
               text:
-                deletedCount === 1
-                  ? "Successfully deleted 1 workspace."
-                  : `Successfully deleted ${deletedCount} workspaces.`,
+                rows.length === 1
+                  ? `Deletion started for “${rows[0]?.company_name}”.`
+                  : `Deletion started for ${rows.length} workspaces.`,
             });
           }}
         />

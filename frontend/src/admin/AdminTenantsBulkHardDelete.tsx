@@ -1,28 +1,37 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { adminFetch } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { HARD_DELETE_TENANT_CONFIRMATION_PHRASE } from "./adminConstants";
+import type { PendingTenantDelete } from "./pendingTenantDeletes";
 
 export type BulkTenant = {
   id: string;
   company_name: string;
 };
 
+type BulkAcceptedResponse = {
+  accepted: boolean;
+  task_id: string;
+  queue: string;
+  tenant_count: number;
+  tenant_ids: string[];
+  company_names: string[];
+};
+
 type Props = {
   tenants: BulkTenant[];
   onCancel: () => void;
-  /** Called after the API confirms all tenants were deleted. */
-  onCompleted: (result: { deletedCount: number }) => void;
+  /** Called immediately after the delete job is enqueued (not when DB work finishes). */
+  onAccepted: (result: { pending: PendingTenantDelete[] }) => void;
 };
 
 /**
  * Destructive confirmation: phrase + one company name per line (sorted by name),
  * matching the numbered list shown in the dialog.
  */
-export default function AdminTenantsBulkHardDelete({ tenants, onCancel, onCompleted }: Props) {
-  const qc = useQueryClient();
+export default function AdminTenantsBulkHardDelete({ tenants, onCancel, onAccepted }: Props) {
   const sorted = useMemo(
     () => [...tenants].sort((a, b) => a.company_name.localeCompare(b.company_name)),
     [tenants],
@@ -75,10 +84,15 @@ export default function AdminTenantsBulkHardDelete({ tenants, onCancel, onComple
       if (!res.ok) {
         throw new Error(await readErrorDetail(res));
       }
+      return (await res.json()) as BulkAcceptedResponse;
     },
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["admin-tenants"] });
-      onCompleted({ deletedCount: sorted.length });
+    onSuccess: (data) => {
+      const pending: PendingTenantDelete[] = data.tenant_ids.map((id, i) => ({
+        id,
+        company_name: data.company_names[i] ?? "",
+        task_id: data.task_id,
+      }));
+      onAccepted({ pending });
     },
     onError: (e: unknown) => {
       setErr(e instanceof Error ? e.message : "Delete failed.");
@@ -106,7 +120,8 @@ export default function AdminTenantsBulkHardDelete({ tenants, onCancel, onComple
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-stone-700">
           Same irreversible wipe as single-workspace delete (all tenant data). User accounts stay unless
-          you remove them separately on Users.
+          you remove them separately on Users. Deletion runs in the background — you can keep using the
+          admin while it finishes.
         </p>
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <p className="font-medium">Companies to delete (exact order for the text box below):</p>
@@ -171,7 +186,7 @@ export default function AdminTenantsBulkHardDelete({ tenants, onCancel, onComple
             disabled={!canSubmit || deleteMut.isPending}
             onClick={() => deleteMut.mutate()}
           >
-            {deleteMut.isPending ? "Deleting…" : `Delete ${sorted.length} workspace(s) forever`}
+            {deleteMut.isPending ? "Starting…" : `Delete ${sorted.length} workspace(s) forever`}
           </button>
         </div>
       </div>

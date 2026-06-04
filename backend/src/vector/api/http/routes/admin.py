@@ -114,8 +114,11 @@ from vector.contracts.admin import (
     CortexIngestionConnectorId,
     AdminHardDeleteOrphanUserRequest,
     AdminHardDeleteOrphanUserResponse,
+    AdminHardDeleteJobStatusResponse,
+    AdminHardDeleteTenantAcceptedResponse,
     AdminHardDeleteTenantRequest,
     AdminHardDeleteTenantResponse,
+    AdminHardDeleteTenantsBulkAcceptedResponse,
     AdminHardDeleteTenantsBulkRequest,
     AdminHardDeleteTenantsBulkResponse,
     AdminOnboardingAnswerOptionsResponse,
@@ -379,6 +382,71 @@ def _admin_reset_tenant_to_signup_response(out: dict[str, Any]) -> AdminResetTen
         deleted_ingestion_runs=s1["deleted_ingestion_runs"],
         deleted_sync_state_rows=s1["deleted_sync_state_rows"],
         deleted_tenant_connections=out["deleted_tenant_connections"],
+    )
+
+
+def _validate_hard_delete_bulk_items(
+    db: Session,
+    items: list[Any],
+) -> list[tuple[uuid.UUID, str]]:
+    """Return (tenant_id, company_name) in request order after existence/name checks."""
+    seen: set[uuid.UUID] = set()
+    validated: list[tuple[uuid.UUID, str]] = []
+    for item in items:
+        if item.tenant_id in seen:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Duplicate tenant_id in request.",
+            ) from None
+        seen.add(item.tenant_id)
+        t = tenancy_repo.get_tenant_by_id(db, item.tenant_id)
+        if t is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail=f"Tenant not found: {item.tenant_id}",
+            ) from None
+        if t.company_name.strip() != item.company_name_confirmation.strip():
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail=f"Company name does not match tenant {item.tenant_id}.",
+            ) from None
+        validated.append((item.tenant_id, t.company_name))
+    return validated
+
+
+def _admin_hard_delete_job_status(task_id: str) -> AdminHardDeleteJobStatusResponse:
+    from celery.result import AsyncResult
+
+    from app.celery_app import celery_app
+
+    ar = AsyncResult(task_id, app=celery_app)
+    payload: dict[str, Any] | None = None
+    err: str | None = None
+    if ar.ready():
+        if ar.successful():
+            raw = ar.result
+            payload = raw if isinstance(raw, dict) else None
+        else:
+            err = str(ar.result)[:500] if ar.result is not None else "task failed"
+    deleted_count: int | None = None
+    deleted: list[dict[str, str]] | None = None
+    errors: list[dict[str, str]] | None = None
+    if payload is not None:
+        deleted_count = int(payload.get("deleted_count") or 0)
+        raw_deleted = payload.get("deleted")
+        raw_errors = payload.get("errors")
+        if isinstance(raw_deleted, list):
+            deleted = [x for x in raw_deleted if isinstance(x, dict)]
+        if isinstance(raw_errors, list):
+            errors = [x for x in raw_errors if isinstance(x, dict)]
+    return AdminHardDeleteJobStatusResponse(
+        task_id=task_id,
+        celery_state=str(ar.state),
+        ready=bool(ar.ready()),
+        deleted_count=deleted_count,
+        deleted=deleted,
+        errors=errors,
+        error=err,
     )
 
 
@@ -931,36 +999,37 @@ def build_admin_router() -> APIRouter:
 
     @r.post(
         "/tenants/{tenant_id}/hard-delete",
-        response_model=AdminHardDeleteTenantResponse,
+        response_model=AdminHardDeleteTenantAcceptedResponse,
     )
     def admin_hard_delete_tenant(
         tenant_id: uuid.UUID,
         body: AdminHardDeleteTenantRequest,
         db: Annotated[Session, Depends(get_db)],
-    ) -> AdminHardDeleteTenantResponse:
-        """Hard-delete tenant and all tenant-scoped product data.
-
-        Users are kept; memberships for this tenant are removed via FK cascade.
-        """
-        t = tenancy_repo.get_tenant_by_id(db, tenant_id)
-        if t is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
+    ) -> AdminHardDeleteTenantAcceptedResponse:
+        """Enqueue hard-delete for one tenant (runs on the vector Celery queue)."""
         if body.confirmation != HARD_DELETE_TENANT_CONFIRMATION_PHRASE:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Confirmation phrase does not match.",
             ) from None
-        if t.company_name.strip() != body.company_name_confirmation.strip():
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                detail="Company name does not match this tenant.",
-            ) from None
-        try:
-            out = hard_delete_tenant(db, tenant_id=tenant_id)
-        except ValueError as e:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-        db.commit()
-        return _admin_hard_delete_tenant_response(tenant_id, out)
+        validated = _validate_hard_delete_bulk_items(
+            db,
+            [
+                SimpleNamespace(
+                    tenant_id=tenant_id,
+                    company_name_confirmation=body.company_name_confirmation,
+                )
+            ],
+        )
+        tid, company_name = validated[0]
+        from app.tasks.admin_tenancy import hard_delete_tenants_bulk_task
+
+        async_result = hard_delete_tenants_bulk_task.delay([str(tid)])
+        return AdminHardDeleteTenantAcceptedResponse(
+            tenant_id=tid,
+            company_name=company_name,
+            task_id=str(async_result.id),
+        )
 
     @r.post(
         "/tenants/{tenant_id}/reset-to-fresh-signup",
@@ -994,54 +1063,38 @@ def build_admin_router() -> APIRouter:
 
     @r.post(
         "/tenants/hard-delete-bulk",
-        response_model=AdminHardDeleteTenantsBulkResponse,
+        response_model=AdminHardDeleteTenantsBulkAcceptedResponse,
     )
     def admin_hard_delete_tenants_bulk(
         body: AdminHardDeleteTenantsBulkRequest,
         db: Annotated[Session, Depends(get_db)],
-    ) -> AdminHardDeleteTenantsBulkResponse:
-        """Hard-delete many tenants in one transaction (same checks as single delete)."""
+    ) -> AdminHardDeleteTenantsBulkAcceptedResponse:
+        """Enqueue hard-delete for many tenants (one background job, per-tenant commits)."""
         if body.confirmation != HARD_DELETE_TENANT_CONFIRMATION_PHRASE:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 detail="Confirmation phrase does not match.",
             ) from None
-        seen: set[uuid.UUID] = set()
-        for item in body.tenants:
-            if item.tenant_id in seen:
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
-                    detail="Duplicate tenant_id in request.",
-                ) from None
-            seen.add(item.tenant_id)
+        validated = _validate_hard_delete_bulk_items(db, body.tenants)
+        tenant_ids = [tid for tid, _ in validated]
+        company_names = [name for _, name in validated]
+        from app.tasks.admin_tenancy import hard_delete_tenants_bulk_task
 
-        results: list[AdminHardDeleteTenantResponse] = []
-        try:
-            for item in body.tenants:
-                t = tenancy_repo.get_tenant_by_id(db, item.tenant_id)
-                if t is None:
-                    raise HTTPException(
-                        status.HTTP_404_NOT_FOUND,
-                        detail=f"Tenant not found: {item.tenant_id}",
-                    ) from None
-                if t.company_name.strip() != item.company_name_confirmation.strip():
-                    raise HTTPException(
-                        status.HTTP_400_BAD_REQUEST,
-                        detail=f"Company name does not match tenant {item.tenant_id}.",
-                    ) from None
-                out = hard_delete_tenant(db, tenant_id=item.tenant_id)
-                results.append(_admin_hard_delete_tenant_response(item.tenant_id, out))
-            db.commit()
-        except HTTPException:
-            db.rollback()
-            raise
-        except ValueError as e:
-            db.rollback()
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-        except Exception:
-            db.rollback()
-            raise
-        return AdminHardDeleteTenantsBulkResponse(results=results)
+        async_result = hard_delete_tenants_bulk_task.delay([str(t) for t in tenant_ids])
+        return AdminHardDeleteTenantsBulkAcceptedResponse(
+            task_id=str(async_result.id),
+            tenant_count=len(tenant_ids),
+            tenant_ids=tenant_ids,
+            company_names=company_names,
+        )
+
+    @r.get(
+        "/tenants/hard-delete-jobs/{task_id}",
+        response_model=AdminHardDeleteJobStatusResponse,
+    )
+    def admin_hard_delete_job_status(task_id: str) -> AdminHardDeleteJobStatusResponse:
+        """Poll Celery result for a hard-delete background job."""
+        return _admin_hard_delete_job_status(task_id)
 
     @r.post(
         "/users/{user_id}/hard-delete",

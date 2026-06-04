@@ -5,15 +5,31 @@ import { useNavigate } from "react-router-dom";
 import { adminFetch } from "../lib/adminFetch";
 import { readErrorDetail } from "../lib/canonicalApi";
 import { HARD_DELETE_TENANT_CONFIRMATION_PHRASE } from "./adminConstants";
+import { addPendingTenantDeletes, type PendingTenantDelete } from "./pendingTenantDeletes";
+
+type HardDeleteAcceptedResponse = {
+  accepted: boolean;
+  tenant_id: string;
+  company_name: string;
+  task_id: string;
+  queue: string;
+};
 
 type Props = {
   tenantId: string;
   companyName: string;
   /** Tighter chrome for dashboard grids (workspace tab). */
   compact?: boolean;
+  /** When set, enqueue async delete and call back instead of navigating away. */
+  onAccepted?: (pending: PendingTenantDelete) => void;
 };
 
-export default function AdminTenantHardDelete({ tenantId, companyName, compact = false }: Props) {
+export default function AdminTenantHardDelete({
+  tenantId,
+  companyName,
+  compact = false,
+  onAccepted,
+}: Props) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -45,14 +61,26 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
       if (!res.ok) {
         throw new Error(await readErrorDetail(res));
       }
+      return (await res.json()) as HardDeleteAcceptedResponse;
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       await qc.invalidateQueries({ queryKey: ["admin-tenants"] });
+      const pending: PendingTenantDelete = {
+        id: tenantId,
+        company_name: companyName,
+        task_id: data.task_id,
+      };
+      if (onAccepted) {
+        onAccepted(pending);
+        setOpen(false);
+        return;
+      }
+      addPendingTenantDeletes([pending]);
       navigate("/admin", {
         state: {
           adminFlash: {
             kind: "success" as const,
-            text: `Workspace “${companyName}” was permanently deleted.`,
+            text: `Deletion started for “${companyName}”. The workspace list will update when finished.`,
           },
         },
       });
@@ -186,7 +214,7 @@ export default function AdminTenantHardDelete({ tenantId, companyName, compact =
                 disabled={!canSubmit || deleteMut.isPending}
                 onClick={() => deleteMut.mutate()}
               >
-                {deleteMut.isPending ? "Deleting…" : "Delete company forever"}
+                {deleteMut.isPending ? "Starting…" : "Delete company forever"}
               </button>
             </div>
           </div>

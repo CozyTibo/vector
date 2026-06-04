@@ -12,6 +12,7 @@ importlib.import_module("app.tasks.cortex_ingestion_sync")
 importlib.import_module("app.tasks.cortex_ingestion_scheduler")
 importlib.import_module("app.tasks.cortex_ingestion_verify")
 importlib.import_module("app.tasks.cortex_runtime")
+importlib.import_module("app.tasks.admin_tenancy")
 
 _REQUIRED_EMAIL_TASKS = (
     "vector.email.send",

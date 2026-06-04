@@ -49,6 +49,7 @@ celery_app = Celery(
         "app.tasks.cortex_ingestion_scheduler",
         "app.tasks.cortex_ingestion_verify",
         "app.tasks.cortex_runtime",
+        "app.tasks.admin_tenancy",
     ],
 )
 celery_app.conf.broker_connection_retry_on_startup = True
@@ -63,6 +64,7 @@ celery_app.conf.imports = (
     "app.tasks.cortex_ingestion_scheduler",
     "app.tasks.cortex_ingestion_verify",
     "app.tasks.cortex_runtime",
+    "app.tasks.admin_tenancy",
 )
 
 celery_app.conf.task_routes = {
@@ -72,6 +74,7 @@ celery_app.conf.task_routes = {
     "vector.cortex.runtime.plan_passes": {"queue": "vector"},
     "vector.cortex.runtime.poll_passes": {"queue": "vector"},
     "vector.cortex.admin.clear_derived": {"queue": "vector"},
+    "vector.admin.hard_delete_tenants_bulk": {"queue": "vector"},
 }
 
 _orchestrator_seconds = max(
@@ -95,6 +98,7 @@ def _register_tasks() -> None:
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
     importlib.import_module("app.tasks.cortex_runtime")
+    importlib.import_module("app.tasks.admin_tenancy")
 
 
 _register_tasks()
@@ -108,3 +112,4 @@ def _import_task_modules_after_fork(**_kwargs: object) -> None:
     importlib.import_module("app.tasks.cortex_ingestion_scheduler")
     importlib.import_module("app.tasks.cortex_ingestion_verify")
     importlib.import_module("app.tasks.cortex_runtime")
+    importlib.import_module("app.tasks.admin_tenancy")
