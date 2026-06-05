@@ -10,7 +10,9 @@ from datetime import datetime
 from types import SimpleNamespace
 from typing import Annotated, Any, Literal
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -125,6 +127,10 @@ from vector.contracts.admin import (
     AdminOnboardingCollectedDataPatch,
     AdminResetTenantToSignupRequest,
     AdminResetTenantToSignupResponse,
+    AdminSlackMessageItem,
+    AdminSlackMessagesResponse,
+    AdminSendSlackMessageRequest,
+    AdminSendSlackMessageResponse,
     AdminSlackChannelsIngestApplyRequest,
     AdminSlackChannelsIngestApplyResponse,
     AdminSlackChannelsIngestListResponse,
@@ -233,9 +239,12 @@ from vector.domains.tenancy.reset_tenant_to_fresh_signup import (
     RESET_TENANT_TO_SIGNUP_CONFIRMATION_PHRASE,
     reset_tenant_to_fresh_signup,
 )
+from vector.infrastructure.db.models.membership import TenantMembership
 from vector.infrastructure.db.models.onboarding_state import OnboardingState
+from vector.infrastructure.db.models.slack_bot_message import SlackBotMessage
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.repositories import onboarding as onboarding_repo
+from vector.infrastructure.db.repositories import slack_connection as slack_repo
 from vector.infrastructure.db.repositories import tenancy as tenancy_repo
 from vector.infrastructure.email.onboarding_activation import (
     enqueue_onboarding_activation_email,
@@ -872,6 +881,25 @@ def _assert_tenant(session: Session, tenant_id: uuid.UUID) -> None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tenant not found.") from None
 
 
+def _primary_tenant_ids_for_user_ids(
+    session: Session,
+    user_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, uuid.UUID]:
+    """Oldest ``tenant_memberships`` row per user (primary workspace)."""
+    if not user_ids:
+        return {}
+    stmt = (
+        select(TenantMembership)
+        .where(TenantMembership.user_id.in_(user_ids))
+        .order_by(TenantMembership.user_id.asc(), TenantMembership.created_at.asc())
+    )
+    out: dict[uuid.UUID, uuid.UUID] = {}
+    for membership in session.scalars(stmt).all():
+        if membership.user_id not in out:
+            out[membership.user_id] = membership.tenant_id
+    return out
+
+
 def _active_cortex_routed_connection(
     session: Session,
     settings: Settings,
@@ -979,6 +1007,7 @@ def build_admin_router() -> APIRouter:
         u_ids = [u.id for u in rows]
         m_counts = tenancy_repo.membership_counts_for_user_ids(db, u_ids)
         c_counts = tenancy_repo.tenant_connection_counts_for_connected_user_ids(db, u_ids)
+        primary_tenants = _primary_tenant_ids_for_user_ids(db, u_ids)
         items: list[AdminUserListItem] = []
         for u in rows:
             mc = m_counts.get(u.id, 0)
@@ -993,6 +1022,7 @@ def build_admin_router() -> APIRouter:
                     membership_count=mc,
                     tenant_connections_as_connector_count=cc,
                     orphan_eligible=mc == 0 and cc == 0,
+                    tenant_id=primary_tenants.get(u.id),
                 ),
             )
         return AdminUserListResponse(items=items)
@@ -1126,6 +1156,92 @@ def build_admin_router() -> APIRouter:
         db.commit()
         return AdminHardDeleteOrphanUserResponse(deleted_user_id=user_id, deleted_email=deleted_email)
 
+    @r.post("/users/{user_id}/message", response_model=AdminSendSlackMessageResponse)
+    def admin_send_slack_message_to_user(
+        user_id: uuid.UUID,
+        body: AdminSendSlackMessageRequest,
+        db: Annotated[Session, Depends(get_db)],
+    ) -> AdminSendSlackMessageResponse | JSONResponse:
+        u = tenancy_repo.get_user_by_id(db, user_id)
+        if u is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found.") from None
+        memberships = tenancy_repo.list_memberships_for_user(db, user_id)
+        if not memberships:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "User has no workspace membership."},
+            )
+        tenant_id = memberships[0].tenant_id
+        latest = db.scalars(
+            select(SlackBotMessage)
+            .where(SlackBotMessage.tenant_id == tenant_id)
+            .order_by(SlackBotMessage.created_at.desc())
+            .limit(1)
+        ).first()
+        if latest is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "error": (
+                        "No Slack conversation found for this user. Send the onboarding DM first."
+                    ),
+                },
+            )
+        link = slack_repo.get_slack_connection_for_tenant(db, tenant_id)
+        if link is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Slack is not connected for this workspace."},
+            )
+        message_text = body.message.strip()
+        headers = {
+            "Authorization": f"Bearer {link.detail.bot_access_token}",
+            "Content-Type": "application/json; charset=utf-8",
+        }
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                resp = client.post(
+                    "https://slack.com/api/chat.postMessage",
+                    headers=headers,
+                    json={"channel": latest.slack_channel_id, "text": message_text},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail=f"Slack request failed: {exc}",
+            ) from exc
+        if not data.get("ok"):
+            err = str(data.get("error", "unknown"))
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=err)
+        channel_id = data.get("channel")
+        slack_ts = data.get("ts")
+        if not isinstance(channel_id, str) or not channel_id.strip():
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail="Slack response missing channel",
+            )
+        if not isinstance(slack_ts, str) or not slack_ts.strip():
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail="Slack response missing ts",
+            )
+        db.add(
+            SlackBotMessage(
+                tenant_id=tenant_id,
+                slack_team_id=link.detail.team_id,
+                slack_user_id=latest.slack_user_id,
+                slack_channel_id=channel_id.strip(),
+                slack_ts=slack_ts.strip(),
+                direction="outbound",
+                text=message_text,
+                outbound_idempotency_key=f"admin-{tenant_id}-{user_id}-{uuid.uuid4()}",
+            )
+        )
+        db.commit()
+        return AdminSendSlackMessageResponse(ok=True, slack_ts=slack_ts.strip())
+
     @r.get("/tenants/{tenant_id}", response_model=TenantAdminDetailResponse)
     def get_tenant(
         tenant_id: uuid.UUID,
@@ -1147,6 +1263,37 @@ def build_admin_router() -> APIRouter:
             member_email=member.email if member else None,
             connected_connectors=[c.provider for c in conns],
             slack_vector_paused=bool(t.slack_vector_paused),
+        )
+
+    @r.get("/tenants/{tenant_id}/slack-messages", response_model=AdminSlackMessagesResponse)
+    def list_tenant_slack_messages(
+        tenant_id: uuid.UUID,
+        db: Annotated[Session, Depends(get_db)],
+        slack_user_id: Annotated[str | None, Query()] = None,
+    ) -> AdminSlackMessagesResponse:
+        _assert_tenant(db, tenant_id)
+        stmt = (
+            select(SlackBotMessage)
+            .where(SlackBotMessage.tenant_id == tenant_id)
+            .order_by(SlackBotMessage.created_at.asc())
+            .limit(500)
+        )
+        uid = slack_user_id.strip() if isinstance(slack_user_id, str) and slack_user_id.strip() else None
+        if uid is not None:
+            stmt = stmt.where(SlackBotMessage.slack_user_id == uid)
+        rows = list(db.scalars(stmt).all())
+        return AdminSlackMessagesResponse(
+            messages=[
+                AdminSlackMessageItem(
+                    id=row.id,
+                    direction=row.direction,
+                    text=row.text,
+                    slack_user_id=row.slack_user_id,
+                    slack_ts=row.slack_ts,
+                    created_at=row.created_at,
+                )
+                for row in rows
+            ],
         )
 
     @r.patch(

@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { adminJson } from "../lib/adminFetch";
 import AdminUserHardDelete from "./AdminUserHardDelete";
+import SlackConversationPanel from "./SlackConversationPanel";
 import AdminFeedbackBanner from "./ui/AdminFeedbackBanner";
 import { OperatorIntro, OperatorSection } from "./ui/OperatorSections";
 
@@ -17,10 +18,17 @@ type UserRow = {
   membership_count: number;
   tenant_connections_as_connector_count: number;
   orphan_eligible: boolean;
+  tenant_id: string | null;
+};
+
+type ActiveSlackUser = {
+  id: string;
+  tenantId: string;
 };
 
 export default function AdminUsersPage() {
   const [flash, setFlash] = useState<AdminFlash | null>(null);
+  const [activeUser, setActiveUser] = useState<ActiveSlackUser | null>(null);
   const q = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => adminJson<{ items: UserRow[] }>("/admin/users"),
@@ -95,20 +103,37 @@ export default function AdminUsersPage() {
                       {u.id}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right align-middle">
-                      {u.orphan_eligible ? (
-                        <AdminUserHardDelete
-                          userId={u.id}
-                          email={u.email}
-                          onDeleted={({ email }) =>
-                            setFlash({
-                              kind: "success",
-                              text: `Successfully deleted account ${email}.`,
-                            })
-                          }
-                        />
-                      ) : (
-                        <span className="text-xs text-stone-400">—</span>
-                      )}
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {u.tenant_id ? (
+                          <button
+                            type="button"
+                            className="rounded-md border border-stone-200 bg-white px-2 py-1 text-xs font-semibold text-stone-800 hover:bg-stone-50"
+                            onClick={() => {
+                              const tenantId = u.tenant_id;
+                              if (tenantId) {
+                                setActiveUser({ id: u.id, tenantId });
+                              }
+                            }}
+                          >
+                            Messages
+                          </button>
+                        ) : null}
+                        {u.orphan_eligible ? (
+                          <AdminUserHardDelete
+                            userId={u.id}
+                            email={u.email}
+                            onDeleted={({ email }) =>
+                              setFlash({
+                                kind: "success",
+                                text: `Successfully deleted account ${email}.`,
+                              })
+                            }
+                          />
+                        ) : null}
+                        {!u.tenant_id && !u.orphan_eligible ? (
+                          <span className="text-xs text-stone-400">—</span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -117,6 +142,13 @@ export default function AdminUsersPage() {
           </table>
         </div>
       </OperatorSection>
+      {activeUser ? (
+        <SlackConversationPanel
+          userId={activeUser.id}
+          tenantId={activeUser.tenantId}
+          onClose={() => setActiveUser(null)}
+        />
+      ) : null}
     </main>
   );
 }

@@ -105,12 +105,46 @@ class AdminUserListItem(BaseModel):
         default=False,
         description="True when the user can be hard-deleted (no memberships, no connector rows).",
     )
+    tenant_id: uuid.UUID | None = Field(
+        default=None,
+        description="Primary workspace (oldest tenant_memberships row) when the user belongs to one.",
+    )
 
 
 class AdminUserListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=False)
 
     items: list[AdminUserListItem]
+
+
+class AdminSlackMessageItem(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    id: uuid.UUID
+    direction: str
+    text: str
+    slack_user_id: str
+    slack_ts: str
+    created_at: datetime
+
+
+class AdminSlackMessagesResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    messages: list[AdminSlackMessageItem]
+
+
+class AdminSendSlackMessageRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    message: str = Field(min_length=1)
+
+
+class AdminSendSlackMessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=False)
+
+    ok: bool = True
+    slack_ts: str
 
 
 class OnboardingAdminSnapshot(BaseModel):
