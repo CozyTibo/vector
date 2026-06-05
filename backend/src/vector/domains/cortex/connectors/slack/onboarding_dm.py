@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, TypedDict
 
 import httpx
 
@@ -14,12 +14,17 @@ SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY = "slack_handoff_welcome_dm_sent_for"
 DEFAULT_HANDOFF_WELCOME_TEXT = "Hi :wave:"
 
 
+class SlackSendResult(TypedDict):
+    channel_id: str
+    slack_ts: str
+
+
 def send_slack_handoff_welcome_dm(
     bot_token: str,
     slack_user_id: str,
     *,
     text: str = DEFAULT_HANDOFF_WELCOME_TEXT,
-) -> None:
+) -> SlackSendResult:
     """
     Send a short DM from the bot to a workspace member.
 
@@ -46,11 +51,17 @@ def send_slack_handoff_welcome_dm(
         post_direct.raise_for_status()
         direct_data: dict[str, Any] = post_direct.json()
         if direct_data.get("ok"):
+            channel_id = direct_data.get("channel")
+            slack_ts = direct_data.get("ts")
+            if not isinstance(channel_id, str) or not channel_id.strip():
+                raise RuntimeError("slack chat.postMessage missing channel")
+            if not isinstance(slack_ts, str) or not slack_ts.strip():
+                raise RuntimeError("slack chat.postMessage missing ts")
             log.info(
                 "Slack handoff welcome DM sent (chat.postMessage with user id as channel) slack_user=%s",
                 uid,
             )
-            return
+            return SlackSendResult(channel_id=channel_id.strip(), slack_ts=slack_ts.strip())
 
         err_direct = str(direct_data.get("error", "unknown"))
         log.info(
@@ -90,8 +101,12 @@ def send_slack_handoff_welcome_dm(
             raise RuntimeError(
                 f"slack handoff DM: conversations.open ok but chat.postMessage failed: {err!r}"
             )
+        slack_ts = post_data.get("ts")
+        if not isinstance(slack_ts, str) or not slack_ts.strip():
+            raise RuntimeError("slack chat.postMessage missing ts")
         log.info(
             "Slack handoff welcome DM sent (conversations.open + postMessage) slack_user=%s channel=%s",
             uid,
             channel_id,
         )
+        return SlackSendResult(channel_id=channel_id.strip(), slack_ts=slack_ts.strip())

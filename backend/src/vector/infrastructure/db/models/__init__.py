@@ -52,7 +52,9 @@ from vector.infrastructure.db.models.raw_memory_recovery_validation import RawMe
 from vector.infrastructure.db.models.raw_memory_revision_index import RawMemoryRevisionIndex
 from vector.infrastructure.db.models.raw_memory_trust_state import RawMemoryTrustState
 from vector.infrastructure.db.models.raw_memory_trust_transition import RawMemoryTrustTransition
+from vector.infrastructure.db.models.slack_bot_message import SlackBotMessage
 from vector.infrastructure.db.models.slack_connection_detail import SlackConnectionDetail
+from vector.infrastructure.db.models.slack_user_tenant_map import SlackUserTenantMap
 from vector.infrastructure.db.models.tenant import Tenant
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.models.user import User
@@ -104,7 +106,9 @@ __all__ = [
     "RawMemoryRevisionIndex",
     "RawMemoryTrustState",
     "RawMemoryTrustTransition",
+    "SlackBotMessage",
     "SlackConnectionDetail",
+    "SlackUserTenantMap",
     "Tenant",
     "TenantConnection",
     "TenantMembership",

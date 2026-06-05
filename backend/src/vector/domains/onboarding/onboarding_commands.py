@@ -8,6 +8,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from vector.contracts.onboarding import (
@@ -21,9 +22,12 @@ from vector.contracts.onboarding import (
     SlackWorkspaceMemberItem,
 )
 from vector.domains.cortex.connectors.slack.onboarding_dm import (
+    DEFAULT_HANDOFF_WELCOME_TEXT,
     SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY,
     send_slack_handoff_welcome_dm,
 )
+from vector.infrastructure.db.models.slack_bot_message import SlackBotMessage
+from vector.infrastructure.db.models.slack_user_tenant_map import SlackUserTenantMap
 from vector.domains.cortex.connectors.slack.workspace_channels import list_slack_workspace_public_channels
 from vector.domains.cortex.connectors.slack.workspace_members import list_slack_workspace_members
 from vector.domains.identity_access.services.session_jwt import SessionClaims
@@ -248,8 +252,27 @@ def _maybe_send_slack_handoff_welcome_dm(
         return False
     if merged_answers.get(SLACK_HANDOFF_WELCOME_DM_SENT_FOR_USER_KEY) == primary:
         return False
+    stmt = pg_insert(SlackUserTenantMap).values(
+        slack_team_id=sl.detail.team_id,
+        slack_user_id=primary,
+        tenant_id=tenant_id,
+    ).on_conflict_do_nothing(index_elements=["slack_team_id", "slack_user_id"])
+    db.execute(stmt)
     try:
-        send_slack_handoff_welcome_dm(sl.detail.bot_access_token, primary)
+        result = send_slack_handoff_welcome_dm(sl.detail.bot_access_token, primary)
+        db.add(
+            SlackBotMessage(
+                tenant_id=tenant_id,
+                slack_team_id=sl.detail.team_id,
+                slack_user_id=primary,
+                slack_channel_id=result["channel_id"],
+                slack_ts=result["slack_ts"],
+                direction="outbound",
+                text=DEFAULT_HANDOFF_WELCOME_TEXT,
+                outbound_idempotency_key=f"handoff-{tenant_id}-{primary}",
+            )
+        )
+        db.commit()
     except Exception as e:
         _logger.warning(
             "Slack onboarding handoff welcome DM failed for tenant=%s slack_user=%s: %s",

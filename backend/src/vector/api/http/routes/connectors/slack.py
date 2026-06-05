@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
+import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vector.api.http.deps import connector_install_claims_dependency, get_db, settings_dep
@@ -27,6 +32,8 @@ from vector.domains.identity_access.errors import NoMembershipError
 from vector.domains.identity_access.services.me_read import assert_membership
 from vector.domains.identity_access.services.session_jwt import SessionClaims
 from vector.domains.onboarding.connector_connected_chat_log import append_connector_connected_user_line
+from vector.infrastructure.db.models.slack_bot_message import SlackBotMessage
+from vector.infrastructure.db.models.slack_user_tenant_map import SlackUserTenantMap
 from vector.settings import Settings
 
 _logger = logging.getLogger("app")
@@ -163,5 +170,108 @@ def build_slack_callback_router() -> APIRouter:
         )
         _logger.info("Slack OAuth completed; redirecting to frontend with slack_connected=1")
         return RedirectResponse(url=ok, status_code=status.HTTP_302_FOUND)
+
+    @r.post("/slack/events")
+    async def slack_events(
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+        settings: Annotated[Settings, Depends(settings_dep)],
+    ) -> JSONResponse:
+        raw_body = await request.body()
+        try:
+            body = json.loads(raw_body)
+        except json.JSONDecodeError:
+            return JSONResponse({"ok": True})
+
+        if body.get("type") == "url_verification":
+            return JSONResponse({"challenge": body["challenge"]})
+
+        timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
+        slack_sig = request.headers.get("X-Slack-Signature", "")
+        signing_secret = settings.slack_signing_secret.strip()
+        if not signing_secret:
+            raise HTTPException(status_code=403, detail="Slack signing secret not configured")
+        try:
+            if abs(time.time() - float(timestamp)) > 60 * 5:
+                raise HTTPException(status_code=403, detail="Stale timestamp")
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=403, detail="Invalid timestamp") from exc
+
+        sig_basestring = f"v0:{timestamp}:{raw_body.decode()}"
+        computed = (
+            "v0="
+            + hmac.new(
+                signing_secret.encode(),
+                sig_basestring.encode(),
+                hashlib.sha256,
+            ).hexdigest()
+        )
+        if not hmac.compare_digest(computed, slack_sig):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
+        try:
+            payload = body
+            event = payload.get("event", {})
+            if payload.get("type") != "event_callback":
+                return JSONResponse({"ok": True})
+            if event.get("type") != "message":
+                return JSONResponse({"ok": True})
+            if event.get("channel_type") != "im":
+                return JSONResponse({"ok": True})
+            if event.get("bot_id"):
+                return JSONResponse({"ok": True})
+            if event.get("subtype"):
+                return JSONResponse({"ok": True})
+
+            team_id = payload.get("team_id")
+            slack_user_id = event.get("user")
+            if not isinstance(team_id, str) or not isinstance(slack_user_id, str):
+                return JSONResponse({"ok": True})
+
+            mapping = db.scalars(
+                select(SlackUserTenantMap).where(
+                    SlackUserTenantMap.slack_team_id == team_id,
+                    SlackUserTenantMap.slack_user_id == slack_user_id,
+                )
+            ).first()
+            if mapping is None:
+                _logger.warning(
+                    "No tenant mapping for team=%s user=%s",
+                    team_id,
+                    slack_user_id,
+                )
+                return JSONResponse({"ok": True})
+
+            slack_event_id = event.get("event_ts") or event.get("ts")
+            if isinstance(slack_event_id, str) and slack_event_id.strip():
+                existing = db.scalars(
+                    select(SlackBotMessage).where(
+                        SlackBotMessage.slack_event_id == slack_event_id,
+                    )
+                ).first()
+                if existing is not None:
+                    return JSONResponse({"ok": True})
+
+            channel = event.get("channel")
+            ts = event.get("ts")
+            if not isinstance(channel, str) or not isinstance(ts, str):
+                return JSONResponse({"ok": True})
+
+            db.add(
+                SlackBotMessage(
+                    tenant_id=mapping.tenant_id,
+                    slack_team_id=team_id,
+                    slack_user_id=slack_user_id,
+                    slack_channel_id=channel,
+                    slack_ts=ts,
+                    direction="inbound",
+                    text=str(event.get("text", "")),
+                    slack_event_id=slack_event_id if isinstance(slack_event_id, str) else None,
+                )
+            )
+            db.commit()
+        except Exception:
+            _logger.exception("Slack events processing failed")
+        return JSONResponse({"ok": True})
 
     return r

@@ -21,8 +21,9 @@ def test_send_slack_handoff_welcome_dm_uses_postmessage_user_channel_when_ok() -
     with patch("vector.domains.cortex.connectors.slack.onboarding_dm.httpx.Client") as ClientCls:
         ClientCls.return_value.__enter__.return_value = instance
         ClientCls.return_value.__exit__.return_value = None
-        send_slack_handoff_welcome_dm("xoxb-secret", "U0TEAMMEM")
+        result = send_slack_handoff_welcome_dm("xoxb-secret", "U0TEAMMEM")
 
+    assert result == {"channel_id": "D0ABC", "slack_ts": "1.2"}
     assert instance.post.call_count == 1
     assert instance.post.call_args.kwargs["json"] == {"channel": "U0TEAMMEM", "text": "Hi :wave:"}
 
@@ -44,8 +45,9 @@ def test_send_slack_handoff_welcome_dm_falls_back_to_conversations_open() -> Non
     with patch("vector.domains.cortex.connectors.slack.onboarding_dm.httpx.Client") as ClientCls:
         ClientCls.return_value.__enter__.return_value = instance
         ClientCls.return_value.__exit__.return_value = None
-        send_slack_handoff_welcome_dm("xoxb-secret", "U0TEAMMEM")
+        result = send_slack_handoff_welcome_dm("xoxb-secret", "U0TEAMMEM")
 
+    assert result == {"channel_id": "D0DM123", "slack_ts": "1.3"}
     assert instance.post.call_count == 3
     assert instance.post.call_args_list[1].kwargs["json"] == {"users": "U0TEAMMEM"}
     assert instance.post.call_args_list[2].kwargs["json"] == {
