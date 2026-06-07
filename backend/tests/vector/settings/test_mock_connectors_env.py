@@ -44,6 +44,27 @@ def test_mock_connectors_rejected_in_production() -> None:
         _restore("VECTOR_USE_MOCK_CONNECTORS", old_mock)
 
 
+def test_mock_connectors_rejected_when_database_targets_prod_host() -> None:
+    old_env = os.environ.get("ENV")
+    old_mock = os.environ.get("VECTOR_USE_MOCK_CONNECTORS")
+    old_db = os.environ.get("DATABASE_URL")
+    old_prod_host = os.environ.get("DB_PROD_HOST")
+    get_settings.cache_clear()
+    try:
+        os.environ["ENV"] = "development"
+        os.environ["VECTOR_USE_MOCK_CONNECTORS"] = "true"
+        os.environ["DB_PROD_HOST"] = "prod-db.example.com"
+        os.environ["DATABASE_URL"] = "postgresql+psycopg://u:p@prod-db.example.com:5432/postgres"
+        with pytest.raises(ValueError, match="DB_PROD_HOST"):
+            Settings()
+    finally:
+        get_settings.cache_clear()
+        _restore("ENV", old_env)
+        _restore("VECTOR_USE_MOCK_CONNECTORS", old_mock)
+        _restore("DATABASE_URL", old_db)
+        _restore("DB_PROD_HOST", old_prod_host)
+
+
 def test_mock_mode_swaps_data_plane_connector_urls() -> None:
     """OAuth hosts remain real; connector data-plane endpoints switch to local mock."""
     old_env = os.environ.get("ENV")

@@ -26,6 +26,41 @@ def linear_redirect_uri(settings: Settings) -> str:
     return f"{settings.github_api_public_base_url.rstrip('/')}/connectors/linear/callback"
 
 
+def refresh_linear_access_token(settings: Settings, refresh_token: str) -> LinearTokenResponse:
+    cid = settings.linear_client_id.strip()
+    secret = settings.linear_client_secret.strip()
+    if not cid or not secret:
+        raise LinearOAuthError("linear OAuth not configured")
+    body = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": cid,
+        "client_secret": secret,
+    }
+    try:
+        r = httpx.post(
+            settings.linear_oauth_token_url(),
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=30.0,
+        )
+    except httpx.HTTPError as e:
+        raise LinearOAuthError(f"linear refresh http error: {e}") from e
+    if r.status_code >= 400:
+        raise LinearOAuthError(f"linear refresh error: {r.status_code} {r.text[:500]}")
+    payload: dict[str, Any] = r.json()
+    access = payload.get("access_token")
+    if not isinstance(access, str):
+        raise LinearOAuthError("linear refresh response missing access_token")
+    refresh = payload.get("refresh_token")
+    expires_in = payload.get("expires_in")
+    return LinearTokenResponse(
+        access_token=access,
+        refresh_token=refresh if isinstance(refresh, str) else None,
+        expires_in=expires_in if isinstance(expires_in, int) else None,
+    )
+
+
 def exchange_linear_authorization_code(settings: Settings, code: str) -> LinearTokenResponse:
     cid = settings.linear_client_id.strip()
     secret = settings.linear_client_secret.strip()

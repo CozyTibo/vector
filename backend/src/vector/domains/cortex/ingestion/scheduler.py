@@ -15,7 +15,10 @@ from vector.domains.cortex.connectors.cortex_ingestion_policy import (
     should_route_ingestion_to_cortex,
 )
 from vector.domains.cortex.ingestion.checkpoint_contract import checkpoint_last_incremental_at
-from vector.domains.cortex.ingestion.live_queue_pending import is_live_queue_pending
+from vector.domains.cortex.ingestion.live_queue_pending import (
+    clear_live_queue_pending,
+    is_live_queue_pending,
+)
 from vector.infrastructure.db.models.connector_sync_state import ConnectorSyncState
 from vector.infrastructure.db.models.ingestion_run import IngestionRun
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
@@ -128,6 +131,36 @@ def iter_routed_live_sync_jobs(session: Session, settings: Settings) -> list[Rou
     return out
 
 
+def reconcile_orphan_live_queue_pending(
+    session: Session,
+    settings: Settings,
+    jobs: list[RoutedSyncJob],
+) -> int:
+    """Drop stale Redis reservations left when a worker dies before releasing pending."""
+    cleared = 0
+    for job in jobs:
+        if not is_live_queue_pending(
+            settings,
+            tenant_id=job.tenant_id,
+            connection_id=job.connection_id,
+        ):
+            continue
+        if _has_running_ingestion_run(
+            session,
+            tenant_id=job.tenant_id,
+            connection_id=job.connection_id,
+            connector_id=job.connector_id,
+        ):
+            continue
+        clear_live_queue_pending(
+            settings,
+            tenant_id=job.tenant_id,
+            connection_id=job.connection_id,
+        )
+        cleared += 1
+    return cleared
+
+
 def filter_jobs_without_broker_pending(
     jobs: list[RoutedSyncJob],
     settings: Settings,
@@ -184,6 +217,7 @@ def select_sync_jobs_to_enqueue(
 ) -> tuple[list[RoutedSyncJob], list[RoutedSyncJob]]:
     """Eligible jobs after DB checks, broker-pending filter, and per-tenant fair cap."""
     candidates = iter_routed_live_sync_jobs(session, settings)
+    reconcile_orphan_live_queue_pending(session, settings, candidates)
     eligible = filter_jobs_without_broker_pending(candidates, settings)
     to_enqueue = apply_per_tenant_fair_enqueue_cap(eligible, settings)
     return candidates, to_enqueue

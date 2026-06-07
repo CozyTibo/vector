@@ -1785,6 +1785,15 @@ class Settings(BaseSettings):
         if env in ("staging", "production") and self.vector_use_mock_connectors:
             msg = "VECTOR_USE_MOCK_CONNECTORS must be false when ENV is staging or production"
             raise ValueError(msg)
+        if self.vector_use_mock_connectors:
+            db_url = self.database_url.lower()
+            prod_host = os.environ.get("DB_PROD_HOST", "").strip().lower()
+            if prod_host and prod_host in db_url:
+                msg = (
+                    "VECTOR_USE_MOCK_CONNECTORS=true cannot be used when DATABASE_URL targets "
+                    "DB_PROD_HOST — mock connector data must not be written to production."
+                )
+                raise ValueError(msg)
         return self
 
     def github_rest_api_base_url(self) -> str:

@@ -68,6 +68,7 @@ from vector.infrastructure.db.models.raw_memory_revision_index import RawMemoryR
 from vector.infrastructure.db.models.tenant_connection import TenantConnection
 from vector.infrastructure.db.repositories import calls_connection as calls_repo
 from vector.infrastructure.db.repositories import github_connection as gh_repo
+from vector.domains.cortex.connectors.linear.token_refresh import ensure_linear_access_token
 from vector.infrastructure.db.repositories import linear_connection as lin_repo
 from vector.infrastructure.db.repositories import notion_connection as notion_repo
 from vector.domains.cortex.connectors.slack.channel_ingest import get_saved_ingest_channel_ids
@@ -115,13 +116,11 @@ query LinearIngestIssues($first: Int!, $after: String) {
       assignee { id name email displayName }
       creator { id name email displayName }
       team { id name key }
-      subscriberIds
+      subscribers { nodes { id } }
       project { id name }
-      initiative { id name }
       cycle { id name }
       labels { nodes { id name color } }
       attachments { nodes { id title url } }
-      metadata
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -173,7 +172,6 @@ query LinearIngestComments($first: Int!, $after: String) {
       issue { id identifier }
       user { id name }
       parent { id }
-      metadata
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -279,6 +277,13 @@ query LinearIngestInitiatives($first: Int!, $after: String) {
   }
 }
 """
+
+
+def _linear_graphql_page_failed(status: int, payload: dict[str, Any]) -> bool:
+    """True when a page fetch failed auth/validation and must not mark backfill complete."""
+    if status >= 400:
+        return True
+    return bool(isinstance(payload, dict) and payload.get("errors"))
 
 
 def linear_graphql_connection_page(
@@ -401,7 +406,7 @@ def _sync_linear_people_plane(
         pages = 0
         complete = False
         for _ in range(max_pages):
-            status, _payload, nodes, page_info = linear_graphql_connection_page(
+            status, payload, nodes, page_info = linear_graphql_connection_page(
                 settings,
                 token,
                 operation_name=operation_name,
@@ -411,6 +416,8 @@ def _sync_linear_people_plane(
                 after=cursor,
             )
             pages += 1
+            if _linear_graphql_page_failed(status, payload if isinstance(payload, dict) else {}):
+                break
             for idx, node in enumerate(nodes):
                 nid = node.get("id")
                 ext = str(nid if isinstance(nid, str) else f"{stream_key}:{idx}")[:512] or "unknown"
@@ -597,7 +604,7 @@ def run_linear_connector_sync(
             sync_mode=ctx.checkpoint_sync_mode,
         )
         return ins
-    token = link.detail.access_token
+    token = ensure_linear_access_token(session, settings, link)
     n_ins = 0
     start_t = time.monotonic()
     streams_existing = checkpoint_streams_for_mode(existing_ckpt, ctx.sync_mode)
@@ -669,6 +676,11 @@ def run_linear_connector_sync(
         )
         last_issues_status = st_issues
         issue_pages += 1
+        if _linear_graphql_page_failed(
+            st_issues,
+            payload_issues if isinstance(payload_issues, dict) else {},
+        ):
+            break
         for node in issue_nodes:
             updated_at = node.get("updatedAt")
             if isinstance(updated_at, str):
@@ -794,7 +806,7 @@ def run_linear_connector_sync(
     for _ in range(settings.cortex_linear_comments_max_pages_per_sync):
         if budget_exhausted:
             break
-        st_comments, _payload_comments, comment_nodes, page_info_c = linear_graphql_connection_page(
+        st_comments, payload_comments, comment_nodes, page_info_c = linear_graphql_connection_page(
             settings,
             token,
             operation_name="LinearIngestComments",
@@ -804,6 +816,11 @@ def run_linear_connector_sync(
             after=comment_cursor,
         )
         comment_pages += 1
+        if _linear_graphql_page_failed(
+            st_comments,
+            payload_comments if isinstance(payload_comments, dict) else {},
+        ):
+            break
         for idx, node in enumerate(comment_nodes):
             nid = node.get("id")
             ext = str(nid if isinstance(nid, str) else f"comments:{idx}")[:512] or "unknown"
@@ -947,7 +964,7 @@ def run_linear_connector_sync(
         pages_fetched = 0
         complete = False
         for _ in range(max_pages):
-            status_stream, _payload_stream, nodes, page_info = linear_graphql_connection_page(
+            status_stream, payload_stream, nodes, page_info = linear_graphql_connection_page(
                 settings,
                 token,
                 operation_name=op_name,
@@ -957,6 +974,11 @@ def run_linear_connector_sync(
                 after=cursor,
             )
             pages_fetched += 1
+            if _linear_graphql_page_failed(
+                status_stream,
+                payload_stream if isinstance(payload_stream, dict) else {},
+            ):
+                break
             for idx, node in enumerate(nodes):
                 nid = node.get("id")
                 ext = str(nid if isinstance(nid, str) else f"{stream_key}:{idx}")[:512] or "unknown"
